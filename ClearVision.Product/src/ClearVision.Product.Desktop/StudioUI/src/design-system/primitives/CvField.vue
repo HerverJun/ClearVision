@@ -27,7 +27,7 @@ const props = withDefaults(defineProps<{
   placeholder: undefined,
   hint: undefined,
   error: undefined,
-  autocomplete: undefined,
+  autocomplete: 'off',
   inputmode: undefined,
   min: undefined,
   max: undefined,
@@ -86,7 +86,7 @@ function updateValue(event: Event): void {
         class="cv-field__control"
         :value="modelValue"
         :type="type"
-        :name="name"
+        :name="name ?? inputId"
         :placeholder="placeholder"
         :autocomplete="autocomplete"
         :inputmode="inputmode"
@@ -128,7 +128,7 @@ function updateValue(event: Event): void {
 <style scoped>
 .cv-field { display: grid; gap: var(--cv-density-field-gap); min-width: 0; }
 .cv-field__label { color: var(--cv-text-secondary); font-size: var(--cv-font-size-xs); font-weight: var(--cv-font-weight-semibold); }
-.cv-field__required { color: var(--cv-color-status-ng); }
+.cv-field__required { color: var(--cv-color-status-error); }
 .cv-field__control-wrap {
   position: relative;
   display: flex;
@@ -155,7 +155,7 @@ function updateValue(event: Event): void {
 .cv-field__control-wrap:hover:has(.cv-field__control:not(:disabled):not(:read-only)) { border-color: var(--cv-control-border-hover); }
 .cv-field__control-wrap:focus-within { border-color: var(--cv-focus-ring-color); box-shadow: var(--cv-focus-ring); }
 .cv-field__control::placeholder { color: var(--cv-text-muted); }
-.cv-field--error .cv-field__control-wrap { border-color: var(--cv-color-status-ng); }
+.cv-field--error .cv-field__control-wrap { border-color: var(--cv-color-status-error); }
 .cv-field--disabled { opacity: 0.54; }
 .cv-field--readonly .cv-field__control-wrap { border-color: var(--cv-border-default); background: var(--cv-surface-sunken); }
 .cv-field__leading,
@@ -167,5 +167,5 @@ function updateValue(event: Event): void {
 .cv-field__unit { font-family: var(--cv-font-numeric); font-variant-numeric: tabular-nums lining-nums; }
 .cv-field__hint, .cv-field__error { font-size: var(--cv-font-size-2xs); line-height: var(--cv-line-height-normal); }
 .cv-field__hint { color: var(--cv-text-muted); }
-.cv-field__error { color: var(--cv-color-status-ng-strong); }
+.cv-field__error { color: var(--cv-color-status-error-strong); }
 </style>

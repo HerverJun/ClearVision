@@ -143,10 +143,10 @@ test('M08 f09 current-candidate evidence includes formal Workspace DPI and point
   assert.doesNotMatch(smoke, /waitForLoadState\('networkidle'\)/);
   assert.match(smoke, /waitForLoadState\('domcontentloaded'\)/);
   assert.match(smoke, /'\.results-page__advanced-trigger'/);
-  assert.doesNotMatch(smoke, /'\.results-page__date'/);
+  assert.match(smoke, /resultsFilterLayout\.advanced\.controls\.filter\([\s\S]*control\.selector === '\.results-page__date'\)\.length === 2/);
   assert.match(smoke, /\.filter\(element => element\.getClientRects\(\)\.length > 0\)/);
-  assert.match(smoke, /resultsFilterLayout\.controls\.length === 6/);
-  assert.match(smoke, /resultsFilterLayout\.maximumBottomDelta <= 1/);
+  assert.match(smoke, /resultsFilterLayout\.primary\.controls\.length === 5/);
+  assert.match(smoke, /resultsFilterLayout\.primary\.maximumBottomDelta <= 1/);
   assert.doesNotMatch(smoke, /1350px WebView2 client/);
   assert.match(productPerformance, /async function waitForFunctionWithoutHandle/);
   assert.match(productPerformance, /await handle\.dispose\(\)/);

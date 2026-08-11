@@ -246,7 +246,7 @@ onUnmounted(() => {
         @action="handleAction"
       />
 
-      <main class="ai-workbench-page__main">
+      <div class="ai-workbench-page__main">
         <AiTaskComposer
           v-if="showComposer"
           :initial-description="state.taskDescription"
@@ -331,7 +331,7 @@ onUnmounted(() => {
             @save="decisions => owner?.updateResourceDecisions(decisions)"
           />
         </div>
-      </main>
+      </div>
     </template>
 
     <AiHistoryDrawer

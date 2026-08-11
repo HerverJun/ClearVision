@@ -89,6 +89,7 @@ async function retryRecovery(): Promise<void> {
           class="auth-form__control"
           name="username"
           autocomplete="username"
+          spellcheck="false"
           required
           autofocus
         >
@@ -125,6 +126,7 @@ async function retryRecovery(): Promise<void> {
           <input
             v-model="rememberUsername"
             type="checkbox"
+            name="rememberUsername"
           >
           <span>记住账号</span>
         </label>

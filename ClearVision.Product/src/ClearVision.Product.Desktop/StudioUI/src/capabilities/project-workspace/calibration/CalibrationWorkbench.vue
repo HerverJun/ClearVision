@@ -134,22 +134,40 @@ function updateNumber(sampleId: string, key: 'worldX' | 'worldY', value: string)
             <td>{{ numericValue(sample.pixelX) }}</td>
             <td>{{ numericValue(sample.pixelY) }}</td>
             <td>
-              <input
-                :value="numericValue(sample.worldX)"
-                type="number"
-                step="any"
-                :disabled="worldEditingDisabled"
-                @change="updateNumber(sample.sampleId, 'worldX', ($event.target as HTMLInputElement).value)"
+              <label
+                class="calibration-workbench__coordinate-field"
+                :for="`calibration-world-x-${sample.sampleId}`"
               >
+                <span class="calibration-workbench__visually-hidden">第 {{ sample.order }} 个样本 World X</span>
+                <input
+                  :id="`calibration-world-x-${sample.sampleId}`"
+                  :name="`calibration-world-x-${sample.sampleId}`"
+                  :value="numericValue(sample.worldX)"
+                  type="number"
+                  step="any"
+                  autocomplete="off"
+                  :disabled="worldEditingDisabled"
+                  @change="updateNumber(sample.sampleId, 'worldX', ($event.target as HTMLInputElement).value)"
+                >
+              </label>
             </td>
             <td>
-              <input
-                :value="numericValue(sample.worldY)"
-                type="number"
-                step="any"
-                :disabled="worldEditingDisabled"
-                @change="updateNumber(sample.sampleId, 'worldY', ($event.target as HTMLInputElement).value)"
+              <label
+                class="calibration-workbench__coordinate-field"
+                :for="`calibration-world-y-${sample.sampleId}`"
               >
+                <span class="calibration-workbench__visually-hidden">第 {{ sample.order }} 个样本 World Y</span>
+                <input
+                  :id="`calibration-world-y-${sample.sampleId}`"
+                  :name="`calibration-world-y-${sample.sampleId}`"
+                  :value="numericValue(sample.worldY)"
+                  type="number"
+                  step="any"
+                  autocomplete="off"
+                  :disabled="worldEditingDisabled"
+                  @change="updateNumber(sample.sampleId, 'worldY', ($event.target as HTMLInputElement).value)"
+                >
+              </label>
             </td>
             <td><span :data-inlier="sample.inlier === null ? 'unknown' : sample.inlier">{{ sample.inlier === false ? '外点' : sample.inlier === true ? '内点' : sample.valid ? '待拟合' : '待补全' }}</span></td>
             <td>
@@ -199,6 +217,8 @@ function updateNumber(sampleId: string, key: 'worldX' | 'worldY', value: string)
 .calibration-workbench__table th, .calibration-workbench__table td { padding: 4px 5px; border-bottom: 1px solid var(--cv-border-subtle); text-align: left; white-space: nowrap; }
 .calibration-workbench__table th { color: var(--cv-text-muted); font-size: var(--cv-font-size-2xs); font-weight: var(--cv-font-weight-semibold); }
 .calibration-workbench__table td { color: var(--cv-text-secondary); }
+.calibration-workbench__coordinate-field { display: inline-flex; }
+.calibration-workbench__visually-hidden { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
 .calibration-workbench__table input { width: 68px; min-width: 0; height: 32px; padding: 0 6px; border: 1px solid var(--cv-control-border); border-radius: var(--cv-radius-sm); background: var(--cv-surface-raised); color: var(--cv-text-primary); font: inherit; }
 .calibration-workbench__table button { border: 0; background: transparent; color: var(--cv-color-status-ng-strong); cursor: pointer; font: inherit; }
 .calibration-workbench__table button:disabled { color: var(--cv-text-muted); cursor: not-allowed; }

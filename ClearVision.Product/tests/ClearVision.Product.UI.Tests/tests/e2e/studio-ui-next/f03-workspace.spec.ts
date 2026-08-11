@@ -3175,7 +3175,8 @@ test('G5 saves and reloads a catalog-added numeric operator type through the for
   await expect(shell).toHaveAttribute('data-workspace-persistence-revision', '8');
   await expect(canvas).toHaveAttribute('data-node-count', '1');
   expect(audit.some(entry => /\/api\/(?:inspection\/execute|runs)/i.test(entry.path))).toBe(false);
-  expect(audit.filter(entry => entry.path === '/api/inspection/admission')).toHaveLength(2);
+  await expect.poll(() => audit.filter(entry => entry.path === '/api/inspection/admission').length)
+    .toBe(2);
   expect(isF03G5RequestAllowlist(audit)).toBe(true);
 });
 
@@ -4740,6 +4741,37 @@ const workspaceG3VisualMatrix = [
     (['compact', 'comfortable'] as const).map(density => ({ viewport, theme, density }))
   )
 );
+
+test('Workspace keeps formal run connection context visible at 1366x768 125 percent layout pressure', async ({ page }) => {
+  const viewport = { width: 1093, height: 614 };
+  await page.setViewportSize(viewport);
+  const runtimeErrors = createF03RuntimeErrorAudit(page);
+  const audit = await bootWorkspace(page);
+  const connection = page.locator('.run-status-bar__connection');
+
+  await expect(connection).toBeVisible();
+  await expect(connection).toContainText('状态已读取');
+
+  const layout = await page.evaluate(() => {
+    const statusBar = document.querySelector('.run-status-bar');
+    const connectionElement = document.querySelector('.run-status-bar__connection');
+    return {
+      horizontalOverflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+      statusBarHorizontalOverflow: statusBar ? statusBar.scrollWidth - statusBar.clientWidth : null,
+      connectionDisplay: connectionElement ? getComputedStyle(connectionElement).display : null,
+      connectionWidth: connectionElement?.getBoundingClientRect().width ?? 0
+    };
+  });
+
+  expect(layout).toMatchObject({
+    horizontalOverflow: 0,
+    statusBarHorizontalOverflow: 0
+  });
+  expect(layout.connectionDisplay).not.toBe('none');
+  expect(layout.connectionWidth).toBeGreaterThan(0);
+  expect(isF03G4RequestAllowlist(audit)).toBe(true);
+  expect(runtimeErrors).toEqual({ consoleErrors: [], pageErrors: [] });
+});
 
 for (const scenario of workspaceG3VisualMatrix) {
   test(`Workspace Shell fits ${scenario.viewport.width}x${scenario.viewport.height} in ${scenario.theme}/${scenario.density}`, async ({ page }) => {

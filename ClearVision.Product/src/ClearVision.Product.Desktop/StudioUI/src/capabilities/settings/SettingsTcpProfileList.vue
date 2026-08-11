@@ -67,6 +67,7 @@ const emit = defineEmits<{
         :class="{ 'is-active': profile.id === selectedId }"
         type="button"
         :title="profile.name || '未命名配置'"
+        :aria-pressed="profile.id === selectedId"
         @click="emit('select', profile.id)"
       >
         <span class="tcp-profile-list__main">

@@ -68,6 +68,22 @@ describe('Design Foundation color tokens', () => {
   it.each([
     ['light', light],
     ['dark', dark]
+  ] as const)('keeps the %s primary action states readable', (_theme, tokens) => {
+    for (const background of [
+      '--cv-color-action',
+      '--cv-color-action-hover',
+      '--cv-color-action-active'
+    ] as const) {
+      expect(contrastRatio(
+        tokens.get('--cv-color-on-action')!,
+        tokens.get(background)!
+      )).toBeGreaterThanOrEqual(4.5);
+    }
+  });
+
+  it.each([
+    ['light', light],
+    ['dark', dark]
   ] as const)('separates %s brand, NG, execution error, Info and Canvas technical colors', (_theme, tokens) => {
     const brand = tokens.get('--cv-color-brand-500');
     expect(brand).not.toBe(tokens.get('--cv-color-status-ng'));
@@ -109,6 +125,7 @@ describe('Design Foundation color tokens', () => {
       '--cv-surface-floating',
       '--cv-type-display-size',
       '--cv-type-page-title-size',
+      '--cv-type-auth-title-size',
       '--cv-type-section-title-size',
       '--cv-type-body-size',
       '--cv-type-secondary-size',

@@ -124,6 +124,7 @@ function updateSelected(): void {
             type="button"
             class="template-workbench__item"
             :data-active="template.id === selectedId"
+            :aria-pressed="template.id === selectedId"
             @click="selectTemplate(template.id)"
           >
             <span>

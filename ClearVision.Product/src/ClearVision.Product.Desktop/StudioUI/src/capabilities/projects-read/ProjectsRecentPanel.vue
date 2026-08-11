@@ -106,25 +106,23 @@ const emit = defineEmits<{
 
 <style scoped>
 .projects-recent {
-  display: grid;
-  grid-template-columns: minmax(168px, 204px) minmax(0, 1fr);
-  align-items: stretch;
-  border-block: 1px solid var(--cv-border-subtle);
-  background: var(--cv-surface-raised);
+  display: block;
+  background: transparent;
 }
 .projects-recent :deep(.cv-panel__header) {
   align-items: center;
-  padding: var(--cv-space-4);
-  border-inline-end: 1px solid var(--cv-border-subtle);
-  background: var(--cv-surface-page);
+  padding: 0 0 var(--cv-space-3);
 }
 .projects-recent :deep(.cv-panel__content) { min-width: 0; }
 .projects-recent__list {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(176px, 1fr));
-  min-height: 72px;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1px;
+  min-height: 64px;
   margin: 0;
   padding: 0;
+  border-block: 1px solid var(--cv-border-subtle);
+  background: var(--cv-border-subtle);
   list-style: none;
 }
 .projects-recent__list li {
@@ -133,11 +131,11 @@ const emit = defineEmits<{
   align-items: center;
   gap: var(--cv-space-2);
   min-width: 0;
-  padding: var(--cv-space-3);
-  border-inline-end: 1px solid var(--cv-border-subtle);
+  min-height: 64px;
+  padding: var(--cv-space-2) var(--cv-space-3);
+  background: var(--cv-surface-raised);
   transition: background var(--cv-motion-duration-fast) var(--cv-motion-ease-standard);
 }
-.projects-recent__list li:last-child { border-inline-end: 0; }
 .projects-recent__list li:hover,
 .projects-recent__list li:focus-within { background: var(--cv-interactive-hover); }
 .projects-recent__copy {
@@ -164,18 +162,10 @@ const emit = defineEmits<{
 }
 .projects-recent :deep(.cv-inline-alert),
 .projects-recent :deep(.cv-page-state) { margin: 0 var(--cv-density-panel-padding) var(--cv-density-panel-padding); }
-@media (max-width: 1180px) {
-  .projects-recent { display: block; }
-  .projects-recent :deep(.cv-panel__header) {
-    padding-inline: 0;
-    border-inline-end: 0;
-    background: transparent;
-  }
-  .projects-recent__list { grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); border-block-start: 1px solid var(--cv-border-subtle); }
-  .projects-recent__list li { border-block-end: 1px solid var(--cv-border-subtle); }
+@media (max-width: 920px) {
+  .projects-recent__list { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 @media (max-width: 640px) {
   .projects-recent__list { grid-template-columns: 1fr; }
-  .projects-recent__list li { border-inline-end: 0; }
 }
 </style>

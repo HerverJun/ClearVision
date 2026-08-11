@@ -63,7 +63,7 @@ function updateValue(event: Event): void {
         :id="selectId"
         class="cv-select__control"
         :value="modelValue"
-        :name="name"
+        :name="name ?? selectId"
         :disabled="disabled"
         :required="required"
         :aria-invalid="error ? 'true' : undefined"
@@ -100,7 +100,7 @@ function updateValue(event: Event): void {
 <style scoped>
 .cv-select { display: grid; gap: var(--cv-density-field-gap); min-width: 0; }
 .cv-select__label { color: var(--cv-text-secondary); font-size: var(--cv-font-size-xs); font-weight: var(--cv-font-weight-semibold); }
-.cv-select__required { color: var(--cv-color-status-ng); }
+.cv-select__required { color: var(--cv-color-status-error); }
 .cv-select__control-wrap { position: relative; display: flex; min-width: 0; }
 .cv-select__control {
   width: 100%;
@@ -115,11 +115,20 @@ function updateValue(event: Event): void {
   transition: border-color var(--cv-motion-duration-fast) var(--cv-motion-ease-standard), box-shadow var(--cv-motion-duration-fast) var(--cv-motion-ease-standard);
 }
 .cv-select__control:hover:not(:disabled) { border-color: var(--cv-control-border-hover); }
-.cv-select__control:focus-visible { border-color: var(--cv-focus-ring-color); outline: 2px solid var(--cv-focus-ring-color); outline-offset: 1px; box-shadow: none; }
-.cv-select--error .cv-select__control { border-color: var(--cv-color-status-ng); }
+.cv-select__control:focus-visible { border-color: var(--cv-focus-ring-color); outline: 0; box-shadow: var(--cv-focus-ring); }
+.cv-select--error .cv-select__control { border-color: var(--cv-color-status-error); }
 .cv-select--disabled { opacity: 0.54; }
 .cv-select__chevron { position: absolute; right: var(--cv-space-3); top: 50%; transform: translateY(-50%) rotate(90deg); color: var(--cv-text-muted); pointer-events: none; }
 .cv-select__hint, .cv-select__error { font-size: var(--cv-font-size-2xs); line-height: var(--cv-line-height-normal); }
 .cv-select__hint { color: var(--cv-text-muted); }
-.cv-select__error { color: var(--cv-color-status-ng-strong); }
+.cv-select__error { color: var(--cv-color-status-error-strong); }
+
+@media (forced-colors: active) {
+  .cv-select__control:focus-visible {
+    border-color: Highlight;
+    outline: 2px solid Highlight;
+    outline-offset: 2px;
+    box-shadow: none;
+  }
+}
 </style>

@@ -88,6 +88,8 @@ describe('F07 G6 Camera/Trigger/Preview panel', () => {
     expect(wrapper.text()).toContain('触发输入与诊断');
     expect(wrapper.text()).toContain('采集预览');
     expect(wrapper.text()).toContain('N 点标定');
+    expect(wrapper.get('.camera-binding-row').attributes('aria-pressed')).toBe('true');
+    expect(wrapper.get('input[name="cameraEnabled-cam-1"]').attributes('type')).toBe('checkbox');
 
     await wrapper.get('input[name="cameraExposure"]').setValue('7000');
     await wrapper.findAll('button').find(button => button.text().includes('保存绑定'))?.trigger('click');

@@ -1920,7 +1920,7 @@ onBeforeUnmount(() => {
   width: 100%;
   min-width: 0;
   min-height: 100%;
-  max-width: 1720px;
+  max-width: var(--cv-page-max-width);
   margin: 0 auto;
   display: flex;
   flex-direction: column;
@@ -1989,14 +1989,11 @@ onBeforeUnmount(() => {
 
 .results-page__filters {
   overflow: hidden;
-  border: 1px solid var(--cv-border-subtle);
-  border-radius: var(--cv-radius-md);
-  background: var(--cv-surface-raised);
+  border-block: 1px solid var(--cv-border-subtle);
 }
 
 .results-page__filter-toolbar {
-  padding: var(--cv-space-3) var(--cv-space-4);
-  background: var(--cv-surface-raised);
+  padding: var(--cv-space-3) 0;
 }
 
 .results-page__filter-toolbar :deep(.cv-toolbar__primary) {
@@ -2025,9 +2022,8 @@ onBeforeUnmount(() => {
   flex-wrap: wrap;
   align-items: start;
   gap: var(--cv-space-3);
-  padding: var(--cv-space-3) var(--cv-space-4);
+  padding: var(--cv-space-3) 0;
   border-top: 1px solid var(--cv-border-subtle);
-  background: var(--cv-surface-page);
 }
 
 .results-page__tab-panel {
@@ -2394,9 +2390,6 @@ onBeforeUnmount(() => {
   }
 
   .results-page__commands { width: 100%; flex-wrap: wrap; }
-
-  .results-page__filter-toolbar,
-  .results-page__advanced { padding-inline: var(--cv-space-3); }
 
   .results-page__source,
   .results-page__project,

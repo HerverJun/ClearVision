@@ -63,8 +63,8 @@ withDefaults(defineProps<{
 .cv-page-header {
   display: grid;
   min-width: 0;
-  gap: var(--cv-space-2);
-  padding-block: var(--cv-space-1) var(--cv-space-2);
+  gap: var(--cv-space-3);
+  padding-block: var(--cv-space-1) var(--cv-space-3);
 }
 
 .cv-page-header__row {

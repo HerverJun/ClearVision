@@ -67,6 +67,8 @@ describe('Design Foundation primitives', () => {
 
     const input = wrapper.get('input');
     const describedBy = input.attributes('aria-describedby')?.split(' ') ?? [];
+    expect(input.attributes('name')).toBe(input.attributes('id'));
+    expect(input.attributes('autocomplete')).toBe('off');
     expect(input.attributes('aria-invalid')).toBe('true');
     expect(describedBy).toHaveLength(3);
     expect(describedBy.every(id => document.getElementById(id) !== null || wrapper.find(`#${id}`).exists())).toBe(true);
@@ -88,6 +90,7 @@ describe('Design Foundation primitives', () => {
     });
 
     expect(wrapper.findAll('option')).toHaveLength(2);
+    expect(wrapper.get('select').attributes('name')).toBe(wrapper.get('select').attributes('id'));
     expect(wrapper.findAll('option')[1]?.attributes()).toHaveProperty('disabled');
     await wrapper.get('select').setValue('decision');
     expect(wrapper.emitted('update:modelValue')?.at(-1)).toEqual(['decision']);

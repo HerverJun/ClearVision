@@ -315,7 +315,27 @@ test('F04 login remembers the username only after an accepted authentication', a
   await expect(page.getByRole('checkbox', { name: '记住账号' })).not.toBeChecked();
 });
 
+test('F04 login keeps a visible checkbox focus indicator in Windows high contrast mode', async ({ page }) => {
+  const state = freshState({ requiresSetup: false, role: 'Engineer' });
+  await page.emulateMedia({ forcedColors: 'active' });
+  await installStartup(page);
+  await installAuthFixture(page, state);
+  await page.goto('/studio/index.html#/login');
+
+  const checkbox = page.getByRole('checkbox', { name: '记住账号' });
+  await checkbox.focus();
+  await expect(checkbox).toBeFocused();
+  const focusStyle = await checkbox.evaluate(element => {
+    const style = getComputedStyle(element);
+    return { outlineStyle: style.outlineStyle, outlineWidth: style.outlineWidth };
+  });
+  expect(focusStyle.outlineStyle).not.toBe('none');
+  expect(focusStyle.outlineWidth).not.toBe('0px');
+});
+
 test('F04 product shell keeps the approved navigation stable across viewport and Browser DPR matrix', async ({ browser }) => {
+  test.setTimeout(60_000);
+
   const viewports = [
     { width: 1366, height: 768 },
     { width: 1600, height: 1000 },
@@ -415,6 +435,7 @@ test('V4 auth entry keeps the auxiliary product language stable across B0-B4', a
     { id: 'b0', width: 1920, height: 1080, theme: 'light', density: 'compact' },
     { id: 'b1', width: 1536, height: 864, theme: 'light', density: 'compact' },
     { id: 'b2', width: 1366, height: 768, theme: 'light', density: 'compact' },
+    { id: 'b2-dark', width: 1366, height: 768, theme: 'dark', density: 'compact' },
     { id: 'b3', width: 1920, height: 1080, theme: 'dark', density: 'compact' },
     { id: 'b4-light', width: 1920, height: 1080, theme: 'light', density: 'comfortable' },
     { id: 'b4-dark', width: 1920, height: 1080, theme: 'dark', density: 'comfortable' }

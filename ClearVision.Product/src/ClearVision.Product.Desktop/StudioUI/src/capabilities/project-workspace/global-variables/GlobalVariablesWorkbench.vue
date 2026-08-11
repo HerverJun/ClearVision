@@ -307,6 +307,7 @@ watch(() => props.owner.projection.runtimeValues, values => {
           :key="item.key"
           type="button"
           :data-active="tab === item.key"
+          :aria-pressed="tab === item.key"
           @click="tab = item.key as typeof tab"
         >
           {{ item.label }}
@@ -323,6 +324,7 @@ watch(() => props.owner.projection.runtimeValues, values => {
             :key="item.id"
             type="button"
             :data-active="editingId === item.id"
+            :aria-pressed="editingId === item.id"
             @click="editVariable(item.id)"
           >
             <span><strong>{{ item.displayName }}</strong><small>{{ valueTypeLabel(item.valueType.value) }}</small></span>

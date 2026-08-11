@@ -82,7 +82,7 @@ function handleEscape(event: KeyboardEvent): void {
         :data-testid="inputTestId"
         class="cv-search-field__control"
         type="search"
-        :name="name"
+        :name="name ?? inputId"
         :value="modelValue"
         :placeholder="placeholder"
         :disabled="disabled"
@@ -167,7 +167,12 @@ function handleEscape(event: KeyboardEvent): void {
 
 .cv-search-field__control::-webkit-search-cancel-button { display: none; }
 .cv-search-field__control:hover:not(:disabled) { border-color: var(--cv-control-border-hover); }
-.cv-search-field__control:focus-visible { border-color: var(--cv-focus-ring-color); outline: 2px solid var(--cv-focus-ring-color); outline-offset: 1px; box-shadow: none; }
+.cv-search-field__control:focus-visible {
+  border-color: var(--cv-focus-ring-color);
+  outline: 2px solid var(--cv-focus-ring-color);
+  outline-offset: 1px;
+  box-shadow: none;
+}
 .cv-search-field__control::placeholder { color: var(--cv-text-muted); }
 
 .cv-search-field__clear {

@@ -175,7 +175,7 @@ const inspectionLabel = computed(() => props.admissionLabel
 <style scoped>
 .run-status-bar {
   min-width: 0;
-  min-height: 42px;
+  min-height: 38px;
   display: grid;
   grid-template-columns: minmax(220px, auto) minmax(220px, 1fr) auto;
   align-items: center;
@@ -226,9 +226,9 @@ const inspectionLabel = computed(() => props.admissionLabel
 }
 
 @media (max-width: 1180px) {
-  .run-status-bar { grid-template-columns: minmax(180px, 1fr) auto; }
-  .run-status-bar__admission { grid-column: 1 / -1; grid-row: 2; }
-  .run-status-bar__actions { grid-column: 2; grid-row: 1; }
+  .run-status-bar { grid-template-columns: minmax(170px, 220px) minmax(0, 1fr) auto; }
+  .run-status-bar__state { overflow: hidden; }
+  .run-status-bar__connection { flex: 1 1 auto; }
 }
 
 @media (max-width: 760px) {

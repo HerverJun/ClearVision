@@ -228,7 +228,7 @@ const emit = defineEmits<{
   gap: var(--cv-space-2);
   padding: 4px 10px;
   border-bottom: 1px solid var(--cv-border-subtle);
-  background: var(--cv-surface-page);
+  background: var(--cv-surface-raised);
 }
 .workspace-shell__identity,
 .workspace-shell__commands {

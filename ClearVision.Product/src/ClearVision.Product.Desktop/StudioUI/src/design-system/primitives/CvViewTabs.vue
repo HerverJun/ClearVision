@@ -78,7 +78,7 @@ function moveFocus(event: KeyboardEvent, direction: -1 | 1 | 'first' | 'last'): 
   min-width: 0;
   display: flex;
   align-items: end;
-  gap: var(--cv-space-5);
+  gap: var(--cv-space-6);
   border-bottom: 1px solid var(--cv-border-subtle);
 }
 

@@ -33,6 +33,7 @@ describe('M-series shared visual and navigation guards', () => {
     const layout = read('src/app/layouts/product-layout.css');
     expect(layout).not.toMatch(/workspace-nav-item:nth-child/);
     expect(layout).toContain('overflow-x: auto;');
+    expect(layout).toMatch(/workspace-nav-item\.is-current::after[\s\S]*?bottom:\s*0;/);
   });
 
   it('keeps the workspace route protected by role while flag-off stays an explicit capability state', () => {
@@ -66,6 +67,25 @@ describe('M-series shared visual and navigation guards', () => {
     expect(toast).toContain("name=\"close\"");
     expect(modal).not.toMatch(/>\s*[×✕✖]\s*</);
     expect(toast).not.toMatch(/>\s*[×✕✖]\s*</);
+  });
+
+  it('keeps shared select focus visible in Windows forced-colors mode', () => {
+    const select = read('src/design-system/primitives/CvSelect.vue');
+    expect(select).toMatch(/@media \(forced-colors: active\)[\s\S]*?\.cv-select__control:focus-visible/);
+    expect(select).toMatch(/outline:\s*2px solid Highlight;/);
+    expect(select).toMatch(/box-shadow:\s*none;/);
+  });
+
+  it('keeps formal run context visible at Windows 125 percent layout pressure', () => {
+    const statusBar = read('src/capabilities/inspection-run/RunStatusBar.vue');
+    const pressureStart = statusBar.indexOf('@media (max-width: 1180px)');
+    const narrowStart = statusBar.indexOf('@media (max-width: 760px)');
+    const pressureStyles = statusBar.slice(pressureStart, narrowStart);
+
+    expect(pressureStart).toBeGreaterThanOrEqual(0);
+    expect(narrowStart).toBeGreaterThan(pressureStart);
+    expect(pressureStyles).not.toContain('display: none');
+    expect(pressureStyles).toContain('.run-status-bar__connection { flex: 1 1 auto; }');
   });
 
   it('keeps product source colors in the shared token table', () => {

@@ -15,6 +15,8 @@ describe('read-only query presentation primitives', () => {
     });
     const input = wrapper.get('input');
     expect(input.attributes('type')).toBe('search');
+    expect(input.attributes('name')).toBe(input.attributes('id'));
+    expect(input.attributes('autocomplete')).toBe('off');
     expect(input.attributes('data-testid')).toBe('project-search');
     expect(wrapper.get('label').text()).toContain('搜索工程');
 

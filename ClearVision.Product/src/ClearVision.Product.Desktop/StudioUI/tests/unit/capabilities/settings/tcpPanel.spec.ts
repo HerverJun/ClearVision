@@ -92,6 +92,7 @@ describe('F07 G5 TCP Profile lifecycle', () => {
     expect(fixture.readTcpProfiles).toHaveBeenCalledTimes(1);
     expect(fixture.readTcpStatus).toHaveBeenCalledWith('tcp-1');
     expect(fixture.readTcpFrames).toHaveBeenCalledWith('tcp-1');
+    expect(wrapper.get('button[title="Fixture Client"]').attributes('aria-pressed')).toBe('true');
 
     await wrapper.get('input[name="tcpRemoteHost"]').setValue('::1');
     await wrapper.get('[data-tcp-action="save-profiles"]').trigger('click');

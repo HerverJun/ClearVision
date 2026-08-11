@@ -88,7 +88,7 @@ function submit(): void {
         v-if="error"
         id="ai-task-description-error"
         class="ai-task-composer__error"
-        role="alert"
+        aria-live="polite"
       >{{ error }}</span>
     </label>
 
@@ -99,6 +99,7 @@ function submit(): void {
           <input
             v-model="mode"
             type="radio"
+            name="ai-requirement-mode"
             autocomplete="off"
             value="strict"
             :disabled="busy"
@@ -109,6 +110,7 @@ function submit(): void {
           <input
             v-model="mode"
             type="radio"
+            name="ai-requirement-mode"
             autocomplete="off"
             value="draft"
             :disabled="busy"

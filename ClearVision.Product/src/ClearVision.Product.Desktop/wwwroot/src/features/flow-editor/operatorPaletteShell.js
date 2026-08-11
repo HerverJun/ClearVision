@@ -480,6 +480,11 @@ export class OperatorPaletteShell {
         const description = operator?.description || operator?.Description || '暂无说明';
         const lifecycle = getOperatorLifecycle(operator);
         const lifecycleNote = operator?.lifecycleNote || operator?.LifecycleNote || '';
+        const lifecycleLabel = getLifecycleLabel(lifecycle);
+        const lifecycleDescription = lifecycleNote
+            ? `${lifecycleLabel}：${lifecycleNote}`
+            : `生命周期：${lifecycleLabel}`;
+        const lifecycleDescriptionId = `operator-lifecycle-note-${index}`;
         const inputCount = (operator?.inputPorts || operator?.InputPorts || []).length;
         const outputCount = (operator?.outputPorts || operator?.OutputPorts || []).length;
 
@@ -489,11 +494,17 @@ export class OperatorPaletteShell {
                     draggable="true"
                     data-operator-index="${index}"
                     data-operator-type="${escapeHtml(type)}"
+                    ${lifecycle !== 'Stable' ? `aria-describedby="${escapeHtml(lifecycleDescriptionId)}"` : ''}
                     title="添加 ${escapeHtml(title)}">
                 <span class="operator-flyout-drag">⋮⋮</span>
                 <span class="operator-flyout-icon" data-operator-icon="${index}"></span>
                 <span class="operator-flyout-main">
-                    <strong>${escapeHtml(title)}</strong>
+                    <span class="operator-flyout-title">
+                        <strong>${escapeHtml(title)}</strong>
+                        ${lifecycle !== 'Stable'
+                            ? `<span class="operator-lifecycle-badge operator-lifecycle-${escapeHtml(lifecycle.toLowerCase())}" title="${escapeHtml(lifecycleDescription)}" aria-hidden="true">${escapeHtml(lifecycleLabel)}</span>`
+                            : ''}
+                    </span>
                     <span class="operator-flyout-detail">
                         ${showCategory ? `<span class="operator-flyout-category">${escapeHtml(category)}</span>` : ''}
                         <em>${escapeHtml(description)}</em>
@@ -502,6 +513,9 @@ export class OperatorPaletteShell {
                 <span class="operator-flyout-meta">
                     ${escapeHtml(inputCount)} 入 / ${escapeHtml(outputCount)} 出
                 </span>
+                ${lifecycle !== 'Stable'
+                    ? `<span id="${escapeHtml(lifecycleDescriptionId)}" class="operator-flyout-lifecycle-note">${escapeHtml(lifecycleDescription)}</span>`
+                    : ''}
             </button>
         `;
     }

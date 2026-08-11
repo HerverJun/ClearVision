@@ -141,7 +141,12 @@ function copyMappings(value: readonly PlcMappingV1[]): MappingDraft[] {
   }));
 }
 
+function clearValidationIssues(): void {
+  validationIssues.value = Object.freeze([]);
+}
+
 function copySettings(value: PlcSettingsV1): void {
+  clearValidationIssues();
   baseline.value = Object.freeze({
     ...value,
     s7: Object.freeze({ ...value.s7, mappings: Object.freeze(value.s7.mappings.map(item => Object.freeze({ ...item })))}),
@@ -201,6 +206,7 @@ async function load(): Promise<void> {
   phase.value = 'loading';
   pendingAction.value = 'load';
   feedback.value = null;
+  clearValidationIssues();
   try {
     const settings = await props.owner.readPlcSettings();
     if (settings.status !== 'completed' || !settings.value.settings) {
@@ -227,7 +233,7 @@ async function saveSettings(): Promise<void> {
   if (!props.canWrite || isBusy.value || localErrors.value.length > 0) return;
   pendingAction.value = 'save-settings';
   feedback.value = null;
-  validationIssues.value = Object.freeze([]);
+  clearValidationIssues();
   try {
     const result = await props.owner.savePlcSettings(settingsPayload());
     if (result.status !== 'completed') {
@@ -260,7 +266,7 @@ async function saveMappings(): Promise<void> {
   }
   pendingAction.value = 'save-mappings';
   feedback.value = null;
-  validationIssues.value = Object.freeze([]);
+  clearValidationIssues();
   try {
     const result = await props.owner.savePlcMappings(mappingPayload());
     if (result.status !== 'completed') {
@@ -322,12 +328,54 @@ function addMapping(): void {
 
 function removeMapping(index: number): void {
   mappingDrafts[protocol.value].splice(index, 1);
+  clearValidationIssues();
 }
 
-function mappingIssue(index: number, field: string): string | undefined {
-  return validationIssues.value.find(item => item.index === index && item.field.toLowerCase() === field.toLowerCase())?.message;
+function mappingIssueIndex(index: number, field: string): number {
+  return validationIssues.value.findIndex(item =>
+    item.protocol === protocol.value &&
+    item.section === 'mapping' &&
+    item.index === index &&
+    item.field.toLowerCase() === field.toLowerCase()
+  );
 }
 
+function mappingIssue(index: number, field: string): DeviceValidationIssueV1 | undefined {
+  const issueIndex = mappingIssueIndex(index, field);
+  return issueIndex >= 0 ? validationIssues.value[issueIndex] : undefined;
+}
+
+function mappingIssueId(index: number, field: string): string | undefined {
+  const issueIndex = mappingIssueIndex(index, field);
+  return issueIndex >= 0 ? `plc-validation-issue-${issueIndex}` : undefined;
+}
+
+function connectionIssue(field: string): DeviceValidationIssueV1 | undefined {
+  return validationIssues.value.find(item =>
+    item.protocol === protocol.value &&
+    (item.section === 'connection' || item.section === 'settings') &&
+    item.index === null &&
+    item.field.toLowerCase() === field.toLowerCase()
+  );
+}
+
+function validationIssueAnnouncementRole(issue: DeviceValidationIssueV1): 'alert' | undefined {
+  const field = issue.field.toLowerCase();
+  const connectionFieldOwnsAlert = issue.protocol === protocol.value &&
+    (issue.section === 'connection' || issue.section === 'settings') &&
+    issue.index === null &&
+    (field === 'ipaddress' || field === 'port' ||
+      (protocol.value === 'S7' && ['cputype', 'rack', 'slot'].includes(field)));
+  const mappingSelectOwnsAlert = issue.protocol === protocol.value &&
+    issue.section === 'mapping' &&
+    issue.index !== null &&
+    issue.index >= 0 &&
+    issue.index < mappingDrafts[protocol.value].length &&
+    field === 'datatype';
+  return connectionFieldOwnsAlert || mappingSelectOwnsAlert ? undefined : 'alert';
+}
+
+watch(protocol, () => clearValidationIssues());
 watch(() => props.owner.projection.device.plcSettings, value => {
   if (value && !settingsDirty.value && !mappingDirty.value) copySettings(value);
 });
@@ -380,6 +428,7 @@ onBeforeUnmount(() => detachPanelState());
           label="心跳间隔（毫秒）"
           name="plcHeartbeatIntervalMs"
           type="number"
+          autocomplete="off"
           :readonly="!canWrite"
         />
         <div class="plc-toolbar__scope">
@@ -394,8 +443,9 @@ onBeforeUnmount(() => detachPanelState());
           v-model="activeDraft.ipAddress"
           label="PLC IP 地址"
           name="plcIpAddress"
+          autocomplete="off"
           :readonly="!canWrite"
-          :error="localErrors.find(item => item.includes('IP'))"
+          :error="localErrors.find(item => item.includes('IP')) ?? connectionIssue('ipAddress')?.message"
           required
         />
         <CvField
@@ -403,8 +453,9 @@ onBeforeUnmount(() => detachPanelState());
           label="端口"
           name="plcPort"
           type="number"
+          autocomplete="off"
           :readonly="!canWrite"
-          :error="localErrors.find(item => item.includes('端口'))"
+          :error="localErrors.find(item => item.includes('端口')) ?? connectionIssue('port')?.message"
           required
         />
         <CvField
@@ -412,7 +463,9 @@ onBeforeUnmount(() => detachPanelState());
           v-model="activeDraft.cpuType"
           label="S7 CPU 类型"
           name="plcCpuType"
+          autocomplete="off"
           :readonly="!canWrite"
+          :error="localErrors.find(item => item.includes('CPU')) ?? connectionIssue('cpuType')?.message"
           required
         />
         <CvField
@@ -421,7 +474,9 @@ onBeforeUnmount(() => detachPanelState());
           label="机架号（Rack）"
           name="plcRack"
           type="number"
+          autocomplete="off"
           :readonly="!canWrite"
+          :error="localErrors.find(item => item.includes('机架')) ?? connectionIssue('rack')?.message"
         />
         <CvField
           v-if="protocol === 'S7'"
@@ -429,7 +484,9 @@ onBeforeUnmount(() => detachPanelState());
           label="槽位号（Slot）"
           name="plcSlot"
           type="number"
+          autocomplete="off"
           :readonly="!canWrite"
+          :error="localErrors.find(item => item.includes('槽位')) ?? connectionIssue('slot')?.message"
         />
       </div>
 
@@ -542,7 +599,11 @@ onBeforeUnmount(() => detachPanelState());
                   v-model="mapping.name"
                   :class="{ 'has-error': mappingIssue(index, 'name') }"
                   :disabled="!canWrite"
+                  :name="`plcMappingName-${index}`"
+                  autocomplete="off"
                   aria-label="变量名"
+                  :aria-invalid="mappingIssue(index, 'name') ? 'true' : undefined"
+                  :aria-describedby="mappingIssueId(index, 'name')"
                 >
               </td>
               <td>
@@ -550,21 +611,29 @@ onBeforeUnmount(() => detachPanelState());
                   v-model="mapping.address"
                   :class="{ 'has-error': mappingIssue(index, 'address') }"
                   :disabled="!canWrite"
+                  :name="`plcMappingAddress-${index}`"
+                  autocomplete="off"
                   aria-label="PLC 地址"
+                  :aria-invalid="mappingIssue(index, 'address') ? 'true' : undefined"
+                  :aria-describedby="mappingIssueId(index, 'address')"
                 >
               </td>
               <td>
                 <CvSelect
                   v-model="mapping.dataType"
                   label="数据类型"
+                  :name="`plcMappingDataType-${index}`"
                   :options="dataTypeOptions"
                   :disabled="!canWrite"
+                  :error="mappingIssue(index, 'dataType')?.message"
                 />
               </td>
               <td>
                 <input
                   v-model="mapping.description"
                   :disabled="!canWrite"
+                  :name="`plcMappingDescription-${index}`"
+                  autocomplete="off"
                   aria-label="说明"
                 >
               </td>
@@ -573,6 +642,7 @@ onBeforeUnmount(() => detachPanelState());
                   v-model="mapping.canWrite"
                   type="checkbox"
                   :disabled="!canWrite"
+                  :name="`plcMappingCanWrite-${index}`"
                   aria-label="允许写入"
                 >
               </td>
@@ -611,7 +681,9 @@ onBeforeUnmount(() => detachPanelState());
       >
         <li
           v-for="(issue, index) in validationIssues"
+          :id="`plc-validation-issue-${index}`"
           :key="`${issue.field}-${issue.index}-${index}`"
+          :role="validationIssueAnnouncementRole(issue)"
         >
           {{ issue.message }}
         </li>
@@ -639,7 +711,7 @@ onBeforeUnmount(() => detachPanelState());
     </section>
 
     <CvInlineAlert
-      v-if="feedback"
+      v-if="feedback && validationIssues.length === 0"
       :tone="feedback.tone"
       :title="feedback.title"
       data-settings-device-feedback="plc"

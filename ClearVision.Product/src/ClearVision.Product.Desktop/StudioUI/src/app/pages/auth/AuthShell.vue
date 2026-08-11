@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { CvBrand } from '@/design-system/patterns';
+import AuthProductPreview from './AuthProductPreview.vue';
 
 defineProps<{
   title: string;
@@ -11,24 +12,28 @@ defineProps<{
   <main
     class="auth-shell"
     data-auth-shell="ready"
+    aria-label="ClearVision Studio"
   >
+    <AuthProductPreview />
     <section
       class="auth-shell__stage"
       aria-labelledby="auth-shell-title"
     >
-      <header class="auth-shell__masthead">
-        <CvBrand />
-      </header>
-      <header class="auth-shell__header">
-        <h1 id="auth-shell-title">
-          {{ title }}
-        </h1>
-        <p class="auth-shell__description">
-          {{ description }}
-        </p>
-      </header>
-      <div class="auth-shell__form-host">
-        <slot />
+      <div class="auth-shell__frame">
+        <header class="auth-shell__masthead">
+          <CvBrand />
+        </header>
+        <header class="auth-shell__header">
+          <h1 id="auth-shell-title">
+            {{ title }}
+          </h1>
+          <p class="auth-shell__description">
+            {{ description }}
+          </p>
+        </header>
+        <div class="auth-shell__form-host">
+          <slot />
+        </div>
       </div>
     </section>
   </main>
@@ -39,56 +44,59 @@ defineProps<{
   min-height: 100vh;
   min-height: 100svh;
   display: grid;
-  place-items: center;
-  padding: var(--cv-space-6);
+  grid-template-columns: minmax(0, 1.12fr) minmax(420px, 0.88fr);
   background: var(--cv-surface-page);
   color: var(--cv-text-primary);
 }
-.auth-shell__masthead {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  min-height: 56px;
-}
-.auth-shell__masthead :deep(.cv-brand__mark) {
-  width: 52px;
-  height: 52px;
-}
-.auth-shell__masthead :deep(.cv-brand) { gap: var(--cv-space-3); }
-.auth-shell__masthead :deep(.cv-brand__wordmark) { gap: var(--cv-space-2); }
-.auth-shell__masthead :deep(.cv-brand__wordmark strong) { font-size: var(--cv-font-size-lg); }
-.auth-shell__masthead :deep(.cv-brand__wordmark small) { font-size: var(--cv-font-size-sm); }
+
 .auth-shell__stage {
-  width: min(440px, calc(100% - 32px));
+  min-width: 0;
+  min-height: 100vh;
+  min-height: 100svh;
   display: grid;
-  gap: var(--cv-space-5);
-  padding: var(--cv-space-10);
-  border: 1px solid transparent;
-  border-radius: var(--cv-radius-lg);
+  place-items: center;
+  overflow: auto;
+  overscroll-behavior: contain;
+  padding: var(--cv-space-12) clamp(32px, 5vw, 80px);
   background: var(--cv-surface-raised);
-  box-shadow: var(--cv-elevation-2);
 }
+
+.auth-shell__frame {
+  width: min(420px, 100%);
+  display: grid;
+  gap: var(--cv-space-8);
+}
+
+.auth-shell__masthead {
+  display: none;
+  align-items: center;
+}
+
 .auth-shell__header {
   display: grid;
-  gap: var(--cv-space-2);
-  justify-items: center;
-  text-align: center;
+  gap: var(--cv-space-3);
 }
+
 .auth-shell__header h1 {
   margin: 0;
-  font-size: var(--cv-font-size-2xl);
+  font-size: var(--cv-type-auth-title-size);
   font-weight: var(--cv-font-weight-semibold);
   line-height: var(--cv-line-height-tight);
   letter-spacing: 0;
+  text-wrap: balance;
 }
+
 .auth-shell__description {
-  max-width: 36ch;
+  max-width: 42ch;
   margin: 0;
   color: var(--cv-text-secondary);
   font-size: var(--cv-font-size-md);
   line-height: var(--cv-line-height-relaxed);
+  text-wrap: pretty;
 }
+
 .auth-shell__form-host { min-width: 0; }
+
 :deep(.auth-form) { display: grid; gap: var(--cv-space-5); }
 :deep(.auth-form__field) { display: grid; gap: var(--cv-space-2); }
 :deep(.auth-form__field label) {
@@ -98,21 +106,23 @@ defineProps<{
 }
 :deep(.auth-form__control) {
   width: 100%;
-  min-height: 46px;
-  padding: 0 var(--cv-space-3);
+  min-height: 44px;
+  padding: 0 var(--cv-space-4);
   border: 1px solid var(--cv-control-border);
-  border-radius: var(--cv-radius-sm);
+  border-radius: var(--cv-radius-md);
   background: var(--cv-surface-raised);
   color: var(--cv-text-primary);
   font: inherit;
   font-size: var(--cv-font-size-md);
   transition:
     border-color var(--cv-motion-duration-fast) var(--cv-motion-ease-standard),
+    background var(--cv-motion-duration-fast) var(--cv-motion-ease-standard),
     box-shadow var(--cv-motion-duration-fast) var(--cv-motion-ease-standard);
 }
 :deep(.auth-form__control:hover) { border-color: var(--cv-control-border-hover); }
 :deep(.auth-form__control:focus-visible) {
   border-color: var(--cv-focus-ring-color);
+  background: var(--cv-surface-raised);
   outline: none;
   box-shadow: var(--cv-focus-ring);
 }
@@ -159,11 +169,36 @@ defineProps<{
   user-select: none;
 }
 :deep(.auth-form__remember input) {
+  appearance: none;
   width: var(--cv-control-check-size);
   height: var(--cv-control-check-size);
   flex: 0 0 auto;
+  display: grid;
   margin: 0;
-  accent-color: var(--cv-color-action);
+  place-content: center;
+  border: 1px solid var(--cv-control-border);
+  border-radius: var(--cv-radius-xs);
+  background: var(--cv-surface-page);
+  transition:
+    border-color var(--cv-motion-duration-fast) var(--cv-motion-ease-standard),
+    background var(--cv-motion-duration-fast) var(--cv-motion-ease-standard);
+}
+:deep(.auth-form__remember input::before) {
+  width: 8px;
+  height: 4px;
+  border-bottom: 2px solid var(--cv-color-on-action);
+  border-left: 2px solid var(--cv-color-on-action);
+  content: '';
+  transform: translateY(-1px) rotate(-45deg) scale(0);
+  transform-origin: center;
+  transition: transform var(--cv-motion-duration-fast) var(--cv-motion-ease-emphasized);
+}
+:deep(.auth-form__remember input:checked) {
+  border-color: var(--cv-color-action);
+  background: var(--cv-color-action);
+}
+:deep(.auth-form__remember input:checked::before) {
+  transform: translateY(-1px) rotate(-45deg) scale(1);
 }
 :deep(.auth-form__remember input:focus-visible) {
   outline: none;
@@ -176,24 +211,54 @@ defineProps<{
 }
 :deep(.auth-form__submit.cv-button) {
   width: 100%;
-  min-height: 46px;
+  min-height: 44px;
   border-radius: var(--cv-radius-md);
+  font-size: var(--cv-font-size-md);
 }
 :deep(.auth-form__actions > a) { color: var(--cv-color-link); font-size: var(--cv-font-size-sm); text-decoration: none; }
 :deep(.auth-form__actions > a) { justify-self: center; }
 :deep(.auth-form__actions > a:hover) { text-decoration: underline; }
-@media (max-width: 720px) {
-  .auth-shell__stage {
-    width: min(440px, calc(100% - 24px));
-    padding: var(--cv-space-8);
-  }
+
+@media (max-width: 1080px) {
+  .auth-shell__stage { padding-inline: 36px; }
 }
+
 @media (max-height: 700px) {
-  .auth-shell__stage { padding-block: var(--cv-space-6); }
+  .auth-shell__stage { place-items: start center; padding-block: var(--cv-space-6); }
+  .auth-shell__frame { gap: var(--cv-space-5); }
+  .auth-shell__header { gap: var(--cv-space-2); }
+  .auth-shell__header h1 { font-size: var(--cv-font-size-2xl); }
+  :deep(.auth-form) { gap: var(--cv-space-4); }
 }
-@media (max-width: 420px) {
-  .auth-shell { padding: var(--cv-space-3); }
-  .auth-shell__masthead :deep(.cv-brand__mark) { width: 40px; height: 40px; }
-  .auth-shell__stage { padding: var(--cv-space-6) var(--cv-space-5); }
+
+@media (max-width: 920px) {
+  .auth-shell { grid-template-columns: minmax(0, 1fr); }
+  .auth-shell > :deep(.auth-product-preview) { display: none; }
+  .auth-shell__stage { padding: var(--cv-space-8); }
+  .auth-shell__masthead { display: flex; }
+  .auth-shell__masthead :deep(.cv-brand__mark) { width: 38px; height: 38px; }
+}
+
+@media (max-width: 480px) {
+  .auth-shell__stage { place-items: start center; padding: var(--cv-space-6) var(--cv-space-5); }
+  .auth-shell__frame { gap: var(--cv-space-6); }
+  .auth-shell__header h1 { font-size: var(--cv-font-size-2xl); }
+  .auth-shell__description { font-size: var(--cv-font-size-md); }
+}
+
+@media (forced-colors: active) {
+  :deep(.auth-form__remember input) {
+    appearance: auto;
+    border: initial;
+    background: initial;
+    box-shadow: none;
+  }
+
+  :deep(.auth-form__remember input:focus-visible) {
+    outline: 2px solid Highlight;
+    outline-offset: 2px;
+  }
+
+  :deep(.auth-form__remember input::before) { content: none; }
 }
 </style>

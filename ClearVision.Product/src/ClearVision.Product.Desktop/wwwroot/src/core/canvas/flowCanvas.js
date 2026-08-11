@@ -984,7 +984,7 @@ class FlowCanvas {
 
         // 默认边框样式。
         let borderColor = isSelected ? node.color : palette.nodeBorder;
-        let borderWidth = isSelected ? 3 : 1;
+        let borderWidth = isSelected ? 2 : 1;
         let glowColor = null;
 
         // 特殊类型高亮。
@@ -995,7 +995,7 @@ class FlowCanvas {
 
         if (node.status === 'running') {
             borderColor = '#5ac8fa';
-            borderWidth = 3;
+            borderWidth = 2;
             glowColor = 'rgba(52, 152, 219, 0.6)';
         } else if (node.status === 'success') {
             borderColor = '#34c759';
@@ -1028,24 +1028,13 @@ class FlowCanvas {
 
         // Encoding cleanup: previous comment text was unreadable.
         this.ctx.save();
-        if (glowColor) {
-            this.ctx.shadowColor = glowColor;
-            this.ctx.shadowBlur = 15;
-            this.ctx.shadowOffsetX = 0;
-            this.ctx.shadowOffsetY = 0;
-        } else {
-            this.ctx.shadowColor = palette.nodeShadow;
-            this.ctx.shadowBlur = 8;
-            this.ctx.shadowOffsetX = 2;
-            this.ctx.shadowOffsetY = 2;
-        }
+        this.ctx.shadowColor = palette.nodeShadow;
+        this.ctx.shadowBlur = glowColor || isSelected ? 4 : 3;
+        this.ctx.shadowOffsetX = 0;
+        this.ctx.shadowOffsetY = 1;
 
-        // 节点背景 - 渐变填充
-        const gradient = this.ctx.createLinearGradient(x, y, x, y + h);
-        gradient.addColorStop(0, isSelected ? palette.nodeSelectedStart : palette.nodeBackgroundStart);
-        gradient.addColorStop(1, isSelected ? palette.nodeSelectedEnd : palette.nodeBackgroundEnd);
-
-        this.ctx.fillStyle = gradient;
+        // 节点主体使用哑光实体表面；颜色只编码选择与状态。
+        this.ctx.fillStyle = isSelected ? palette.nodeSelectedStart : palette.nodeBackgroundStart;
         this.ctx.strokeStyle = borderColor;
         this.ctx.lineWidth = borderWidth;
 
@@ -1055,7 +1044,7 @@ class FlowCanvas {
         }
 
         // Encoding cleanup: previous comment text was unreadable.
-        this.roundRect(x, y, w, h, 8);
+        this.roundRect(x, y, w, h, 6);
         this.ctx.fill();
         this.ctx.stroke();
 
@@ -1067,11 +1056,8 @@ class FlowCanvas {
         this.ctx.restore();
 
         // Encoding cleanup: previous comment text was unreadable.
-        const headerGradient = this.ctx.createLinearGradient(x, y, x + w, y);
-        headerGradient.addColorStop(0, node.color);
-        headerGradient.addColorStop(1, this.adjustColor(node.color, -20));
-        this.ctx.fillStyle = headerGradient;
-        this.roundRect(x, y, w, 24 * this.scale, { tl: 8, tr: 8, bl: 0, br: 0 });
+        this.ctx.fillStyle = node.color;
+        this.roundRect(x, y, w, 24 * this.scale, { tl: 6, tr: 6, bl: 0, br: 0 });
         this.ctx.fill();
 
         // Encoding cleanup: previous comment text was unreadable.
@@ -1746,21 +1732,21 @@ class FlowCanvas {
         // Encoding cleanup: previous comment text was unreadable.
         if (connection.status === 'active') {
             this.ctx.strokeStyle = '#34c759';
-            this.ctx.shadowColor = 'rgba(46, 204, 113, 0.5)';
-            this.ctx.shadowBlur = 10;
+            this.ctx.shadowColor = 'transparent';
+            this.ctx.shadowBlur = 0;
         } else if (connection.status === 'error') {
             this.ctx.strokeStyle = '#e74c3c';
-            this.ctx.shadowColor = 'rgba(231, 76, 60, 0.5)';
-            this.ctx.shadowBlur = 10;
+            this.ctx.shadowColor = 'transparent';
+            this.ctx.shadowBlur = 0;
         } else {
             this.ctx.strokeStyle = isSelected
                 ? (this.themePalette?.connectionSelected || FLOW_CANVAS_THEME_DEFAULTS.connectionSelected)
                 : (this.themePalette?.connection || FLOW_CANVAS_THEME_DEFAULTS.connection);
-            this.ctx.shadowColor = isSelected ? 'rgba(255, 255, 255, 0.4)' : 'transparent';
-            this.ctx.shadowBlur = isSelected ? 8 : 0;
+            this.ctx.shadowColor = 'transparent';
+            this.ctx.shadowBlur = 0;
         }
 
-        this.ctx.lineWidth = isSelected ? 3 * this.scale : 2 * this.scale;
+        this.ctx.lineWidth = isSelected ? 2.5 * this.scale : 2 * this.scale;
         this.ctx.stroke();
         this.ctx.restore();
 

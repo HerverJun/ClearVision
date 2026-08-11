@@ -50,7 +50,7 @@ withDefaults(defineProps<{
 }
 
 .cv-typography--display {
-  font-size: clamp(var(--cv-font-size-xl), 2vw, var(--cv-type-display-size));
+  font-size: var(--cv-type-display-size);
   line-height: var(--cv-line-height-tight);
   letter-spacing: var(--cv-letter-spacing-display);
 }

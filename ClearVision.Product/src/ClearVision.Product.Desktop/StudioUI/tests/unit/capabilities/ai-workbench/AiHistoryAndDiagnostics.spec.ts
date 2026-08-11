@@ -75,6 +75,28 @@ describe('AI history and diagnostics drawers', () => {
     expect(dialog?.textContent).not.toContain('run_private_internal_01');
     expect(document.activeElement?.getAttribute('aria-label')).toBe('关闭抽屉');
 
+    const tabs = [...(dialog?.querySelectorAll<HTMLButtonElement>('[role="tab"]') ?? [])];
+    expect(tabs.map(tab => tab.tabIndex)).toEqual([0, -1]);
+    expect(dialog?.querySelector<HTMLElement>('#ai-history-session-panel')?.style.display).toBe('');
+    expect(dialog?.querySelector<HTMLElement>('#ai-history-run-panel')?.style.display).toBe('none');
+    tabs[0]?.focus();
+    tabs[0]?.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }));
+    await nextTick();
+    expect(tabs.map(tab => tab.tabIndex)).toEqual([-1, 0]);
+    expect(document.activeElement).toBe(tabs[1]);
+    expect(dialog?.querySelector<HTMLElement>('#ai-history-session-panel')?.style.display).toBe('none');
+    expect(dialog?.querySelector<HTMLElement>('#ai-history-run-panel')?.style.display).toBe('');
+
+    tabs[1]?.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowLeft', bubbles: true }));
+    await nextTick();
+    expect(document.activeElement).toBe(tabs[0]);
+    tabs[0]?.dispatchEvent(new KeyboardEvent('keydown', { key: 'End', bubbles: true }));
+    await nextTick();
+    expect(document.activeElement).toBe(tabs[1]);
+    tabs[1]?.dispatchEvent(new KeyboardEvent('keydown', { key: 'Home', bubbles: true }));
+    await nextTick();
+    expect(document.activeElement).toBe(tabs[0]);
+
     dialog?.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
     expect(wrapper.emitted('close')).toHaveLength(1);
     wrapper.unmount();

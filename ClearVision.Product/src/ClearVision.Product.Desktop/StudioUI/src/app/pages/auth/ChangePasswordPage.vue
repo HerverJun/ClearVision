@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, shallowRef, watch } from 'vue';
+import { computed, nextTick, shallowRef, useTemplateRef, watch } from 'vue';
 import { useAuthLifecycleRoot } from '@/app/auth';
 import { CvButton, CvIconButton } from '@/design-system/primitives';
 import { CvIcon } from '@/design-system/icons';
@@ -12,13 +12,14 @@ const confirmNewPassword = shallowRef('');
 const showOldPassword = shallowRef(false);
 const showNewPassword = shallowRef(false);
 const showConfirmNewPassword = shallowRef(false);
-const localMessage = shallowRef<string | null>(null);
+const confirmPasswordError = shallowRef<string | null>(null);
 const messageRoot = shallowRef<HTMLElement>();
+const confirmNewPasswordInput = useTemplateRef<HTMLInputElement>('confirmNewPasswordInput');
 const busy = computed(() => root.auth.projection.phase === 'changing-password' ||
   root.auth.projection.phase === 'protected-transition');
-const messageTone = computed(() => localMessage.value || root.auth.projection.errorCode ? 'error' : 'info');
-const displayMessage = computed(() => localMessage.value ?? root.auth.projection.message);
-const prominentMessage = computed(() => Boolean(localMessage.value || root.auth.projection.errorCode));
+const messageTone = computed(() => root.auth.projection.errorCode ? 'error' : 'info');
+const displayMessage = computed(() => root.auth.projection.message);
+const prominentMessage = computed(() => Boolean(root.auth.projection.errorCode));
 const passwordHint = computed(() => {
   const policy = root.auth.projection.setupPolicy;
   const requirements = [`至少 ${policy?.passwordMinLength ?? 6} 位`];
@@ -28,15 +29,15 @@ const passwordHint = computed(() => {
   return `新密码要求：${requirements.join('，')}。`;
 });
 
-watch([oldPassword, newPassword, confirmNewPassword], () => {
-  localMessage.value = null;
+watch([newPassword, confirmNewPassword], ([nextPassword, nextConfirmation]) => {
+  if (nextPassword === nextConfirmation) confirmPasswordError.value = null;
 });
 
 async function submit(): Promise<void> {
   if (newPassword.value !== confirmNewPassword.value) {
-    localMessage.value = '两次输入的新密码不一致。';
+    confirmPasswordError.value = '两次输入的新密码不一致。';
     await nextTick();
-    messageRoot.value?.focus();
+    confirmNewPasswordInput.value?.focus();
     return;
   }
   const accepted = await root.auth.changePassword({
@@ -135,11 +136,14 @@ async function submit(): Promise<void> {
         <div class="auth-form__password">
           <input
             id="confirm-new-password"
+            ref="confirmNewPasswordInput"
             v-model="confirmNewPassword"
             class="auth-form__control"
             name="confirm-new-password"
             :type="showConfirmNewPassword ? 'text' : 'password'"
             autocomplete="new-password"
+            :aria-invalid="confirmPasswordError ? 'true' : undefined"
+            :aria-describedby="confirmPasswordError ? 'confirm-new-password-error' : undefined"
             required
           >
           <CvIconButton
@@ -156,6 +160,13 @@ async function submit(): Promise<void> {
             />
           </CvIconButton>
         </div>
+        <small
+          v-if="confirmPasswordError"
+          id="confirm-new-password-error"
+          class="auth-form__error"
+          data-auth-message
+          role="alert"
+        >{{ confirmPasswordError }}</small>
       </div>
       <div class="auth-form__actions">
         <CvButton
@@ -175,3 +186,14 @@ async function submit(): Promise<void> {
     </form>
   </AuthShell>
 </template>
+
+<style scoped>
+.auth-form__error {
+  margin: 0;
+  color: var(--cv-color-status-error-strong);
+  font-size: var(--cv-font-size-xs);
+  line-height: var(--cv-line-height-normal);
+}
+
+.auth-form__control[aria-invalid="true"] { border-color: var(--cv-color-status-error); }
+</style>

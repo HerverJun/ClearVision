@@ -276,6 +276,7 @@ watch(() => props.activeCameraId, value => {
           :class="{ 'is-active': binding.id === selectedId }"
           type="button"
           :disabled="disabled"
+          :aria-pressed="binding.id === selectedId"
           @click="selectBinding(binding.id)"
         >
           <span class="camera-binding-row__copy">
@@ -309,6 +310,7 @@ watch(() => props.activeCameraId, value => {
             v-model="selectedDraft.displayName"
             label="显示名称"
             name="cameraDisplayName"
+            autocomplete="off"
             :readonly="!canWrite || disabled"
             required
           />
@@ -323,23 +325,27 @@ watch(() => props.activeCameraId, value => {
             v-model="selectedDraft.serialNumber"
             label="序列号"
             name="cameraSerialNumber"
+            autocomplete="off"
             readonly
           />
           <CvField
             v-model="selectedDraft.ipAddress"
             label="IP 地址"
             name="cameraIpAddress"
+            autocomplete="off"
             readonly
           />
           <CvField
             v-model="selectedDraft.interfaceType"
             label="接口"
             name="cameraInterface"
+            autocomplete="off"
             readonly
           />
           <label class="check-field"><input
             v-model="selectedDraft.isEnabled"
             type="checkbox"
+            :name="`cameraEnabled-${selectedDraft.id}`"
             :disabled="!canWrite || disabled"
           ><span>启用绑定</span></label>
           <CvField
@@ -347,6 +353,7 @@ watch(() => props.activeCameraId, value => {
             label="曝光时间（微秒）"
             name="cameraExposure"
             type="number"
+            autocomplete="off"
             :readonly="!canWrite || disabled"
             :error="selectedErrors.find(item => item.includes('曝光'))"
             required
@@ -356,6 +363,7 @@ watch(() => props.activeCameraId, value => {
             label="增益（dB）"
             name="cameraGain"
             type="number"
+            autocomplete="off"
             :readonly="!canWrite || disabled"
             :error="selectedErrors.find(item => item.includes('增益'))"
             required
@@ -372,6 +380,7 @@ watch(() => props.activeCameraId, value => {
             label="目标帧率（帧/秒）"
             name="cameraTargetFrameRate"
             type="number"
+            autocomplete="off"
             :readonly="!canWrite || disabled"
             :error="selectedErrors.find(item => item.includes('帧率'))"
           />
@@ -386,6 +395,7 @@ watch(() => props.activeCameraId, value => {
             v-model="selectedDraft.hardwareTriggerSource"
             label="硬件触发源"
             name="cameraHardwareTriggerSource"
+            autocomplete="off"
             :readonly="!canWrite || disabled"
           />
           <CvSelect
@@ -406,6 +416,7 @@ watch(() => props.activeCameraId, value => {
               v-model="selectedDraft.enterPhotoelectricDeviceId"
               label="设备 ID"
               name="enterPhotoelectricDeviceId"
+              autocomplete="off"
               :readonly="!canWrite || disabled"
             />
             <CvField
@@ -413,6 +424,7 @@ watch(() => props.activeCameraId, value => {
               label="去抖时间（毫秒）"
               name="enterDebounce"
               type="number"
+              autocomplete="off"
               :readonly="!canWrite || disabled"
             />
             <CvField
@@ -420,11 +432,13 @@ watch(() => props.activeCameraId, value => {
               label="等待超时（毫秒）"
               name="enterTimeout"
               type="number"
+              autocomplete="off"
               :readonly="!canWrite || disabled"
             />
             <label class="check-field"><input
               v-model="selectedDraft.ignoreEnterTriggerWhileBusy"
               type="checkbox"
+              :name="`cameraIgnoreEnterWhileBusy-${selectedDraft.id}`"
               :disabled="!canWrite || disabled"
             ><span>忙碌时忽略触发</span></label>
           </div>
@@ -447,6 +461,7 @@ watch(() => props.activeCameraId, value => {
               label="波特率"
               name="serialBaudRate"
               type="number"
+              autocomplete="off"
               :readonly="!canWrite || disabled"
             />
             <CvField
@@ -454,6 +469,7 @@ watch(() => props.activeCameraId, value => {
               label="去抖时间（毫秒）"
               name="serialDebounce"
               type="number"
+              autocomplete="off"
               :readonly="!canWrite || disabled"
             />
             <CvField
@@ -461,11 +477,13 @@ watch(() => props.activeCameraId, value => {
               label="等待超时（毫秒）"
               name="serialTimeout"
               type="number"
+              autocomplete="off"
               :readonly="!canWrite || disabled"
             />
             <label class="check-field"><input
               v-model="selectedDraft.ignoreSerialPhotoelectricTriggerWhileBusy"
               type="checkbox"
+              :name="`cameraIgnoreSerialWhileBusy-${selectedDraft.id}`"
               :disabled="!canWrite || disabled"
             ><span>忙碌时忽略触发</span></label>
           </div>

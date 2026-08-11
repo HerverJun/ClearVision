@@ -49,7 +49,10 @@ test('G5 Admin PLC keeps protocol drafts isolated and separates save, mapping, a
   const saveSettings = plc.locator('[data-plc-action="save-settings"]');
   await expect(saveSettings).toHaveCount(1);
   await saveSettings.click();
-  await expect(plc.locator('[data-settings-device-feedback="plc"]')).toContainText('校验');
+  const ipAddressField = plc.locator('label:has(input[name="plcIpAddress"])');
+  await expect(ipAddressField.locator('[role="alert"]')).toContainText('Fixture 拒绝该 PLC 地址');
+  await expect(plc.locator('.validation-list [role="alert"]')).toHaveCount(0);
+  await expect(plc.locator('[data-settings-device-feedback="plc"]')).toBeHidden();
   expect(fixture.audit.filter(entry => entry.method === 'PUT' && entry.path === '/api/plc/settings')).toHaveLength(1);
 
   await plc.locator('input[name="plcIpAddress"]').fill('10.0.0.21');

@@ -97,16 +97,17 @@ const isDisabled = computed(() => props.disabled || props.loading);
   border-color: var(--cv-color-action);
   background: var(--cv-color-action);
   color: var(--cv-color-on-action);
-  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--cv-color-on-action) 16%, transparent);
+  box-shadow: none;
+  font-weight: var(--cv-font-weight-semibold);
 }
 
 .cv-button--primary:hover:not(:disabled) { border-color: var(--cv-color-action-hover); background: var(--cv-color-action-hover); }
-.cv-button--primary:active:not(:disabled) { border-color: var(--cv-color-action-active); background: var(--cv-color-action-active); }
+.cv-button--primary:active:not(:disabled) { border-color: var(--cv-color-action-active); background: var(--cv-color-action-active); transform: translateY(1px); }
 
 .cv-button--secondary {
-  border-color: var(--cv-border-default);
+  border-color: var(--cv-control-border);
   background: var(--cv-surface-raised);
-  color: var(--cv-color-action-text);
+  color: var(--cv-text-primary);
 }
 
 .cv-button--secondary:hover:not(:disabled) { border-color: var(--cv-control-border-hover); background: var(--cv-interactive-hover); }

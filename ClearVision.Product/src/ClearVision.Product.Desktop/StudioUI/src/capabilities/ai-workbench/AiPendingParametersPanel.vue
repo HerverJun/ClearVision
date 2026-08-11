@@ -120,6 +120,35 @@ function dataTypeLabel(value: string): string {
   return '参数';
 }
 
+function parameterDescriptionId(parameter: AiBuildParameterV1): string {
+  return `ai-param-${parameter.canonicalKey}-description`;
+}
+
+function parameterReasonId(parameter: AiBuildParameterV1): string {
+  return `ai-param-${parameter.canonicalKey}-reason`;
+}
+
+function parameterPickerErrorId(parameter: AiBuildParameterV1): string {
+  return `ai-param-${parameter.canonicalKey}-picker-error`;
+}
+
+function parameterValidationErrorId(parameter: AiBuildParameterV1): string {
+  return `ai-param-${parameter.canonicalKey}-validation-error`;
+}
+
+function parameterDescribedBy(parameter: AiBuildParameterV1): string {
+  const key = parameter.canonicalKey;
+  const ids = [parameterDescriptionId(parameter), parameterReasonId(parameter)];
+  if (pickerErrors[key]) ids.push(parameterPickerErrorId(parameter));
+  if (errors.value[key]) ids.push(parameterValidationErrorId(parameter));
+  return ids.join(' ');
+}
+
+function parameterInvalid(parameter: AiBuildParameterV1): 'true' | undefined {
+  const key = parameter.canonicalKey;
+  return pickerErrors[key] || errors.value[key] ? 'true' : undefined;
+}
+
 function submit(): void {
   if (!canSubmit.value || props.busy) return;
   const pendingKeys = new Set(validation.value.activeKeys);
@@ -162,12 +191,18 @@ function submit(): void {
               :label="dataTypeLabel(parameter.dataType)"
             />
           </div>
-          <p>{{ parameter.purpose || parameter.impact }}</p>
+          <p :id="parameterDescriptionId(parameter)">
+            {{ parameter.purpose || parameter.impact }}
+          </p>
           <select
             v-if="parameter.options.length"
             :id="`ai-param-${parameter.canonicalKey}`"
             v-model="drafts[parameter.canonicalKey]"
+            :name="`ai-param-${parameter.canonicalKey}`"
+            autocomplete="off"
             :disabled="busy || nullValues[parameter.canonicalKey]"
+            :aria-invalid="parameterInvalid(parameter)"
+            :aria-describedby="parameterDescribedBy(parameter)"
           >
             <option value="">
               请选择
@@ -184,7 +219,11 @@ function submit(): void {
             v-else-if="parameter.dataType === 'bool'"
             :id="`ai-param-${parameter.canonicalKey}`"
             v-model="drafts[parameter.canonicalKey]"
+            :name="`ai-param-${parameter.canonicalKey}`"
+            autocomplete="off"
             :disabled="busy || nullValues[parameter.canonicalKey]"
+            :aria-invalid="parameterInvalid(parameter)"
+            :aria-describedby="parameterDescribedBy(parameter)"
           >
             <option value="">
               请选择
@@ -199,9 +238,13 @@ function submit(): void {
               :id="`ai-param-${parameter.canonicalKey}`"
               :value="drafts[parameter.canonicalKey] ?? ''"
               type="text"
+              :name="`ai-param-${parameter.canonicalKey}`"
+              autocomplete="off"
               readonly
               :disabled="busy || Boolean(pickerBusy[parameter.canonicalKey]) || nullValues[parameter.canonicalKey]"
               :title="drafts[parameter.canonicalKey] || '尚未选择文件'"
+              :aria-invalid="parameterInvalid(parameter)"
+              :aria-describedby="parameterDescribedBy(parameter)"
             >
             <CvButton
               size="sm"
@@ -219,16 +262,21 @@ function submit(): void {
             :id="`ai-param-${parameter.canonicalKey}`"
             v-model="drafts[parameter.canonicalKey]"
             :type="['int', 'double', 'number'].includes(parameter.dataType) ? 'number' : 'text'"
+            :name="`ai-param-${parameter.canonicalKey}`"
+            autocomplete="off"
             :min="typeof parameter.minValue === 'number' ? parameter.minValue : undefined"
             :max="typeof parameter.maxValue === 'number' ? parameter.maxValue : undefined"
             :step="parameter.dataType === 'int' ? '1' : 'any'"
             :disabled="busy || nullValues[parameter.canonicalKey]"
             :placeholder="suggested(parameter)"
+            :aria-invalid="parameterInvalid(parameter)"
+            :aria-describedby="parameterDescribedBy(parameter)"
           >
           <p
             v-if="pickerErrors[parameter.canonicalKey]"
+            :id="parameterPickerErrorId(parameter)"
             class="ai-parameters__error"
-            role="alert"
+            aria-live="polite"
           >
             {{ pickerErrors[parameter.canonicalKey] }}
           </p>
@@ -239,17 +287,23 @@ function submit(): void {
             <input
               v-model="nullValues[parameter.canonicalKey]"
               type="checkbox"
+              :name="`ai-param-${parameter.canonicalKey}-null`"
+              autocomplete="off"
               :disabled="busy"
             >
             使用空值（与空字符串不同）
           </label>
-          <p class="ai-parameters__reason">
+          <p
+            :id="parameterReasonId(parameter)"
+            class="ai-parameters__reason"
+          >
             {{ suggested(parameter) }}。{{ parameter.suggestedReason }}
           </p>
           <p
             v-if="errors[parameter.canonicalKey]"
+            :id="parameterValidationErrorId(parameter)"
             class="ai-parameters__error"
-            role="alert"
+            aria-live="polite"
           >
             {{ errors[parameter.canonicalKey] }}
           </p>

@@ -8,6 +8,7 @@ import {
   CvModal,
   CvPagination,
   CvStatusBadge,
+  CvViewTabs,
   type CvStatusTone
 } from '@/design-system/primitives';
 import type { AiHistoryState } from './aiHistoryController';
@@ -33,6 +34,22 @@ const emit = defineEmits<{
 const activeTab = shallowRef<'sessions' | 'runs'>('sessions');
 const runScope = shallowRef<'all' | 'current'>('all');
 const deleteCandidate = shallowRef<AiSessionSummaryV1 | null>(null);
+const historyTabOptions = Object.freeze([
+  {
+    value: 'sessions',
+    label: '会话',
+    description: '查看并恢复历史会话',
+    id: 'ai-history-session-tab',
+    controls: 'ai-history-session-panel'
+  },
+  {
+    value: 'runs',
+    label: '运行',
+    description: '查看规划与构建运行记录',
+    id: 'ai-history-run-tab',
+    controls: 'ai-history-run-panel'
+  }
+]);
 const dateFormatter = new Intl.DateTimeFormat('zh-CN', {
   year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit'
 });
@@ -131,32 +148,12 @@ function confirmDelete(): void {
     description="历史来自当前用户的服务端记录。恢复会替换当前会话并释放旧请求与事件流。"
     @close="emit('close')"
   >
-    <div
+    <CvViewTabs
+      v-model="activeTab"
       class="ai-history__tabs"
-      role="tablist"
-      aria-label="历史类型"
-    >
-      <button
-        id="ai-history-session-tab"
-        type="button"
-        role="tab"
-        :aria-selected="activeTab === 'sessions'"
-        aria-controls="ai-history-session-panel"
-        @click="activeTab = 'sessions'"
-      >
-        会话
-      </button>
-      <button
-        id="ai-history-run-tab"
-        type="button"
-        role="tab"
-        :aria-selected="activeTab === 'runs'"
-        aria-controls="ai-history-run-panel"
-        @click="activeTab = 'runs'"
-      >
-        运行
-      </button>
-    </div>
+      :options="historyTabOptions"
+      label="历史类型"
+    />
 
     <CvInlineAlert
       v-if="history.message && history.deletePhase !== 'idle'"
@@ -176,10 +173,11 @@ function confirmDelete(): void {
     </CvInlineAlert>
 
     <section
-      v-if="activeTab === 'sessions'"
+      v-show="activeTab === 'sessions'"
       id="ai-history-session-panel"
       role="tabpanel"
       aria-labelledby="ai-history-session-tab"
+      tabindex="0"
       :aria-busy="history.sessionsPhase === 'loading' ? 'true' : undefined"
     >
       <div class="ai-history__section-heading">
@@ -282,10 +280,11 @@ function confirmDelete(): void {
     </section>
 
     <section
-      v-else
+      v-show="activeTab === 'runs'"
       id="ai-history-run-panel"
       role="tabpanel"
       aria-labelledby="ai-history-run-tab"
+      tabindex="0"
       :aria-busy="history.runsPhase === 'loading' ? 'true' : undefined"
     >
       <div class="ai-history__section-heading">
@@ -426,14 +425,10 @@ function confirmDelete(): void {
 </template>
 
 <style scoped>
-.ai-history__tabs,
 .ai-history__scope { display: inline-flex; min-width: 0; padding: 2px; border: 1px solid var(--cv-control-border); border-radius: var(--cv-radius-md); background: var(--cv-surface-2); }
 .ai-history__tabs { margin-block-end: var(--cv-space-4); }
-.ai-history__tabs button,
 .ai-history__scope button { min-height: var(--cv-density-control-height-sm); padding: 0 var(--cv-space-3); border: 0; border-radius: var(--cv-radius-sm); background: transparent; color: var(--cv-text-secondary); cursor: pointer; font: inherit; font-size: var(--cv-font-size-xs); }
-.ai-history__tabs button[aria-selected="true"],
 .ai-history__scope button[aria-pressed="true"] { background: var(--cv-surface-raised); color: var(--cv-text-primary); box-shadow: var(--cv-elevation-raised); }
-.ai-history__tabs button:hover,
 .ai-history__scope button:hover:not(:disabled) { color: var(--cv-color-link); }
 .ai-history__scope button:disabled { cursor: not-allowed; opacity: 0.48; }
 .ai-history__section-heading { display: flex; min-width: 0; align-items: flex-start; justify-content: space-between; gap: var(--cv-space-3); margin-block-end: var(--cv-space-3); }

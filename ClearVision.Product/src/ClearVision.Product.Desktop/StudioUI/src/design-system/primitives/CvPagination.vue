@@ -183,7 +183,7 @@ function goTo(page: number): void {
 }
 
 .cv-pagination__button:hover:not(:disabled) { background: var(--cv-interactive-hover); color: var(--cv-text-primary); }
-.cv-pagination__button--current { border-color: var(--cv-color-status-info-border); background: var(--cv-color-status-info-soft); color: var(--cv-color-link); font-weight: var(--cv-font-weight-semibold); }
+.cv-pagination__button--current { border-color: var(--cv-color-action-border); background: var(--cv-color-action-soft); color: var(--cv-color-action-text); font-weight: var(--cv-font-weight-semibold); }
 .cv-pagination__button:disabled { cursor: not-allowed; opacity: 0.42; }
 .cv-pagination__ellipsis { color: var(--cv-text-muted); }
 

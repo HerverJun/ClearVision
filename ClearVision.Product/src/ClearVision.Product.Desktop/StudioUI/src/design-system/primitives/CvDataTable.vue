@@ -213,7 +213,7 @@ caption {
   white-space: nowrap;
 }
 
-thead { background: var(--cv-surface-tool); }
+thead { background: transparent; }
 
 th,
 td {
@@ -233,7 +233,6 @@ th {
 }
 
 tbody tr:last-child td { border-bottom: 0; }
-tbody tr:nth-child(even) { background: color-mix(in srgb, var(--cv-color-action) 2.5%, transparent); }
 tbody tr:hover { background: var(--cv-interactive-hover); }
 .cv-data-table__cell--center { text-align: center; }
 .cv-data-table__cell--end { text-align: right; }

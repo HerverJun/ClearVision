@@ -15,6 +15,7 @@
 
     --success-jade: #16866f;
     --warning-amber: #b56a0a;
+    --warning-amber-strong: #8f4f08;
     --error-cinnabar: #c92f3b;
     --info-azure: #47738f;
 
@@ -217,6 +218,7 @@ html[data-theme="dark"] {
 
     --success-jade: #4eac94;
     --warning-amber: #d29a4a;
+    --warning-amber-strong: #e0ad65;
     --error-cinnabar: #ef6673;
     --info-azure: #75a4bf;
     --status-ok: #4eac94;

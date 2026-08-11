@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import {
   GLOBAL_SEARCH_GROUP_KEY,
   buildOperatorSearchText,
@@ -12,6 +13,43 @@ import {
   OperatorPaletteShell
 } from '../../../../src/ClearVision.Product.Desktop/wwwroot/src/features/flow-editor/operatorPaletteShell.js';
 import { getOperatorTypeDisplayName } from '../../../../src/ClearVision.Product.Desktop/wwwroot/src/shared/operatorDisplayNames.js';
+
+const flowEditorLayoutCss = readFileSync(
+  new URL('../../../../src/ClearVision.Product.Desktop/wwwroot/src/shared/styles/flow-editor-layout.css', import.meta.url),
+  'utf8'
+);
+const legacyVariablesCss = readFileSync(
+  new URL('../../../../src/ClearVision.Product.Desktop/wwwroot/src/shared/styles/variables.css', import.meta.url),
+  'utf8'
+);
+
+function readCssBlock(source, selector) {
+  const start = source.indexOf(selector);
+  assert.notEqual(start, -1, `Missing CSS block ${selector}`);
+  const end = source.indexOf('\n}', start);
+  assert.notEqual(end, -1, `Unterminated CSS block ${selector}`);
+  return source.slice(start, end);
+}
+
+function readHexToken(block, token) {
+  const match = block.match(new RegExp(`${token.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*:\\s*(#[0-9a-f]{6})`, 'i'));
+  assert.ok(match, `Missing hex token ${token}`);
+  return match[1];
+}
+
+function relativeLuminance(hex) {
+  const channels = [1, 3, 5].map(index => Number.parseInt(hex.slice(index, index + 2), 16) / 255);
+  const linear = channels.map(channel => channel <= 0.04045
+    ? channel / 12.92
+    : ((channel + 0.055) / 1.055) ** 2.4);
+  return 0.2126 * linear[0] + 0.7152 * linear[1] + 0.0722 * linear[2];
+}
+
+function contrastRatio(foreground, background) {
+  const lighter = Math.max(relativeLuminance(foreground), relativeLuminance(background));
+  const darker = Math.min(relativeLuminance(foreground), relativeLuminance(background));
+  return (lighter + 0.05) / (darker + 0.05);
+}
 
 const operators = [
   {
@@ -390,12 +428,40 @@ test('OperatorPaletteShell renders lifecycle badges for Experimental and Referen
   }, 2);
 
   assert.match(experimental, /operator-lifecycle-experimental/);
-  assert.match(experimental, />实验<\/span>/);
-  assert.match(experimental, /实验能力边界/);
+  assert.match(experimental, /class="operator-flyout-title">\s*<strong>颜色分析<\/strong>/);
+  assert.match(experimental, /aria-describedby="operator-lifecycle-note-0"/);
+  assert.match(experimental, /aria-hidden="true">实验<\/span>/);
+  assert.match(experimental, /id="operator-lifecycle-note-0" class="operator-flyout-lifecycle-note">实验：实验能力边界<\/span>/);
   assert.match(reference, /operator-lifecycle-reference/);
-  assert.match(reference, />参考<\/span>/);
-  assert.match(reference, /参考实现边界/);
+  assert.match(reference, /aria-describedby="operator-lifecycle-note-1"/);
+  assert.match(reference, /aria-hidden="true">参考<\/span>/);
+  assert.match(reference, /id="operator-lifecycle-note-1" class="operator-flyout-lifecycle-note">参考：参考实现边界<\/span>/);
   assert.doesNotMatch(stable, /operator-lifecycle-badge/);
+  assert.doesNotMatch(stable, /aria-describedby="operator-lifecycle-note-/);
+});
+
+test('OperatorPaletteShell lifecycle badges use defined AA-readable theme colors', () => {
+  assert.doesNotMatch(flowEditorLayoutCss, /--surface-raised/);
+  assert.match(flowEditorLayoutCss, /background:\s*var\(--bg-surface\)/);
+  assert.match(flowEditorLayoutCss, /operator-lifecycle-experimental\s*\{\s*color:\s*var\(--warning-amber-strong\)/);
+  assert.match(flowEditorLayoutCss, /operator-lifecycle-reference\s*\{\s*color:\s*var\(--status-info-strong\)/);
+  assert.match(flowEditorLayoutCss, /operator-lifecycle-deprecated\s*\{\s*color:\s*var\(--status-ng-strong\)/);
+
+  const root = readCssBlock(legacyVariablesCss, ':root {');
+  const light = readCssBlock(legacyVariablesCss, 'html[data-theme="light"] {');
+  const dark = readCssBlock(legacyVariablesCss, 'html[data-theme="dark"] {');
+  const lifecycleTokens = ['--warning-amber-strong', '--status-info-strong', '--status-ng-strong'];
+
+  for (const token of lifecycleTokens) {
+    assert.ok(contrastRatio(
+      readHexToken(root, token),
+      readHexToken(light, '--theme-surface-1')
+    ) >= 4.5, `${token} must remain readable in the light theme.`);
+    assert.ok(contrastRatio(
+      readHexToken(dark, token),
+      readHexToken(dark, '--theme-surface-1')
+    ) >= 4.5, `${token} must remain readable in the dark theme.`);
+  }
 });
 
 test('OperatorPaletteShell compatibility checkbox updates the shared library filter', () => {
