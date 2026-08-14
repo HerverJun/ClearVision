@@ -85,6 +85,11 @@ VIEW_POLISH_DOTNET_TESTS=NOT_RUN_THIS_REFINEMENT
 VIEW_POLISH_OWNER_SIGNOFF=NOT_PERFORMED
 FIELD_CAMERA_PLC_STATION_AI=NOT_PERFORMED
 PRODUCTION_SOAK=NOT_PERFORMED
+PARITY_ALIGNMENT_PLAN=PROPOSED_FOR_OWNER_REVIEW
+PARITY_ALIGNMENT_BASELINE_HEAD=22a3d26a00a2d3b8098165aab5489ce54f5bc95b
+PARITY_ALIGNMENT_W0_STATE=BLOCKED_BY_CONTRACT
+PARITY_ALIGNMENT_W0_CONTRACT_PACKET=PROPOSED_FOR_OWNER_REVIEW
+PARITY_ALIGNMENT_W0_OWNER_APPROVAL=NOT_PERFORMED
 ```
 
 ## G0 候选冻结与稳定线语义同步
@@ -177,6 +182,7 @@ G0_WORKTREE_STATE=IMPLEMENTATION_CLEAN_BEFORE_DOCUMENTATION_COMMIT
 | G8_NO_NODE | PARTIAL | `aba696269...` 本机 publish 静态扫描、合法 Vite 图片资产、Desktop 进程树无 Node child、sanitized-path 启动均 PASS；独立无 Node 目标机仍为 `NOT_PERFORMED`。 |
 | G9_FIELD_HARDWARE | NOT_PERFORMED | 当前环境没有现场 Camera、PLC、Station 验证条件。 |
 | G10_FINAL_CI | PARTIAL | `bf662c838...` 视觉实现的软件 gates 与 `aba696269...` 本机 WebView2 100% 证据通过；本轮 .NET tests `NOT RUN`。S00-S13 Browser 全矩阵、clean-checkout Remote CI、125% DPI、独立目标机、现场硬件、生产 soak 和产品签收未完成，不授予 production acceptance。 |
+| PARITY_ALIGNMENT_W0 | BLOCKED_BY_CONTRACT | 本次 Legacy parity 审计确认 Canvas run-to-node/subgraph、Inspector recommendation、Station high-risk confirmation 与六项产品处置尚无签字。事实、拟议边界、风险表和批准记录见 [ADR-ParityAlignment-Wave0](./ADR-ParityAlignment-Wave0-ContractFreeze.md)；不得将本行当作 W1/W2 实现完成。 |
 
 状态枚举：`DONE`、`PARTIAL`、`BLOCKED_BY_CONTRACT`、`BLOCKED_BY_ENVIRONMENT`、`NOT_PERFORMED`、`FAILED_RELATED`、`FAILED_UNRELATED`、`DEFERRED`。
 

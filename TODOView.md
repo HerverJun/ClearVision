@@ -1,5 +1,7 @@
 # ClearVision Studio UI Next 视觉精修自动推进 TODO
 
+> **历史计划说明（2026-08-12）**：本文件保留 V0-V6/V6R 的第一轮执行事实、SHA 与证据边界。第二轮旗舰级视觉精修的当前执行队列是 [`TODOViewR2.md`](./TODOViewR2.md)；不得把本文件的历史 PASS 自动继承为 R2 PASS。
+
 ```text
 DOCUMENT_ROLE=CODEX_AUTOMATED_VISUAL_POLISH_PLAN
 DOCUMENT_STATE=V6_LOCAL_BROWSER_AND_EXTERNAL_GATES_PENDING
