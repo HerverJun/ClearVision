@@ -25,10 +25,37 @@ const emit = defineEmits<{
 
 const runtime = computed(() => props.projection.runtime);
 const readonly = computed(() => props.projection.mutationGate !== 'editable');
+const nodeCount = computed(() => runtime.value?.nodeCount ?? props.projection.draft.operators.length);
+const connectionCount = computed(() => runtime.value?.connectionCount ?? props.projection.draft.connections.length);
 const selectedCount = computed(() => runtime.value?.selectedNodeIds.length ?? 0);
 const selectedDisabledCount = computed(() => {
   const selected = new Set(runtime.value?.selectedNodeIds ?? []);
   return runtime.value?.nodes.filter(node => selected.has(node.id) && node.disabled).length ?? 0;
+});
+const canvasStatusId = computed(() => `${props.canvasId}-accessibility-status`);
+const canvasHelpId = computed(() => `${props.canvasId}-accessibility-help`);
+const canvasDescriptionIds = computed(() => `${canvasStatusId.value} ${canvasHelpId.value}`);
+const canvasKeyboardShortcuts = computed(() => {
+  const selectionShortcuts = 'Control+A Meta+A Control+C Meta+C Escape';
+  if (readonly.value) return selectionShortcuts;
+  return `${selectionShortcuts} Control+V Meta+V Control+Z Meta+Z Control+Shift+Z Meta+Shift+Z Control+Y Meta+Y Delete Backspace`;
+});
+const canvasKeyboardHelp = computed(() => readonly.value
+  ? '画布当前仅可查看。获得焦点后，可使用 Ctrl/Command+A 全选，Ctrl/Command+C 复制，Escape 取消选择。'
+  : '画布获得焦点后，可使用 Ctrl/Command+A 全选，Ctrl/Command+C 和 Ctrl/Command+V 复制粘贴，Ctrl/Command+Z 撤销，Ctrl/Command+Shift+Z 或 Ctrl/Command+Y 重做，Delete 或 Backspace 删除，Escape 取消选择。');
+const canvasStatusText = computed(() => {
+  const selectedObjects: string[] = [];
+  if (selectedCount.value > 0) {
+    const disabledStatus = selectedDisabledCount.value > 0
+      ? `，其中 ${selectedDisabledCount.value} 个已禁用`
+      : '';
+    selectedObjects.push(`${selectedCount.value} 个节点${disabledStatus}`);
+  }
+  if (runtime.value?.selectedConnectionId) selectedObjects.push('1 条连线');
+  const selection = selectedObjects.length > 0
+    ? `已选中 ${selectedObjects.join('、')}`
+    : '未选择节点或连线';
+  return `流程包含 ${nodeCount.value} 个节点和 ${connectionCount.value} 条连线；${selection}。`;
 });
 const toggleDisabledLabel = computed(() => {
   if (selectedCount.value === 0) return '切换启用状态';
@@ -69,7 +96,7 @@ const toggleDisabledLabel = computed(() => {
           :disabled="readonly || !runtime?.canUndo"
           title="撤销（Ctrl+Z）"
           aria-label="撤销"
-          aria-keyshortcuts="Control+Z"
+          :aria-keyshortcuts="!readonly && runtime?.canUndo ? 'Control+Z Meta+Z' : undefined"
           @click="emit('undo')"
         >
           <CvIcon
@@ -84,7 +111,7 @@ const toggleDisabledLabel = computed(() => {
           :disabled="readonly || !runtime?.canRedo"
           title="重做（Ctrl+Y）"
           aria-label="重做"
-          aria-keyshortcuts="Control+Y"
+          :aria-keyshortcuts="!readonly && runtime?.canRedo ? 'Control+Y Meta+Y Control+Shift+Z Meta+Shift+Z' : undefined"
           @click="emit('redo')"
         >
           <CvIcon
@@ -106,7 +133,7 @@ const toggleDisabledLabel = computed(() => {
           :disabled="selectedCount === 0"
           title="复制所选节点（Ctrl+C）"
           aria-label="复制所选节点"
-          aria-keyshortcuts="Control+C"
+          :aria-keyshortcuts="selectedCount > 0 ? 'Control+C Meta+C' : undefined"
           @click="emit('copy')"
         >
           <CvIcon
@@ -122,7 +149,7 @@ const toggleDisabledLabel = computed(() => {
           :disabled="readonly"
           title="粘贴节点（Ctrl+V）"
           aria-label="粘贴节点"
-          aria-keyshortcuts="Control+V"
+          :aria-keyshortcuts="!readonly ? 'Control+V Meta+V' : undefined"
           @click="emit('paste')"
         >
           <CvIcon
@@ -175,7 +202,7 @@ const toggleDisabledLabel = computed(() => {
           :disabled="readonly || (selectedCount === 0 && !runtime?.selectedConnectionId)"
           title="删除所选对象（Delete）"
           aria-label="删除所选对象"
-          aria-keyshortcuts="Delete"
+          :aria-keyshortcuts="!readonly && (selectedCount > 0 || Boolean(runtime?.selectedConnectionId)) ? 'Delete Backspace' : undefined"
           @click="emit('delete')"
         >
           <CvIcon
@@ -235,8 +262,21 @@ const toggleDisabledLabel = computed(() => {
         :id="canvasId"
         tabindex="0"
         aria-label="流程编辑画布"
+        :aria-describedby="canvasDescriptionIds"
+        :aria-keyshortcuts="canvasKeyboardShortcuts"
         data-testid="flow-canvas"
       />
+      <span
+        :id="canvasStatusId"
+        class="flow-canvas-surface__visually-hidden"
+        role="status"
+        aria-live="polite"
+        aria-atomic="true"
+      >{{ canvasStatusText }}</span>
+      <span
+        :id="canvasHelpId"
+        class="flow-canvas-surface__visually-hidden"
+      >{{ canvasKeyboardHelp }}</span>
       <div
         v-if="projection.phase === 'idle'"
         class="flow-canvas-surface__loading"
@@ -256,8 +296,8 @@ const toggleDisabledLabel = computed(() => {
 
     <footer class="flow-canvas-surface__status">
       <span class="flow-canvas-surface__counts">
-        节点 {{ runtime?.nodeCount ?? projection.draft.operators.length }} ·
-        连线 {{ runtime?.connectionCount ?? projection.draft.connections.length }} ·
+        节点 {{ nodeCount }} ·
+        连线 {{ connectionCount }} ·
         已选 {{ selectedCount }}
       </span>
       <span class="flow-canvas-surface__revision">本地流程修订 {{ runtime?.flowRevision ?? 0 }}</span>
@@ -284,9 +324,9 @@ const toggleDisabledLabel = computed(() => {
 .flow-canvas-surface__toolbar {
   position: absolute;
   z-index: calc(var(--cv-z-sticky) - 1);
-  top: 12px;
-  right: 12px;
-  left: 12px;
+  top: 8px;
+  right: 8px;
+  left: 8px;
   min-width: 0;
   height: 36px;
   display: flex;
@@ -294,10 +334,10 @@ const toggleDisabledLabel = computed(() => {
   gap: var(--cv-space-1);
   padding: 0 var(--cv-space-2);
   overflow: hidden;
-  border: 1px solid var(--cv-border-subtle);
+  border: 1px solid color-mix(in srgb, var(--cv-border-subtle) 72%, transparent);
   border-radius: var(--cv-radius-sm);
   background: var(--cv-surface-floating);
-  box-shadow: var(--cv-elevation-1);
+  box-shadow: 0 1px 2px color-mix(in srgb, var(--cv-text-primary) 7%, transparent);
 }
 .flow-canvas-surface__tool-group { min-width: 0; display: flex; align-items: center; gap: 2px; }
 .flow-canvas-surface__tool-group + .flow-canvas-surface__tool-group { margin-left: var(--cv-space-1); padding-left: var(--cv-space-1); border-left: 1px solid var(--cv-border-subtle); }
@@ -334,6 +374,7 @@ const toggleDisabledLabel = computed(() => {
 .flow-canvas-surface__stage { position: relative; grid-row: 1; min-width: 0; min-height: 300px; overflow: hidden; }
 .flow-canvas-surface__stage canvas { display: block; width: 100%; height: 100%; outline: none; touch-action: none; }
 .flow-canvas-surface__stage canvas:focus-visible { box-shadow: inset 0 0 0 2px var(--cv-focus-ring-color); }
+.flow-canvas-surface__visually-hidden { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
 .flow-canvas-surface__loading { position: absolute; inset: 0; display: grid; place-content: center; gap: var(--cv-space-1); text-align: center; background: color-mix(in srgb, var(--flow-canvas-background) 86%, transparent); color: var(--cv-text-secondary); font-size: var(--cv-font-size-xs); pointer-events: none; }
 .flow-canvas-surface__loading strong { color: var(--cv-color-status-ng-strong); font-size: var(--cv-font-size-sm); }
 .flow-canvas-surface__loading.is-error { color: var(--cv-color-status-ng-strong); }
@@ -364,6 +405,11 @@ const toggleDisabledLabel = computed(() => {
 }
 
 @media (max-height: 760px) {
-  .flow-canvas-surface__toolbar { top: 8px; right: 8px; left: 8px; height: 34px; }
+  .flow-canvas-surface__toolbar { top: 6px; right: 6px; left: 6px; height: 34px; }
+}
+
+@media (forced-colors: active) {
+  .flow-canvas-surface__toolbar { border-color: CanvasText; background: Canvas; box-shadow: none; }
+  .flow-canvas-surface__tool-button { color: ButtonText; }
 }
 </style>

@@ -8,6 +8,7 @@ import {
   workspacePreviewDefaultHeight,
   workspacePreviewDefaultWidth,
   workspacePreviewMinHeight,
+  workspaceWideLayoutMinWidth,
   type WorkspaceLayoutObserver
 } from '@/capabilities/project-workspace/flow';
 
@@ -38,6 +39,26 @@ function createObserverHarness() {
 }
 
 describe('Workspace layout owner', () => {
+  it('budgets the largest operator rail token without horizontal overflow', () => {
+    const observer = createObserverHarness();
+    const owner = createWorkspaceLayoutOwner({
+      storage: createMemoryStorage(),
+      createObserver: observer.createObserver
+    });
+    owner.attach(document.createElement('section'));
+
+    observer.resize(1366, 768);
+    expect(workspaceWideLayoutMinWidth).toBe(1308);
+    expect(owner.projection).toMatchObject({
+      inspectorWidth: 280,
+      previewWidth: 318,
+      previewMaxWidth: 318
+    });
+    expect(72 + owner.projection.inspectorWidth + 8 + 680 + 8 + owner.projection.previewWidth)
+      .toBeLessThanOrEqual(1366);
+    owner.dispose();
+  });
+
   it('clamps Inspector and Preview to preserve the Canvas budget', () => {
     const observer = createObserverHarness();
     const owner = createWorkspaceLayoutOwner({
@@ -49,26 +70,32 @@ describe('Workspace layout owner', () => {
     observer.resize(1290, 600);
     expect(owner.projection).toMatchObject({
       inspectorMinWidth: 240,
-      inspectorMaxWidth: 240,
-      inspectorWidth: 240,
+      inspectorMaxWidth: 380,
+      inspectorWidth: 280,
       previewMinHeight: 160,
       previewMaxHeight: 240,
       previewHeight: 160,
-      previewWidth: 300
+      previewMaxWidth: 480,
+      previewWidth: 340
     });
 
     owner.setInspectorWidth(999);
     owner.setPreviewHeight(999);
-    expect(owner.projection.inspectorWidth).toBe(240);
+    expect(owner.projection.inspectorWidth).toBe(380);
     expect(owner.projection.previewHeight).toBe(240);
-    expect(owner.projection.previewWidth).toBe(300);
+    expect(owner.projection.previewWidth).toBe(340);
 
     observer.resize(980, 520);
-    expect(owner.projection.inspectorMaxWidth).toBe(240);
-    expect(owner.projection.inspectorWidth).toBe(240);
+    expect(owner.projection.inspectorMaxWidth).toBe(380);
+    expect(owner.projection.inspectorWidth).toBe(380);
     expect(owner.projection.previewMaxHeight).toBe(160);
     expect(owner.projection.previewHeight).toBe(160);
-    expect(owner.projection.previewWidth).toBe(300);
+    expect(owner.projection.previewMaxWidth).toBe(340);
+    expect(owner.projection.previewWidth).toBe(340);
+
+    observer.resize(940, 520);
+    expect(owner.projection.previewMaxWidth).toBe(480);
+    expect(owner.projection.previewWidth).toBe(340);
 
     owner.dispose();
     expect(observer.disconnected).toBe(true);

@@ -1317,6 +1317,101 @@ test('ImageCanvas pan, zoom, and ROI edits schedule redraws', async () => {
   }
 });
 
+test('ImageCanvas refits host resizes only while the view remains in fit mode', async () => {
+  const { ImageCanvas } = await import(
+    '../../../../src/ClearVision.Product.Desktop/wwwroot/src/core/canvas/imageCanvas.js'
+  );
+
+  const rafSpy = installRafSpy();
+  const canvas = createMockCanvas();
+  global.document = createMockDocument(canvas);
+  global.window = createMockWindow(canvas);
+
+  try {
+    const viewChanges = [];
+    const ic = new ImageCanvas('canvas', { onViewChanged: view => viewChanges.push(view) });
+    ic.image = { width: 100, height: 100 };
+    ic.resetView();
+
+    canvas.parentElement.clientWidth = 317;
+    canvas.parentElement.clientHeight = 231;
+    ic.resize();
+
+    assert.equal(ic._viewMode, 'fit');
+    assert.ok(Math.abs(ic.scale - 2.079) < 1e-9, 'fit scale should follow the resized logical host');
+    assert.ok(Math.abs(ic.offset.x - 54.55) < 1e-9);
+    assert.ok(Math.abs(ic.offset.y - 11.55) < 1e-9);
+    assert.deepEqual(viewChanges.at(-1), ic.getViewState(), 'fit resize should publish the canonical view');
+
+    ic.setViewState({ scale: 1.5, offset: { x: 7, y: 9 } });
+    canvas.parentElement.clientWidth = 500;
+    canvas.parentElement.clientHeight = 400;
+    ic.resize();
+
+    assert.equal(ic._viewMode, 'custom');
+    assert.deepEqual(ic.getViewState(), { scale: 1.5, offset: { x: 7, y: 9 } });
+    assert.deepEqual(viewChanges.at(-1), ic.getViewState(), 'explicit view changes should be published');
+
+    ic.fitToScreen();
+    assert.equal(ic._viewMode, 'fit');
+    assert.equal(ic.scale, 3.6);
+
+    ic.actualSize();
+    const actualView = ic.getViewState();
+    canvas.parentElement.clientWidth = 640;
+    canvas.parentElement.clientHeight = 480;
+    ic.resize();
+
+    assert.equal(ic._viewMode, 'actual');
+    assert.deepEqual(ic.getViewState(), actualView, 'actual-size view should retain its explicit position');
+
+    ic.destroy();
+  } finally {
+    rafSpy.restore();
+  }
+});
+
+test('ImageCanvas isolates synchronous and asynchronous view observer failures', async () => {
+  const { ImageCanvas } = await import(
+    '../../../../src/ClearVision.Product.Desktop/wwwroot/src/core/canvas/imageCanvas.js'
+  );
+
+  const rafSpy = installRafSpy();
+  const canvas = createMockCanvas();
+  global.document = createMockDocument(canvas);
+  global.window = createMockWindow(canvas);
+  const originalConsoleError = console.error;
+  const errors = [];
+  console.error = (...args) => errors.push(args);
+
+  try {
+    const syncError = new Error('sync observer failure');
+    const syncCanvas = new ImageCanvas('canvas', { onViewChanged: () => { throw syncError; } });
+    assert.doesNotThrow(() => syncCanvas.setViewState({ scale: 1.25, offset: { x: 4, y: 6 } }));
+    assert.deepEqual(syncCanvas.getViewState(), { scale: 1.25, offset: { x: 4, y: 6 } });
+    assert.equal(errors.length, 1);
+    assert.equal(errors[0]?.[1], syncError);
+    syncCanvas.destroy();
+
+    const asyncError = new Error('async observer failure');
+    const asyncCanvas = new ImageCanvas('canvas', {
+      onViewChanged: () => Promise.reject(asyncError)
+    });
+    assert.doesNotThrow(() => asyncCanvas.setViewState({ scale: 1.5, offset: { x: 7, y: 9 } }));
+    await Promise.resolve();
+    await Promise.resolve();
+    assert.equal(errors.length, 2);
+    assert.equal(errors[1]?.[1], asyncError);
+
+    asyncCanvas.destroy();
+    assert.doesNotThrow(() => asyncCanvas.notifyViewChanged());
+    assert.equal(errors.length, 2, 'destroyed canvases must not notify observers');
+  } finally {
+    console.error = originalConsoleError;
+    rafSpy.restore();
+  }
+});
+
 test('ImageCanvas blank click clears selection and schedules redraw', async () => {
   const { ImageCanvas } = await import(
     '../../../../src/ClearVision.Product.Desktop/wwwroot/src/core/canvas/imageCanvas.js'
@@ -1365,7 +1460,8 @@ test('ImageCanvas clear releases image resources and redraws empty canvas', asyn
   };
 
   try {
-    const ic = new ImageCanvas('canvas');
+    const viewChanges = [];
+    const ic = new ImageCanvas('canvas', { onViewChanged: view => viewChanges.push(view) });
     const blob = new Blob(['fake-image']);
     await ic.loadImage(blob);
     const trackedUrl = ic._imageUrlToRevoke;
@@ -1376,6 +1472,7 @@ test('ImageCanvas clear releases image resources and redraws empty canvas', asyn
     ic.interactionState = { type: 'draw', overlayId: 'roi-1', startPoint: { x: 10, y: 10 } };
     ic.activeHandle = 'se';
     ic._pendingResetView = true;
+    ic.setViewState({ scale: 2, offset: { x: 30, y: 40 } });
 
     clearPendingFrame(ic, rafSpy);
     ic.clear();
@@ -1387,6 +1484,8 @@ test('ImageCanvas clear releases image resources and redraws empty canvas', asyn
     assert.equal(ic.interactionState, null, 'clear should cancel active ROI interaction');
     assert.equal(ic.activeHandle, null, 'clear should reset active handle');
     assert.equal(ic._pendingResetView, false, 'clear should not leave a pending reset for a removed image');
+    assert.deepEqual(ic.getViewState(), { scale: 1, offset: { x: 0, y: 0 } }, 'clear should reset the empty view');
+    assert.deepEqual(viewChanges.at(-1), ic.getViewState(), 'clear should publish the reset view');
     assert.equal(global.URL._lastRevoked, trackedUrl, 'clear should revoke the tracked blob URL');
     assert.equal(rafSpy.count, 1, 'clear should schedule a redraw for the empty canvas');
 

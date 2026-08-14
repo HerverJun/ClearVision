@@ -62,6 +62,15 @@ const keyOutputs = computed(() => Object.entries(preview.outputData ?? {})
     key,
     value: value === null ? '空' : String(value)
   })));
+const diagnosticItems = computed(() => {
+  const occurrences = new Map<string, number>();
+  return preview.diagnostics.map(item => {
+    const identity = `${item.code}\u0000${item.message}\u0000${item.pathHint ?? ''}`;
+    const occurrence = (occurrences.get(identity) ?? 0) + 1;
+    occurrences.set(identity, occurrence);
+    return Object.freeze({ item, key: `${identity}\u0000${occurrence}` });
+  });
+});
 const outputFieldCount = computed(() => Object.keys(preview.outputData ?? {}).length);
 const previewActionTitle = computed(() => preview.autoPreviewAllowed
   ? '使用当前本地流程执行节点预览'
@@ -466,11 +475,11 @@ async function openArtifact(artifactId: string, isImage: boolean): Promise<void>
           </div>
           <ul>
             <li
-              v-for="(item, index) in preview.diagnostics"
-              :key="`${item.code}-${index}`"
+              v-for="diagnostic in diagnosticItems"
+              :key="diagnostic.key"
             >
-              <code translate="no">{{ item.code }}</code>
-              <span>{{ item.message }}</span>
+              <code translate="no">{{ diagnostic.item.code }}</code>
+              <span>{{ diagnostic.item.message }}</span>
             </li>
             <li
               v-for="item in preview.missingResources"
@@ -493,7 +502,7 @@ async function openArtifact(artifactId: string, isImage: boolean): Promise<void>
   display: grid;
   grid-template-rows: 42px minmax(0, 1fr);
   overflow: hidden;
-  background: var(--cv-surface-raised);
+  background: var(--cv-surface-page);
   container-name: preview;
   container-type: inline-size;
 }
@@ -502,7 +511,7 @@ async function openArtifact(artifactId: string, isImage: boolean): Promise<void>
 .preview-panel--image-empty .preview-panel__body { grid-template-rows: 94px minmax(0, 1fr); }
 .preview-panel--image-empty .preview-panel__body > :deep(.image-viewport) { grid-template-rows: 34px minmax(0, 1fr) 26px; }
 .preview-panel--image-empty .preview-panel__body > :deep(.image-viewport__stage) { min-height: 0; }
-.preview-panel :deep(.workspace-pane-header) { min-height: 42px; padding-inline: var(--cv-space-2); background: var(--cv-surface-raised); }
+.preview-panel :deep(.workspace-pane-header) { min-height: 42px; padding-inline: var(--cv-space-2); background: var(--cv-surface-page); }
 .preview-panel__revision,
 .preview-panel__manual-reason,
 .preview-panel__node-title { overflow: hidden; color: var(--cv-text-muted); font-size: var(--cv-font-size-2xs); text-overflow: ellipsis; white-space: nowrap; }
@@ -584,5 +593,11 @@ async function openArtifact(artifactId: string, isImage: boolean): Promise<void>
   .preview-panel__result,
   .preview-panel__artifacts,
   .preview-panel__diagnostics { padding-block: var(--cv-space-1); }
+}
+
+@media (forced-colors: active) {
+  .preview-panel,
+  .preview-panel :deep(.workspace-pane-header),
+  .preview-panel__details { border-color: CanvasText; background: Canvas; }
 }
 </style>

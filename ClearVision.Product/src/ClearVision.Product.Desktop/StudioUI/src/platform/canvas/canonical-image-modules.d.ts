@@ -50,6 +50,18 @@ declare module '@clearvision/canonical-preview-coordinator' {
 }
 
 declare module '@clearvision/canonical-image-canvas' {
+  export interface CanonicalImageCanvasViewState {
+    readonly scale: number;
+    readonly offset: Readonly<{ x: number; y: number }>;
+  }
+
+  export interface CanonicalImageCanvasOptions {
+    readonly interactionMode?: string;
+    readonly enableRightButtonPan?: boolean;
+    readonly onOverlayChanged?: ((geometry: unknown, phase: string) => void) | null;
+    readonly onViewChanged?: (view: CanonicalImageCanvasViewState) => void;
+  }
+
   export interface CanonicalImageCanvasResourceDiagnostics {
     readonly destroyed: boolean;
     readonly animationFramePending: boolean;
@@ -68,15 +80,15 @@ declare module '@clearvision/canonical-image-canvas' {
     readonly image: CanvasImageSource & { readonly width: number; readonly height: number } | null;
     readonly scale: number;
     readonly offset: Readonly<{ x: number; y: number }>;
-    constructor(canvasId: string, options?: Readonly<Record<string, unknown>>);
+    constructor(canvasId: string, options?: Readonly<CanonicalImageCanvasOptions>);
     loadImage(source: string | Blob | ArrayBuffer | Uint8Array): Promise<unknown>;
     clear(): void;
     resize(): void;
     fitToScreen(): void;
     fitToWindow(): void;
     actualSize(): void;
-    getViewState(): Readonly<{ scale: number; offset: Readonly<{ x: number; y: number }> }>;
-    setViewState(state: Readonly<{ scale: number; offset: Readonly<{ x: number; y: number }> }>): void;
+    getViewState(): CanonicalImageCanvasViewState;
+    setViewState(state: CanonicalImageCanvasViewState): void;
     setInteractionMode(mode: string): void;
     setOverlayChangedCallback(callback: ((geometry: unknown, phase: string) => void) | null): void;
     setEditableGeometry(geometry: unknown, options?: Readonly<Record<string, unknown>>): unknown;

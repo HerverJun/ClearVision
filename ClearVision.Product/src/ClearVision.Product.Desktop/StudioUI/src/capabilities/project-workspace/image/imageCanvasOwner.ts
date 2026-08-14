@@ -16,7 +16,7 @@ import {
   type PixelProbeProjectionModel
 } from './pixelProbeProjection';
 
-export type ImageCanvasOwnerPhase = 'unmounted' | 'empty' | 'loading' | 'ready' | 'error' | 'disposed';
+export type ImageCanvasOwnerPhase = 'unmounted' | 'empty' | 'loading' | 'ready' | 'stale' | 'error' | 'disposed';
 
 export interface ImageCanvasOwnerProjection {
   readonly phase: ImageCanvasOwnerPhase;
@@ -304,18 +304,11 @@ export function createImageCanvasOwner(options: {
   }
 
   function bindCanvasEvents(element: HTMLCanvasElement): void {
-    const sync = (): void => syncView();
     element.addEventListener('pointermove', handlePointerMove);
     element.addEventListener('click', handleClick);
-    element.addEventListener('wheel', sync);
-    element.addEventListener('mouseup', sync);
-    element.addEventListener('pointerup', sync);
     domCleanup.push(
       () => element.removeEventListener('pointermove', handlePointerMove),
-      () => element.removeEventListener('click', handleClick),
-      () => element.removeEventListener('wheel', sync),
-      () => element.removeEventListener('mouseup', sync),
-      () => element.removeEventListener('pointerup', sync)
+      () => element.removeEventListener('click', handleClick)
     );
   }
 
@@ -347,10 +340,22 @@ export function createImageCanvasOwner(options: {
     ] as const,
     ([requestKey, output, input, stale, phase]) => {
       if (disposed) return;
+      if ((stale || phase === 'loading') && imageElement()) {
+        pendingSource = null;
+        pendingIdentity = null;
+        state.imageGeneration += 1;
+        state.phase = 'stale';
+        state.errorMessage = null;
+        state.pixelProbe = pixelModel.setImageContext({ identity: state.imageIdentity, status: 'no-image' });
+        syncDiagnostics();
+        return;
+      }
       pendingSource = stale || phase === 'loading' ? null : output || input;
       pendingIdentity = pendingSource && requestKey ? `${requestKey}:${output ? 'output' : 'input'}` : null;
-      primarySource = pendingSource;
-      primaryIdentity = pendingIdentity;
+      if (pendingSource && pendingIdentity) {
+        primarySource = pendingSource;
+        primaryIdentity = pendingIdentity;
+      }
       void loadPendingImage();
     },
     { immediate: true }
@@ -427,7 +432,11 @@ export function createImageCanvasOwner(options: {
       if (disposed) throw new Error('ImageCanvas owner has been disposed.');
       if (canvas) throw new Error(`ImageCanvas owner already mounted for project ${options.projectId}.`);
       canvasId = nextCanvasId;
-      canvas = createCanonicalImageCanvasHost(canvasId, { interactionMode: 'legacy', enableRightButtonPan: false });
+      canvas = createCanonicalImageCanvasHost(canvasId, {
+        interactionMode: 'legacy',
+        enableRightButtonPan: false,
+        onViewChanged: syncView
+      });
       bindCanvasEvents(canvas.element);
       state.phase = 'empty';
       syncDiagnostics();

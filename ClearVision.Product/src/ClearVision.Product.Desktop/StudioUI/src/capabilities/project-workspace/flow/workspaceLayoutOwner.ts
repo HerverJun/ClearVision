@@ -14,11 +14,14 @@ export const workspacePreviewDefaultWidth = 340;
 export const workspacePreviewMaxWidth = 480;
 
 const workspaceSplitterSize = 8;
-const workspaceWideOperatorWidth = 56;
-const workspaceCompactOperatorWidth = 56;
+const workspaceOperatorWidthBudget = 72;
 const workspaceWideCanvasMinWidth = 680;
 const workspaceCompactCanvasMinWidth = 560;
 const workspaceCanvasSurfaceMinHeight = 352;
+export const workspaceWideLayoutMinWidth = workspaceOperatorWidthBudget + workspaceInspectorMinWidth +
+  workspaceSplitterSize * 2 + workspaceWideCanvasMinWidth + workspacePreviewMinWidth;
+export const workspaceStackedLayoutMaxWidth = workspaceOperatorWidthBudget + workspaceCompactCanvasMinWidth +
+  workspaceSplitterSize + workspacePreviewMinWidth;
 
 export interface WorkspaceLayoutProjection {
   readonly containerWidth: number;
@@ -144,12 +147,16 @@ export function createWorkspaceLayoutOwner(
     state.containerWidth = Math.max(0, Math.round(width));
     state.containerHeight = Math.max(0, Math.round(height));
 
-    const wideLayout = state.containerWidth > 1180;
-    const operatorWidth = wideLayout ? workspaceWideOperatorWidth : workspaceCompactOperatorWidth;
+    const wideLayout = state.containerWidth >= workspaceWideLayoutMinWidth;
+    const stackedLayout = state.containerWidth > 0 &&
+      state.containerWidth <= workspaceStackedLayoutMaxWidth;
+    const operatorWidth = workspaceOperatorWidthBudget;
     const canvasMinWidth = wideLayout ? workspaceWideCanvasMinWidth : workspaceCompactCanvasMinWidth;
-    const availableInspectorWidth = state.containerWidth > 0
+    const availableInspectorWidth = wideLayout
       ? state.containerWidth - operatorWidth - workspaceSplitterSize * 2 - canvasMinWidth - state.previewMinWidth
-      : workspaceInspectorMaxWidth;
+      : state.containerWidth > 0
+        ? state.containerWidth - operatorWidth - 48
+        : workspaceInspectorMaxWidth;
     state.inspectorMaxWidth = clamp(
       availableInspectorWidth,
       workspaceInspectorMinWidth,
@@ -174,9 +181,11 @@ export function createWorkspaceLayoutOwner(
       state.previewMinHeight,
       state.previewMaxHeight
     );
-    const availablePreviewWidth = state.containerWidth > 0
-      ? state.containerWidth - operatorWidth - workspaceSplitterSize * 2 - canvasMinWidth - state.inspectorWidth
-      : workspacePreviewMaxWidth;
+    const availablePreviewWidth = state.containerWidth <= 0 || stackedLayout
+      ? workspacePreviewMaxWidth
+      : wideLayout
+        ? state.containerWidth - operatorWidth - workspaceSplitterSize * 2 - canvasMinWidth - state.inspectorWidth
+        : state.containerWidth - operatorWidth - workspaceSplitterSize - canvasMinWidth;
     state.previewMaxWidth = clamp(
       availablePreviewWidth,
       workspacePreviewMinWidth,

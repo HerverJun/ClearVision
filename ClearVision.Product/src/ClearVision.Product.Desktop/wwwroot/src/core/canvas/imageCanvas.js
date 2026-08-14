@@ -166,6 +166,7 @@ class ImageCanvas {
         // 视图状态
         this.scale = 1;
         this.offset = { x: 0, y: 0 };
+        this._viewMode = 'fit';
         this.minScale = 0.1;
         this.maxScale = 10;
 
@@ -182,6 +183,7 @@ class ImageCanvas {
         // 交互模式
         this.interactionMode = options.interactionMode || 'legacy';
         this.onOverlayChanged = options.onOverlayChanged || null;
+        this.onViewChanged = typeof options.onViewChanged === 'function' ? options.onViewChanged : null;
         this.enableRightButtonPan = options.enableRightButtonPan ?? this.interactionMode === 'roi-rect';
         this.handleSize = options.handleSize || 10;
         this.minimumOverlaySize = options.minimumOverlaySize || 1;
@@ -348,9 +350,8 @@ class ImageCanvas {
         const cssWidth = container ? container.clientWidth : 0;
         const cssHeight = container ? container.clientHeight : 0;
 
-        // 【关键修复】如果尺寸从0变为非0且有待处理的重置视图，执行重置
-        const wasZero = this._logicalWidth === 0 || this._logicalHeight === 0;
         const isNowNonZero = cssWidth > 0 && cssHeight > 0;
+        const dimensionsChanged = cssWidth !== this._logicalWidth || cssHeight !== this._logicalHeight;
 
         const dpr = window.devicePixelRatio || 1;
         this._dpr = dpr;
@@ -364,9 +365,8 @@ class ImageCanvas {
 
         this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
-        // 如果之前因为尺寸为0而延迟了resetView，现在重新尝试
-        if (wasZero && isNowNonZero && this._pendingResetView && this.image) {
-            this._pendingResetView = false;
+        // Fit view tracks its host while preserving explicit actual-size and custom views.
+        if (isNowNonZero && dimensionsChanged && this.image && this._viewMode === 'fit') {
             this.resetView();
         } else {
             this.invalidate();
@@ -496,8 +496,8 @@ class ImageCanvas {
 
                 this._releaseCurrentImage();
                 this.image = bitmap;
-                // 如果是第一帧，重置视图；否则保持视图状态以支持视频流
-                if (this.scale === 1 && this.offset.x === 0 && this.offset.y === 0) {
+                // Fit mode follows frame dimensions; explicit actual/custom views remain stable.
+                if (this._viewMode === 'fit') {
                     this.resetView();
                 }
                 this.invalidate();
@@ -514,6 +514,8 @@ class ImageCanvas {
      */
     resetView() {
         if (!this.image) return;
+
+        this._viewMode = 'fit';
 
         const canvasWidth = this._logicalWidth;
         const canvasHeight = this._logicalHeight;
@@ -539,6 +541,7 @@ class ImageCanvas {
         this.offset.y = (canvasHeight - imageHeight * this.scale) / 2;
         
         this.invalidate();
+        this.notifyViewChanged();
     }
 
     /**
@@ -553,10 +556,13 @@ class ImageCanvas {
      */
     actualSize() {
         if (!this.image) return;
+        this._viewMode = 'actual';
+        this._pendingResetView = false;
         this.scale = 1;
         this.offset.x = (this._logicalWidth - this.image.width) / 2;
         this.offset.y = (this._logicalHeight - this.image.height) / 2;
         this.invalidate();
+        this.notifyViewChanged();
     }
 
     /**
@@ -1183,9 +1189,12 @@ class ImageCanvas {
                 // 平移画布
                 const dx = e.clientX - this.lastMouse.x;
                 const dy = e.clientY - this.lastMouse.y;
+                this._viewMode = 'custom';
+                this._pendingResetView = false;
                 this.offset.x += dx;
                 this.offset.y += dy;
                 this.lastMouse = { x: e.clientX, y: e.clientY };
+                this.notifyViewChanged();
             }
             this.invalidate();
         }
@@ -1333,10 +1342,13 @@ class ImageCanvas {
         
         if (newScale !== this.scale) {
             // 以鼠标位置为中心缩放
+            this._viewMode = 'custom';
+            this._pendingResetView = false;
             this.offset.x = mouseX - (mouseX - this.offset.x) * (newScale / this.scale);
             this.offset.y = mouseY - (mouseY - this.offset.y) * (newScale / this.scale);
             this.scale = newScale;
             this.invalidate();
+            this.notifyViewChanged();
         }
     }
 
@@ -1363,6 +1375,20 @@ class ImageCanvas {
         };
     }
 
+    notifyViewChanged() {
+        if (this._destroyed || !this.onViewChanged) return;
+        try {
+            const result = this.onViewChanged(this.getViewState());
+            if (result && typeof result.then === 'function') {
+                Promise.resolve(result).catch(error => {
+                    console.error('ImageCanvas onViewChanged callback failed:', error);
+                });
+            }
+        } catch (error) {
+            console.error('ImageCanvas onViewChanged callback failed:', error);
+        }
+    }
+
     getResourceDiagnostics() {
         return Object.freeze({
             destroyed: this._destroyed,
@@ -1382,9 +1408,12 @@ class ImageCanvas {
      * 设置视图状态
      */
     setViewState(state) {
+        this._viewMode = 'custom';
+        this._pendingResetView = false;
         this.scale = state.scale;
         this.offset = { ...state.offset };
         this.invalidate();
+        this.notifyViewChanged();
     }
 
     /**
@@ -1400,8 +1429,12 @@ class ImageCanvas {
         this.activeOverlayId = null;
         this.interactionState = null;
         this.activeHandle = null;
+        this._viewMode = 'fit';
         this._pendingResetView = false;
+        this.scale = 1;
+        this.offset = { x: 0, y: 0 };
         this.invalidate();
+        this.notifyViewChanged();
     }
 
     getPrimaryEditableOverlay() {
@@ -2291,9 +2324,12 @@ class ImageCanvas {
 
         if (this.interactionState.type === 'pan') {
             const canvasPoint = this.getCanvasPoint(e);
+            this._viewMode = 'custom';
+            this._pendingResetView = false;
             this.offset.x = this.interactionState.startOffset.x + (canvasPoint.x - this.interactionState.startCanvasPoint.x);
             this.offset.y = this.interactionState.startOffset.y + (canvasPoint.y - this.interactionState.startCanvasPoint.y);
             this.invalidate();
+            this.notifyViewChanged();
             return;
         }
 

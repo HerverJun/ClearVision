@@ -23,6 +23,7 @@ const phaseLabel = computed(() => ({
   empty: '无图像输出',
   loading: '正在加载…',
   ready: dimensions.value,
+  stale: `${dimensions.value} · 旧结果`,
   error: '图像加载失败',
   disposed: '已关闭'
 }[projection.phase] ?? dimensions.value));

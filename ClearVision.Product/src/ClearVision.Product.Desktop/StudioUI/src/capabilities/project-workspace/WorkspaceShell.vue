@@ -451,7 +451,7 @@ const runBlockerMessage = computed(() => {
 const runStatusMessage = computed(() => {
   if (runBlockerMessage.value) return runBlockerMessage.value;
   if (!run.value || ![
-    'occupied', 'reconnecting', 'disconnected', 'failed', 'cancelled',
+    'succeeded', 'occupied', 'reconnecting', 'disconnected', 'failed', 'cancelled',
     'cancel-requested', 'unknown-outcome'
   ].includes(run.value.phase)) return null;
   return runProjectionMessage.value;
@@ -1063,7 +1063,7 @@ function workspaceResultsLink(resultId?: string): string {
   .workspace-shell__work-area--state { grid-template-columns: 176px minmax(520px, 1fr) 248px; }
 }
 
-@media (max-width: 920px) {
+@media (max-width: 1040px) {
   .workspace-shell__work-area--state { grid-template-columns: minmax(0, 1fr); }
   .workspace-shell__work-area--state .workspace-shell__rail,
   .workspace-shell__work-area--state .workspace-shell__inspector { display: none; }

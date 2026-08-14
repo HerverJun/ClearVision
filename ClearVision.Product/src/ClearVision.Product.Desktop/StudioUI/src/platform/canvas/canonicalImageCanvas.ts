@@ -9,14 +9,25 @@ export interface CanonicalImageSnapshot {
   readonly height: number;
 }
 
+export interface CanonicalImageCanvasViewState {
+  readonly scale: number;
+  readonly offset: Readonly<{ x: number; y: number }>;
+}
+
+export interface CanonicalImageCanvasHostOptions {
+  readonly interactionMode?: string;
+  readonly enableRightButtonPan?: boolean;
+  readonly onViewChanged?: (view: CanonicalImageCanvasViewState) => void;
+}
+
 export interface CanonicalImageCanvasHost {
   readonly element: HTMLCanvasElement;
   load(source: string | Blob | ArrayBuffer | Uint8Array): Promise<unknown>;
   clear(): void;
   fit(): void;
   actualSize(): void;
-  getViewState(): Readonly<{ scale: number; offset: Readonly<{ x: number; y: number }> }>;
-  setViewState(state: Readonly<{ scale: number; offset: Readonly<{ x: number; y: number }> }>): void;
+  getViewState(): CanonicalImageCanvasViewState;
+  setViewState(state: CanonicalImageCanvasViewState): void;
   getImagePoint(event: MouseEvent | PointerEvent): Readonly<{ x: number; y: number }>;
   getImageSnapshot(): CanonicalImageSnapshot | null;
   setRoiMode(enabled: boolean): void;
@@ -42,7 +53,7 @@ export class CanonicalImageCanvasOwnerConflictError extends Error {
 
 export function createCanonicalImageCanvasHost(
   canvasId: string,
-  options: Readonly<Record<string, unknown>> = {}
+  options: Readonly<CanonicalImageCanvasHostOptions> = {}
 ): CanonicalImageCanvasHost {
   if (activeImageCanvasToken) throw new CanonicalImageCanvasOwnerConflictError();
   const token = Symbol(`canonical-image-canvas:${canvasId}`);
@@ -70,7 +81,7 @@ export function createCanonicalImageCanvasHost(
     fit(): void { assertActive(); canvas.fitToWindow(); },
     actualSize(): void { assertActive(); canvas.actualSize(); },
     getViewState() { assertActive(); return canvas.getViewState(); },
-    setViewState(state: Readonly<{ scale: number; offset: Readonly<{ x: number; y: number }> }>) {
+    setViewState(state: CanonicalImageCanvasViewState) {
       assertActive();
       canvas.setViewState(state);
     },
