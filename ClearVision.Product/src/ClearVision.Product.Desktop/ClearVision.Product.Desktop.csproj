@@ -92,6 +92,11 @@
     <StudioUiNodeModulesLock>$(StudioUiRoot)node_modules\.package-lock.json</StudioUiNodeModulesLock>
     <SkipStudioUiBuild Condition="'$(SkipStudioUiBuild)' == ''">false</SkipStudioUiBuild>
     <SkipStudioUiInstall Condition="'$(SkipStudioUiInstall)' == ''">false</SkipStudioUiInstall>
+    <StudioUiNpmExecutable Condition="'$(StudioUiNpmExecutable)' == '' and '$(CLEARVISION_NPM)' != ''">$(CLEARVISION_NPM)</StudioUiNpmExecutable>
+    <StudioUiNpmExecutable Condition="'$(StudioUiNpmExecutable)' == '' and '$(LOCALAPPDATA)' != '' and Exists('$(LOCALAPPDATA)\Programs\nodejs\npm.cmd')">$(LOCALAPPDATA)\Programs\nodejs\npm.cmd</StudioUiNpmExecutable>
+    <StudioUiNpmExecutable Condition="'$(StudioUiNpmExecutable)' == '' and '$(ProgramFiles)' != '' and Exists('$(ProgramFiles)\nodejs\npm.cmd')">$(ProgramFiles)\nodejs\npm.cmd</StudioUiNpmExecutable>
+    <StudioUiNpmExecutable Condition="'$(StudioUiNpmExecutable)' == '' and '$(LOCALAPPDATA)' != '' and Exists('$(LOCALAPPDATA)\Microsoft\WindowsApps\npm.cmd')">$(LOCALAPPDATA)\Microsoft\WindowsApps\npm.cmd</StudioUiNpmExecutable>
+    <StudioUiNpmExecutable Condition="'$(StudioUiNpmExecutable)' == ''">npm.cmd</StudioUiNpmExecutable>
   </PropertyGroup>
 
   <ItemGroup>
@@ -131,9 +136,11 @@
     <Error Condition="'$(SkipStudioUiInstall)' == 'true'"
            Text="SkipStudioUiInstall=true requires up-to-date StudioUI node_modules and $(StudioUiNodeModulesLock). Run npm ci before invoking MSBuild with this property." />
     <Message Importance="high"
-             Text="Installing StudioUI dependencies from $(StudioUiRoot)" />
+              Text="Installing StudioUI dependencies from $(StudioUiRoot)" />
+    <Message Importance="low"
+              Text="Using StudioUI npm executable: $(StudioUiNpmExecutable)" />
     <Exec WorkingDirectory="$(StudioUiRoot)"
-          Command="npm ci" />
+          Command="&quot;$(StudioUiNpmExecutable)&quot; ci" />
   </Target>
 
   <Target Name="BuildStudioUi"
@@ -145,10 +152,12 @@
     <Error Condition="'$(SkipStudioUiBuild)' == 'true'"
            Text="SkipStudioUiBuild=true requires current StudioUI assets at $(StudioUiIntermediateDist). Rebuild assets before using this property." />
     <Message Importance="high"
-             Text="Building StudioUI assets into $(StudioUiIntermediateDist)" />
+              Text="Building StudioUI assets into $(StudioUiIntermediateDist)" />
+    <Message Importance="low"
+              Text="Using StudioUI npm executable: $(StudioUiNpmExecutable)" />
     <RemoveDir Directories="$(StudioUiIntermediateDist)" />
     <Exec WorkingDirectory="$(StudioUiRoot)"
-          Command="npm run build"
+          Command="&quot;$(StudioUiNpmExecutable)&quot; run build"
           EnvironmentVariables="VITE_OUT_DIR=$(StudioUiIntermediateDist);CONFIGURATION=$(Configuration);TARGET_FRAMEWORK=$(TargetFramework)" />
   </Target>
 
