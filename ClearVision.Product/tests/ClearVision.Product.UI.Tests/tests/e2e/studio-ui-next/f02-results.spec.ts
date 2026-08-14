@@ -17,6 +17,12 @@ import {
   createF04RuntimeErrorAudit,
   hasF04VisualEvidenceTarget
 } from './f04-browser-evidence';
+import {
+  captureR2FinalMatrixGroup,
+  prepareR2FinalMatrixPage,
+  r2Viewport,
+  type R2FinalVariant
+} from './r2-visual/r2-final-matrix-evidence';
 
 const fixtureSchemaVersion = 'f02-results-read.v1';
 const projectId = '11111111-1111-4111-8111-111111111111';
@@ -494,6 +500,34 @@ async function bootResults(page: Page, initialHash = '/results'): Promise<F02Met
   await page.goto(`/studio/index.html#${initialHash}`);
   await expect(page.locator('[data-capability="results-read"]')).toBeVisible();
   return audit;
+}
+
+for (const variant of ['B0', 'B2', 'EXCEPTION'] as const satisfies readonly R2FinalVariant[]) {
+  test(`@r2-final S07 ${variant} projects the F02 result investigation`, async ({ page }) => {
+    await page.setViewportSize(r2Viewport(variant));
+    await installF02VisualPreferences(page, 'light', 'compact');
+    const runtime = await prepareR2FinalMatrixPage(page);
+    const exception = variant === 'EXCEPTION';
+    const initialHash = `/results?source=local&projectId=${projectId}&resultId=${localResultId}&outcome=Ng${exception ? '&evidenceMode=expired' : ''}`;
+    const audit = await bootResults(page, initialHash);
+
+    const detail = page.getByLabel('结果详情');
+    await expect(detail.getByText('判定 NG', { exact: true })).toBeVisible();
+    await expect(detail.getByText('FIXTURE_NG', { exact: true }).first()).toBeVisible();
+    if (exception) {
+      await expect(page.locator('[data-evidence-phase="expired"]')).toBeVisible();
+      await expect(page.getByText('证据已过保留期，结果摘要仍可调查。')).toBeVisible();
+    } else {
+      await expect(page.locator('[data-evidence-phase="available"]')).toBeVisible();
+    }
+    expect(expectGetOnly(audit)).toBe(true);
+    await captureR2FinalMatrixGroup(page, {
+      scene: 'S07', variant, route: `#${initialHash}` as `#/${string}`,
+      state: exception ? 'expired' : 'data-ng-first',
+      role: 'Engineer', owner: 'F02-results', runtime,
+      requiredCriticalActions: ['[data-testid="results-refresh"]']
+    });
+  });
 }
 
 test('Results local view keeps query filters, dual axes, detail 404 and GET-only transport', async ({ page }) => {

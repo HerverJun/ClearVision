@@ -7,6 +7,12 @@ import {
   type F06BrowserAudit,
   type F06BrowserFixtureOptions
 } from './f06-ai-fixture';
+import {
+  captureR2FinalMatrixGroup,
+  prepareR2FinalMatrixPage,
+  r2Viewport,
+  type R2FinalVariant
+} from './r2-visual/r2-final-matrix-evidence';
 
 async function boot(
   page: Page,
@@ -37,6 +43,32 @@ async function expectNoHorizontalOverflow(page: Page): Promise<void> {
     document.body.scrollWidth - document.body.clientWidth
   ));
   expect(overflow).toBeLessThanOrEqual(1);
+}
+
+for (const variant of ['B0', 'B2', 'EXCEPTION'] as const satisfies readonly R2FinalVariant[]) {
+  test(`@r2-final S11 ${variant} projects the F06 AgentRun recovery state`, async ({ page }) => {
+    const runtime = await prepareR2FinalMatrixPage(page);
+    const exception = variant === 'EXCEPTION';
+    const audit = await boot(page, r2Viewport(variant), 'compact', '/ai?sessionId=session_f06_01', {
+      initialBuildState: exception ? 'failed' : 'ready',
+      role: 'Engineer'
+    });
+
+    await expect(page.locator(`[data-ai-owner-phase="${exception ? 'build-failed' : 'build-ready'}"]`)).toBeVisible();
+    if (exception) {
+      await expect(page.locator('[data-ai-terminal-state]')).toBeVisible();
+    } else {
+      await expect(page.locator('[data-ai-apply-preview]')).toBeVisible();
+    }
+    expectNoRuntimeErrors(audit);
+    await captureR2FinalMatrixGroup(page, {
+      scene: 'S11', variant, route: '#/ai?sessionId=session_f06_01',
+      state: exception ? 'failure-recovery' : 'recovery',
+      role: 'Engineer', flags: { 'Studio2.AiWorkbench': true }, owner: 'F06-ai-workbench',
+      runtime,
+      requiredCriticalActions: ['[aria-label="打开历史与恢复"]']
+    });
+  });
 }
 
 test('unbound AI journey closes Build parameters resources Validation and read-only ApplyGate', async ({ page }) => {

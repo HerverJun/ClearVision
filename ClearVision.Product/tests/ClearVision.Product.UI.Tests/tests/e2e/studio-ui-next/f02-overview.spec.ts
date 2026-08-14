@@ -10,6 +10,12 @@ import {
   installF02VisualPreferences,
   type F02MethodAuditEntry
 } from './f02-browser-fixture';
+import {
+  captureR2FinalMatrixGroup,
+  prepareR2FinalMatrixPage,
+  r2Viewport,
+  type R2FinalVariant
+} from './r2-visual/r2-final-matrix-evidence';
 
 const fixtureSchemaVersion = 'f02-overview.v1';
 const projectId = '11111111-1111-4111-8111-111111111111';
@@ -268,6 +274,36 @@ for (const state of [
       runtimeErrors
     });
     expect(runtimeErrors).toEqual({ consoleErrors: [], pageErrors: [] });
+  });
+}
+
+for (const variant of ['B0', 'B2', 'EXCEPTION'] as const satisfies readonly R2FinalVariant[]) {
+  test(`@r2-final S01 ${variant} projects the F02 shell and Overview state`, async ({ page }) => {
+    await page.setViewportSize(r2Viewport(variant));
+    await installF02VisualPreferences(page, 'light', 'compact');
+    const runtime = await prepareR2FinalMatrixPage(page, {
+      expectedHttpErrors: variant === 'EXCEPTION'
+        ? [{ method: 'GET', path: '/api/projects/recent', status: 403 }]
+        : []
+    });
+    const audit = await bootOverview(page, true, variant === 'EXCEPTION' ? 403 : 200, 'Engineer');
+    await expect(page.locator('[data-product-shell]')).toHaveCount(1);
+    await expect(page.locator('[data-capability="overview"]')).toBeVisible();
+    if (variant === 'EXCEPTION') {
+      await expect(page.locator('[data-page-state="forbidden"]')).toBeVisible();
+    } else {
+      await expect(page.getByRole('link', { name: '瓶盖检测' })).toBeVisible();
+      await expect(page.getByRole('region', { name: '当前会话' })).toContainText('fixture-operator');
+    }
+    expect(expectGetOnly(audit)).toBe(true);
+    await captureR2FinalMatrixGroup(page, {
+      scene: 'S01', variant, route: '#/overview',
+      state: variant === 'EXCEPTION' ? 'recent-projects-forbidden' : 'healthy',
+      role: 'Engineer', owner: 'F02-overview', runtime,
+      requiredCriticalActions: [variant === 'EXCEPTION'
+        ? '.overview-page__quick-links a[href="#/projects"]'
+        : '.overview-page__continue']
+    });
   });
 }
 

@@ -67,6 +67,47 @@ async function installStartup(page: Page, token?: string): Promise<void> {
   }, token);
 }
 
+async function collectAuthLayoutProjection(page: Page) {
+  return page.evaluate(() => {
+    const shell = document.querySelector<HTMLElement>('[data-auth-shell="ready"]');
+    const frame = document.querySelector<HTMLElement>('.auth-shell__frame');
+    const form = document.querySelector<HTMLElement>('[data-auth-page="login"]');
+    const submit = document.querySelector<HTMLElement>('.auth-form__submit');
+    if (!shell || !frame || !form || !submit) throw new Error('Auth layout is incomplete.');
+
+    const inspect = (element: HTMLElement) => {
+      const box = element.getBoundingClientRect();
+      const centerX = box.left + box.width / 2;
+      const centerY = box.top + box.height / 2;
+      const hit = document.elementFromPoint(centerX, centerY);
+      return {
+        x: box.x,
+        y: box.y,
+        width: box.width,
+        height: box.height,
+        right: box.right,
+        bottom: box.bottom,
+        centerX,
+        unobscured: hit !== null && (hit === element || element.contains(hit) || hit.contains(element))
+      };
+    };
+
+    return {
+      viewport: { width: innerWidth, height: innerHeight },
+      shell: inspect(shell),
+      frame: inspect(frame),
+      form: inspect(form),
+      submit: inspect(submit),
+      productShells: document.querySelectorAll('[data-product-shell]').length,
+      productPreviews: document.querySelectorAll('.auth-product-preview').length,
+      overflow: Math.max(
+        document.documentElement.scrollWidth - document.documentElement.clientWidth,
+        document.body.scrollWidth - document.body.clientWidth
+      )
+    };
+  });
+}
+
 async function installAuthFixture(page: Page, state: AuthFixtureState): Promise<void> {
   await page.route('**/health', route => json(route, 200, { status: 'Healthy', port: 5177 }));
   await page.route('**/api/**', async route => {
@@ -430,7 +471,7 @@ test('F04 auth deduplicates submit, ignores late response and collapses concurre
   await expect(page.locator('[data-product-shell]')).toHaveCount(0);
 });
 
-test('V4 auth entry keeps the auxiliary product language stable across B0-B4', async ({ browser }) => {
+test('V4 auth entry remains isolated and centered across supported viewports', async ({ browser }) => {
   for (const visual of [
     { id: 'b0', width: 1920, height: 1080, theme: 'light', density: 'compact' },
     { id: 'b1', width: 1536, height: 864, theme: 'light', density: 'compact' },
@@ -438,7 +479,10 @@ test('V4 auth entry keeps the auxiliary product language stable across B0-B4', a
     { id: 'b2-dark', width: 1366, height: 768, theme: 'dark', density: 'compact' },
     { id: 'b3', width: 1920, height: 1080, theme: 'dark', density: 'compact' },
     { id: 'b4-light', width: 1920, height: 1080, theme: 'light', density: 'comfortable' },
-    { id: 'b4-dark', width: 1920, height: 1080, theme: 'dark', density: 'comfortable' }
+    { id: 'b4-dark', width: 1920, height: 1080, theme: 'dark', density: 'comfortable' },
+    { id: 'edge-920', width: 920, height: 768, theme: 'light', density: 'compact' },
+    { id: 'narrow-480', width: 480, height: 720, theme: 'dark', density: 'comfortable' },
+    { id: 'short-viewport', width: 1366, height: 600, theme: 'light', density: 'compact' }
   ] as const) {
     const viewport = { width: visual.width, height: visual.height } as const;
     const context = await browser.newContext({ viewport });
@@ -451,15 +495,33 @@ test('V4 auth entry keeps the auxiliary product language stable across B0-B4', a
       await page.goto('/studio/index.html#/login');
       await expect(page.locator('[data-auth-page="login"]')).toBeVisible();
       await expect(page.getByRole('heading', { name: '登录', exact: true })).toBeVisible();
-      const projection = await page.evaluate(() => ({
+      await expect(page.locator('[data-product-shell]')).toHaveCount(0);
+      await expect(page.locator('.auth-product-preview')).toHaveCount(0);
+      const preferences = await page.evaluate(() => ({
         theme: document.documentElement.dataset.theme,
-        density: document.documentElement.dataset.density,
-        overflow: Math.max(
-          document.documentElement.scrollWidth - document.documentElement.clientWidth,
-          document.body.scrollWidth - document.body.clientWidth
-        )
+        density: document.documentElement.dataset.density
       }));
-      expect(projection).toEqual({ theme: visual.theme, density: visual.density, overflow: 0 });
+      expect(preferences).toEqual({ theme: visual.theme, density: visual.density });
+
+      const layout = await collectAuthLayoutProjection(page);
+      expect(layout.productShells).toBe(0);
+      expect(layout.productPreviews).toBe(0);
+      expect(layout.overflow).toBe(0);
+      expect(Math.abs(layout.shell.x)).toBeLessThanOrEqual(1);
+      expect(Math.abs(layout.shell.y)).toBeLessThanOrEqual(1);
+      expect(layout.shell.width).toBeGreaterThanOrEqual(layout.viewport.width - 1);
+      expect(layout.shell.height).toBeGreaterThanOrEqual(layout.viewport.height - 1);
+      expect(Math.abs(layout.frame.centerX - layout.viewport.width / 2)).toBeLessThanOrEqual(12);
+      expect(layout.form.x).toBeGreaterThanOrEqual(0);
+      expect(layout.form.right).toBeLessThanOrEqual(layout.viewport.width);
+      expect(layout.form.y).toBeGreaterThanOrEqual(0);
+      expect(layout.form.bottom).toBeLessThanOrEqual(layout.viewport.height);
+      expect(layout.form.unobscured).toBe(true);
+      expect(layout.submit.x).toBeGreaterThanOrEqual(0);
+      expect(layout.submit.right).toBeLessThanOrEqual(layout.viewport.width);
+      expect(layout.submit.y).toBeGreaterThanOrEqual(0);
+      expect(layout.submit.bottom).toBeLessThanOrEqual(layout.viewport.height);
+      expect(layout.submit.unobscured).toBe(true);
       if (hasF04VisualEvidenceTarget()) {
         await captureF04VisualEvidence(page, {
           scenario: `auth-login-${visual.id}`,
@@ -472,6 +534,39 @@ test('V4 auth entry keeps the auxiliary product language stable across B0-B4', a
       await context.close();
     }
   }
+});
+
+test('F04 auth controls remain scroll-reachable in an extremely short viewport', async ({ page }) => {
+  await page.setViewportSize({ width: 480, height: 360 });
+  await installStartup(page);
+  await installAuthFixture(page, freshState({ requiresSetup: false, role: 'Engineer' }));
+  await page.goto('/studio/index.html#/login');
+
+  const stage = page.locator('.auth-shell__stage');
+  const username = page.getByLabel('用户名');
+  const submit = page.getByRole('button', { name: '登录', exact: true });
+  await expect(page.locator('[data-auth-shell="ready"]')).toBeVisible();
+  await expect(page.locator('[data-product-shell]')).toHaveCount(0);
+  await expect(page.locator('.auth-product-preview')).toHaveCount(0);
+  await expect(stage).toHaveJSProperty('scrollTop', 0);
+  const overflow = await stage.evaluate(element => ({
+    horizontal: element.scrollWidth - element.clientWidth,
+    vertical: element.scrollHeight - element.clientHeight
+  }));
+  expect(overflow.horizontal).toBe(0);
+  expect(overflow.vertical).toBeGreaterThan(0);
+
+  await submit.scrollIntoViewIfNeeded();
+  await expect(submit).toBeInViewport();
+  await expect(submit).toBeEnabled();
+  expect(await submit.evaluate(element => {
+    const box = element.getBoundingClientRect();
+    const hit = document.elementFromPoint(box.left + box.width / 2, box.top + box.height / 2);
+    return hit === element || element.contains(hit);
+  })).toBe(true);
+
+  await username.scrollIntoViewIfNeeded();
+  await expect(username).toBeInViewport();
 });
 
 test('F04 startup contract failure stays outside Vue and provides recovery actions', async ({ page }) => {

@@ -16,6 +16,12 @@ import {
   captureF04VisualEvidence,
   hasF04VisualEvidenceTarget
 } from './f04-browser-evidence';
+import {
+  captureR2FinalMatrixGroup,
+  prepareR2FinalMatrixPage,
+  r2Viewport,
+  type R2FinalVariant
+} from './r2-visual/r2-final-matrix-evidence';
 
 const stationFixture = Object.freeze({
   schemaVersion: 'f02-stations-read.v1',
@@ -394,8 +400,14 @@ test('Station list uses URL filters, preserves nine outcomes and stays GET-only'
   await expect(page.locator('[data-capability="stations-read"]')).toBeVisible();
   const viewTabs = page.getByRole('tablist', { name: '工作站监控视图' });
   await expect(viewTabs.getByRole('tab', { name: '异常调查' })).toHaveAttribute('aria-selected', 'true');
+  const investigationPanel = page.getByRole('tabpanel', { name: '异常调查' });
+  await expect(investigationPanel).not.toHaveAttribute('tabindex', '0');
+  await expect(investigationPanel).toHaveAttribute('aria-labelledby', 'stations-investigation-tab');
   await expect(page.getByRole('cell', { name: /一号检测站/ })).toBeVisible();
   await viewTabs.getByRole('tab', { name: '全站概览' }).click();
+  const overviewPanel = page.getByRole('tabpanel', { name: '全站概览' });
+  await expect(overviewPanel).not.toHaveAttribute('tabindex', '0');
+  await expect(overviewPanel).toHaveAttribute('aria-labelledby', 'stations-overview-tab');
   const outcomeCounters = page.locator('.stations-page__outcomes');
   await expect(outcomeCounters).toContainText('未判定 1');
   await expect(outcomeCounters).toContainText('不适用 1');
@@ -531,6 +543,67 @@ test('F10 Station preserves unknown outcome, blocks duplicate submit and reconci
   expect(audit.filter(entry => entry.method === 'POST' && entry.path === '/api/stations/station-a/commands')).toHaveLength(1);
   expect(audit.filter(entry => entry.method === 'GET' && entry.path.includes('/commands/by-client-request/'))).toHaveLength(1);
 });
+
+for (const variant of ['B0', 'B2', 'EXCEPTION'] as const satisfies readonly R2FinalVariant[]) {
+  test(`@r2-final S08 ${variant} projects the F02 Station authority`, async ({ page }) => {
+    await page.setViewportSize(r2Viewport(variant));
+    await installF02VisualPreferences(page, 'light', 'compact');
+    const exception = variant === 'EXCEPTION';
+    const runtime = await prepareR2FinalMatrixPage(page, {
+      expectedRequestAborts: exception
+        ? [
+            { method: 'GET', path: '/api/stations/station-a' },
+            { method: 'GET', path: '/api/stations/station-a/logs' },
+            { method: 'GET', path: '/api/stations/station-a/commands' },
+            { method: 'GET', path: '/api/stations/audit' },
+            { method: 'GET', path: '/api/station-packages' }
+          ]
+        : []
+    });
+    const detail = variant !== 'B0';
+    const role = exception ? 'Admin' : 'Engineer';
+    const route = detail ? '#/stations/station-a' : '#/stations';
+    const audit = await bootStations(page, [station()], summary(), role);
+    await page.goto(`/studio/index.html${route}`);
+
+    if (!detail) {
+      await expect(page.locator('[data-capability="stations-read"]')).toBeVisible();
+      await page.getByRole('tab', { name: '异常调查' }).click();
+      await expect(page.locator('.stations-page__station-name a').filter({ hasText: '一号检测站' })).toBeVisible();
+      expect(expectGetOnly(audit)).toBe(true);
+    } else {
+      await expect(page.locator('[data-capability="stations-read-detail"]')).toBeVisible();
+      await expect(page.getByText('判定 NG')).toBeVisible();
+      if (exception) {
+        const admin = page.locator('[data-capability="station-admin-control"]');
+        await expect(admin).toBeVisible();
+        await admin.getByTestId('station-issue-command').click();
+        await expect(admin.getByText('命令已创建；执行结果尚未确认。')).toBeVisible();
+        expect(audit.filter(entry => entry.method === 'POST' && entry.path === '/api/stations/station-a/commands')).toHaveLength(1);
+        await page.evaluate(() => window.scrollTo(0, 1400));
+        await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(1400);
+        await expect(page.locator('[data-product-nav="/stations"]')).toBeVisible();
+        await expect(page.locator('[data-product-nav="/stations"]')).toBeEnabled();
+      } else {
+        await expect(page.locator('[data-capability="station-admin-control"]')).toHaveCount(0);
+        expect(expectGetOnly(audit)).toBe(true);
+      }
+    }
+    await captureR2FinalMatrixGroup(page, {
+      scene: 'S08', variant, route: route as `#/${string}`,
+      state: exception ? 'admin-feedback' : detail ? 'detail' : 'online-offline-stale',
+      role, flags: { 'Studio2.StationsRead': true }, owner: 'F02-stations',
+      writes: exception ? 1 : 0,
+      allowedWrites: exception ? ['POST /api/stations/station-a/commands'] : [],
+      runtime,
+      requiredCriticalActions: [exception
+        ? '[data-product-nav="/stations"]'
+        : detail
+          ? '[data-testid="station-open-results"]'
+          : '.stations-page__station-name a']
+    });
+  });
+}
 
 test('Station list surfaces frozen-contract malformed and empty responses', async ({ page }) => {
   await bootStations(page, { items: [] });

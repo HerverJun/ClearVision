@@ -51,6 +51,7 @@ export default defineConfig({
   testIgnore: isStudioUiNext
     ? []
     : ['**/studio-ui-next/**/*.spec.ts'],
+  grepInvert: isStudioUiNext ? /@r2-final/ : undefined,
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,

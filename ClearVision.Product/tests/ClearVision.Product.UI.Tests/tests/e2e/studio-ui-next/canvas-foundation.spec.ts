@@ -136,6 +136,7 @@ async function bootCanvasLab(page: Page): Promise<string[]> {
   await page.goto('/studio/index.html#/labs/canvas');
   await expect(page.locator('[data-canvas-lab="ready"]')).toBeVisible();
   await expect(page.locator('#studio-ui-canonical-flow-canvas')).toBeVisible();
+  await expect(page.locator('#studio-ui-canonical-flow-canvas')).toHaveAttribute('aria-label', '流程编辑画布');
   return runtimeErrors;
 }
 

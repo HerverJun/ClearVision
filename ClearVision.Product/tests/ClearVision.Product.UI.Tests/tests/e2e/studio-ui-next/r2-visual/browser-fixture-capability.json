@@ -1,0 +1,27 @@
+{
+  "schemaVersion": "r2-browser-fixture-capability.v1",
+  "generatedFrom": "22a3d26a00a2d3b8098165aab5489ce54f5bc95b",
+  "fixtureHash": "ed13e8c5f800ac72a82972b63097f22469a94107c731269d185fa0c35e6beb4e",
+  "ownershipRule": "Exactly one route dispatcher is installed per Playwright page or in-app browser context.",
+  "scenes": [
+    { "scene": "S00", "surface": "Auth", "owner": "F04", "capability": "DIRECTLY_REUSABLE", "states": ["login", "validation", "401-recovery", "change-password"], "reason": "F04 owns the stateful authentication model; R2 does not create a second auth state machine." },
+    { "scene": "S01", "surface": "Shell / Overview", "owner": "F02", "capability": "DIRECTLY_REUSABLE", "states": ["healthy", "degraded", "short-viewport"], "reason": "F02 provides startup, session, health, project and preference projections." },
+    { "scene": "S02", "surface": "Projects", "owner": "F02/F04", "capability": "DIRECTLY_REUSABLE", "states": ["data", "empty", "readonly", "lifecycle-error"], "reason": "Read projections remain in F02; lifecycle writes remain exclusively in F04." },
+    { "scene": "S03", "surface": "Workspace chrome", "owner": "F03", "capability": "DIRECTLY_REUSABLE", "states": ["flow-main", "short-viewport", "splitter-extremes"], "reason": "F03 owns the canonical Workspace fixture and mounted owner lifecycle." },
+    { "scene": "S04", "surface": "Flow / Inspector", "owner": "F03", "capability": "DIRECTLY_REUSABLE", "states": ["node-selected", "validation-error", "operator-flyout"], "reason": "F03 exposes deterministic operator, Canvas selection and parameter validation paths." },
+    { "scene": "S05", "surface": "Preview / ROI", "owner": "F03", "capability": "DIRECTLY_REUSABLE", "states": ["preview-ready", "stale", "roi-edit"], "reason": "F03 owns a shared deterministic PNG fixture, ROI coordinates and the canonical ImageCanvas/ROI lifecycle." },
+    { "scene": "S06", "surface": "Save / Formal Run", "owner": "F03/F05", "capability": "REQUIRES_SHARED_EXTRACTION", "states": ["dirty", "conflict", "running", "ng", "unknown"], "reason": "Save remains F03-owned and Inspection run remains F05-owned; R2 may sequence them but must not compose two dispatchers in one page." },
+    { "scene": "S07", "surface": "Results", "owner": "F02", "capability": "DIRECTLY_REUSABLE", "states": ["data", "partial", "expired", "export-feedback"], "reason": "F02 provides result list, detail, statistics and investigation projections." },
+    { "scene": "S08", "surface": "Stations", "owner": "F02/F08", "capability": "DIRECTLY_REUSABLE", "states": ["online-offline-stale", "detail", "admin-feedback"], "reason": "Read routes are reusable from F02 and current page-level owners; command behavior stays with the existing Station command owner." },
+    { "scene": "S09", "surface": "Inspection", "owner": "F05", "capability": "DIRECTLY_REUSABLE", "states": ["admission-ready", "blocked", "running", "stop", "recent-result"], "reason": "F05 owns the inspection selector and run-control fixture." },
+    { "scene": "S10", "surface": "Settings", "owner": "F07", "capability": "DIRECTLY_REUSABLE", "states": ["long-form", "403", "save-success", "save-failure", "secret", "device-feedback"], "reason": "F07 owns settings, authority reconciliation and device workbench projections." },
+    { "scene": "S11", "surface": "AI Workbench", "owner": "F06", "capability": "DIRECTLY_REUSABLE", "states": ["clarification", "build", "failure", "recovery", "history"], "reason": "F06 owns AgentRun fixture state, stream and workspace handoff behavior." },
+    { "scene": "S12", "surface": "Operators", "owner": "F02", "capability": "DIRECTLY_REUSABLE", "states": ["catalog", "search", "long-metadata", "detail"], "reason": "F02 provides deterministic dense catalog and detail reads." },
+    { "scene": "S13", "surface": "Diagnostics / About / Error", "owner": "F02", "capability": "DIRECTLY_REUSABLE", "states": ["service-warning", "identity", "forbidden", "not-found"], "reason": "F02 provides service facts and public error surfaces without writes." }
+  ],
+  "unavailable": [
+    { "capability": "Station or Results Excel export", "status": "BLOCKED_BY_CONTRACT", "reason": "Current export authority supports asynchronous CSV and JSON only; R2 must not invent XLSX or a Station-specific export endpoint." },
+    { "capability": "Native 120 DPI fixture", "status": "BLOCKED_BY_ENVIRONMENT", "reason": "Browser DPR is not native Windows DPI." },
+    { "capability": "Independent no-Node target", "status": "BLOCKED_BY_ENVIRONMENT", "reason": "The current developer machine is not an independent published target without Node." }
+  ]
+}

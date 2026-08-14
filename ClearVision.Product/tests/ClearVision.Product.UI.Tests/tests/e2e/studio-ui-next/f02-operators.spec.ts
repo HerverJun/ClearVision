@@ -12,6 +12,12 @@ import {
   installF02VisualPreferences,
   type F02MethodAuditEntry
 } from './f02-browser-fixture';
+import {
+  captureR2FinalMatrixGroup,
+  prepareR2FinalMatrixPage,
+  r2Viewport,
+  type R2FinalVariant
+} from './r2-visual/r2-final-matrix-evidence';
 
 const operatorFixture = Object.freeze({
   schemaVersion: 'f02-operators-read.v1',
@@ -277,5 +283,31 @@ for (const visual of [
     });
     expect(expectGetOnly(audit)).toBe(true);
     expect(runtimeErrors).toEqual({ consoleErrors: [], pageErrors: [] });
+  });
+}
+
+for (const variant of ['B0', 'B2', 'EXCEPTION'] as const satisfies readonly R2FinalVariant[]) {
+  test(`@r2-final S12 ${variant} projects the F02 operator catalog`, async ({ page }) => {
+    await page.setViewportSize(r2Viewport(variant));
+    await installF02VisualPreferences(page, 'light', 'compact');
+    const runtime = await prepareR2FinalMatrixPage(page);
+    const audit = await bootOperators(page, variant === 'EXCEPTION' ? { items: [] } : performanceOperators);
+    await page.goto('/studio/index.html#/operators');
+    await expect(page.locator('[data-capability="operators-read"]')).toBeVisible();
+    if (variant === 'EXCEPTION') {
+      await expect(page.getByText('算子目录读取失败')).toBeVisible();
+    } else {
+      await expect(page.locator('tbody tr')).toHaveCount(25);
+      await expect(page.getByRole('searchbox', { name: '搜索算子' })).toBeVisible();
+    }
+    expect(expectGetOnly(audit)).toBe(true);
+    await captureR2FinalMatrixGroup(page, {
+      scene: 'S12', variant, route: '#/operators',
+      state: variant === 'EXCEPTION' ? 'malformed-catalog' : 'catalog',
+      role: 'Engineer', owner: 'F02-operators-read', runtime,
+      requiredCriticalActions: [variant === 'EXCEPTION'
+        ? '[data-capability="operators-read"] .cv-page-state button'
+        : 'tbody tr:first-child .operators-page__detail-link']
+    });
   });
 }

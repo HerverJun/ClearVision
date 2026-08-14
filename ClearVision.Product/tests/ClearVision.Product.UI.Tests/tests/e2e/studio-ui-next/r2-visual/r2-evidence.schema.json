@@ -1,0 +1,302 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "clearvision://studio-ui-next/r2-evidence.v1",
+  "title": "ClearVision Studio UI Next R2 evidence manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "headSha",
+    "candidateContentHash",
+    "worktreeState",
+    "stage",
+    "batch",
+    "scene",
+    "route",
+    "state",
+    "fixture",
+    "role",
+    "profile",
+    "flags",
+    "evidenceClass",
+    "hostKind",
+    "browserSurface",
+    "baseUrl",
+    "server",
+    "viewport",
+    "window",
+    "client",
+    "dpr",
+    "nativeDpi",
+    "theme",
+    "density",
+    "reducedMotion",
+    "motionProfile",
+    "motionClock",
+    "focus",
+    "scrollOwner",
+    "runtime",
+    "ownerLedger",
+    "requiredCriticalActions",
+    "metrics",
+    "screenshots",
+    "reports",
+    "iteration",
+    "cleanup",
+    "pairId",
+    "comparability",
+    "nonComparableReasons",
+    "claimScope"
+  ],
+  "properties": {
+    "schemaVersion": { "const": "r2-evidence.v1" },
+    "headSha": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
+    "candidateContentHash": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "worktreeState": { "enum": ["DIRTY_CANDIDATE", "CLEAN_SHA"] },
+    "stage": { "type": "string", "pattern": "^R2\\.[0-8]$" },
+    "batch": { "type": "string", "minLength": 1 },
+    "scene": { "type": "string", "pattern": "^S(?:0[0-9]|1[0-3])$" },
+    "route": { "type": "string", "pattern": "^#/" },
+    "state": { "type": "string", "minLength": 1 },
+    "fixture": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "hash"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "hash": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+      }
+    },
+    "role": { "enum": ["Public", "Operator", "Engineer", "Admin"] },
+    "profile": { "type": "string", "minLength": 1 },
+    "flags": { "type": "object", "additionalProperties": { "type": "boolean" } },
+    "evidenceClass": {
+      "enum": ["IN_APP_BROWSER_ITERATION", "REPOSITORY_PLAYWRIGHT", "WINFORMS_WEBVIEW2"]
+    },
+    "hostKind": { "enum": ["IN_APP_BROWSER", "PLAYWRIGHT_CHROMIUM", "WINFORMS_WEBVIEW2"] },
+    "browserSurface": { "type": "string", "minLength": 1 },
+    "baseUrl": { "type": "string", "pattern": "^https?://" },
+    "server": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["owner", "pid", "port", "createdByBatch", "cleanupToken"],
+      "properties": {
+        "owner": { "type": "string", "minLength": 1 },
+        "pid": { "type": "integer", "minimum": 1 },
+        "port": { "type": "integer", "minimum": 1, "maximum": 65535 },
+        "createdByBatch": { "type": "boolean" },
+        "cleanupToken": { "type": "string", "minLength": 16 }
+      }
+    },
+    "viewport": { "$ref": "#/$defs/size" },
+    "window": { "$ref": "#/$defs/sizeOrStatus" },
+    "client": { "$ref": "#/$defs/sizeOrStatus" },
+    "dpr": { "type": "number", "exclusiveMinimum": 0 },
+    "nativeDpi": {
+      "oneOf": [
+        { "type": "integer", "minimum": 72, "maximum": 480 },
+        { "enum": ["NOT_PERFORMED", "NOT_APPLICABLE"] }
+      ]
+    },
+    "theme": { "enum": ["light", "dark"] },
+    "density": { "enum": ["compact", "comfortable"] },
+    "reducedMotion": { "type": "boolean" },
+    "motionProfile": { "type": "string", "minLength": 1 },
+    "motionClock": { "type": "string", "minLength": 1 },
+    "focus": { "type": "string" },
+    "scrollOwner": { "type": "string", "minLength": 1 },
+    "runtime": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "requests",
+        "allowedWrites",
+        "consoleErrors",
+        "pageErrors",
+        "failedRequests",
+        "httpErrors",
+        "expectedHttpErrors",
+        "observedExpectedHttpErrors",
+        "unexpectedWrites"
+      ],
+      "properties": {
+        "requests": { "type": "array", "items": { "$ref": "#/$defs/request" } },
+        "allowedWrites": { "type": "array", "uniqueItems": true, "items": { "$ref": "#/$defs/writeRequest" } },
+        "consoleErrors": { "type": "array", "items": { "type": "string" } },
+        "pageErrors": { "type": "array", "items": { "type": "string" } },
+        "failedRequests": { "type": "array", "items": { "type": "string" } },
+        "httpErrors": { "type": "array", "items": { "type": "string" } },
+        "expectedHttpErrors": { "type": "array", "uniqueItems": true, "items": { "$ref": "#/$defs/httpError" } },
+        "observedExpectedHttpErrors": { "type": "array", "uniqueItems": true, "items": { "$ref": "#/$defs/httpError" } },
+        "unexpectedWrites": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "ownerLedger": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/owner" } },
+    "requiredCriticalActions": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "metrics": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "domBoxes",
+        "computedStyles",
+        "criticalActions",
+        "horizontalOverflow",
+        "unrecordedNestedScrollOwners",
+        "criticalActionTruncationCount",
+        "criticalActionUnreachableCount",
+        "layoutShift"
+      ],
+      "properties": {
+        "domBoxes": { "type": "object" },
+        "computedStyles": { "type": "object" },
+        "criticalActions": { "type": "array", "items": { "$ref": "#/$defs/criticalAction" } },
+        "horizontalOverflow": { "type": "number", "minimum": 0 },
+        "unrecordedNestedScrollOwners": { "type": "integer", "minimum": 0 },
+        "criticalActionTruncationCount": { "type": "integer", "minimum": 0 },
+        "criticalActionUnreachableCount": { "type": "integer", "minimum": 0 },
+        "layoutShift": { "type": "number", "minimum": 0 }
+      }
+    },
+    "screenshots": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["before", "after"],
+      "properties": {
+        "before": { "$ref": "#/$defs/artifact" },
+        "after": { "$ref": "#/$defs/artifact" }
+      }
+    },
+    "reports": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["domBefore", "domAfter", "interaction"],
+      "properties": {
+        "domBefore": { "$ref": "#/$defs/reportArtifact" },
+        "domAfter": { "$ref": "#/$defs/reportArtifact" },
+        "interaction": { "$ref": "#/$defs/reportArtifact" }
+      }
+    },
+    "iteration": { "type": "integer", "minimum": 1, "maximum": 3 },
+    "cleanup": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "timers",
+        "animationFrames",
+        "listeners",
+        "requests",
+        "serverStopped",
+        "ownershipMarkerVerified",
+        "endpointUnreachable",
+        "pidExited"
+      ],
+      "properties": {
+        "status": { "const": "PASS" },
+        "timers": { "const": 0 },
+        "animationFrames": { "const": 0 },
+        "listeners": { "const": 0 },
+        "requests": { "const": 0 },
+        "serverStopped": { "const": true },
+        "ownershipMarkerVerified": { "const": true },
+        "endpointUnreachable": { "const": true },
+        "pidExited": { "const": true }
+      }
+    },
+    "pairId": { "type": "string", "minLength": 1 },
+    "comparability": { "enum": ["COMPARABLE", "NON_COMPARABLE"] },
+    "nonComparableReasons": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+    "claimScope": {
+      "enum": ["DIRECTIONAL_BROWSER", "FORMAL_CHROMIUM", "WEBVIEW2_100", "WEBVIEW2_125", "NO_NODE_TARGET", "FIELD"]
+    }
+  },
+  "$defs": {
+    "size": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["width", "height"],
+      "properties": {
+        "width": { "type": "integer", "minimum": 1 },
+        "height": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "sizeOrStatus": {
+      "oneOf": [
+        { "$ref": "#/$defs/size" },
+        { "enum": ["NOT_PERFORMED", "NOT_APPLICABLE"] }
+      ]
+    },
+    "path": { "type": "string", "minLength": 1 },
+    "request": { "type": "string", "pattern": "^[A-Z]+ /" },
+    "writeRequest": { "type": "string", "pattern": "^(?!GET |HEAD )[A-Z]+ /" },
+    "httpError": { "type": "string", "pattern": "^[A-Z]+ /.+: [45][0-9]{2}$" },
+    "artifact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "sha256", "width", "height"],
+      "properties": {
+        "path": { "$ref": "#/$defs/path" },
+        "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "width": { "type": "integer", "minimum": 1 },
+        "height": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "reportArtifact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "sha256"],
+      "properties": {
+        "path": { "$ref": "#/$defs/path" },
+        "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+      }
+    },
+    "criticalAction": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["selector", "truncated", "inViewport", "reachable", "enabled", "unobscured"],
+      "properties": {
+        "selector": { "type": "string", "minLength": 1 },
+        "testId": {
+          "oneOf": [
+            { "type": "string" },
+            { "type": "null" }
+          ]
+        },
+        "text": { "type": "string" },
+        "box": { "$ref": "#/$defs/box" },
+        "truncated": { "type": "boolean" },
+        "inViewport": { "type": "boolean" },
+        "reachable": { "type": "boolean" },
+        "enabled": { "type": "boolean" },
+        "unobscured": { "type": "boolean" }
+      }
+    },
+    "box": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["x", "y", "width", "height"],
+      "properties": {
+        "x": { "type": "number" },
+        "y": { "type": "number" },
+        "width": { "type": "number", "minimum": 0 },
+        "height": { "type": "number", "minimum": 0 }
+      }
+    },
+    "owner": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["capability", "mounted", "subscriptions", "writes"],
+      "properties": {
+        "capability": { "type": "string", "minLength": 1 },
+        "mounted": { "type": "integer", "minimum": 0, "maximum": 1 },
+        "subscriptions": { "type": "integer", "minimum": 0 },
+        "writes": { "type": "integer", "minimum": 0, "maximum": 1 }
+      }
+    }
+  }
+}

@@ -15,8 +15,9 @@ const studioUiRoot = path.join(
 const host = (process.env.CV_UI_HOST || '127.0.0.1').trim();
 const port = (process.env.CV_UI_PORT || '5177').trim();
 const configuredWebRoot = process.env.CV_UI_WEB_ROOT?.trim();
+const persistentSession = process.env.CV_UI_PERSISTENT_SESSION === 'true';
 const evidencePhase = (process.env.CV_STUDIO_UI_EVIDENCE_PHASE || 'f01').trim().toLowerCase();
-if (!['f01', 'f02', 'f03', 'f04', 'f05', 'f06', 'f07', 'f09'].includes(evidencePhase)) {
+if (!['f01', 'f02', 'f03', 'f04', 'f05', 'f06', 'f07', 'f09', 'r2'].includes(evidencePhase)) {
   throw new Error(`Unsupported StudioUI evidence phase: ${evidencePhase}`);
 }
 const fixtureRoot = path.join(
@@ -105,7 +106,7 @@ process.once('SIGTERM', requestShutdown);
 if (typeof process.disconnect === 'function') {
   process.once('disconnect', requestShutdown);
 }
-if (!process.stdin.isTTY) {
+if (!persistentSession && !process.stdin.isTTY) {
   process.stdin.once('end', requestShutdown);
   process.stdin.once('close', requestShutdown);
   process.stdin.resume();

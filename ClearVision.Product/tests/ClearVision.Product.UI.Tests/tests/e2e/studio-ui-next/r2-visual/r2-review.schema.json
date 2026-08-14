@@ -1,0 +1,91 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "clearvision://studio-ui-next/r2-review.v1",
+  "title": "ClearVision Studio UI Next R2 blind review",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "reviewId", "scope", "seed", "finalSide", "reviewers", "groups", "disagreement"],
+  "properties": {
+    "schemaVersion": { "const": "r2-review.v1" },
+    "reviewId": { "type": "string", "minLength": 1 },
+    "scope": { "enum": ["LOCAL_BATCH", "PHASE", "FINAL"] },
+    "seed": { "type": "integer", "minimum": 0 },
+    "finalSide": { "enum": ["left", "right"] },
+    "reviewers": {
+      "type": "array",
+      "minItems": 2,
+      "uniqueItems": true,
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "groups": {
+      "type": "array",
+      "minItems": 4,
+      "items": { "$ref": "#/$defs/group" }
+    },
+    "disagreement": { "type": "array", "items": { "type": "string" } }
+  },
+  "$defs": {
+    "scores": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["visual_focus", "material_hierarchy", "operation_priority", "cross_page_consistency"],
+      "properties": {
+        "visual_focus": { "type": "integer", "minimum": 1, "maximum": 5 },
+        "material_hierarchy": { "type": "integer", "minimum": 1, "maximum": 5 },
+        "operation_priority": { "type": "integer", "minimum": 1, "maximum": 5 },
+        "cross_page_consistency": { "type": "integer", "minimum": 1, "maximum": 5 }
+      }
+    },
+    "reasons": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["visual_focus", "material_hierarchy", "operation_priority", "cross_page_consistency"],
+      "properties": {
+        "visual_focus": { "type": "string", "minLength": 8 },
+        "material_hierarchy": { "type": "string", "minLength": 8 },
+        "operation_priority": { "type": "string", "minLength": 8 },
+        "cross_page_consistency": { "type": "string", "minLength": 8 }
+      }
+    },
+    "vote": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["reviewer", "preference", "scores", "reasons"],
+          "properties": {
+            "reviewer": { "type": "string", "minLength": 1 },
+            "preference": { "enum": ["left", "right"] },
+            "scores": { "$ref": "#/$defs/scores" },
+            "reasons": { "$ref": "#/$defs/reasons" }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["reviewer", "preference", "leftScores", "rightScores", "reasons"],
+          "properties": {
+            "reviewer": { "type": "string", "minLength": 1 },
+            "preference": { "const": "no-difference" },
+            "leftScores": { "$ref": "#/$defs/scores" },
+            "rightScores": { "$ref": "#/$defs/scores" },
+            "reasons": { "$ref": "#/$defs/reasons" }
+          }
+        }
+      ]
+    },
+    "group": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["pairId", "scene", "variant", "routes", "comparability", "votes"],
+      "properties": {
+        "pairId": { "type": "string", "minLength": 1 },
+        "scene": { "type": "string", "pattern": "^S(?:0[0-9]|1[0-3])$" },
+        "variant": { "enum": ["B0", "B2", "EXCEPTION"] },
+        "routes": { "type": "array", "minItems": 1, "maxItems": 4, "items": { "type": "string", "pattern": "^#/" } },
+        "comparability": { "const": "COMPARABLE" },
+        "votes": { "type": "array", "minItems": 2, "items": { "$ref": "#/$defs/vote" } }
+      }
+    }
+  }
+}

@@ -1,0 +1,220 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "clearvision://studio-ui-next/r2-final-matrix-summary.v1",
+  "title": "ClearVision Studio UI Next R2 final matrix summary",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "runId",
+    "generatedAtUtc",
+    "status",
+    "expectedGroupCount",
+    "groupCount",
+    "comparableGroupCount",
+    "baseline",
+    "candidate",
+    "fixtureHash",
+    "harness",
+    "serverCleanup",
+    "claim",
+    "groups",
+    "errors"
+  ],
+  "properties": {
+    "schemaVersion": { "const": "r2-final-matrix-summary.v1" },
+    "runId": { "type": "string", "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._-]*$" },
+    "generatedAtUtc": { "type": "string", "format": "date-time" },
+    "status": { "enum": ["PASS", "FAIL"] },
+    "expectedGroupCount": { "const": 42 },
+    "groupCount": { "type": "integer", "minimum": 0, "maximum": 42 },
+    "comparableGroupCount": { "type": "integer", "minimum": 0, "maximum": 42 },
+    "baseline": { "$ref": "#/$defs/source" },
+    "candidate": { "$ref": "#/$defs/source" },
+    "fixtureHash": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "harness": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["config", "testCount", "workers", "fullyParallel", "hostKind", "ports"],
+      "properties": {
+        "config": { "type": "string", "minLength": 1 },
+        "testCount": { "const": 42 },
+        "workers": { "const": 1 },
+        "fullyParallel": { "const": false },
+        "hostKind": { "const": "PLAYWRIGHT_CHROMIUM" },
+        "ports": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["before", "final"],
+          "properties": {
+            "before": { "type": "integer", "minimum": 1, "maximum": 65535 },
+            "final": { "type": "integer", "minimum": 1, "maximum": 65535 }
+          }
+        }
+      }
+    },
+    "serverCleanup": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["before", "final"],
+      "properties": {
+        "before": { "$ref": "#/$defs/cleanup" },
+        "final": { "$ref": "#/$defs/cleanup" }
+      }
+    },
+    "claim": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["evidenceClass", "scope", "formalAcceptance", "blindReview"],
+      "properties": {
+        "evidenceClass": { "const": "REPOSITORY_PLAYWRIGHT" },
+        "scope": { "const": "CHROMIUM_DIRTY_CANDIDATE_COMPARISON" },
+        "formalAcceptance": { "const": "PARTIAL" },
+        "blindReview": { "const": "NOT_PERFORMED" }
+      }
+    },
+    "groups": {
+      "type": "array",
+      "maxItems": 42,
+      "items": { "$ref": "#/$defs/group" }
+    },
+    "errors": { "type": "array", "items": { "type": "string", "minLength": 1 } }
+  },
+  "$defs": {
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["headSha", "contentHash", "worktreeState", "buildHash"],
+      "properties": {
+        "headSha": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
+        "contentHash": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "worktreeState": { "enum": ["CLEAN_HEAD_STATIC", "DIRTY_CANDIDATE", "CLEAN_SHA"] },
+        "buildHash": { "type": "string", "pattern": "^(?!0{64}$)[0-9a-f]{64}$" }
+      }
+    },
+    "cleanup": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["port", "endpointUnreachable", "listenerReleased"],
+      "properties": {
+        "port": { "type": "integer", "minimum": 1, "maximum": 65535 },
+        "endpointUnreachable": { "const": true },
+        "listenerReleased": { "const": true }
+      }
+    },
+    "group": {
+      "type": "object",
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": { "properties": { "scene": { "const": "S05" } }, "required": ["scene"] },
+          "then": {
+            "required": ["bitmapEvidence"],
+            "properties": {
+              "rawArtifactSha256": {
+                "required": ["source-before.png", "source-final.png"]
+              }
+            }
+          }
+        }
+      ],
+      "required": ["pairId", "scene", "variant", "route", "state", "comparability", "nonComparableReasons", "beforeSha256", "finalSha256", "rawArtifactSha256"],
+      "properties": {
+        "pairId": { "type": "string", "pattern": "^S(?:0[0-9]|1[0-3])-(?:B0|B2|EXCEPTION)$" },
+        "scene": { "type": "string", "pattern": "^S(?:0[0-9]|1[0-3])$" },
+        "variant": { "enum": ["B0", "B2", "EXCEPTION"] },
+        "route": { "type": "string", "pattern": "^#/" },
+        "state": { "type": "string", "minLength": 1 },
+        "comparability": { "enum": ["COMPARABLE", "NON_COMPARABLE"] },
+        "nonComparableReasons": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+        "beforeSha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "finalSha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "bitmapEvidence": { "$ref": "#/$defs/bitmapEvidence" },
+        "rawArtifactSha256": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "before.png",
+            "after.png",
+            "dom-before.json",
+            "dom-after.json",
+            "interaction-before.json",
+            "interaction-final.json",
+            "capture-before.json",
+            "capture-final.json"
+          ],
+          "properties": {
+            "before.png": { "$ref": "#/$defs/sha256" },
+            "after.png": { "$ref": "#/$defs/sha256" },
+            "dom-before.json": { "$ref": "#/$defs/sha256" },
+            "dom-after.json": { "$ref": "#/$defs/sha256" },
+            "interaction-before.json": { "$ref": "#/$defs/sha256" },
+            "interaction-final.json": { "$ref": "#/$defs/sha256" },
+            "capture-before.json": { "$ref": "#/$defs/sha256" },
+            "capture-final.json": { "$ref": "#/$defs/sha256" },
+            "source-before.png": { "$ref": "#/$defs/sha256" },
+            "source-final.png": { "$ref": "#/$defs/sha256" }
+          }
+        }
+      }
+    },
+    "bitmapEvidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["contract", "roi", "source", "before", "final"],
+      "properties": {
+        "contract": { "type": "object" },
+        "roi": { "type": "object" },
+        "source": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["before", "final"],
+          "properties": {
+            "before": { "$ref": "#/$defs/sourceArtifact" },
+            "final": { "$ref": "#/$defs/sourceArtifact" }
+          }
+        },
+        "before": { "type": "object" },
+        "final": { "type": "object" }
+      }
+    },
+    "sourceArtifact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "sha256", "byteLength", "contentType", "status", "response", "size"],
+      "properties": {
+        "path": { "type": "string", "pattern": "^source-(?:before|final)\\.png$" },
+        "sha256": { "$ref": "#/$defs/sha256" },
+        "byteLength": { "type": "integer", "minimum": 1 },
+        "contentType": { "const": "image/png" },
+        "status": { "const": 200 },
+        "response": { "$ref": "#/$defs/responseSnapshot" },
+        "size": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["width", "height"],
+          "properties": {
+            "width": { "type": "integer", "minimum": 1 },
+            "height": { "type": "integer", "minimum": 1 }
+          }
+        }
+      }
+    },
+    "responseSnapshot": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["source", "method", "path", "url", "status", "contentType", "sha256", "byteLength"],
+      "properties": {
+        "source": { "const": "PLAYWRIGHT_ROUTE_FULFILL_RESPONSE_SNAPSHOT" },
+        "method": { "const": "GET" },
+        "path": { "type": "string", "pattern": "^/api/preview-artifacts/[A-Za-z0-9_-]{43}$" },
+        "url": { "type": "string", "format": "uri" },
+        "status": { "const": 200 },
+        "contentType": { "const": "image/png" },
+        "sha256": { "$ref": "#/$defs/sha256" },
+        "byteLength": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+  }
+}

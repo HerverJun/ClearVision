@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "clearvision://studio-ui-next/r2-in-app-browser.v1",
+  "title": "ClearVision Studio UI Next R2 browser fixture session",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "status",
+    "readyUrl",
+    "pid",
+    "port",
+    "serverOwner",
+    "sourceSha",
+    "candidateContentHash",
+    "fixtureHash",
+    "createdByBatch",
+    "cleanupToken",
+    "fixtureRoot",
+    "startedAtUtc"
+  ],
+  "properties": {
+    "schemaVersion": { "const": "r2-in-app-browser.v1" },
+    "status": { "enum": ["STARTING", "READY", "STOPPED", "FAILED"] },
+    "readyUrl": { "type": "string", "pattern": "^http://127\\.0\\.0\\.1:[0-9]+/studio/index\\.html$" },
+    "pid": { "type": "integer", "minimum": 1 },
+    "port": { "type": "integer", "minimum": 1, "maximum": 65535 },
+    "serverOwner": { "const": "R2_BROWSER_FIXTURE_SESSION" },
+    "sourceSha": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
+    "candidateContentHash": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "fixtureHash": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "createdByBatch": { "type": "string", "minLength": 1 },
+    "cleanupToken": { "type": "string", "minLength": 32 },
+    "fixtureRoot": { "type": "string", "pattern": "[\\\\/]\\.tmp[\\\\/]studio-ui-next[\\\\/]r2[\\\\/]browser-fixture$" },
+    "startedAtUtc": { "type": "string", "format": "date-time" },
+    "stoppedAtUtc": { "type": "string", "format": "date-time" }
+  }
+}

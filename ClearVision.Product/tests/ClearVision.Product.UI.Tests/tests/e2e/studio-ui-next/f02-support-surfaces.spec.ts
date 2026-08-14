@@ -10,6 +10,12 @@ import {
   installF02VisualPreferences,
   type F02MethodAuditEntry
 } from './f02-browser-fixture';
+import {
+  captureR2FinalMatrixGroup,
+  prepareR2FinalMatrixPage,
+  r2Viewport,
+  type R2FinalVariant
+} from './r2-visual/r2-final-matrix-evidence';
 
 const fixtureSchema = 'f02-support-surfaces.v1';
 
@@ -139,5 +145,36 @@ for (const visual of [
     });
     expect(expectGetOnly(audit)).toBe(true);
     expect(runtimeErrors).toEqual({ consoleErrors: [], pageErrors: [] });
+  });
+}
+
+for (const variant of ['B0', 'B2', 'EXCEPTION'] as const satisfies readonly R2FinalVariant[]) {
+  test(`@r2-final S13 ${variant} projects F02 support and identity surfaces`, async ({ page }) => {
+    await page.setViewportSize(r2Viewport(variant));
+    await installF02VisualPreferences(page, 'light', 'compact');
+    const runtime = await prepareR2FinalMatrixPage(page);
+    const audit = await bootSupportSurfaces(page, variant === 'EXCEPTION' ? 'Degraded' : 'Healthy');
+    const route = variant === 'B2' ? '#/about' : '#/diagnostics';
+    await page.goto(`/studio/index.html${route}`);
+    if (route === '#/about') {
+      await expect(page.locator('[data-studio-page="about"]')).toBeVisible();
+      await expect(page.getByText('关于 ClearVision Studio', { exact: true })).toBeVisible();
+    } else {
+      const diagnostics = page.locator('[data-studio-page="diagnostics"]');
+      await expect(diagnostics).toBeVisible();
+      await expect(diagnostics.getByText(
+        variant === 'EXCEPTION' ? '本地服务需要处理' : '本地服务在线',
+        { exact: true }
+      )).toBeVisible();
+    }
+    expect(expectGetOnly(audit)).toBe(true);
+    await captureR2FinalMatrixGroup(page, {
+      scene: 'S13', variant, route,
+      state: variant === 'EXCEPTION' ? 'service-warning' : route === '#/about' ? 'identity' : 'healthy',
+      role: 'Engineer', owner: 'F02-support-surfaces', runtime,
+      requiredCriticalActions: [route === '#/about'
+        ? '[data-product-appearance] button'
+        : '[data-studio-page="diagnostics"] .cv-page-header__actions button:last-child']
+    });
   });
 }

@@ -17,6 +17,14 @@ import {
   createF04RuntimeErrorAudit,
   hasF04VisualEvidenceTarget
 } from './f04-browser-evidence';
+import { f03PreviewBitmapFixture } from './f03-preview-bitmap-fixture';
+import {
+  captureR2FinalMatrixGroup,
+  collectR2S05BitmapEvidence,
+  prepareR2FinalMatrixPage,
+  r2Viewport,
+  type R2FinalVariant
+} from './r2-visual/r2-final-matrix-evidence';
 
 const fixtureSchema = 'f03-g5-workspace.v1';
 const projectA = '11111111-1111-4111-8111-111111111111';
@@ -28,12 +36,8 @@ const goldenJudgeNodeId = 'aaaaaaaa-aaaa-4aaa-8aaa-00000000c353';
 const goldenJudgeOutputId = 'aaaaaaaa-aaaa-4aaa-8aaa-00000000c3b5';
 const goldenResultId = 'aaaaaaaa-aaaa-4aaa-8aaa-000000015f91';
 const goldenSessionId = 'aaaaaaaa-aaaa-4aaa-8aaa-000000015f92';
-const previewImage = Buffer.from(
-  '<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 100 100">' +
-  '<rect width="100" height="100" fill="#203040"/><circle cx="50" cy="50" r="24" fill="#7dd3fc"/></svg>',
-  'utf8'
-);
-const previewImageSha256 = createHash('sha256').update(previewImage).digest('hex');
+const previewImage = f03PreviewBitmapFixture.bytes;
+const previewImageSha256 = f03PreviewBitmapFixture.sha256;
 
 function deferred<T = void>() {
   let resolve!: (value: T | PromiseLike<T>) => void;
@@ -94,14 +98,14 @@ function previewArtifactReference(call: number) {
     kind: 'image',
     role: 'outputImage',
     pathHint: '$.output',
-    contentType: 'image/svg+xml',
+    contentType: f03PreviewBitmapFixture.contentType,
     length: previewImage.length,
     sha256: previewImageSha256,
     createdAtUtc: '2026-07-17T00:00:00Z',
     expiresAtUtc: '2026-07-17T00:10:00Z',
-    width: 100,
-    height: 100,
-    channels: 4
+    width: f03PreviewBitmapFixture.width,
+    height: f03PreviewBitmapFixture.height,
+    channels: f03PreviewBitmapFixture.channels
   };
 }
 
@@ -318,6 +322,16 @@ interface BootOptions {
     request: Readonly<Record<string, unknown>>,
     call: number
   ) => Readonly<{ status?: number; body?: unknown; delayMs?: number; abort?: boolean }>;
+  readonly onPreviewArtifactFulfilled?: (response: Readonly<{
+    bytes: Buffer;
+    method: 'GET';
+    path: string;
+    url: string;
+    contentType: string;
+    status: number;
+    sha256: string;
+    byteLength: number;
+  }>) => void;
   readonly runScenario?: (
     stage: 'admission' | 'execute' | 'stop' | 'reconcile',
     request: Readonly<Record<string, unknown>>,
@@ -680,17 +694,28 @@ async function bootWorkspace(page: Page, options: BootOptions = {}) {
         return;
       }
       if (request.method() === 'GET') {
+        const responseBody = Buffer.from(previewImage);
         await route.fulfill({
           status: 200,
-          contentType: 'image/svg+xml',
+          contentType: f03PreviewBitmapFixture.contentType,
           headers: {
-            'Content-Length': String(previewImage.length),
+            'Content-Length': String(responseBody.length),
             ETag: `"${previewImageSha256}"`,
             'X-Artifact-Sha256': previewImageSha256,
             'x-clearvision-fixture-schema': fixtureSchema
           },
-          body: previewImage
+          body: responseBody
         });
+        options.onPreviewArtifactFulfilled?.(Object.freeze({
+          bytes: Buffer.from(responseBody),
+          method: 'GET',
+          path: url.pathname,
+          url: request.url(),
+          contentType: f03PreviewBitmapFixture.contentType,
+          status: 200,
+          sha256: previewImageSha256,
+          byteLength: responseBody.byteLength
+        }));
         return;
       }
     }
@@ -1549,10 +1574,10 @@ function roiPreviewFlow() {
         isRequired: true,
         options: [{ label: 'Rectangle', value: 'Rectangle' }]
       },
-        parameter(50_201, 'X', 10),
-        parameter(50_202, 'Y', 10),
-        parameter(50_203, 'Width', 30),
-        parameter(50_204, 'Height', 20)
+        parameter(50_201, 'X', f03PreviewBitmapFixture.roi.x),
+        parameter(50_202, 'Y', f03PreviewBitmapFixture.roi.y),
+        parameter(50_203, 'Width', f03PreviewBitmapFixture.roi.width),
+        parameter(50_204, 'Height', f03PreviewBitmapFixture.roi.height)
       ],
       isEnabled: true,
       executionStatus: 0,
@@ -1756,6 +1781,252 @@ function withoutExpectedPreviewTransportConsoleErrors(
   };
 }
 
+const r2WorkspaceStartupWrites = Object.freeze([
+  `POST /api/projects/${projectA}/open`,
+  'POST /api/inspection/decision-configuration/validate',
+  'POST /api/inspection/admission'
+]);
+
+for (const variant of ['B0', 'B2', 'EXCEPTION'] as const satisfies readonly R2FinalVariant[]) {
+  test(`@r2-final S03 ${variant} projects the single F03 Workspace owner`, async ({ page }) => {
+    await page.setViewportSize(r2Viewport(variant));
+    const runtime = await prepareR2FinalMatrixPage(page);
+    const audit = await bootWorkspace(page, {
+      projectBody: projectId => projectPayload(projectId, { flow: inspectorFlow() })
+    });
+    const shell = page.locator('[data-evidence-surface="f03-workspace-shell"]');
+    const workspace = page.locator('.flow-workspace');
+    await expect(shell).toHaveAttribute('data-workspace-state', 'ready');
+    await expect(shell).toHaveAttribute('data-workspace-owner-count', '1');
+    await expect(page.locator('[data-evidence-surface="f03-g2-flow-canvas"]')).toHaveAttribute('data-node-count', '2');
+
+    if (variant === 'EXCEPTION') {
+      const inspectorSplitter = page.locator('[data-workspace-splitter="inspector"]');
+      const previewSplitter = page.locator('[data-workspace-splitter="preview"]');
+      await inspectorSplitter.focus();
+      await page.keyboard.press('Home');
+      await expect(workspace).toHaveAttribute('data-inspector-width', '240');
+      await previewSplitter.focus();
+      await page.keyboard.press('End');
+      const responsivePreviewMax = await workspace.getAttribute('data-preview-max-width');
+      expect(responsivePreviewMax).toBeTruthy();
+      await expect(workspace).toHaveAttribute('data-preview-width', responsivePreviewMax!);
+    }
+    expect(isF03G4RequestAllowlist(audit), JSON.stringify(audit)).toBe(true);
+    await captureR2FinalMatrixGroup(page, {
+      scene: 'S03', variant, route: `#/projects/${projectA}/workspace`,
+      state: variant === 'B0' ? 'flow-main' : variant === 'B2' ? 'short-viewport' : 'splitter-extremes',
+      role: 'Engineer', flags: { 'Studio2.Workspace': true }, owner: 'F03-workspace',
+      writes: 0, allowedWrites: r2WorkspaceStartupWrites, runtime,
+      requiredCriticalActions: ['[data-testid="workspace-run-details"]'],
+      notes: ['Non-GET startup requests are existing admission and project-open authority checks; no Project save or formal execution write is issued.']
+    });
+  });
+}
+
+for (const variant of ['B0', 'B2', 'EXCEPTION'] as const satisfies readonly R2FinalVariant[]) {
+  test(`@r2-final S04 ${variant} projects F03 Flow and Inspector states`, async ({ page }) => {
+    await page.setViewportSize(r2Viewport(variant));
+    const runtime = await prepareR2FinalMatrixPage(page);
+    const metadataFailure = variant === 'EXCEPTION';
+    const audit = await bootWorkspace(page, {
+      projectBody: projectId => projectPayload(projectId, { flow: inspectorFlow() }),
+      ...(metadataFailure ? { operatorCatalogBody: [{ ...operatorCatalog[1], parameters: 'invalid' }] } : {})
+    });
+    const inspector = page.locator('[data-evidence-surface="f03-g3-inspector"]');
+    await selectInspectorNode(page, 120, 125);
+    await expect(inspector).toHaveAttribute('data-inspector-mode', 'node');
+
+    if (metadataFailure) {
+      await expect(inspector).toHaveAttribute('data-metadata-phase', 'error');
+      await expect(inspector.locator('[data-parameter-name="Text"] input')).toBeDisabled();
+    } else {
+      await expect(inspector).toHaveAttribute('data-metadata-phase', 'ready');
+      if (variant === 'B2') {
+        const count = inspector.locator('[data-parameter-name="Count"] input[type="number"]');
+        await count.fill('11');
+        await count.press('Enter');
+        await expect(inspector.locator('.inspector-panel__validation')).toContainText('不能大于 10');
+      }
+    }
+    expect(isF03G4RequestAllowlist(audit), JSON.stringify(audit)).toBe(true);
+    await captureR2FinalMatrixGroup(page, {
+      scene: 'S04', variant, route: `#/projects/${projectA}/workspace`,
+      state: metadataFailure ? 'metadata-error' : variant === 'B2' ? 'validation-error' : 'node-selected',
+      role: 'Engineer', flags: { 'Studio2.Workspace': true }, owner: 'F03-inspector',
+      writes: 0, allowedWrites: r2WorkspaceStartupWrites, runtime,
+      requiredCriticalActions: ['[data-testid="workspace-run-details"]']
+    });
+  });
+}
+
+for (const variant of ['B0', 'B2', 'EXCEPTION'] as const satisfies readonly R2FinalVariant[]) {
+  test(`@r2-final S05 ${variant} projects the F03 Preview ImageCanvas and ROI lifecycle`, async ({ page }) => {
+    await page.setViewportSize(r2Viewport(variant));
+    const runtime = await prepareR2FinalMatrixPage(page);
+    const artifactFulfilled = deferred<Readonly<{
+      bytes: Buffer;
+      method: 'GET';
+      path: string;
+      url: string;
+      contentType: string;
+      status: number;
+      sha256: string;
+      byteLength: number;
+    }>>();
+    const audit = await bootWorkspace(page, {
+      projectBody: projectId => projectPayload(projectId, { flow: roiPreviewFlow() }),
+      previewScenario: (request, call) => ({
+        body: previewPayload(request, call, {
+          outputData: { score: 0.98, call },
+          artifacts: [previewArtifactReference(call)]
+        })
+      }),
+      onPreviewArtifactFulfilled: artifactFulfilled.resolve
+    });
+    const bitmapResponsePromise = page.waitForResponse(response =>
+      response.request().method() === 'GET' &&
+      /^\/api\/preview-artifacts\/[A-Za-z0-9_-]{43}$/.test(new URL(response.url()).pathname) &&
+      response.status() === 200);
+    await selectInspectorNode(page, 120, 125);
+    const bitmapResponse = await bitmapResponsePromise;
+    const bitmapSource = await artifactFulfilled.promise;
+    expect(bitmapResponse.headers()['content-type']).toBe(f03PreviewBitmapFixture.contentType);
+    expect(Number(bitmapResponse.headers()['content-length'])).toBe(f03PreviewBitmapFixture.byteLength);
+    expect(bitmapResponse.headers()['x-artifact-sha256']).toBe(f03PreviewBitmapFixture.sha256);
+    expect(bitmapSource.method).toBe('GET');
+    expect(bitmapSource.path).toMatch(/^\/api\/preview-artifacts\/[A-Za-z0-9_-]{43}$/);
+    expect(new URL(bitmapSource.url).pathname).toBe(bitmapSource.path);
+    expect(bitmapSource.sha256).toBe(f03PreviewBitmapFixture.sha256);
+    expect(bitmapSource.byteLength).toBe(f03PreviewBitmapFixture.byteLength);
+    expect(createHash('sha256').update(bitmapSource.bytes).digest('hex')).toBe(f03PreviewBitmapFixture.sha256);
+    const preview = page.locator('[data-capability="preview-workbench"]');
+    const image = page.locator('[data-capability="image-canvas"]');
+    const roi = page.locator('.preview-panel__roi');
+    await expect(preview).toHaveAttribute('data-preview-phase', 'success');
+    await expect(image).toHaveAttribute('data-image-phase', 'ready');
+    const s05BitmapBefore = await collectR2S05BitmapEvidence(page, {
+      schemaVersion: f03PreviewBitmapFixture.schemaVersion,
+      contentType: f03PreviewBitmapFixture.contentType,
+      sha256: f03PreviewBitmapFixture.sha256,
+      byteLength: f03PreviewBitmapFixture.byteLength,
+      width: f03PreviewBitmapFixture.width,
+      height: f03PreviewBitmapFixture.height,
+      channels: f03PreviewBitmapFixture.channels,
+      samples: f03PreviewBitmapFixture.samples
+    });
+
+    if (variant === 'B2') {
+      await page.getByTestId('roi-start').click();
+      await expect(roi).toHaveAttribute('data-roi-phase', 'editing');
+    } else if (variant === 'EXCEPTION') {
+      const xInput = page.locator('[data-evidence-surface="f03-g3-inspector"] [data-parameter-name="X"] input');
+      await xInput.fill('14');
+      await xInput.press('Tab');
+      await expect(preview).toHaveAttribute('data-preview-stale', 'true');
+    } else {
+      await expect(preview).toHaveAttribute('data-preview-stale', 'false');
+      await expect(roi).toHaveAttribute('data-roi-phase', 'ready');
+    }
+    expect(isF03G4RequestAllowlist(audit), JSON.stringify(audit)).toBe(true);
+    await captureR2FinalMatrixGroup(page, {
+      scene: 'S05', variant, route: `#/projects/${projectA}/workspace`,
+      state: variant === 'B0' ? 'preview-ready' : variant === 'B2' ? 'roi-edit' : 'stale',
+      role: 'Engineer', flags: { 'Studio2.Workspace': true }, owner: 'F03-preview-roi',
+      writes: 0,
+      allowedWrites: [
+        ...r2WorkspaceStartupWrites,
+        'POST /api/flows/preview-node',
+        ...(variant === 'EXCEPTION' ? [`DELETE /api/preview-artifacts/${previewArtifactId(1)}`] : [])
+      ],
+      runtime,
+      s05BitmapBefore,
+      s05BitmapSource: {
+        bytes: bitmapSource.bytes,
+        method: bitmapSource.method,
+        path: bitmapSource.path,
+        url: bitmapSource.url,
+        contentType: bitmapSource.contentType,
+        status: bitmapSource.status,
+        sha256: bitmapSource.sha256,
+        byteLength: bitmapSource.byteLength
+      },
+      requiredCriticalActions: [variant === 'B2'
+        ? '[data-testid="roi-cancel"]'
+        : variant === 'EXCEPTION'
+          ? '[data-testid="preview-collapse-toggle"]'
+          : '[data-testid="preview-run"]'],
+      notes: ['Preview and artifact requests use the existing F03 debug lifecycle; ROI edits remain an unsaved local draft.']
+    });
+  });
+}
+
+for (const variant of ['B0', 'B2', 'EXCEPTION'] as const satisfies readonly R2FinalVariant[]) {
+  test(`@r2-final S06 ${variant} projects the F03 formal-run authority`, async ({ page }) => {
+    await page.setViewportSize(r2Viewport(variant));
+    const runtime = await prepareR2FinalMatrixPage(page);
+    const blocked = variant === 'EXCEPTION';
+    let admissionCall = 0;
+    const audit = await bootWorkspace(page, {
+      projectBody: projectId => projectPayload(projectId, { flow: inspectorFlow() }),
+      runScenario: (stage, request) => {
+        if (stage === 'execute') {
+          return { body: formalRunFixtureResult(request, 90_101, 'Succeeded', 'Ng') };
+        }
+        if (stage !== 'admission' || !blocked) return {};
+        admissionCall += 1;
+        return admissionCall === 1
+          ? {}
+          : {
+              body: {
+                allowed: false,
+                code: 'ADMISSION_FINAL_DECISION_INVALID',
+                message: 'fixture decision invalid',
+                projectId: request.projectId,
+                clientSnapshotId: request.clientSnapshotId,
+                projectPersistenceRevision: null,
+                canonicalFlowHash: null,
+                decisionConfigurationHash: null,
+                violations: [{ code: 'FINAL_DECISION_INVALID', reason: '最终判定配置未通过权威校验。' }]
+              }
+            };
+      }
+    });
+    const shell = page.locator('[data-evidence-surface="f03-workspace-shell"]');
+    await page.getByTestId('workspace-run').click();
+    if (blocked) {
+      await expect(shell).toHaveAttribute('data-workspace-run-phase', 'blocked');
+      await expect(page.getByTestId('workspace-run')).toBeDisabled();
+      expect(audit.filter(entry => entry.path === '/api/inspection/execute')).toHaveLength(0);
+    } else {
+      await expect(shell).toHaveAttribute('data-workspace-run-phase', 'succeeded');
+      await expect(page.getByTestId('workspace-current-result')).toBeVisible();
+      expect(audit.filter(entry => entry.method === 'POST' && entry.path === '/api/inspection/execute')).toHaveLength(1);
+    }
+    await page.getByTestId('workspace-run-details').click();
+    const details = page.getByTestId('workspace-run-details-panel');
+    await expect(details).toBeVisible();
+    if (blocked) {
+      await expect(details).toContainText('FINAL_DECISION_INVALID');
+    } else {
+      await expect(details).toContainText('判定 NG');
+    }
+    expect(isF03G6RequestAllowlist(audit), JSON.stringify(audit)).toBe(true);
+    await captureR2FinalMatrixGroup(page, {
+      scene: 'S06', variant, route: `#/projects/${projectA}/workspace`,
+      state: blocked ? 'admission-blocked' : 'run-succeeded-ng',
+      role: 'Engineer', flags: { 'Studio2.Workspace': true }, owner: 'F03-formal-run',
+      writes: blocked ? 0 : 1,
+      allowedWrites: [
+        ...r2WorkspaceStartupWrites,
+        ...(blocked ? [] : ['POST /api/inspection/execute'])
+      ],
+      runtime,
+      requiredCriticalActions: ['[aria-label="关闭运行详情"]']
+    });
+  });
+}
+
 test('flag off keeps Workspace owner/resources at zero and skips the Project GET', async ({ page }) => {
   const audit = await bootWorkspace(page, { workspaceEnabled: false });
   const shell = page.locator('[data-evidence-surface="f03-workspace-shell"]');
@@ -1815,6 +2086,7 @@ test('renders loading before the Project read settles', async ({ page }) => {
 });
 
 test('Operator Rail supports search, category, click-add and drag-add', async ({ page }) => {
+  await page.setViewportSize({ width: 1920, height: 1080 });
   const audit = await bootWorkspace(page);
   const rail = page.locator('[data-evidence-surface="f03-g2-operator-rail"]');
   const canvas = page.locator('[data-evidence-surface="f03-g2-flow-canvas"]');
@@ -2014,6 +2286,7 @@ test('node selection, move, copy/paste, undo/redo, delete and focus/IME gates st
 });
 
 test('pointer wiring creates and disconnects connections with stable feedback', async ({ page }) => {
+  await page.setViewportSize({ width: 1920, height: 1080 });
   await bootWorkspace(page);
   const surface = page.locator('[data-evidence-surface="f03-g2-flow-canvas"]');
   const canvas = page.locator('[data-testid="flow-canvas"]');
@@ -2174,6 +2447,7 @@ test('G3 Inspector edits primitive, slider and nullable parameters with validati
 });
 
 test('G3 connection Inspector selects endpoints and disconnects through the typed command', async ({ page }) => {
+  await page.setViewportSize({ width: 1920, height: 1080 });
   await bootWorkspace(page, {
     projectBody: projectId => projectPayload(projectId, { flow: inspectorFlow() })
   });
@@ -2355,6 +2629,7 @@ test('G4 Preview and ImageCanvas render artifacts, probe pixels and commit ROI o
 });
 
 test('G5 GET PUT GET saves one canonical payload and preserves null, falsy and opaque values', async ({ page }) => {
+  await page.setViewportSize({ width: 1920, height: 1080 });
   let captured: Readonly<Record<string, unknown>> | null = null;
   const audit = await bootWorkspace(page, {
     projectBody: projectId => projectPayload(projectId, { flow: inspectorFlow() }),
@@ -3278,6 +3553,7 @@ test('G5 save failure retries explicitly, PSV011 reconciles fail closed, and unk
 });
 
 test('G5 settles a delayed reconcile before route leave and cannot overwrite the next Project', async ({ page }) => {
+  await page.setViewportSize({ width: 1920, height: 1080 });
   const runtimeErrors = createF03RuntimeErrorAudit(page);
   let delayedReconcileStarted = false;
   const audit = await bootWorkspace(page, {
@@ -3337,6 +3613,7 @@ test('G5 settles a delayed reconcile before route leave and cannot overwrite the
 });
 
 test('G5 protects route leave and project switch while readonly and running responses disable saving', async ({ page }) => {
+  await page.setViewportSize({ width: 1920, height: 1080 });
   let responseMode: 'success' | 'readonly' | 'running' = 'success';
   await bootWorkspace(page, {
     projectBody: projectId => projectPayload(projectId, { flow: inspectorFlow() }),
@@ -3637,6 +3914,7 @@ test('passes 20 project switches with one owner and a zero final resource ledger
 
 test('G5 passes 20 save and project-switch cycles with one PUT per save and a zero final ledger', async ({ page }) => {
   test.setTimeout(90_000);
+  await page.setViewportSize({ width: 1920, height: 1080 });
   const audit = await bootWorkspace(page, {
     projectBody: projectId => projectPayload(projectId, { flow: inspectorFlow() })
   });
@@ -3988,6 +4266,7 @@ test('F10 Template journey loads and applies one server template to the canonica
 });
 
 test('F10 N Point Calibration solves a candidate and saves through Project asset authority', async ({ page }) => {
+  await page.setViewportSize({ width: 1920, height: 1080 });
   const calibrationNodeId = fixtureUuid(82_001);
   const formalAssetId = 'calibration-f10-asset';
   const initialProject = projectPayload(projectA, { flow: f10CalibrationFlow() });
@@ -4122,6 +4401,7 @@ test('F10 N Point Calibration solves a candidate and saves through Project asset
 });
 
 test('F10 Line Sequence runs backend Analyze and Recommendation then applies one draft-only patch', async ({ page }) => {
+  await page.setViewportSize({ width: 1920, height: 1080 });
   const judgeNodeId = fixtureUuid(81_002);
   const audit = await bootWorkspace(page, {
     projectBody: projectPayload(projectA, { flow: f10LineSequenceFlow() }),
@@ -4184,6 +4464,7 @@ test('F10 Line Sequence runs backend Analyze and Recommendation then applies one
 });
 
 test('F10 Line Sequence invalidates a recommendation after draft change and projects backend safety rejection', async ({ page }) => {
+  await page.setViewportSize({ width: 1920, height: 1080 });
   const judgeNodeId = fixtureUuid(81_002);
   let rejectAnalysis = false;
   const audit = await bootWorkspace(page, {

@@ -15,6 +15,12 @@ import {
   captureF04VisualEvidence,
   hasF04VisualEvidenceTarget
 } from './f04-browser-evidence';
+import {
+  captureR2FinalMatrixGroup,
+  prepareR2FinalMatrixPage,
+  r2Viewport,
+  type R2FinalVariant
+} from './r2-visual/r2-final-matrix-evidence';
 
 const fixtureSchemaVersion = 'f02-projects-read.v1';
 const projectId = '11111111-1111-4111-8111-111111111111';
@@ -172,5 +178,30 @@ for (const visual of f02G3VisualMatrix) {
     }
     expect(expectGetOnly(audit)).toBe(true);
     expect(runtimeErrors).toEqual({ consoleErrors: [], pageErrors: [] });
+  });
+}
+
+for (const variant of ['B0', 'B2', 'EXCEPTION'] as const satisfies readonly R2FinalVariant[]) {
+  test(`@r2-final S02 ${variant} projects the F02 project collection`, async ({ page }) => {
+    await page.setViewportSize(r2Viewport(variant));
+    await installF02VisualPreferences(page, 'light', 'compact');
+    const runtime = await prepareR2FinalMatrixPage(page);
+    const audit = await bootProjects(page, variant === 'EXCEPTION' ? { items: [] } : [summary()]);
+    if (variant === 'EXCEPTION') {
+      await expect(page.getByText('工程列表读取失败')).toBeVisible();
+    } else {
+      await expect(page.getByRole('cell', { name: '瓶盖检测', exact: true })).toBeVisible();
+      await expect(page.getByRole('searchbox', { name: '搜索工程' })).toBeVisible();
+    }
+    expect(expectGetOnly(audit)).toBe(true);
+    await captureR2FinalMatrixGroup(page, {
+      scene: 'S02', variant, route: '#/projects',
+      state: variant === 'EXCEPTION' ? 'malformed-list' : 'data',
+      role: 'Engineer', flags: { 'Studio2.ProjectPage': true },
+      owner: 'F02-projects-read', runtime,
+      requiredCriticalActions: [variant === 'EXCEPTION'
+        ? '.projects-page__state button'
+        : `[data-testid="project-open-${projectId}"]`]
+    });
   });
 }

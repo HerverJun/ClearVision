@@ -43,6 +43,7 @@ export const f02G3VisualMatrix: readonly F02G3VisualScenario[] = Object.freeze(
 export interface F02MethodAuditEntry {
   readonly method: string;
   readonly path: string;
+  readonly url: string;
 }
 
 export interface F02RuntimeErrorAudit {
@@ -276,7 +277,8 @@ export function auditF02Request(request: Request): F02MethodAuditEntry {
   const url = new URL(request.url());
   return Object.freeze({
     method: request.method(),
-    path: `${url.pathname}${url.search}`
+    path: `${url.pathname}${url.search}`,
+    url: url.href
   });
 }
 

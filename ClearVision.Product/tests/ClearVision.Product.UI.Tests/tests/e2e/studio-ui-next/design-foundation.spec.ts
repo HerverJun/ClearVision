@@ -105,8 +105,8 @@ test('Modal traps keyboard focus, closes with Escape and restores its trigger', 
   await expect(trigger).toBeFocused();
   await page.keyboard.press('Enter');
 
-  const dialog = page.getByRole('dialog', { name: 'Confirm visual foundation' });
-  const initial = page.getByRole('button', { name: 'Accept direction' });
+  const dialog = page.getByRole('dialog', { name: '确认视觉基础' });
+  const initial = page.getByRole('button', { name: '接受此方向' });
   const close = page.getByRole('button', { name: '关闭对话框' });
   await expect(dialog).toBeVisible();
   await expect(initial).toBeFocused();
@@ -123,7 +123,7 @@ test('Modal traps keyboard focus, closes with Escape and restores its trigger', 
 
 test('Menu and Tooltip keep keyboard focus and floating layers inside the viewport', async ({ page }) => {
   const runtimeErrors = await bootDesignLab(page);
-  const guidance = page.getByRole('button', { name: 'Toggle state guidance' });
+  const guidance = page.getByRole('button', { name: '切换状态说明' });
   await guidance.focus();
   await expect(page.getByRole('tooltip')).toHaveText('显示或隐藏键盘状态说明');
   await page.keyboard.press('Escape');
@@ -158,13 +158,13 @@ test('Menu and Tooltip keep keyboard focus and floating layers inside the viewpo
 
 test('Toast and Splitter release transient lifecycle work', async ({ page }) => {
   const runtimeErrors = await bootDesignLab(page);
-  await page.getByRole('button', { name: 'Show toast' }).click();
+  await page.getByRole('button', { name: '显示通知' }).click();
   const toast = page.locator('[data-toast-id]');
   await expect(toast).toBeVisible();
   await toast.getByRole('button').click();
   await expect(toast).toHaveCount(0);
 
-  const separator = page.getByRole('separator', { name: 'Resize inspector preview' });
+  const separator = page.getByRole('separator', { name: '调整属性检查器预览宽度' });
   await separator.focus();
   await page.keyboard.press('ArrowRight');
   await expect(page.locator('.design-lab__inspector-sample')).toContainText('300 px');
@@ -190,8 +190,9 @@ test('Reduced-motion preference removes design motion durations', async ({ page 
   );
   expect(['0ms', '0s']).toContain(mediaDuration);
 
-  await page.locator('.design-lab__motion-toggle').click();
-  await expect(page.locator('[data-design-reduced-motion]')).toBeChecked();
+  const reducedMotionToggle = page.locator('[data-design-reduced-motion]');
+  await page.locator('label:has([data-design-reduced-motion])').click();
+  await expect(reducedMotionToggle).toBeChecked();
   await expect(page.locator('html')).toHaveAttribute('data-reduced-motion', 'true');
   const explicitDuration = await page.locator('html').evaluate(element =>
     getComputedStyle(element).getPropertyValue('--cv-motion-duration-slow').trim()

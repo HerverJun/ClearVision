@@ -8,7 +8,18 @@ import {
   installF02VisualPreferences,
   type F02MethodAuditEntry
 } from './f02-browser-fixture';
-import { captureF07Evidence, hasF07EvidenceTarget } from './f07-device-fixture';
+import {
+  captureF07Evidence,
+  expectNoFixtureErrors,
+  hasF07EvidenceTarget,
+  installF07DeviceFixture
+} from './f07-device-fixture';
+import {
+  captureR2FinalMatrixGroup,
+  prepareR2FinalMatrixPage,
+  r2Viewport,
+  type R2FinalVariant
+} from './r2-visual/r2-final-matrix-evidence';
 
 const fixtureSchema = 'f07-settings-shell.v1';
 
@@ -358,6 +369,39 @@ test('Settings shell renders loading then Admin full projection without a save r
   expect(audit.filter(entry => entry.method !== 'GET')).toEqual([]);
 });
 
+for (const variant of ['B0', 'B2', 'EXCEPTION'] as const satisfies readonly R2FinalVariant[]) {
+  test(`@r2-final S10 ${variant} projects the F07 Settings authority`, async ({ page }) => {
+    await page.setViewportSize(r2Viewport(variant));
+    await installF02VisualPreferences(page, 'light', 'compact');
+    const runtime = await prepareR2FinalMatrixPage(page);
+    const exception = variant === 'EXCEPTION';
+    const role: 'Admin' | 'Operator' = exception ? 'Operator' : 'Admin';
+    const audit = await bootSettings(page, role, exception ? 'safe' : 'full');
+    await page.goto('/studio/index.html#/settings');
+
+    if (exception) {
+      await expect(page.locator('[data-studio-page="forbidden"]')).toBeVisible();
+      await expect(page.locator('[data-capability="settings"]')).toHaveCount(0);
+      expect(audit.some(entry => entry.path === '/api/settings')).toBe(false);
+    } else {
+      await expect(page.locator('[data-capability="settings"]')).toBeVisible();
+      await expect(page.locator('[data-settings-phase="ready"]')).toBeVisible();
+      await page.locator('[data-settings-group="general"]').click();
+      await expect(page.locator('[data-settings-section="general"]')).toBeVisible();
+    }
+    expect(expectGetOnly(audit)).toBe(true);
+    await captureR2FinalMatrixGroup(page, {
+      scene: 'S10', variant, route: exception ? '#/forbidden' : '#/settings',
+      state: exception ? '403' : 'long-form',
+      role, flags: { 'Studio2.Settings': true }, owner: 'F07-settings',
+      runtime,
+      requiredCriticalActions: [exception
+        ? '[data-auth-page="forbidden"] a[href="#/projects"]'
+        : '[data-settings-generic-refresh]']
+    });
+  });
+}
+
 test('Admin can save a scoped General section and discard the next draft', async ({ page }) => {
   const audit = await bootSettings(page, 'Admin', 'full');
   await page.goto('/studio/index.html#/settings');
@@ -571,6 +615,137 @@ test('Operator is redirected to forbidden and never mounts Settings owner read',
   expect(expectGetOnly(audit)).toBe(true);
 });
 
+test('Admin can save and test PLC settings and mappings through the device owner', async ({ page }) => {
+  const settingsBodies: Record<string, unknown>[] = [];
+  const mappingBodies: unknown[][] = [];
+  page.on('request', request => {
+    const url = new URL(request.url());
+    if (url.pathname === '/api/plc/settings' && request.method() === 'PUT') {
+      settingsBodies.push(JSON.parse(request.postData() ?? '{}') as Record<string, unknown>);
+    }
+    if (url.pathname === '/api/plc/mappings' && request.method() === 'PUT') {
+      mappingBodies.push(JSON.parse(request.postData() ?? '[]') as unknown[]);
+    }
+  });
+  const fixture = await installF07DeviceFixture(page, 'Admin');
+  await page.goto('/studio/index.html#/settings');
+
+  await page.locator('[data-settings-group="plc"]').click();
+  const plc = page.locator('[data-settings-section="plc"]');
+  await expect(plc.locator('input[name="plcHeartbeatIntervalMs"]')).toHaveValue('1000');
+  await plc.locator('input[name="plcHeartbeatIntervalMs"]').fill('1500');
+  await plc.locator('[data-plc-action="save-settings"]').click();
+  await expect(plc.locator('[data-settings-device-feedback="plc"]')).toContainText('PLC 设置已保存');
+
+  await plc.locator('input[name="plcMappingDescription-0"]').fill('浏览器设备回归映射');
+  await plc.locator('[data-plc-action="save-mappings"]').click();
+  await expect(plc.locator('[data-settings-device-feedback="plc"]')).toContainText('PLC 映射已保存');
+  await plc.locator('[data-plc-action="test-connection"]').click();
+  await expect(plc.locator('[data-settings-device-feedback="plc"]')).toContainText('Fixture PLC 未连接');
+
+  expect(settingsBodies).toHaveLength(1);
+  expect(settingsBodies[0]).toMatchObject({ activeProtocol: 'S7', heartbeatIntervalMs: 1500 });
+  expect(mappingBodies).toHaveLength(1);
+  expect(mappingBodies[0]?.[0]).toMatchObject({ name: 'Ready', description: '浏览器设备回归映射' });
+  expect(fixture.audit.some(entry => entry.method === 'POST' && entry.path === '/api/plc/test-connection')).toBe(true);
+  expectNoFixtureErrors(fixture);
+});
+
+test('Admin can save, connect, and send through the TCP device workbench', async ({ page }) => {
+  const profileBodies: unknown[][] = [];
+  const sendBodies: Record<string, unknown>[] = [];
+  page.on('request', request => {
+    const url = new URL(request.url());
+    if (url.pathname === '/api/tcp/profiles' && request.method() === 'PUT') {
+      profileBodies.push(JSON.parse(request.postData() ?? '[]') as unknown[]);
+    }
+    if (url.pathname.endsWith('/send') && request.method() === 'POST') {
+      sendBodies.push(JSON.parse(request.postData() ?? '{}') as Record<string, unknown>);
+    }
+  });
+  const fixture = await installF07DeviceFixture(page, 'Admin');
+  await page.goto('/studio/index.html#/settings');
+
+  await page.locator('[data-settings-group="tcp"]').click();
+  const tcp = page.locator('[data-settings-section="tcp"]');
+  await expect(tcp.getByTitle('测试回环连接')).toHaveAttribute('aria-pressed', 'true');
+  await tcp.locator('input[name="tcpRemoteHost"]').fill('127.0.0.2');
+  await tcp.locator('[data-tcp-action="save-profiles"]').click();
+  await expect(tcp.locator('[data-settings-device-feedback="tcp"]')).toContainText('连接配置已保存');
+  await tcp.locator('[data-tcp-action="connect"]').click();
+  await expect(tcp).toContainText('已连接');
+  await tcp.locator('textarea[name="tcpPayload"]').fill('PING');
+  await tcp.locator('[data-tcp-action="send"]').click();
+  await expect(tcp).toContainText('fixture-response');
+
+  expect(profileBodies).toHaveLength(1);
+  expect(profileBodies[0]?.[0]).toMatchObject({ id: 'tcp-fixture', remoteHost: '127.0.0.2' });
+  expect(sendBodies).toEqual([expect.objectContaining({ payload: 'PING', isHex: false })]);
+  expect(fixture.state.tcpConnectCount).toBe(1);
+  expect(fixture.state.tcpSendCount).toBe(1);
+  expectNoFixtureErrors(fixture);
+});
+
+test('Admin can discover, bind, capture, and dispose Camera preview resources', async ({ page }) => {
+  const bindingBodies: Record<string, unknown>[] = [];
+  page.on('request', request => {
+    const url = new URL(request.url());
+    if (url.pathname === '/api/cameras/bindings' && request.method() === 'PUT') {
+      bindingBodies.push(JSON.parse(request.postData() ?? '{}') as Record<string, unknown>);
+    }
+  });
+  const fixture = await installF07DeviceFixture(page, 'Admin');
+  await page.goto('/studio/index.html#/settings');
+
+  await page.locator('[data-settings-group="camera"]').click();
+  const camera = page.locator('[data-settings-section="camera"]');
+  await expect(camera).toHaveAttribute('data-camera-phase', 'ready');
+  await camera.locator('[data-camera-discovery="huaray"]').click();
+  await expect(camera.locator('[data-camera-section="discovery"]')).toContainText('Huaray 测试相机');
+
+  await camera.locator('input[name="cameraExposure"]').fill('7000');
+  await camera.locator('[data-camera-action="save-bindings"]').click();
+  await expect(camera.locator('[data-settings-device-feedback="camera"]')).toContainText('相机绑定已保存');
+  await camera.locator('[data-camera-action="soft-capture"]').click();
+  await expect(camera.locator('[data-camera-section="preview"] img[alt="相机调试预览帧"]')).toBeVisible();
+
+  await camera.locator('[data-camera-action="toggle-preview"]').click();
+  await expect(camera.getByText('连续预览中', { exact: true })).toBeVisible();
+  await expect.poll(() => fixture.state.previewFrameCount).toBeGreaterThan(0);
+  await camera.locator('[data-camera-action="toggle-preview"]').click();
+  await expect(camera.getByText('未运行', { exact: true })).toBeVisible();
+
+  expect(bindingBodies).toHaveLength(1);
+  expect(bindingBodies[0]).toMatchObject({ activeCameraId: 'cam-fixture' });
+  expect((bindingBodies[0]?.bindings as Record<string, unknown>[] | undefined)?.[0]).toMatchObject({ exposureTimeUs: 7000 });
+  expect(fixture.state.previewStartCount).toBe(1);
+  expect(fixture.state.previewStopCount).toBeGreaterThanOrEqual(1);
+  expectNoFixtureErrors(fixture);
+});
+
+test('Engineer device access keeps PLC and TCP configuration read-only while retaining diagnostics', async ({ page }) => {
+  const fixture = await installF07DeviceFixture(page, 'Engineer');
+  await page.goto('/studio/index.html#/settings');
+
+  await page.locator('[data-settings-group="plc"]').click();
+  const plc = page.locator('[data-settings-section="plc"]');
+  await expect(plc.locator('input[name="plcHeartbeatIntervalMs"]')).toHaveAttribute('readonly');
+  await expect(plc.locator('[data-plc-action="save-settings"]')).toHaveCount(0);
+  await plc.locator('[data-plc-action="test-connection"]').click();
+  await expect(plc.locator('[data-settings-device-feedback="plc"]')).toContainText('Fixture PLC 未连接');
+
+  await page.locator('[data-settings-group="tcp"]').click();
+  const tcp = page.locator('[data-settings-section="tcp"]');
+  await expect(tcp.locator('input[name="tcpRemoteHost"]')).toHaveAttribute('readonly');
+  await expect(tcp.locator('[data-tcp-action="save-profiles"]')).toHaveCount(0);
+  await tcp.locator('[data-tcp-action="connect"]').click();
+  await expect(tcp).toContainText('已连接');
+
+  expect(fixture.audit.some(entry => entry.method === 'PUT')).toBe(false);
+  expect(fixture.state.tcpConnectCount).toBe(1);
+  expectNoFixtureErrors(fixture);
+});
+
 test('Settings shell keeps the page width bounded at desktop and narrow viewports', async ({ page }) => {
   const audit = await bootSettings(page, 'Engineer', 'safe');
   for (const viewport of [{ width: 1920, height: 1080 }, { width: 390, height: 844 }] as const) {
@@ -587,6 +762,38 @@ test('Settings shell keeps the page width bounded at desktop and narrow viewport
   }
   expect(expectGetOnly(audit)).toBe(true);
 });
+
+for (const visual of [
+  { id: 'settings-plc-b0', group: 'plc', selector: '[data-settings-section="plc"]', width: 1920, height: 1080, theme: 'light', density: 'compact' },
+  { id: 'settings-plc-b2-dark', group: 'plc', selector: '[data-settings-section="plc"]', width: 1366, height: 768, theme: 'dark', density: 'comfortable' },
+  { id: 'settings-tcp-b0-dark', group: 'tcp', selector: '[data-settings-section="tcp"]', width: 1920, height: 1080, theme: 'dark', density: 'compact' },
+  { id: 'settings-tcp-b2', group: 'tcp', selector: '[data-settings-section="tcp"]', width: 1366, height: 768, theme: 'light', density: 'comfortable' },
+  { id: 'settings-camera-b0', group: 'camera', selector: '[data-camera-section="bindings"]', width: 1920, height: 1080, theme: 'light', density: 'compact' },
+  { id: 'settings-camera-b2-dark', group: 'camera', selector: '[data-camera-section="preview"]', width: 1366, height: 768, theme: 'dark', density: 'comfortable' }
+] as const) {
+  test(`captures ${visual.id} F07 device evidence`, async ({ page }) => {
+    test.skip(!hasF07EvidenceTarget(), 'F07 visual evidence output was not requested.');
+    const viewport = { width: visual.width, height: visual.height } as const;
+    await page.setViewportSize(viewport);
+    await installF02VisualPreferences(page, visual.theme, visual.density);
+    const runtimeErrors = createF02RuntimeErrorAudit(page);
+    const fixture = await installF07DeviceFixture(page, 'Admin');
+    await page.goto('/studio/index.html#/settings');
+    await page.locator(`[data-settings-group="${visual.group}"]`).click();
+    const target = page.locator(visual.selector);
+    await expect(target).toBeVisible();
+    await target.scrollIntoViewIfNeeded();
+    await captureF07Evidence(page, {
+      scenario: visual.id,
+      viewport,
+      theme: visual.theme,
+      density: visual.density,
+      requests: fixture.audit,
+      runtimeErrors
+    });
+    expectNoFixtureErrors(fixture);
+  });
+}
 
 for (const visual of [
   { id: 'settings-overview', group: 'overview', selector: '[data-settings-overview]', width: 1920, height: 1080, theme: 'light', density: 'compact' },

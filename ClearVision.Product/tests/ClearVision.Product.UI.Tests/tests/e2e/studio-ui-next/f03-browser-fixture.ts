@@ -223,28 +223,51 @@ export async function captureF03WorkspaceEvidence(
   const screenshotPath = resolve(outputRoot, `${stem}.png`);
   const metadataPath = resolve(outputRoot, `${stem}.json`);
   await mkdir(outputRoot, { recursive: true });
-  const projection = await page.evaluate(() => ({
-    viewport: { width: window.innerWidth, height: window.innerHeight },
-    dpr: window.devicePixelRatio,
-    theme: document.documentElement.dataset.theme ?? null,
-    density: document.documentElement.dataset.density ?? null,
-    horizontalOverflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
-    verticalOverflow: document.documentElement.scrollHeight - document.documentElement.clientHeight,
-    state: document.querySelector('[data-evidence-surface="f03-workspace-shell"]')
-      ?.getAttribute('data-workspace-state') ?? null,
-    diagnostics: (window as typeof window & {
-      __STUDIO_UI_WORKSPACE_DIAGNOSTICS__?: Record<string, unknown>;
-    }).__STUDIO_UI_WORKSPACE_DIAGNOSTICS__
-      ? { ...(window as typeof window & {
-          __STUDIO_UI_WORKSPACE_DIAGNOSTICS__: Record<string, unknown>;
-        }).__STUDIO_UI_WORKSPACE_DIAGNOSTICS__ }
-      : null
-  }));
+  const projection = await page.evaluate(async () => {
+    await new Promise<void>(resolveFrame => requestAnimationFrame(() => {
+      requestAnimationFrame(() => resolveFrame());
+    }));
+    const flowCanvas = document.querySelector<HTMLCanvasElement>('[data-testid="flow-canvas"]');
+    const context = flowCanvas?.getContext('2d') ?? null;
+    let paintedPixelCount = 0;
+    if (flowCanvas && context && flowCanvas.width > 0 && flowCanvas.height > 0) {
+      const pixels = context.getImageData(0, 0, flowCanvas.width, flowCanvas.height).data;
+      for (let index = 3; index < pixels.length; index += 4) {
+        if (pixels[index] > 0) paintedPixelCount += 1;
+      }
+    }
+    return {
+      viewport: { width: window.innerWidth, height: window.innerHeight },
+      dpr: window.devicePixelRatio,
+      theme: document.documentElement.dataset.theme ?? null,
+      density: document.documentElement.dataset.density ?? null,
+      horizontalOverflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+      verticalOverflow: document.documentElement.scrollHeight - document.documentElement.clientHeight,
+      flowCanvas: {
+        width: flowCanvas?.width ?? 0,
+        height: flowCanvas?.height ?? 0,
+        paintedPixelCount
+      },
+      state: document.querySelector('[data-evidence-surface="f03-workspace-shell"]')
+        ?.getAttribute('data-workspace-state') ?? null,
+      diagnostics: (window as typeof window & {
+        __STUDIO_UI_WORKSPACE_DIAGNOSTICS__?: Record<string, unknown>;
+      }).__STUDIO_UI_WORKSPACE_DIAGNOSTICS__
+        ? { ...(window as typeof window & {
+            __STUDIO_UI_WORKSPACE_DIAGNOSTICS__: Record<string, unknown>;
+          }).__STUDIO_UI_WORKSPACE_DIAGNOSTICS__ }
+        : null
+    };
+  });
   if (projection.viewport.width !== options.viewport.width || projection.viewport.height !== options.viewport.height) {
     throw new Error(`F03 evidence viewport drifted: ${JSON.stringify(projection.viewport)}.`);
   }
   if (projection.horizontalOverflow > 1 || projection.verticalOverflow > 1) {
     throw new Error(`F03 Workspace overflowed globally: ${JSON.stringify(projection)}.`);
+  }
+  if (projection.flowCanvas.width <= 0 || projection.flowCanvas.height <= 0 ||
+    projection.flowCanvas.paintedPixelCount <= 0) {
+    throw new Error(`F03 FlowCanvas was not stably painted before capture: ${JSON.stringify(projection.flowCanvas)}.`);
   }
   if (!isF03G5RequestAllowlist(options.requests)) {
     throw new Error(`F03 G5 request allowlist failed: ${JSON.stringify(options.requests)}.`);
