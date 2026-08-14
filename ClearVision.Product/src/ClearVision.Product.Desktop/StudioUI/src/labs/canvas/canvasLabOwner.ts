@@ -114,7 +114,7 @@ function freezeDiagnostics(value: CanvasLabDiagnostics): CanvasLabDiagnostics {
 }
 
 function errorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : 'Unknown Canvas Lab failure.';
+  return error instanceof Error ? error.message : '画布实验室发生未知错误。';
 }
 
 function serializeWithEnvelope(owner: ActiveCanvasOwner): OperatorFlowDto {

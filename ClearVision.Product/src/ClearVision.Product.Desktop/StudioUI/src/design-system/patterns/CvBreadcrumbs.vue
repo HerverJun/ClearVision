@@ -15,6 +15,13 @@ const hasExplicitCurrent = computed(() => props.items.some(item => item.current 
 function isCurrent(item: CvBreadcrumbItem, index: number): boolean {
   return hasExplicitCurrent.value ? item.current === true : index === props.items.length - 1;
 }
+
+function internalHref(item: CvBreadcrumbItem): string | undefined {
+  const href = item.href?.trim();
+  if (!href) return undefined;
+  if (href.startsWith('#/') || (href.startsWith('/') && !href.startsWith('//'))) return href;
+  return undefined;
+}
 </script>
 
 <template>
@@ -44,12 +51,12 @@ function isCurrent(item: CvBreadcrumbItem, index: number): boolean {
             :current="isCurrent(item, index)"
             :index="index"
           >
-            <span v-if="isCurrent(item, index) || !item.href">
+            <span v-if="isCurrent(item, index) || !internalHref(item)">
               {{ item.label }}
             </span>
             <a
               v-else
-              :href="item.href"
+              :href="internalHref(item)"
             >
               {{ item.label }}
             </a>

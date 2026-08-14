@@ -273,21 +273,16 @@ onMounted(() => {
               :key="item.label"
             >
               <RouterLink
-                v-if="item.to && !item.current"
+                v-if="item.to"
                 class="product-layout__workspace-nav-item"
+                :class="{ 'is-current': item.current }"
                 :to="item.to"
                 :data-product-nav="item.to"
                 :title="item.description"
+                :aria-current="item.current ? 'page' : undefined"
               >
                 {{ item.label }}
               </RouterLink>
-              <span
-                v-else-if="item.current"
-                class="product-layout__workspace-nav-item is-current"
-                aria-current="page"
-                :data-product-nav="item.to"
-                :title="item.description"
-              >{{ item.label }}</span>
               <button
                 v-else
                 type="button"

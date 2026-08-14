@@ -38,6 +38,7 @@ function checkBadge(check: AiBuildCheckV1): Readonly<{ label: string; tone: CvSt
 <template>
   <CvPanel
     title="构建结果"
+    variant="section"
     data-ai-build-workspace
   >
     <div class="ai-build-workspace">

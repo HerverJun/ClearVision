@@ -33,7 +33,12 @@ describe('M-series shared visual and navigation guards', () => {
     const layout = read('src/app/layouts/product-layout.css');
     expect(layout).not.toMatch(/workspace-nav-item:nth-child/);
     expect(layout).toContain('overflow-x: auto;');
-    expect(layout).toMatch(/workspace-nav-item\.is-current::after[\s\S]*?bottom:\s*0;/);
+    expect(layout).toMatch(/workspace-nav-item\.is-current[\s\S]*?background:\s*var\(--cv-color-action-soft\);/);
+    expect(layout).toMatch(/workspace-nav-item\.is-current[\s\S]*?box-shadow:\s*inset 3px 0 0 var\(--cv-color-action\);/);
+    expect(layout).not.toMatch(/workspace-nav-item\.is-current::after/);
+
+    const component = read('src/app/layouts/ProductLayout.vue');
+    expect(component).toContain(":aria-current=\"item.current ? 'page' : undefined\"");
   });
 
   it('keeps the workspace route protected by role while flag-off stays an explicit capability state', () => {
@@ -76,9 +81,17 @@ describe('M-series shared visual and navigation guards', () => {
     expect(select).toMatch(/box-shadow:\s*none;/);
   });
 
+  it('keeps toggle states legible in Windows forced-colors mode', () => {
+    const toggle = read('src/design-system/primitives/CvToggle.vue');
+    expect(toggle).toMatch(/@media \(forced-colors: active\)[\s\S]*?border-color:\s*CanvasText;/);
+    expect(toggle).toMatch(/background:\s*Canvas;/);
+    expect(toggle).toMatch(/input:checked[\s\S]*?background:\s*Highlight;/);
+    expect(toggle).toMatch(/input:checked[\s\S]*?background:\s*HighlightText;/);
+  });
+
   it('keeps formal run context visible at Windows 125 percent layout pressure', () => {
     const statusBar = read('src/capabilities/inspection-run/RunStatusBar.vue');
-    const pressureStart = statusBar.indexOf('@media (max-width: 1180px)');
+    const pressureStart = statusBar.indexOf('@media (max-width: 1307px)');
     const narrowStart = statusBar.indexOf('@media (max-width: 760px)');
     const pressureStyles = statusBar.slice(pressureStart, narrowStart);
 
@@ -95,5 +108,44 @@ describe('M-series shared visual and navigation guards', () => {
       .filter(relativePath => rawColor.test(read(relativePath)));
 
     expect(violations).toEqual([]);
+  });
+
+  it('keeps support work surfaces continuous and preserves a single page scroll owner', () => {
+    const settingsPage = read('src/capabilities/settings/SettingsPage.vue');
+    const settingsOverview = read('src/capabilities/settings/SettingsOverview.vue');
+    const aiPage = read('src/capabilities/ai-workbench/AiWorkbenchPage.vue');
+    const operatorsPage = read('src/capabilities/operators-read/OperatorsPage.vue');
+    const diagnosticsPage = read('src/platform/diagnostics/DiagnosticsPage.vue');
+    const aboutPage = read('src/capabilities/about/AboutPage.vue');
+
+    expect(settingsPage).toMatch(/settings-page__workspace > :first-child[\s\S]*?position:\s*sticky;/);
+    expect(settingsPage).not.toMatch(/settings-page__content[\s\S]{0,180}overflow-y:/);
+    expect(settingsOverview).toMatch(/settings-overview__section-list[\s\S]*?border-block:/);
+    expect(aiPage).toContain('data-ai-active-work-surface');
+    expect(aiPage).toMatch(/ai-workbench-page__workspace > :only-child[\s\S]*?grid-column:\s*1 \/ -1;/);
+    expect(operatorsPage).toContain('variant="section"');
+    expect(diagnosticsPage.match(/variant="section"/g)).toHaveLength(2);
+    expect(aboutPage.match(/variant="section"/g)).toHaveLength(2);
+  });
+
+  it('keeps application reduced motion bounded and collapses state-only workspace panes before overflow', () => {
+    const base = read('src/app/base.css');
+    const workspace = read('src/capabilities/project-workspace/WorkspaceShell.vue');
+    expect(base).toMatch(/html\[data-reduced-motion="true"\][\s\S]*?animation-iteration-count:\s*1 !important;/);
+    expect(workspace).toMatch(/@media \(max-width: 1040px\)[\s\S]*?workspace-shell__work-area--state[\s\S]*?grid-template-columns:\s*minmax\(0, 1fr\);/);
+  });
+
+  it('keeps Design Lab task compositions free of a repeated card shell', () => {
+    const designLab = read('src/labs/design/designLab.css');
+    expect(designLab).toMatch(/\.design-lab__composition\s*\{[^}]*border:\s*0;[^}]*border-radius:\s*0;[^}]*background:\s*transparent;/);
+  });
+
+  it('does not key repeated diagnostic text directly by its display value', () => {
+    const stationTrace = read('src/capabilities/stations-read/StationProductionTrace.vue');
+    const results = read('src/capabilities/results-read/ResultsPage.vue');
+    const preview = read('src/capabilities/project-workspace/preview/PreviewPanel.vue');
+    expect(stationTrace).not.toContain(':key="message"');
+    expect(results).not.toContain(':key="warning"');
+    expect(preview).not.toMatch(/:key="`\$\{item\.code\}-\$\{index\}`"/);
   });
 });

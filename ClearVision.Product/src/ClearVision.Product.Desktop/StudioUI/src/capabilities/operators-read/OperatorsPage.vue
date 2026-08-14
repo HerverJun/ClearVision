@@ -151,7 +151,6 @@ onBeforeUnmount(() => { catalogQuery.dispose(); });
     data-capability="operators-read"
   >
     <CvPageHeader
-      eyebrow="资源目录"
       title="算子库"
       description="按名称、分类、端口和参数查找可用算子，查看当前版本的接口定义。"
     >
@@ -179,6 +178,7 @@ onBeforeUnmount(() => { catalogQuery.dispose(); });
     <CvPanel
       title="目录与筛选"
       description="筛选条件会随当前链接保留，返回目录时可继续上次查找。"
+      variant="section"
     >
       <div
         class="operators-page__filters"

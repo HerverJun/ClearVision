@@ -497,11 +497,11 @@ onBeforeUnmount(() => {
       class="stations-page__overview"
       role="tabpanel"
       aria-labelledby="stations-overview-tab"
-      tabindex="0"
     >
       <CvPanel
         class="stations-page__summary-panel"
         title="运行摘要"
+        variant="section"
         :padded="false"
       >
         <CvInlineAlert
@@ -561,6 +561,7 @@ onBeforeUnmount(() => {
         class="stations-page__priority-panel"
         title="异常优先"
         description="按连接、运行、最近结果与待回放数量综合排序。"
+        variant="tool"
         :padded="false"
       >
         <CvPageState
@@ -635,6 +636,7 @@ onBeforeUnmount(() => {
       <CvPanel
         class="stations-page__statistics-panel"
         title="结果统计"
+        variant="section"
         :padded="false"
       >
         <CvToolbar
@@ -769,10 +771,10 @@ onBeforeUnmount(() => {
       id="stations-investigation-panel"
       class="stations-page__list-panel"
       title="工作站列表"
+      variant="section"
       :padded="false"
       role="tabpanel"
       aria-labelledby="stations-investigation-tab"
-      tabindex="0"
     >
       <CvToolbar
         class="stations-page__list-toolbar"
@@ -958,7 +960,7 @@ onBeforeUnmount(() => {
 
 <style scoped>
 .stations-page { display: grid; max-width: 1720px; min-width: 0; gap: var(--cv-density-page-gap); align-items: start; }
-.stations-page__overview { display: grid; min-width: 0; grid-template-columns: minmax(0, 1fr) minmax(320px, 360px); gap: var(--cv-density-page-gap); align-items: start; }
+.stations-page__overview { display: grid; min-width: 0; grid-template-columns: minmax(0, 1.45fr) minmax(300px, .65fr); gap: var(--cv-density-page-gap); align-items: start; }
 .stations-page__overview > * { min-width: 0; }
 .stations-page__updated-at { align-self: center; color: var(--cv-text-secondary); font-size: var(--cv-font-size-xs); font-variant-numeric: tabular-nums lining-nums; }
 .stations-page__summary-panel { grid-column: 1 / -1; }
@@ -1008,7 +1010,7 @@ onBeforeUnmount(() => {
 .stations-page__outcomes dt { color: var(--cv-text-muted); font-size: var(--cv-font-size-xs); }
 .stations-page__outcomes dd { margin: 0; color: var(--cv-text-primary); font-size: var(--cv-font-size-md); font-weight: var(--cv-font-weight-semibold); font-variant-numeric: tabular-nums lining-nums; }
 .stations-page__outcomes p { margin: 0; padding: var(--cv-space-2) var(--cv-space-3); border-top: 1px solid var(--cv-border-subtle); color: var(--cv-text-secondary); font-size: var(--cv-font-size-xs); line-height: var(--cv-line-height-normal); }
-.stations-page__priority-list { margin: 0; padding: 0; list-style: none; }
+.stations-page__priority-list { max-height: 304px; margin: 0; padding: 0; overflow-y: auto; overscroll-behavior: contain; list-style: none; }
 .stations-page__priority-list li { min-width: 0; min-height: 48px; padding: var(--cv-space-2) var(--cv-density-panel-padding); display: flex; align-items: center; justify-content: space-between; gap: var(--cv-space-3); border-top: 1px solid var(--cv-border-subtle); }
 .stations-page__priority-list li > div { min-width: 0; display: grid; gap: 2px; }
 .stations-page__priority-list a { overflow-wrap: anywhere; color: var(--cv-color-link); font-size: var(--cv-font-size-sm); font-weight: var(--cv-font-weight-semibold); text-decoration: none; }
@@ -1041,4 +1043,7 @@ onBeforeUnmount(() => {
   .stations-page__statistics-toolbar :deep(.cv-field) { width: auto; }
 }
 @media (max-width: 720px) { .stations-page__metrics { grid-template-columns: repeat(3, minmax(0, 1fr)); } .stations-page__metrics div { border-bottom: 1px solid var(--cv-border-subtle); } .stations-page__metrics div:nth-child(3n) { border-right: 0; } }
+@media (forced-colors: active) {
+  .stations-page__priority-panel { border-color: CanvasText; }
+}
 </style>

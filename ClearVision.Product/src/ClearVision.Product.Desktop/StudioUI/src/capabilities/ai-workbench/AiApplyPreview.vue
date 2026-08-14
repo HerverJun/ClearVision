@@ -44,6 +44,7 @@ function checkBadge(check: AiBuildCheckV1): Readonly<{ label: string; tone: CvSt
 <template>
   <CvPanel
     title="应用预览"
+    variant="section"
     data-ai-apply-preview
   >
     <div class="ai-apply-preview">

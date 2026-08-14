@@ -263,7 +263,8 @@ onBeforeUnmount(() => query.dispose());
 .inspection-projects__search { width: min(100%, 520px); }
 .inspection-projects__notice { margin-bottom: var(--cv-space-3); }
 .inspection-projects__list { margin: 0; padding: 0; border-top: 1px solid var(--cv-border-subtle); list-style: none; }
-.inspection-projects__list li { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: var(--cv-space-4); min-height: 72px; padding: var(--cv-space-3) 0; border-bottom: 1px solid var(--cv-border-subtle); }
+.inspection-projects__list li { display: grid; grid-template-columns: minmax(0, 1fr) 112px; align-items: center; gap: var(--cv-space-4); min-height: 72px; padding: var(--cv-space-3) var(--cv-space-2); border-bottom: 1px solid var(--cv-border-subtle); }
+.inspection-projects__list li:hover { background: var(--cv-interactive-hover); }
 .inspection-projects__summary { display: grid; min-width: 0; gap: 2px; }
 .inspection-projects__summary strong { color: var(--cv-text-primary); font-size: var(--cv-font-size-sm); }
 .inspection-projects__summary strong,
@@ -273,6 +274,7 @@ onBeforeUnmount(() => query.dispose());
 .inspection-projects__summary small { color: var(--cv-text-muted); font-size: var(--cv-font-size-xs); }
 .inspection-projects__open,
 .inspection-projects__projects-link { display: inline-flex; min-height: var(--cv-density-control-height-sm); align-items: center; gap: var(--cv-space-1); color: var(--cv-color-link); font-size: var(--cv-font-size-xs); font-weight: var(--cv-font-weight-medium); text-decoration: none; white-space: nowrap; }
+.inspection-projects__open { justify-self: end; }
 .inspection-projects__open:hover,
 .inspection-projects__projects-link:hover { text-decoration: underline; }
 .inspection-projects__open:focus-visible,
@@ -281,5 +283,8 @@ onBeforeUnmount(() => query.dispose());
   .inspection-projects__toolbar { align-items: stretch; flex-direction: column; }
   .inspection-projects__list li { grid-template-columns: 1fr; }
   .inspection-projects__open { justify-self: start; }
+}
+@media (forced-colors: active) {
+  .inspection-projects__list li:hover { outline: 1px solid Highlight; outline-offset: -1px; }
 }
 </style>

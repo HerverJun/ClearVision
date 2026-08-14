@@ -14,6 +14,7 @@ export { default as CvSelect } from './CvSelect.vue';
 export { default as CvSplitter } from './CvSplitter.vue';
 export { default as CvStatusBadge } from './CvStatusBadge.vue';
 export { default as CvSurface } from './CvSurface.vue';
+export { default as CvToggle } from './CvToggle.vue';
 export { default as CvToastRegion } from './CvToastRegion.vue';
 export { default as CvTooltip } from './CvTooltip.vue';
 export { default as CvTypography } from './CvTypography.vue';

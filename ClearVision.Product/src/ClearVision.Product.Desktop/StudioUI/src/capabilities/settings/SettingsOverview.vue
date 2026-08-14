@@ -296,10 +296,8 @@ function isGenericSection(target: SettingsNavigationTarget): target is GenericSe
   gap: 0;
   margin: 0;
   padding: 0;
-  overflow: hidden;
-  border: 1px solid var(--cv-border-subtle);
-  border-radius: var(--cv-radius-md);
-  background: var(--cv-surface-raised);
+  border-block: 1px solid var(--cv-border-subtle);
+  background: transparent;
   list-style: none;
 }
 

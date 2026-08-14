@@ -878,13 +878,13 @@ onBeforeUnmount(() => {
   pointer-events: none;
   white-space: nowrap;
 }
-.projects-page__layout { display: grid; min-width: 0; gap: var(--cv-space-6); align-items: start; }
+.projects-page__layout { display: grid; min-width: 0; gap: var(--cv-space-8); align-items: start; }
 .projects-page__layout--empty .projects-page__recent { display: none; }
-.projects-page__library { background: var(--cv-surface-raised); }
+.projects-page__library { background: transparent; }
 .projects-page__library-toolbar {
   padding: var(--cv-space-3) var(--cv-density-panel-padding);
   border-block: 1px solid var(--cv-border-subtle);
-  background: var(--cv-surface-page);
+  background: var(--cv-surface-raised);
 }
 .projects-page__library-toolbar :deep(.cv-toolbar__primary) { flex: 1 1 680px; }
 .projects-page__search { flex: 1 1 420px; max-width: 720px; }
@@ -907,6 +907,7 @@ onBeforeUnmount(() => {
 .projects-page__name {
   display: block;
   overflow: hidden;
+  overflow-wrap: anywhere;
   color: var(--cv-text-primary);
   font-weight: var(--cv-font-weight-semibold);
   text-decoration: none;
@@ -955,5 +956,6 @@ onBeforeUnmount(() => {
 
 @media (max-width: 640px) {
   .projects-page__actions { flex-wrap: wrap; justify-content: flex-start; }
+  .projects-page__name { white-space: normal; }
 }
 </style>

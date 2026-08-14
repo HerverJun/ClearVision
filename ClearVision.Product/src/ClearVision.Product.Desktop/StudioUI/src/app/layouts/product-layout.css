@@ -115,19 +115,10 @@
 }
 
 .product-layout__workspace-nav-item.is-current {
-  background: transparent;
-  color: var(--cv-text-primary);
-}
-
-.product-layout__workspace-nav-item.is-current::after {
-  position: absolute;
-  right: 14px;
-  bottom: 0;
-  left: 14px;
-  height: 2px;
-  border-radius: var(--cv-radius-pill) var(--cv-radius-pill) 0 0;
-  background: var(--cv-color-action);
-  content: '';
+  background: var(--cv-color-action-soft);
+  box-shadow: inset 3px 0 0 var(--cv-color-action);
+  color: var(--cv-color-action-text);
+  font-weight: var(--cv-font-weight-semibold);
 }
 
 .product-layout__workspace-nav-item:disabled {

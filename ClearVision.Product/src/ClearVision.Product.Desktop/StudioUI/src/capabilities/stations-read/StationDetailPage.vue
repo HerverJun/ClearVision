@@ -35,15 +35,24 @@ import {
 import {
   createStationMonitoringOwner,
   createStationQuerySlot,
+  type StationQuerySlot,
   type StationAuthorityRefreshRequest
 } from './stationLifecycleOwner';
 import { createStationSseAdapter } from './stationSseAdapter';
-import { createStationAdminCommandOwner } from './stationAdminCommandOwner';
+import {
+  createStationAdminCommandOwner,
+  type StationAdminCommandOwner
+} from './stationAdminCommandOwner';
 import StationAdminPanel from './StationAdminPanel.vue';
 import StationProductionTrace from './StationProductionTrace.vue';
 import type { StationAdminEvidenceState } from './stationProductionTrace';
 import type {
+  StationAdminDetails,
+  StationAudit,
+  StationCommand,
   StationHealthSnapshot,
+  StationLog,
+  StationPackage,
   StationResult
 } from './stationContracts';
 import {
@@ -73,8 +82,9 @@ const route = useRoute();
 const router = useRouter();
 const runtime = useStationsReadRuntime(props.runtime);
 const activeStationId = computed(() => props.stationId ?? String(route.params.stationId ?? ''));
-const isStationAdmin = runtime.session?.projection.user?.role === 'Admin';
-const canOpenWorkspace = ['Admin', 'Engineer'].includes(runtime.session?.projection.user?.role ?? '');
+const currentRole = computed(() => runtime.session?.projection.user?.role ?? '');
+const isStationAdmin = computed(() => currentRole.value === 'Admin');
+const canOpenWorkspace = computed(() => ['Admin', 'Engineer'].includes(currentRole.value));
 const returnTarget = computed(() => {
   const value = route.query.returnTo;
   return resolveProductionReturnTo(typeof value === 'string' ? value : null);
@@ -100,32 +110,61 @@ const healthSlot = createStationQuerySlot(() => createStationHealthQuery(
   () => activeStationId.value,
   () => take.value
 ));
-const adminSlot = isStationAdmin ? createStationQuerySlot(() => createStationAdminDetailsQuery(
-  runtime.queries, () => activeStationId.value
-)) : undefined;
-const logsSlot = isStationAdmin ? createStationQuerySlot(() => createStationLogsQuery(
-  runtime.queries, () => activeStationId.value, () => take.value
-)) : undefined;
-const commandsSlot = isStationAdmin ? createStationQuerySlot(() => createStationCommandsQuery(
-  runtime.queries, () => activeStationId.value, () => take.value
-)) : undefined;
-const auditsSlot = isStationAdmin ? createStationQuerySlot(() => createStationAuditsQuery(
-  runtime.queries, () => activeStationId.value, () => take.value
-)) : undefined;
-const packagesSlot = isStationAdmin ? createStationQuerySlot(() => createStationPackagesQuery(runtime.queries)) : undefined;
-const adminCommandOwner = isStationAdmin && runtime.api ? createStationAdminCommandOwner({
-  api: runtime.api,
-  stationId: () => activeStationId.value
-}) : undefined;
+
+interface StationAdminCapability {
+  readonly adminSlot: StationQuerySlot<StationAdminDetails>;
+  readonly logsSlot: StationQuerySlot<readonly StationLog[]>;
+  readonly commandsSlot: StationQuerySlot<readonly StationCommand[]>;
+  readonly auditsSlot: StationQuerySlot<readonly StationAudit[]>;
+  readonly packagesSlot: StationQuerySlot<readonly StationPackage[]>;
+  readonly commandOwner: StationAdminCommandOwner | undefined;
+}
+
+function createAdminCapability(): StationAdminCapability {
+  return {
+    adminSlot: createStationQuerySlot(() => createStationAdminDetailsQuery(
+      runtime.queries, () => activeStationId.value
+    )),
+    logsSlot: createStationQuerySlot(() => createStationLogsQuery(
+      runtime.queries, () => activeStationId.value, () => take.value
+    )),
+    commandsSlot: createStationQuerySlot(() => createStationCommandsQuery(
+      runtime.queries, () => activeStationId.value, () => take.value
+    )),
+    auditsSlot: createStationQuerySlot(() => createStationAuditsQuery(
+      runtime.queries, () => activeStationId.value, () => take.value
+    )),
+    packagesSlot: createStationQuerySlot(() => createStationPackagesQuery(runtime.queries)),
+    commandOwner: runtime.api ? createStationAdminCommandOwner({
+      api: runtime.api,
+      stationId: () => activeStationId.value
+    }) : undefined
+  };
+}
+
+const adminCapability = shallowRef<StationAdminCapability | null>(null);
+
+function disposeAdminCapability(): void {
+  const capability = adminCapability.value;
+  if (!capability) return;
+  adminCapability.value = null;
+  capability.adminSlot.dispose();
+  capability.logsSlot.dispose();
+  capability.commandsSlot.dispose();
+  capability.auditsSlot.dispose();
+  capability.packagesSlot.dispose();
+  capability.commandOwner?.dispose();
+}
 
 const listState = listSlot.state;
 const resultsState = resultsSlot.state;
 const healthState = healthSlot.state;
-const adminState = adminSlot?.state ?? null;
-const logsState = logsSlot?.state ?? null;
-const commandsState = commandsSlot?.state ?? null;
-const auditsState = auditsSlot?.state ?? null;
-const packagesState = packagesSlot?.state ?? null;
+const adminState = computed(() => adminCapability.value?.adminSlot.state.value ?? null);
+const logsState = computed(() => adminCapability.value?.logsSlot.state.value ?? null);
+const commandsState = computed(() => adminCapability.value?.commandsSlot.state.value ?? null);
+const auditsState = computed(() => adminCapability.value?.auditsSlot.state.value ?? null);
+const packagesState = computed(() => adminCapability.value?.packagesSlot.state.value ?? null);
+const adminCommandOwner = computed(() => adminCapability.value?.commandOwner ?? null);
 const station = computed(() => listState.value.data?.find(
   item => item.stationId.toLocaleLowerCase() === activeStationId.value.toLocaleLowerCase()
 ) ?? null);
@@ -133,8 +172,8 @@ const lastOutcome = computed(() => station.value?.lastOutcome
   ? formatInspectionOutcome(station.value.lastOutcome)
   : null);
 const adminEvidence = computed<StationAdminEvidenceState>(() => {
-  if (!isStationAdmin) return 'restricted';
-  const states = [commandsState?.value, auditsState?.value, packagesState?.value];
+  if (!isStationAdmin.value) return 'restricted';
+  const states = [commandsState.value, auditsState.value, packagesState.value];
   if (states.some(state => state?.phase === 'loading' || state?.phase === 'idle')) return 'loading';
   if (states.every(state => state && ['success', 'empty', 'stale', 'partial-failure'].includes(state.phase))) {
     return 'available';
@@ -148,17 +187,29 @@ async function refreshAll(): Promise<void> {
     resultsSlot.refresh({ force: true }),
     healthSlot.refresh({ force: true })
   ];
-  for (const slot of [adminSlot, logsSlot, commandsSlot, auditsSlot, packagesSlot]) {
-    if (slot) refreshes.push(slot.refresh({ force: true }));
+  const capability = adminCapability.value;
+  if (capability) {
+    refreshes.push(
+      capability.adminSlot.refresh({ force: true }),
+      capability.logsSlot.refresh({ force: true }),
+      capability.commandsSlot.refresh({ force: true }),
+      capability.auditsSlot.refresh({ force: true }),
+      capability.packagesSlot.refresh({ force: true })
+    );
   }
   await Promise.allSettled(refreshes);
 }
 
 async function refreshAdmin(): Promise<void> {
-  const refreshes = [adminSlot, logsSlot, commandsSlot, auditsSlot, packagesSlot]
-    .filter(slot => slot !== undefined)
-    .map(slot => slot.refresh({ force: true }));
-  await Promise.allSettled(refreshes);
+  const capability = adminCapability.value;
+  if (!capability) return;
+  await Promise.allSettled([
+    capability.adminSlot.refresh({ force: true }),
+    capability.logsSlot.refresh({ force: true }),
+    capability.commandsSlot.refresh({ force: true }),
+    capability.auditsSlot.refresh({ force: true }),
+    capability.packagesSlot.refresh({ force: true })
+  ]);
 }
 
 async function refreshAuthority(request: StationAuthorityRefreshRequest): Promise<void> {
@@ -178,16 +229,24 @@ async function refreshAuthority(request: StationAuthorityRefreshRequest): Promis
     refreshes.push(healthSlot.refresh({ force: true }));
   }
   if (full) {
-    for (const slot of [adminSlot, logsSlot, commandsSlot, auditsSlot, packagesSlot]) {
-      if (slot) refreshes.push(slot.refresh({ force: true }));
+    const capability = adminCapability.value;
+    if (capability) {
+      refreshes.push(
+        capability.adminSlot.refresh({ force: true }),
+        capability.logsSlot.refresh({ force: true }),
+        capability.commandsSlot.refresh({ force: true }),
+        capability.auditsSlot.refresh({ force: true }),
+        capability.packagesSlot.refresh({ force: true })
+      );
     }
   } else {
-    if (eventTypes.has('stationLogAdded') && logsSlot) {
-      refreshes.push(logsSlot.refresh({ force: true }));
+    const capability = adminCapability.value;
+    if (eventTypes.has('stationLogAdded') && capability) {
+      refreshes.push(capability.logsSlot.refresh({ force: true }));
     }
-    if (eventTypes.has('stationCommandUpdated')) {
-      if (commandsSlot) refreshes.push(commandsSlot.refresh({ force: true }));
-      if (auditsSlot) refreshes.push(auditsSlot.refresh({ force: true }));
+    if (eventTypes.has('stationCommandUpdated') && capability) {
+      refreshes.push(capability.commandsSlot.refresh({ force: true }));
+      refreshes.push(capability.auditsSlot.refresh({ force: true }));
     }
   }
   await Promise.allSettled(refreshes);
@@ -200,11 +259,12 @@ const monitoring = createStationMonitoringOwner({
     listSlot.pause();
     resultsSlot.pause();
     healthSlot.pause();
-    adminSlot?.pause();
-    logsSlot?.pause();
-    commandsSlot?.pause();
-    auditsSlot?.pause();
-    packagesSlot?.pause();
+    const capability = adminCapability.value;
+    capability?.adminSlot.pause();
+    capability?.logsSlot.pause();
+    capability?.commandsSlot.pause();
+    capability?.auditsSlot.pause();
+    capability?.packagesSlot.pause();
   }
 });
 const monitoringState = monitoring.state;
@@ -331,6 +391,16 @@ watch(activeStationId, (next, previous) => {
   if (next !== previous) void refreshAll();
 });
 
+watch(isStationAdmin, enabled => {
+  if (!enabled) {
+    disposeAdminCapability();
+    return;
+  }
+  if (adminCapability.value) return;
+  adminCapability.value = createAdminCapability();
+  void refreshAdmin();
+}, { immediate: true });
+
 onMounted(() => monitoring.start());
 
 onBeforeUnmount(() => {
@@ -338,12 +408,7 @@ onBeforeUnmount(() => {
   listSlot.dispose();
   resultsSlot.dispose();
   healthSlot.dispose();
-  adminSlot?.dispose();
-  logsSlot?.dispose();
-  commandsSlot?.dispose();
-  auditsSlot?.dispose();
-  packagesSlot?.dispose();
-  adminCommandOwner?.dispose();
+  disposeAdminCapability();
 });
 </script>
 
@@ -469,6 +534,7 @@ onBeforeUnmount(() => {
       <CvPanel
         class="station-detail__overview-panel"
         title="状态概览"
+        variant="section"
         :padded="false"
       >
         <CvDescriptionList
@@ -490,6 +556,7 @@ onBeforeUnmount(() => {
     <CvPanel
       class="station-detail__results-panel"
       title="最近结果"
+      variant="section"
       :padded="false"
     >
       <CvInlineAlert
@@ -597,6 +664,7 @@ onBeforeUnmount(() => {
     <CvPanel
       class="station-detail__health-panel"
       title="健康快照"
+      variant="section"
       :padded="false"
     >
       <CvInlineAlert
@@ -703,7 +771,7 @@ onBeforeUnmount(() => {
 </template>
 
 <style scoped>
-.station-detail { display: grid; min-width: 0; grid-template-columns: minmax(300px, 360px) minmax(0, 1fr); grid-auto-flow: row dense; gap: var(--cv-density-page-gap); align-items: start; }
+.station-detail { display: grid; min-width: 0; grid-template-columns: minmax(270px, 320px) minmax(0, 1fr); grid-auto-flow: row dense; column-gap: var(--cv-space-5); row-gap: var(--cv-density-page-gap); align-items: start; }
 .station-detail :deep(.cv-page-header),
 .station-detail > :deep(.cv-inline-alert),
 .station-detail > :deep(.cv-page-state) { grid-column: 1 / -1; }
@@ -719,6 +787,8 @@ onBeforeUnmount(() => {
 .station-detail__health-panel { grid-column: 1 / -1; }
 .station-detail__production-trace { grid-column: 1 / -1; }
 .station-detail__admin-control { grid-column: 1 / -1; }
+.station-detail__results-panel { border-top: 2px solid var(--cv-color-industrial-blue); }
+.station-detail__health-panel { border-top: 1px solid var(--cv-border-subtle); }
 .station-detail__outcome { display: grid; justify-items: start; gap: var(--cv-space-1); }
 .station-detail__outcome span { color: var(--cv-text-muted); font-size: var(--cv-font-size-xs); }
 .station-detail__diagnostic,
@@ -745,5 +815,9 @@ onBeforeUnmount(() => {
   .station-detail__overview-panel,
   .station-detail__results-panel,
   .station-detail__health-panel { grid-column: 1; grid-row: auto; }
+}
+@media (forced-colors: active) {
+  .station-detail__results-panel { border-top-color: Highlight; }
+  .station-detail__health-panel { border-top-color: CanvasText; }
 }
 </style>

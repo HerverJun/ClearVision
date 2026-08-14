@@ -47,7 +47,6 @@ function formatStartupMode(value: string): string {
     data-studio-page="about"
   >
     <CvPageHeader
-      eyebrow="产品信息"
       title="关于 ClearVision Studio"
       description="工业视觉工程配置、调试与现场协同平台。"
     />
@@ -55,6 +54,7 @@ function formatStartupMode(value: string): string {
     <CvPanel
       title="产品与版本"
       description="当前进程实际读取到的界面、宿主和本地服务信息。"
+      variant="section"
     >
       <template #actions>
         <CvStatusBadge
@@ -71,6 +71,7 @@ function formatStartupMode(value: string): string {
     <CvPanel
       title="许可与支持"
       description="发布和现场支持信息。"
+      variant="section"
     >
       <CvDescriptionList
         :items="supportItems"

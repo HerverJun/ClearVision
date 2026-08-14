@@ -1,9 +1,7 @@
 .canvas-lab {
   min-height: 100vh;
   padding: clamp(var(--cv-space-4), 2vw, var(--cv-space-8));
-  background:
-    radial-gradient(circle at 76% -18%, var(--cv-color-brand-soft), transparent 34rem),
-    var(--cv-surface-app);
+  background: var(--cv-surface-app);
   color: var(--cv-text-primary);
 }
 
@@ -51,7 +49,7 @@
 }
 
 .canvas-lab h1 {
-  font-size: clamp(var(--cv-font-size-xl), 2vw, var(--cv-font-size-2xl));
+  font-size: var(--cv-font-size-2xl);
   letter-spacing: 0;
 }
 
@@ -531,6 +529,10 @@
 @media (max-width: 640px) {
   .canvas-lab {
     padding: var(--cv-space-3);
+  }
+
+  .canvas-lab h1 {
+    font-size: var(--cv-font-size-xl);
   }
 
   .canvas-lab__header-status,

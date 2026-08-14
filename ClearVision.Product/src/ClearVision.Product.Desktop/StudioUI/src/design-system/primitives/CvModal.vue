@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { nextTick, onUnmounted, ref, useId, watch } from 'vue';
 import { CvIcon } from '../icons';
+import { acquireModalIsolation } from './modalIsolation';
 
 const props = withDefaults(defineProps<{
   open: boolean;
@@ -28,9 +29,7 @@ const titleId = `cv-modal-${generatedId}-title`;
 const descriptionId = `cv-modal-${generatedId}-description`;
 let previousFocus: HTMLElement | null = null;
 let listening = false;
-let ownsBodyScrollLock = false;
-let previousBodyOverflow = '';
-let previousBodyPaddingRight = '';
+let releaseIsolation: (() => void) | null = null;
 
 const focusableSelector = [
   'a[href]',
@@ -44,12 +43,13 @@ const focusableSelector = [
 function focusableElements(): HTMLElement[] {
   if (!dialog.value) return [];
   return [...dialog.value.querySelectorAll<HTMLElement>(focusableSelector)]
-    .filter(element => element.getAttribute('aria-hidden') !== 'true' && !element.hasAttribute('hidden'));
+    .filter(element => element.closest('[hidden], [aria-hidden="true"], [inert]') === null);
 }
 
 function focusInitialElement(): void {
-  const preferred = dialog.value?.querySelector<HTMLElement>('[data-modal-initial-focus]');
-  const target = preferred ?? focusableElements()[0] ?? dialog.value;
+  const elements = focusableElements();
+  const preferred = elements.find(element => element.hasAttribute('data-modal-initial-focus'));
+  const target = preferred ?? elements[0] ?? dialog.value;
   target?.focus();
 }
 
@@ -74,6 +74,12 @@ function handleKeydown(event: KeyboardEvent): void {
   const last = elements[elements.length - 1];
   if (!first || !last) return;
 
+  if (!dialog.value?.contains(document.activeElement)) {
+    event.preventDefault();
+    (event.shiftKey ? last : first).focus();
+    return;
+  }
+
   if (event.shiftKey && document.activeElement === first) {
     event.preventDefault();
     last.focus();
@@ -81,23 +87,6 @@ function handleKeydown(event: KeyboardEvent): void {
     event.preventDefault();
     first.focus();
   }
-}
-
-function lockBodyScroll(): void {
-  if (ownsBodyScrollLock) return;
-  ownsBodyScrollLock = true;
-  previousBodyOverflow = document.body.style.overflow;
-  previousBodyPaddingRight = document.body.style.paddingRight;
-  const scrollbarWidth = Math.max(0, window.innerWidth - document.documentElement.clientWidth);
-  document.body.style.overflow = 'hidden';
-  if (scrollbarWidth > 0) document.body.style.paddingRight = `${scrollbarWidth}px`;
-}
-
-function unlockBodyScroll(): void {
-  if (!ownsBodyScrollLock) return;
-  ownsBodyScrollLock = false;
-  document.body.style.overflow = previousBodyOverflow;
-  document.body.style.paddingRight = previousBodyPaddingRight;
 }
 
 function startListening(): void {
@@ -127,19 +116,21 @@ watch(() => props.open, open => {
   if (open) {
     previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     startListening();
-    lockBodyScroll();
+    releaseIsolation = acquireModalIsolation();
     void nextTick(focusInitialElement);
     return;
   }
 
   stopListening();
-  unlockBodyScroll();
+  releaseIsolation?.();
+  releaseIsolation = null;
   restoreFocus();
 }, { immediate: true, flush: 'post' });
 
 onUnmounted(() => {
   stopListening();
-  unlockBodyScroll();
+  releaseIsolation?.();
+  releaseIsolation = null;
   restoreFocus();
 });
 </script>

@@ -365,6 +365,12 @@ onBeforeUnmount(() => {
   gap: var(--cv-density-page-gap);
 }
 
+.settings-page__workspace > :first-child {
+  position: sticky;
+  top: calc(var(--cv-product-topbar-height) + var(--cv-density-page-padding));
+  align-self: start;
+}
+
 .settings-page__content {
   display: grid;
   min-width: 0;
@@ -381,6 +387,7 @@ onBeforeUnmount(() => {
 
 @media (max-width: 900px) {
   .settings-page__workspace { grid-template-columns: minmax(0, 1fr); }
+  .settings-page__workspace > :first-child { position: static; }
 }
 
 @media (max-width: 560px) {

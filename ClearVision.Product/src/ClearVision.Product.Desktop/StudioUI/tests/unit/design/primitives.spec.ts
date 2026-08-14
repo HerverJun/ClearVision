@@ -1,13 +1,16 @@
 import { mount } from '@vue/test-utils';
+import { nextTick } from 'vue';
 import { describe, expect, it } from 'vitest';
 import {
   CvButton,
   CvField,
   CvIconButton,
+  CvModal,
   CvPanel,
   CvSelect,
   CvStatusBadge,
   CvSurface,
+  CvToggle,
   CvTypography,
   CvViewTabs
 } from '@/design-system/primitives';
@@ -96,6 +99,41 @@ describe('Design Foundation primitives', () => {
     expect(wrapper.emitted('update:modelValue')?.at(-1)).toEqual(['decision']);
   });
 
+  it('keeps toggle semantics, keyboard focus and disabled behavior explicit', async () => {
+    const wrapper = mount(CvToggle, {
+      attachTo: document.body,
+      props: {
+        label: 'Reduced motion',
+        description: 'Disable non-essential transitions.',
+        modelValue: false,
+        inputAttributes: { 'data-toggle-input': 'motion' }
+      }
+    });
+    const input = wrapper.get('input');
+
+    expect(input.attributes('role')).toBe('switch');
+    expect(input.attributes('aria-checked')).toBe('false');
+    expect(input.attributes('name')).toBe(input.attributes('id'));
+    expect(input.attributes('data-toggle-input')).toBe('motion');
+    expect(input.attributes('aria-describedby')).toBeTruthy();
+
+    await input.setValue(true);
+    expect(wrapper.emitted('update:modelValue')?.at(-1)).toEqual([true]);
+    await wrapper.setProps({ modelValue: true });
+    expect(input.attributes('aria-checked')).toBe('true');
+
+    input.element.focus();
+    expect(document.activeElement).toBe(input.element);
+    wrapper.unmount();
+
+    const disabled = mount(CvToggle, {
+      props: { label: 'Locked projection', modelValue: false, disabled: true }
+    });
+    await disabled.get('input').trigger('click');
+    expect(disabled.get('input').attributes()).toHaveProperty('disabled');
+    expect(disabled.emitted('update:modelValue')).toBeUndefined();
+  });
+
   it.each(['ok', 'ng', 'error', 'warning', 'info', 'idle', 'offline', 'unknown', 'disabled'] as const)(
     'keeps the %s status tone explicit',
     tone => {
@@ -140,5 +178,48 @@ describe('Design Foundation primitives', () => {
     expect(document.activeElement).toBe(tabs[0]!.element);
 
     wrapper.unmount();
+  });
+
+  it('isolates modal background, recaptures escaped focus, and restores the trigger', async () => {
+    const application = document.createElement('div');
+    application.id = 'app';
+    const trigger = document.createElement('button');
+    trigger.textContent = 'Open modal';
+    application.append(trigger);
+    document.body.append(application);
+    trigger.focus();
+
+    const wrapper = mount(CvModal, {
+      attachTo: application,
+      props: { open: false, title: 'Review state' },
+      slots: {
+        default: `
+          <span hidden><button data-modal-initial-focus data-hidden-action>Hidden</button></span>
+          <span aria-hidden="true"><button data-aria-hidden-action>ARIA hidden</button></span>
+          <span inert><button data-inert-action>Inert</button></span>
+          <button data-modal-initial-focus data-modal-action>Continue</button>
+        `
+      }
+    });
+    await wrapper.setProps({ open: true });
+    await nextTick();
+
+    const dialog = document.body.querySelector<HTMLElement>('[role="dialog"]');
+    expect(application.inert).toBe(true);
+    expect(application.getAttribute('aria-hidden')).toBe('true');
+    expect(document.body.style.overflow).toBe('hidden');
+    expect(document.activeElement).toBe(dialog?.querySelector('[data-modal-action]'));
+    trigger.focus();
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', bubbles: true }));
+    expect(dialog?.contains(document.activeElement)).toBe(true);
+
+    await wrapper.setProps({ open: false });
+    await nextTick();
+    expect(application.inert).toBe(false);
+    expect(application.hasAttribute('aria-hidden')).toBe(false);
+    expect(document.body.style.overflow).toBe('');
+    expect(document.activeElement).toBe(trigger);
+    wrapper.unmount();
+    application.remove();
   });
 });

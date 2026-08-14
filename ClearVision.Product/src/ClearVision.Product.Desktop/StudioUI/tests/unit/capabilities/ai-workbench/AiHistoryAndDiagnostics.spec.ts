@@ -75,6 +75,14 @@ describe('AI history and diagnostics drawers', () => {
     expect(dialog?.textContent).not.toContain('run_private_internal_01');
     expect(document.activeElement?.getAttribute('aria-label')).toBe('关闭抽屉');
 
+    const escapedTarget = document.createElement('button');
+    escapedTarget.textContent = 'outside';
+    document.body.append(escapedTarget);
+    escapedTarget.focus();
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', bubbles: true }));
+    expect(dialog?.contains(document.activeElement)).toBe(true);
+    escapedTarget.remove();
+
     const tabs = [...(dialog?.querySelectorAll<HTMLButtonElement>('[role="tab"]') ?? [])];
     expect(tabs.map(tab => tab.tabIndex)).toEqual([0, -1]);
     expect(dialog?.querySelector<HTMLElement>('#ai-history-session-panel')?.style.display).toBe('');
@@ -128,5 +136,46 @@ describe('AI history and diagnostics drawers', () => {
     expect(text).not.toMatch(/活动资源|重复 \/ 丢弃|公开事件/);
     expect(text).not.toMatch(/system prompt|chain-of-thought|Bearer|api[_ -]?key|C:\\|PLC:\/\//i);
     wrapper.unmount();
+  });
+
+  it('isolates the application while open and restores scroll and focus after close or unmount', async () => {
+    const application = document.createElement('div');
+    application.id = 'app';
+    const trigger = document.createElement('button');
+    trigger.textContent = '打开历史';
+    application.append(trigger);
+    document.body.append(application);
+    trigger.focus();
+
+    const wrapper = mount(AiHistoryDrawer, {
+      attachTo: application,
+      props: {
+        open: false,
+        history,
+        currentSessionId: null,
+        routeProjectId: null
+      }
+    });
+
+    await wrapper.setProps({ open: true });
+    await nextTick();
+    expect(application.inert).toBe(true);
+    expect(application.getAttribute('aria-hidden')).toBe('true');
+    expect(document.body.style.overflow).toBe('hidden');
+
+    await wrapper.setProps({ open: false });
+    await nextTick();
+    expect(application.inert).toBe(false);
+    expect(application.hasAttribute('aria-hidden')).toBe(false);
+    expect(document.body.style.overflow).toBe('');
+    expect(document.activeElement).toBe(trigger);
+
+    await wrapper.setProps({ open: true });
+    await nextTick();
+    wrapper.unmount();
+    expect(application.inert).toBe(false);
+    expect(application.hasAttribute('aria-hidden')).toBe(false);
+    expect(document.body.style.overflow).toBe('');
+    expect(document.activeElement).toBe(trigger);
   });
 });

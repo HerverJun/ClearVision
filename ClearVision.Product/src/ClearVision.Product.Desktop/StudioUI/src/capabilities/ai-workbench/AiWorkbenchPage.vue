@@ -285,6 +285,7 @@ onUnmounted(() => {
         <div
           v-if="(state.plan || state.build) && state.session"
           class="ai-workbench-page__workspace"
+          data-ai-active-work-surface
         >
           <AiBuildWorkspace
             v-if="state.build && !showApplyPreview"
@@ -364,6 +365,7 @@ onUnmounted(() => {
 .ai-workbench-page__main { display: grid; min-width: 0; gap: var(--cv-density-page-gap); padding: var(--cv-density-page-gap) var(--cv-density-page-padding) var(--cv-density-page-padding); }
 .ai-workbench-page__terminal { max-width: 980px; border-block: 1px solid var(--cv-border-subtle); background: transparent; }
 .ai-workbench-page__workspace { display: grid; grid-template-columns: minmax(0, 1.65fr) minmax(340px, 0.85fr); min-width: 0; align-items: start; gap: var(--cv-density-page-gap); }
+.ai-workbench-page__workspace > :only-child { grid-column: 1 / -1; }
 
 @media (max-width: 1180px) {
   .ai-workbench-page__workspace { grid-template-columns: 1fr; }

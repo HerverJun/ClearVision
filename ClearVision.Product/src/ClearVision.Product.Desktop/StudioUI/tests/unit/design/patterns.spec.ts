@@ -35,6 +35,27 @@ describe('Design System page patterns', () => {
     expect(wrapper.get('[aria-current="page"]').text()).toBe('视觉检测一号线');
   });
 
+  it('renders only same-application breadcrumb destinations as links', () => {
+    const wrapper = mount(CvBreadcrumbs, {
+      props: {
+        items: [
+          { label: '概览', href: '#/overview' },
+          { label: '工程', href: '/studio/index.html#/projects' },
+          { label: '脚本链接', href: 'javascript:alert(1)' },
+          { label: '外部站点', href: 'https://example.test/' },
+          { label: '当前页面' }
+        ]
+      }
+    });
+
+    expect(wrapper.findAll('a').map(link => link.attributes('href'))).toEqual([
+      '#/overview',
+      '/studio/index.html#/projects'
+    ]);
+    expect(wrapper.text()).toContain('脚本链接');
+    expect(wrapper.text()).toContain('外部站点');
+  });
+
   it('supports arrow, Home and End keyboard navigation without global listeners', async () => {
     const wrapper = mount(CvToolbar, {
       attachTo: document.body,

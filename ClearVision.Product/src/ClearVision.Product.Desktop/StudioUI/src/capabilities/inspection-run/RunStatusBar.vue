@@ -225,7 +225,7 @@ const inspectionLabel = computed(() => props.admissionLabel
   outline-offset: 2px;
 }
 
-@media (max-width: 1180px) {
+@media (max-width: 1307px) {
   .run-status-bar { grid-template-columns: minmax(170px, 220px) minmax(0, 1fr) auto; }
   .run-status-bar__state { overflow: hidden; }
   .run-status-bar__connection { flex: 1 1 auto; }

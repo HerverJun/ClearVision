@@ -25,12 +25,21 @@ const summaryItems = computed<readonly CvDescriptionItem[]>(() => Object.freeze(
 const publicEvents = computed(() => props.events.filter(event =>
   event.eventType.startsWith('plan.') || event.eventType.startsWith('semantic.') || event.eventType.startsWith('run.')
 ));
+const executableSteps = computed(() => {
+  const occurrences = new Map<string, number>();
+  return props.plan.executablePlan.map(step => {
+    const occurrence = (occurrences.get(step) ?? 0) + 1;
+    occurrences.set(step, occurrence);
+    return Object.freeze({ key: `${step}::${occurrence}`, label: step });
+  });
+});
 </script>
 
 <template>
   <CvPanel
     class="ai-plan-workspace"
     title="任务理解与视觉方案"
+    variant="section"
     data-ai-plan-workspace
   >
     <div class="ai-plan-workspace__content">
@@ -69,14 +78,14 @@ const publicEvents = computed(() => props.events.filter(event =>
           <p>{{ plan.recommendedRoute.summary || semantic?.suggestedRoute || '当前没有可公开的路线摘要。' }}</p>
         </div>
         <ol
-          v-if="plan.executablePlan.length"
+          v-if="executableSteps.length"
           class="ai-plan-workspace__steps"
         >
           <li
-            v-for="(step, index) in plan.executablePlan"
-            :key="`${index}-${step}`"
+            v-for="(step, index) in executableSteps"
+            :key="step.key"
           >
-            <span>{{ index + 1 }}</span><p>{{ step }}</p>
+            <span>{{ index + 1 }}</span><p>{{ step.label }}</p>
           </li>
         </ol>
       </section>

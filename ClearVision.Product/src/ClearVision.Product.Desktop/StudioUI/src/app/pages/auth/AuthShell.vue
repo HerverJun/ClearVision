@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { CvBrand } from '@/design-system/patterns';
-import AuthProductPreview from './AuthProductPreview.vue';
 
 defineProps<{
   title: string;
@@ -14,7 +13,6 @@ defineProps<{
     data-auth-shell="ready"
     aria-label="ClearVision Studio"
   >
-    <AuthProductPreview />
     <section
       class="auth-shell__stage"
       aria-labelledby="auth-shell-title"
@@ -41,24 +39,23 @@ defineProps<{
 
 <style scoped>
 .auth-shell {
-  min-height: 100vh;
-  min-height: 100svh;
-  display: grid;
-  grid-template-columns: minmax(0, 1.12fr) minmax(420px, 0.88fr);
+  width: 100%;
+  height: 100vh;
+  height: 100svh;
+  overflow: hidden;
   background: var(--cv-surface-page);
   color: var(--cv-text-primary);
 }
 
 .auth-shell__stage {
-  min-width: 0;
-  min-height: 100vh;
-  min-height: 100svh;
+  width: 100%;
+  height: 100%;
   display: grid;
-  place-items: center;
-  overflow: auto;
+  place-items: safe center;
+  overflow-x: hidden;
+  overflow-y: auto;
   overscroll-behavior: contain;
-  padding: var(--cv-space-12) clamp(32px, 5vw, 80px);
-  background: var(--cv-surface-raised);
+  padding: var(--cv-space-10) var(--cv-space-6);
 }
 
 .auth-shell__frame {
@@ -68,7 +65,7 @@ defineProps<{
 }
 
 .auth-shell__masthead {
-  display: none;
+  display: flex;
   align-items: center;
 }
 
@@ -219,10 +216,6 @@ defineProps<{
 :deep(.auth-form__actions > a) { justify-self: center; }
 :deep(.auth-form__actions > a:hover) { text-decoration: underline; }
 
-@media (max-width: 1080px) {
-  .auth-shell__stage { padding-inline: 36px; }
-}
-
 @media (max-height: 700px) {
   .auth-shell__stage { place-items: start center; padding-block: var(--cv-space-6); }
   .auth-shell__frame { gap: var(--cv-space-5); }
@@ -231,16 +224,8 @@ defineProps<{
   :deep(.auth-form) { gap: var(--cv-space-4); }
 }
 
-@media (max-width: 920px) {
-  .auth-shell { grid-template-columns: minmax(0, 1fr); }
-  .auth-shell > :deep(.auth-product-preview) { display: none; }
-  .auth-shell__stage { padding: var(--cv-space-8); }
-  .auth-shell__masthead { display: flex; }
-  .auth-shell__masthead :deep(.cv-brand__mark) { width: 38px; height: 38px; }
-}
-
 @media (max-width: 480px) {
-  .auth-shell__stage { place-items: start center; padding: var(--cv-space-6) var(--cv-space-5); }
+  .auth-shell__stage { padding-inline: var(--cv-space-5); }
   .auth-shell__frame { gap: var(--cv-space-6); }
   .auth-shell__header h1 { font-size: var(--cv-font-size-2xl); }
   .auth-shell__description { font-size: var(--cv-font-size-md); }

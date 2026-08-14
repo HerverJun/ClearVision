@@ -33,11 +33,11 @@ const executionSuccessRate = computed(() => {
         <p>任务是否完成</p>
       </header>
       <dl class="results-situation-summary__metrics">
-        <div class="results-situation-summary__metric">
+        <div class="results-situation-summary__metric results-situation-summary__metric--anchor">
           <dt>检测次数</dt>
           <dd><strong>{{ statistics.totalAttemptCount.toLocaleString('zh-CN') }}</strong></dd>
         </div>
-        <div class="results-situation-summary__metric">
+        <div class="results-situation-summary__metric results-situation-summary__metric--positive">
           <dt>执行成功</dt>
           <dd>
             <strong>{{ statistics.executionSucceededCount.toLocaleString('zh-CN') }}</strong>
@@ -54,11 +54,11 @@ const executionSuccessRate = computed(() => {
             <small>含超时 {{ statistics.timedOutCount }}</small>
           </dd>
         </div>
-        <div class="results-situation-summary__metric">
+        <div class="results-situation-summary__metric results-situation-summary__metric--secondary">
           <dt>取消 / 跳过</dt>
           <dd><strong>{{ statistics.cancelledCount }} / {{ statistics.skippedCount }}</strong></dd>
         </div>
-        <div class="results-situation-summary__metric">
+        <div class="results-situation-summary__metric results-situation-summary__metric--secondary">
           <dt>平均耗时</dt>
           <dd><strong>{{ Math.round(statistics.averageExecutionTimeMs).toLocaleString('zh-CN') }} ms</strong></dd>
         </div>
@@ -75,14 +75,14 @@ const executionSuccessRate = computed(() => {
         <p>合格与缺陷结论</p>
       </header>
       <dl class="results-situation-summary__metrics">
-        <div class="results-situation-summary__metric">
+        <div class="results-situation-summary__metric results-situation-summary__metric--anchor">
           <dt>有效判定</dt>
           <dd>
             <strong>{{ statistics.validDecisionCount.toLocaleString('zh-CN') }}</strong>
             <small>覆盖 {{ percent(statistics.decisionCoverageRate) }}</small>
           </dd>
         </div>
-        <div class="results-situation-summary__metric">
+        <div class="results-situation-summary__metric results-situation-summary__metric--positive">
           <dt>判定 OK</dt>
           <dd><strong>{{ statistics.okCount.toLocaleString('zh-CN') }}</strong></dd>
         </div>
@@ -93,11 +93,11 @@ const executionSuccessRate = computed(() => {
           <dt>判定 NG</dt>
           <dd><strong>{{ statistics.ngCount.toLocaleString('zh-CN') }}</strong></dd>
         </div>
-        <div class="results-situation-summary__metric">
+        <div class="results-situation-summary__metric results-situation-summary__metric--secondary">
           <dt>未判定 / 不适用</dt>
           <dd><strong>{{ statistics.undeterminedCount }} / {{ statistics.notApplicableCount }}</strong></dd>
         </div>
-        <div class="results-situation-summary__metric">
+        <div class="results-situation-summary__metric results-situation-summary__metric--secondary">
           <dt>有效判定良率</dt>
           <dd><strong>{{ percent(statistics.yieldRate) }}</strong></dd>
         </div>
@@ -116,7 +116,7 @@ const executionSuccessRate = computed(() => {
 .results-situation-summary__axis {
   min-width: 0;
   display: grid;
-  grid-template-columns: minmax(136px, 0.72fr) minmax(0, 5fr);
+  grid-template-columns: minmax(148px, 0.72fr) minmax(0, 5fr);
 }
 
 .results-situation-summary__axis + .results-situation-summary__axis {
@@ -131,9 +131,15 @@ const executionSuccessRate = computed(() => {
 }
 
 .results-situation-summary__heading {
-  min-height: 62px;
+  min-height: 58px;
   padding: var(--cv-space-2) var(--cv-space-4) var(--cv-space-2) 0;
   gap: 2px;
+  border-left: 3px solid var(--cv-color-industrial-blue);
+  padding-left: var(--cv-space-3);
+}
+
+.results-situation-summary__axis--decision .results-situation-summary__heading {
+  border-left-color: var(--cv-color-status-ok-strong);
 }
 
 .results-situation-summary__heading h2,
@@ -160,11 +166,11 @@ const executionSuccessRate = computed(() => {
   min-width: 0;
   margin: 0;
   display: grid;
-  grid-template-columns: repeat(5, minmax(96px, 1fr));
+  grid-template-columns: minmax(108px, 1.28fr) minmax(104px, 1.16fr) repeat(3, minmax(92px, 1fr));
 }
 
 .results-situation-summary__metric {
-  min-height: 62px;
+  min-height: 58px;
   padding: var(--cv-space-2) var(--cv-space-3);
   gap: 2px;
   border-left: 1px solid var(--cv-border-subtle);
@@ -185,10 +191,21 @@ const executionSuccessRate = computed(() => {
 
 .results-situation-summary__metric strong {
   color: var(--cv-text-primary);
-  font-size: var(--cv-font-size-lg);
+  font-size: var(--cv-font-size-md);
   font-weight: var(--cv-font-weight-semibold);
   font-variant-numeric: tabular-nums;
   line-height: var(--cv-line-height-tight);
+}
+
+.results-situation-summary__metric--anchor strong,
+.results-situation-summary__metric.has-exception strong,
+.results-situation-summary__metric.has-ng strong {
+  font-size: var(--cv-font-size-lg);
+}
+
+.results-situation-summary__metric--secondary strong {
+  color: var(--cv-text-secondary);
+  font-weight: var(--cv-font-weight-medium);
 }
 
 .results-situation-summary__metric.has-exception dt,
@@ -219,5 +236,13 @@ const executionSuccessRate = computed(() => {
 
   .results-situation-summary__metric:nth-child(odd) { border-left: 0; }
   .results-situation-summary__metric:last-child { grid-column: 1 / -1; }
+}
+
+@media (forced-colors: active) {
+  .results-situation-summary__heading { border-left-color: Highlight; }
+  .results-situation-summary__metric.has-exception dt,
+  .results-situation-summary__metric.has-exception strong,
+  .results-situation-summary__metric.has-ng dt,
+  .results-situation-summary__metric.has-ng strong { color: CanvasText; }
 }
 </style>

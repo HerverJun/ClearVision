@@ -165,6 +165,7 @@ async function copyDiagnostics(): Promise<void> {
     <CvPanel
       title="当前状态"
       description="最近一次确认结果；异常状态会同时给出文字说明。"
+      variant="section"
     >
       <div class="diagnostics-page__status-list">
         <div>
@@ -204,6 +205,7 @@ async function copyDiagnostics(): Promise<void> {
     <CvPanel
       title="版本与环境"
       description="用于确认 Studio 各组成部分是否来自同一套发布。"
+      variant="section"
     >
       <CvDescriptionList
         :items="supportItems"

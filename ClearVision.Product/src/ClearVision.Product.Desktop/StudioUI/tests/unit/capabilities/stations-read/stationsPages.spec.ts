@@ -1,4 +1,5 @@
 import { flushPromises, mount } from '@vue/test-utils';
+import { reactive } from 'vue';
 import { createMemoryHistory, createRouter, type Router } from 'vue-router';
 import { describe, expect, it, vi } from 'vitest';
 import {
@@ -70,6 +71,29 @@ function session(role: 'Admin' | 'Engineer'): SessionProjectionOwner {
     start: vi.fn(),
     refresh: vi.fn(async () => undefined),
     dispose: vi.fn()
+  };
+}
+
+function mutableSession(initialRole: 'Admin' | 'Engineer') {
+  const projection = reactive({
+    phase: 'authenticated' as const,
+    user: { userId: `${initialRole.toLowerCase()}-id`, username: initialRole.toLowerCase(), role: initialRole },
+    sessionGeneration: 1,
+    message: 'test',
+    updatedAt: Date.now()
+  });
+  const owner: SessionProjectionOwner = {
+    projection,
+    start: vi.fn(),
+    refresh: vi.fn(async () => undefined),
+    dispose: vi.fn()
+  };
+  return {
+    owner,
+    setRole(role: 'Admin' | 'Engineer') {
+      projection.user = { userId: `${role.toLowerCase()}-id`, username: role.toLowerCase(), role };
+      projection.sessionGeneration += 1;
+    }
   };
 }
 
@@ -313,6 +337,51 @@ describe('Station read pages', () => {
 
     wrapper.unmount();
     expect(getStationAdminCommandOwnerActiveCount()).toBe(0);
+    queries.dispose();
+  });
+
+  it('mounts and disposes the Admin capability when the session role changes', async () => {
+    const get = vi.fn(async (path: string) => {
+      if (path === 'stations') return [stationStatus()];
+      if (path === 'stations/station-a/results?take=50') return [stationResult()];
+      if (path === 'stations/station-a/health?take=50') return [stationHealth()];
+      if (path === 'stations/station-a') return stationStatus();
+      if (path === 'stations/station-a/logs?take=50') return [stationLog()];
+      if (path === 'stations/station-a/commands?take=50') return [stationCommand()];
+      if (path === 'stations/audit?stationId=station-a&take=50') return [stationAudit()];
+      if (path === 'station-packages') return [stationPackage()];
+      throw new Error(`Unexpected path ${path}`);
+    });
+    const api = {
+      ...apiWith(get),
+      post: vi.fn(async () => stationCommand()),
+      patch: vi.fn(async () => stationStatus())
+    } as ApiTransport;
+    const queries = createReadQueryClient(api);
+    const router = createTestRouter();
+    await router.push('/stations/station-a');
+    await router.isReady();
+    const roleSession = mutableSession('Engineer');
+
+    const wrapper = mount(StationDetailPage, {
+      props: { stationId: 'station-a', runtime: { queries, api, session: roleSession.owner } },
+      global: { plugins: [router] }
+    });
+    await flushPromises();
+    expect(wrapper.find('[data-capability="station-admin-control"]').exists()).toBe(false);
+    expect(getStationAdminCommandOwnerActiveCount()).toBe(0);
+
+    roleSession.setRole('Admin');
+    await flushPromises();
+    expect(wrapper.find('[data-capability="station-admin-control"]').exists()).toBe(true);
+    expect(getStationAdminCommandOwnerActiveCount()).toBe(1);
+
+    roleSession.setRole('Engineer');
+    await flushPromises();
+    expect(wrapper.find('[data-capability="station-admin-control"]').exists()).toBe(false);
+    expect(getStationAdminCommandOwnerActiveCount()).toBe(0);
+
+    wrapper.unmount();
     queries.dispose();
   });
 

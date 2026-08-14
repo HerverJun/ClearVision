@@ -2,6 +2,7 @@
 import { nextTick, onBeforeUnmount, useId, useTemplateRef, watch } from 'vue';
 import { CvIcon } from '@/design-system/icons';
 import { CvIconButton } from '@/design-system/primitives';
+import { acquireModalIsolation } from '@/design-system/primitives/modalIsolation';
 
 const props = defineProps<{
   open: boolean;
@@ -18,6 +19,8 @@ const generatedId = useId();
 const titleId = `ai-drawer-${generatedId}-title`;
 const descriptionId = `ai-drawer-${generatedId}-description`;
 let restoreTarget: HTMLElement | null = null;
+let listening = false;
+let releaseIsolation: (() => void) | null = null;
 
 const focusableSelector = [
   'a[href]',
@@ -49,6 +52,11 @@ function handleKeydown(event: KeyboardEvent): void {
   }
   const first = focusable[0];
   const last = focusable.at(-1);
+  if (!panel.value?.contains(document.activeElement)) {
+    event.preventDefault();
+    (event.shiftKey ? last : first)?.focus();
+    return;
+  }
   if (event.shiftKey && document.activeElement === first) {
     event.preventDefault();
     last?.focus();
@@ -58,20 +66,40 @@ function handleKeydown(event: KeyboardEvent): void {
   }
 }
 
+function startListening(): void {
+  if (listening) return;
+  listening = true;
+  document.addEventListener('keydown', handleKeydown);
+}
+
+function stopListening(): void {
+  if (!listening) return;
+  listening = false;
+  document.removeEventListener('keydown', handleKeydown);
+}
+
 watch(() => props.open, async (open) => {
   if (open) {
     restoreTarget = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    releaseIsolation = acquireModalIsolation();
+    startListening();
     await nextTick();
     const first = focusableElements()[0];
     if (first) first.focus();
     else panel.value?.focus();
     return;
   }
+  stopListening();
+  releaseIsolation?.();
+  releaseIsolation = null;
   restoreTarget?.focus();
   restoreTarget = null;
-}, { flush: 'post' });
+}, { flush: 'post', immediate: true });
 
 onBeforeUnmount(() => {
+  stopListening();
+  releaseIsolation?.();
+  releaseIsolation = null;
   restoreTarget?.focus();
   restoreTarget = null;
 });
@@ -93,7 +121,6 @@ onBeforeUnmount(() => {
           :aria-labelledby="titleId"
           :aria-describedby="descriptionId"
           tabindex="-1"
-          @keydown="handleKeydown"
         >
           <header class="ai-drawer__header">
             <div class="ai-drawer__heading">

@@ -21,26 +21,26 @@ const fixtureOptions: readonly CanvasFixtureOption[] = Object.freeze([
   {
     id: 'canonical',
     action: 'load-canonical',
-    label: 'Canonical contract',
-    detail: '5 nodes · 3 connections'
+    label: '标准契约',
+    detail: '5 个节点 · 3 条连线'
   },
   {
     id: 'interaction',
     action: 'load-interaction',
-    label: 'Interaction matrix',
-    detail: '5 nodes · open ports'
+    label: '交互矩阵',
+    detail: '5 个节点 · 端口开放'
   },
   {
     id: 'benchmark-100',
     action: 'load-benchmark-100',
-    label: 'Benchmark 100',
-    detail: '100 nodes · 150 connections'
+    label: '基准 100',
+    detail: '100 个节点 · 150 条连线'
   },
   {
     id: 'stress-300',
     action: 'load-stress-300',
-    label: 'Stress 300',
-    detail: '300 nodes · 450 connections'
+    label: '压力 300',
+    detail: '300 个节点 · 450 条连线'
   }
 ]);
 
@@ -61,10 +61,10 @@ const labState = computed(() => {
 const validationPassCount = computed(() =>
   diagnostics.value.validation.filter(item => item.passed).length);
 const identityFingerprint = computed(() =>
-  diagnostics.value.identity.afterFingerprint ?? diagnostics.value.identity.beforeFingerprint ?? 'not run');
+  diagnostics.value.identity.afterFingerprint ?? diagnostics.value.identity.beforeFingerprint ?? '未运行');
 
 function errorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : 'Unknown Canvas Lab failure.';
+  return error instanceof Error ? error.message : '画布实验室发生未知错误。';
 }
 
 function supportsCanvasRuntime(): boolean {
@@ -131,7 +131,7 @@ function disposeOwnedController(reportError: boolean): void {
 
 onMounted(() => {
   if (!supportsCanvasRuntime()) {
-    mountError.value = 'Canvas 2D runtime is unavailable in this test environment.';
+    mountError.value = '当前测试环境不支持 Canvas 2D 运行时。';
     return;
   }
 
@@ -164,11 +164,10 @@ onBeforeUnmount(() => {
   >
     <header class="canvas-lab__header">
       <div class="canvas-lab__title-block">
-        <span class="canvas-lab__eyebrow">F01 · canonical host boundary</span>
-        <h1>FlowCanvas verification lab</h1>
+        <span class="canvas-lab__eyebrow">F01 · 标准宿主边界</span>
+        <h1>FlowCanvas 验证实验室</h1>
         <p>
-          The StudioUI shell owns one narrow adapter while the existing FlowCanvas remains the
-          only drawing and pointer kernel.
+          StudioUI 外壳只持有一个窄适配器，现有 FlowCanvas 仍是唯一的绘制与指针内核。
         </p>
       </div>
 
@@ -181,14 +180,14 @@ onBeforeUnmount(() => {
           控制实例 {{ diagnostics.ownerCount }}/1
         </span>
         <RouterLink to="/diagnostics">
-          Diagnostics
+          诊断
         </RouterLink>
       </div>
     </header>
 
     <section
       class="canvas-lab__toolbar"
-      aria-label="Canvas fixtures and verification actions"
+      aria-label="画布夹具与验证操作"
     >
       <div class="canvas-lab__fixture-group">
         <button
@@ -215,7 +214,7 @@ onBeforeUnmount(() => {
           :disabled="!isMounted"
           @click="runIdentityRoundTrip"
         >
-          Identity round-trip
+          身份往返验证
         </button>
         <button
           type="button"
@@ -224,7 +223,7 @@ onBeforeUnmount(() => {
           :disabled="!isMounted"
           @click="resizeCanvas"
         >
-          Re-measure
+          重新测量
         </button>
         <button
           type="button"
@@ -233,7 +232,7 @@ onBeforeUnmount(() => {
           :aria-expanded="diagnosticsExpanded"
           @click="diagnosticsExpanded = !diagnosticsExpanded"
         >
-          {{ diagnosticsExpanded ? 'Hide' : 'Show' }} diagnostics
+          {{ diagnosticsExpanded ? '隐藏诊断' : '显示诊断' }}
         </button>
       </div>
     </section>
@@ -260,25 +259,26 @@ onBeforeUnmount(() => {
             :id="canvasId"
             data-canvas-surface
             tabindex="0"
+            aria-label="流程编辑画布"
           >
-            FlowCanvas requires Canvas 2D support.
+            FlowCanvas 需要 Canvas 2D 支持。
           </canvas>
           <div
             v-if="!isMounted"
             class="canvas-lab__canvas-state"
             aria-live="polite"
           >
-            <strong>{{ mountError ? 'Canvas runtime unavailable' : 'Mounting canonical Canvas…' }}</strong>
+            <strong>{{ mountError ? '画布运行时不可用' : '正在挂载标准画布…' }}</strong>
             <span>{{ mountError ?? '正在等待唯一画布实例。' }}</span>
           </div>
         </div>
 
         <footer class="canvas-lab__interaction-guide">
-          <span><kbd>Drag</kbd> node</span>
-          <span><kbd>Drag blank</kbd> pan</span>
-          <span><kbd>Wheel</kbd> zoom</span>
-          <span><kbd>Shift + drag</kbd> select</span>
-          <span><kbd>Port → port</kbd> connect</span>
+          <span><kbd>拖动</kbd>节点</span>
+          <span><kbd>拖动空白处</kbd>平移</span>
+          <span><kbd>滚轮</kbd>缩放</span>
+          <span><kbd>Shift + 拖动</kbd>选择</span>
+          <span><kbd>端口 → 端口</kbd>连接</span>
         </footer>
       </div>
 
@@ -292,7 +292,7 @@ onBeforeUnmount(() => {
           <div class="canvas-lab__section-heading">
             <div>
               <span class="canvas-lab__eyebrow">当前挂载状态</span>
-              <h2>{{ diagnostics.fixtureName ?? 'No active fixture' }}</h2>
+              <h2>{{ diagnostics.fixtureName ?? '无活动夹具' }}</h2>
             </div>
             <span
               class="canvas-lab__state-pill"
@@ -304,26 +304,26 @@ onBeforeUnmount(() => {
           </div>
 
           <dl class="canvas-lab__metric-grid">
-            <div><dt>Generation</dt><dd>{{ diagnostics.generation }}</dd></div>
-            <div><dt>Mounts / disposals</dt><dd>{{ diagnostics.totalMounts }} / {{ diagnostics.totalDisposals }}</dd></div>
+            <div><dt>代数</dt><dd>{{ diagnostics.generation }}</dd></div>
+            <div><dt>挂载 / 释放</dt><dd>{{ diagnostics.totalMounts }} / {{ diagnostics.totalDisposals }}</dd></div>
             <div>
-              <dt>Nodes</dt><dd data-canvas-node-count>
+              <dt>节点</dt><dd data-canvas-node-count>
                 {{ runtime?.nodeCount ?? 0 }}
               </dd>
             </div>
             <div>
-              <dt>Connections</dt><dd data-canvas-connection-count>
+              <dt>连线</dt><dd data-canvas-connection-count>
                 {{ runtime?.connectionCount ?? 0 }}
               </dd>
             </div>
-            <div><dt>Scale</dt><dd>{{ runtime?.scale.toFixed(3) ?? '—' }}</dd></div>
-            <div><dt>Offset</dt><dd>{{ runtime ? `${runtime.offsetX.toFixed(1)}, ${runtime.offsetY.toFixed(1)}` : '—' }}</dd></div>
+            <div><dt>缩放</dt><dd>{{ runtime?.scale.toFixed(3) ?? '—' }}</dd></div>
+            <div><dt>偏移</dt><dd>{{ runtime ? `${runtime.offsetX.toFixed(1)}, ${runtime.offsetY.toFixed(1)}` : '—' }}</dd></div>
           </dl>
         </section>
 
         <section class="canvas-lab__diagnostic-section">
           <div class="canvas-lab__section-heading canvas-lab__section-heading--compact">
-            <h2>Identity</h2>
+            <h2>身份一致性</h2>
             <span
               class="canvas-lab__state-pill"
               :data-state="diagnostics.identity.state"
@@ -340,7 +340,7 @@ onBeforeUnmount(() => {
 
         <section class="canvas-lab__diagnostic-section">
           <div class="canvas-lab__section-heading canvas-lab__section-heading--compact">
-            <h2>Connection rejection matrix</h2>
+            <h2>连线拒绝矩阵</h2>
             <span>{{ validationPassCount }}/{{ diagnostics.validation.length }}</span>
           </div>
           <ul class="canvas-lab__validation-list">
@@ -364,12 +364,12 @@ onBeforeUnmount(() => {
                 {{ runtime?.dpr ?? '—' }}
               </dd>
             </div>
-            <div><dt>Logical</dt><dd>{{ runtime ? `${runtime.logicalWidth} × ${runtime.logicalHeight}` : '—' }}</dd></div>
-            <div><dt>Backing</dt><dd>{{ runtime ? `${runtime.backingWidth} × ${runtime.backingHeight}` : '—' }}</dd></div>
-            <div><dt>Observers</dt><dd>{{ runtime ? `${Number(runtime.resources.resizeObserverActive)} / ${Number(runtime.resources.themeObserverActive)}` : '—' }}</dd></div>
-            <div><dt>Subscriptions</dt><dd>{{ runtime ? `${runtime.resources.structureListenerCount} / ${runtime.resources.viewListenerCount} / ${runtime.resources.selectionListenerCount}` : '—' }}</dd></div>
-            <div><dt>Interaction cleanup</dt><dd>{{ runtime?.resources.interactionCleanupCount ?? '—' }}</dd></div>
-            <div><dt>Pending frames</dt><dd>{{ runtime ? `${Number(runtime.resources.drawFramePending)} / ${Number(runtime.resources.resizeFramePending)} / ${Number(runtime.resources.interactionFramePending)}` : '—' }}</dd></div>
+            <div><dt>逻辑尺寸</dt><dd>{{ runtime ? `${runtime.logicalWidth} × ${runtime.logicalHeight}` : '—' }}</dd></div>
+            <div><dt>后备尺寸</dt><dd>{{ runtime ? `${runtime.backingWidth} × ${runtime.backingHeight}` : '—' }}</dd></div>
+            <div><dt>观察者</dt><dd>{{ runtime ? `${Number(runtime.resources.resizeObserverActive)} / ${Number(runtime.resources.themeObserverActive)}` : '—' }}</dd></div>
+            <div><dt>订阅</dt><dd>{{ runtime ? `${runtime.resources.structureListenerCount} / ${runtime.resources.viewListenerCount} / ${runtime.resources.selectionListenerCount}` : '—' }}</dd></div>
+            <div><dt>交互清理</dt><dd>{{ runtime?.resources.interactionCleanupCount ?? '—' }}</dd></div>
+            <div><dt>待处理帧</dt><dd>{{ runtime ? `${Number(runtime.resources.drawFramePending)} / ${Number(runtime.resources.resizeFramePending)} / ${Number(runtime.resources.interactionFramePending)}` : '—' }}</dd></div>
           </dl>
         </section>
       </aside>

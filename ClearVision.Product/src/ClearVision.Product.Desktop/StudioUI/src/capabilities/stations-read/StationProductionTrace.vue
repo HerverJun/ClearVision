@@ -59,6 +59,14 @@ const hashItems = computed(() => [
   { key: 'flow', label: '执行流程哈希', value: props.station.executionFlowHash ?? props.station.packageFlowHash },
   { key: 'decision', label: '判定配置哈希', value: props.station.decisionConfigurationHash }
 ]);
+const mismatchItems = computed(() => {
+  const occurrences = new Map<string, number>();
+  return projection.value.mismatches.map(message => {
+    const occurrence = (occurrences.get(message) ?? 0) + 1;
+    occurrences.set(message, occurrence);
+    return Object.freeze({ key: `${message}\u0000${occurrence}`, message });
+  });
+});
 
 async function copyIdentity(key: string, value: string | null): Promise<void> {
   if (!value) return;
@@ -159,12 +167,12 @@ async function copyIdentity(key: string, value: string | null): Promise<void> {
     </dl>
 
     <CvInlineAlert
-      v-for="message in projection.mismatches"
-      :key="message"
+      v-for="item in mismatchItems"
+      :key="item.key"
       tone="error"
       title="生产身份不一致"
     >
-      {{ message }}
+      {{ item.message }}
     </CvInlineAlert>
     <CvInlineAlert
       v-if="projection.gaps.length"

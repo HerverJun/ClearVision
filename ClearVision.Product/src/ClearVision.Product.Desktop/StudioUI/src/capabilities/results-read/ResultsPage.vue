@@ -231,6 +231,14 @@ const stationListState = computed(() => stationListOwner.value?.state.value ?? i
 const stationStatisticsState = computed(() => stationStatisticsOwner.value?.state.value ?? idleState<ResultsOutcomeStatistics>());
 const previousSuccessState = computed(() => previousSuccessOwner.value?.state.value ?? idleState<InspectionPreviousSuccessReference>());
 const comparisonState = computed(() => comparisonOwner.value?.state.value ?? idleState<InspectionHistoryComparison>());
+const comparisonWarnings = computed(() => {
+  const occurrences = new Map<string, number>();
+  return (comparisonState.value.data?.warnings ?? []).map(warning => {
+    const occurrence = (occurrences.get(warning) ?? 0) + 1;
+    occurrences.set(warning, occurrence);
+    return Object.freeze({ key: `${warning}\u0000${occurrence}`, warning });
+  });
+});
 const evidence = computed(() => evidenceOwner.value?.projection ?? null);
 const activeStatisticsState = computed(() => source.value === 'local'
   ? localStatisticsState.value
@@ -1402,7 +1410,7 @@ onBeforeUnmount(() => {
         class="results-page__detail-panel"
         title="结果详情"
         description="判定、缺陷、诊断、证据与技术追溯。"
-        variant="tool"
+        variant="section"
         :padded="false"
       >
         <CvInlineAlert
@@ -1563,12 +1571,12 @@ onBeforeUnmount(() => {
             </template>
             <template v-if="comparisonState.data">
               <CvInlineAlert
-                v-for="warning in comparisonState.data.warnings"
-                :key="warning"
+                v-for="item in comparisonWarnings"
+                :key="item.key"
                 tone="warning"
                 title="对比注意"
               >
-                {{ warning }}
+                {{ item.warning }}
               </CvInlineAlert>
               <dl class="results-page__replay-summary">
                 <div><dt>场景重放</dt><dd>{{ comparisonState.data.sceneReplayAvailability.message }}</dd></div>
@@ -1822,7 +1830,7 @@ onBeforeUnmount(() => {
         class="results-page__detail-panel"
         title="工作站结果详情"
         description="现场上报摘要与可用追溯信息。"
-        variant="tool"
+        variant="section"
         :padded="false"
       >
         <CvPageState
@@ -2041,16 +2049,22 @@ onBeforeUnmount(() => {
 .results-page__layout {
   min-height: 0;
   display: grid;
-  grid-template-columns: minmax(0, 1.72fr) minmax(370px, 0.78fr);
-  gap: var(--cv-space-3);
+  grid-template-columns: minmax(0, 1.8fr) minmax(340px, 0.66fr);
+  gap: var(--cv-space-4);
   align-items: start;
 }
 
-.results-page__list-panel,
-.results-page__detail-panel {
+.results-page__list-panel {
   min-height: 0;
   border-radius: var(--cv-radius-md);
   background: var(--cv-surface-raised);
+}
+
+.results-page__detail-panel {
+  min-height: 0;
+  padding-left: var(--cv-space-4);
+  border-left: 1px solid var(--cv-border-subtle);
+  background: transparent;
 }
 
 .results-page__table-toolbar {
@@ -2115,14 +2129,17 @@ onBeforeUnmount(() => {
 .results-page__detail-panel { position: static; }
 
 .results-page__detail-section {
-  padding: var(--cv-space-4) var(--cv-density-panel-padding);
+  padding: var(--cv-space-3) 0;
 }
 
 .results-page__detail-section + .results-page__detail-section {
   border-top: 1px solid var(--cv-border-subtle);
 }
 
-.results-page__detail-section--summary { background: var(--cv-surface-page); }
+.results-page__detail-section--summary {
+  border-top: 2px solid var(--cv-color-industrial-blue);
+  background: transparent;
+}
 
 .results-page__detail-section h3 {
   margin: 0 0 var(--cv-space-2);
@@ -2356,16 +2373,23 @@ onBeforeUnmount(() => {
   user-select: all;
 }
 
-.results-page :deep(.results-page__list-panel > .cv-panel__header),
-.results-page :deep(.results-page__detail-panel > .cv-panel__header) {
+.results-page :deep(.results-page__list-panel > .cv-panel__header) {
   padding: var(--cv-space-4) var(--cv-density-panel-padding) var(--cv-space-3);
 }
 
+.results-page :deep(.results-page__detail-panel > .cv-panel__header) {
+  padding: var(--cv-space-2) 0 var(--cv-space-3);
+  border-bottom: 1px solid var(--cv-border-subtle);
+}
+
 .results-page :deep(.results-page__list-panel .cv-inline-alert),
-.results-page :deep(.results-page__list-panel .cv-page-state),
+.results-page :deep(.results-page__list-panel .cv-page-state) {
+  margin: var(--cv-space-3) var(--cv-density-panel-padding);
+}
+
 .results-page :deep(.results-page__detail-panel > .cv-panel__content > .cv-inline-alert),
 .results-page :deep(.results-page__detail-panel > .cv-panel__content > .cv-page-state) {
-  margin: var(--cv-space-3) var(--cv-density-panel-padding);
+  margin: var(--cv-space-3) 0;
 }
 
 .results-page :deep(.results-page__list-panel .cv-pagination) {
@@ -2374,13 +2398,17 @@ onBeforeUnmount(() => {
 }
 
 @media (max-width: 1240px) {
-  .results-page__layout { grid-template-columns: minmax(0, 1fr) minmax(340px, 0.72fr); }
+  .results-page__layout { grid-template-columns: minmax(0, 1.45fr) minmax(340px, 0.62fr); }
   .results-page__table-filter-copy { min-width: 190px; }
 }
 
 @media (max-width: 980px) {
   .results-page__layout { grid-template-columns: 1fr; }
-  .results-page__detail-panel { position: static; }
+  .results-page__detail-panel { position: static; padding-left: 0; border-left: 0; }
+}
+
+@media (forced-colors: active) {
+  .results-page__detail-section--summary { border-top-color: Highlight; }
 }
 
 @media (max-width: 760px) {
