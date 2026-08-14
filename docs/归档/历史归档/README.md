@@ -5,6 +5,7 @@
 ## 当前分区
 
 - [合并前历史文档-20260316](./合并前历史文档-20260316/)
+- [2026-08-14 StudioUI parity alignment review](./2026-08-14-StudioUI-Parity-Alignment-Review-22a3d26/)
 
 ## 维护规则
 

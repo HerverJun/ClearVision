@@ -1,0 +1,147 @@
+{
+    "schemaVersion":  1,
+    "runName":  "parity-audit-20260814-0127-r3",
+    "expectation":  "studio-product",
+    "evidencePhase":  "f09",
+    "startedAtUtc":  "2026-08-13T17:34:54.1938747Z",
+    "capturedAtUtc":  "2026-08-13T17:35:14.3804248Z",
+    "runnerSucceeded":  true,
+    "runnerError":  null,
+    "studioUiEnabled":  true,
+    "workspaceCapabilityEnabled":  true,
+    "workspaceSeededByHarness":  true,
+    "formalRun":  true,
+    "dpiOnly":  false,
+    "startupProfileRequested":  "NEXT_DEFAULT",
+    "startupProfileExpected":  "NEXT_DEFAULT",
+    "authMode":  "HARNESS_SEEDED_SESSION",
+    "rollbackPhase":  "",
+    "rollbackStatePath":  null,
+    "finalJourneyPhase":  null,
+    "finalJourneyStatePath":  null,
+    "soakCycles":  0,
+    "authenticationDeferredToScenario":  false,
+    "sanitizedDesktopPath":  false,
+    "isolationRoot":  "C:\\Users\\HerverJun\\Desktop\\ClearVision-UI-Next\\.tmp\\studio-ui-next\\parity-audit-20260814-0127-r3\\isolation",
+    "shutdownDeadlineContract":  {
+                                     "flushSeconds":  5,
+                                     "webViewDisposeSeconds":  5,
+                                     "hostStopSeconds":  10,
+                                     "processMarginSeconds":  5,
+                                     "runnerTotalSeconds":  25
+                                 },
+    "externalNodeDriver":  {
+                               "executablePath":  "C:\\Users\\HerverJun\\AppData\\Local\\Programs\\nodejs\\node.exe",
+                               "isAbsolute":  true,
+                               "isInsideDesktopProcessTree":  false
+                           },
+    "retainedEvidence":  true,
+    "retainedHostLogs":  true,
+    "processCleanup":  {
+                           "passed":  true,
+                           "remaining":  [
+
+                                         ]
+                       },
+    "portCleanup":  {
+                        "webPort":  5513,
+                        "webPortReleased":  true,
+                        "cdpPort":  9513,
+                        "cdpPortReleased":  true,
+                        "passed":  true
+                    },
+    "runtimeCleanup":  {
+                           "root":  "C:\\Users\\HerverJun\\Desktop\\ClearVision-UI-Next\\.tmp\\studio-ui-next\\parity-audit-20260814-0127-r3\\isolation\\runtime",
+                           "webView2UserDataRemoved":  true,
+                           "conversationStoreRemoved":  true,
+                           "agentRunStoreRemoved":  true,
+                           "databasePath":  "C:\\Users\\HerverJun\\Desktop\\ClearVision-UI-Next\\.tmp\\studio-ui-next\\parity-audit-20260814-0127-r3\\isolation\\runtime\\database\\vision.db",
+                           "databaseKept":  false,
+                           "databaseReused":  false,
+                           "databaseArtifactsRemoved":  true,
+                           "databaseStatePassed":  true,
+                           "runtimeRootRemoved":  true,
+                           "removalError":  null
+                       },
+    "startupLog":  {
+                       "recordCount":  1,
+                       "record":  {
+                                      "profile":  "NEXT_DEFAULT",
+                                      "pageKind":  "StudioUi",
+                                      "initialPageUri":  "http://localhost:5513/studio/index.html",
+                                      "assetRoot":  "C:\\Users\\HerverJun\\Desktop\\ClearVision-UI-Next\\ClearVision.Product\\src\\ClearVision.Product.Desktop\\bin\\Debug\\net8.0-windows\\win-x64\\wwwroot\\studio",
+                                      "sourceSha":  "22a3d26a00a2d3b8098165aab5489ce54f5bc95b",
+                                      "authMode":  "HARNESS_SEEDED_SESSION",
+                                      "configurationRequiresRestart":  true,
+                                      "flags":  {
+                                                    "Studio2.Workspace":  true,
+                                                    "Studio:NodePreviewInspectorEnabled":  true,
+                                                    "Studio2.PropertyPanel":  true,
+                                                    "Studio2.PreviewPanel":  true,
+                                                    "Studio2.GlobalVariables":  true,
+                                                    "Studio2.Settings":  true,
+                                                    "Studio2.ProjectPage":  true,
+                                                    "Studio2.Inspection":  true,
+                                                    "Studio2.StationsRead":  true,
+                                                    "Studio2.InspectionRun":  true,
+                                                    "Studio2.ResultsReview":  true,
+                                                    "Studio2.AiPanel":  true,
+                                                    "Studio2.AiWorkbench":  true,
+                                                    "Studio:CircleSearchV2ToolEnabled":  true,
+                                                    "Studio:NPointCalibrationWorkbenchEnabled":  true,
+                                                    "Studio:StudioUiEnabled":  true,
+                                                    "Studio:WorkspaceCapabilityEnabled":  true
+                                                }
+                                  },
+                       "passed":  true
+                   },
+    "messageOwnerLog":  {
+                            "recordCount":  2,
+                            "mounted":  {
+                                            "phase":  "mounted",
+                                            "profile":  "NEXT_DEFAULT",
+                                            "surface":  "studio-host-capabilities",
+                                            "activeSubscriptionCount":  1
+                                        },
+                            "disposed":  {
+                                             "phase":  "disposed",
+                                             "profile":  "NEXT_DEFAULT",
+                                             "surface":  "studio-host-capabilities",
+                                             "activeSubscriptionCount":  0
+                                         },
+                            "expectedSurface":  "studio-host-capabilities",
+                            "expectedMountedSubscriptionCount":  1,
+                            "passed":  true
+                        },
+    "shutdownDiagnostics":  {
+                                "path":  "C:\\Users\\HerverJun\\Desktop\\ClearVision-UI-Next\\.tmp\\studio-ui-next\\parity-audit-20260814-0127-r3\\isolation\\host-logs\\parity-audit-20260814-0127-r3-shutdown.jsonl",
+                                "recordCount":  10,
+                                "forcedExit":  false,
+                                "uncertain":  false,
+                                "parseErrors":  [
+
+                                                ],
+                                "deadlineViolations":  [
+
+                                                       ],
+                                "expectedDeadlinesMilliseconds":  {
+                                                                      "flush-start":  5000,
+                                                                      "workspace-flush":  5000,
+                                                                      "ai-flush":  5000,
+                                                                      "webview-dispose":  5000,
+                                                                      "host-stop":  10000,
+                                                                      "process-exit":  5000
+                                                                  },
+                                "stages":  {
+                                               "flush-start":  "succeeded",
+                                               "workspace-flush":  "succeeded",
+                                               "ai-flush":  "skipped",
+                                               "webview-dispose":  "succeeded",
+                                               "host-stop":  "succeeded",
+                                               "process-exit":  "succeeded"
+                                           },
+                                "passed":  true
+                            },
+    "environmentRestored":  true,
+    "passed":  true
+}
