@@ -1,46 +1,42 @@
 # Studio 2.0
 
-> 状态：Foundation 阶段入口
-> 当前完成项：G04A（含 2026-07-02 stale/revision 收口）
-> 下一执行项：G04B
-> 最近更新：2026-07-02
+> 状态：Release 阶段
+> 已完成：G00-G15.4
+> 当前执行项：G16（`BLOCKED`）
+> 状态权威：仓库根 [`TODO.md`](../../../TODO.md)
+> 入口更新：2026-08-25
 
-本目录保存仓库内 Studio 2.0 的正式执行状态、基线证据和全部后续 Goal 执行卡。外部桌面执行包只作为本次安装来源；完成合并后，仓库内 `TODO.md` 与本目录才是持续维护入口。
+本目录保存 Studio 2.0 的当前执行入口、基线、架构约束和 Goal 卡。根 `TODO.md` 是 Goal 状态的唯一权威；本文只提供导航，不复制完整执行账本。
 
-## 使用规则
+## 当前入口
 
-- 根目录 [`TODO.md`](../../../TODO.md) 是状态薄账本，记录当前 Goal、阶段、红线、协议、Goal 状态总览和最近完成记录。
-- [`goals/`](goals/) 目录保存全部独立执行卡。
-- 每轮只读取根 `AGENTS.md`、根 `TODO.md` 的必要段落、当前 Goal 对应的一张卡和该卡列出的代码锚点。
-- 禁止一次读取并执行全部卡；禁止跳过前置 Goal。
-- 当前 G04A 已完成，下一项为 G04B。
-- G05A 之后的卡片保持 `LOCKED`，直到前置 Goal 完成并由根 `TODO.md` 明确解锁。
-- 后续如果执行包与仓库当前代码事实冲突，以仓库当前代码事实和本目录维护状态为准。
-
-## 当前基线
-
-- 实际基线分支：`codex初稿`
-- G00 Initial SHA：`58c7569958f3bf8ab627f5c5b76ff0a77cc86914`
-- G00 完成 SHA：`3481d5a35f47bbf1f58c3f042cff6a679e720e0c`
-- 执行包审计参考 SHA：`f4d392e2147adf175a2f8faa7d7c09b3d906ba8a`
+- 当前 Goal：[`G16`](goals/G16.md)
+- 根账本记录的阻断边界：生产唯一入口切换与完整 release evidence 尚未闭环。
 - 基线报告：[`baseline/G00-基线冻结报告-2026-07-01.md`](baseline/G00-基线冻结报告-2026-07-01.md)
 - 状态权威与恢复边界：[`状态权威与恢复边界.md`](状态权威与恢复边界.md)
 - Studio 2.0 架构边界 ADR：[`architecture/Studio2-架构边界-ADR.md`](architecture/Studio2-架构边界-ADR.md)
-- capability 迁移白名单与 Feature Flag 台账：[`architecture/Studio2-capability-迁移台账.md`](architecture/Studio2-capability-迁移台账.md)
+- capability 迁移与 Feature Flag 台账：[`architecture/Studio2-capability-迁移台账.md`](architecture/Studio2-capability-迁移台账.md)
 
-## Goal 入口
+## 阶段总览
 
-| Goal | 状态 | 说明 |
+| 阶段 | Goal | 状态 |
 | --- | --- | --- |
-| [`G00`](goals/G00.md) | DONE | 归档 Vision Agent 恢复治理阶段，冻结 Studio 2.0 起点。 |
-| [`G01`](goals/G01.md) | DONE | 建立 Studio 2.0 架构 ADR、迁移白名单、Feature Flag 台账和最小架构守卫。 |
-| [`G02A`](goals/G02A.md) | DONE | 建立 `Desktop/FrontendV2` 构建底座，发布资产进入 `wwwroot/v2/`；收口修复固定 `/v2/` base，并消除 CI/MSBuild 重复 production build。 |
-| [`G02B`](goals/G02B.md) | DONE | 建立 `Studio:WorkspaceV2Enabled` 宿主启动切换、`/v2` 输出静态映射和无业务 V2 测试岛。 |
-| [`G03`](goals/G03.md) | DONE | 建立 V2 Workspace Shell MVP、Flow/Tool/Review 模式和唯一 hosted FlowCanvas 创建链。 |
-| [`G04A`](goals/G04A.md) | DONE | 建立 V2 Flow 编辑端口、本地 stale 防护和最小参数 draft/commit 验证；2026-07-02 追加 Port stale、拖拽 revision 和 dirty draft stale 收口。 |
-| [`G04B`](goals/G04B.md) | READY | 下一项；尚未执行。 |
-| G05A-G16 | LOCKED | 已安装执行卡，等待前置 Goal 解锁。 |
+| Foundation | G00-G04B | DONE |
+| Observation | G05A-G08 | DONE |
+| Geometry / Spatial | G09A-G10C 及 follow-up | DONE |
+| Vertical Product | G11A-G13C 及 follow-up | DONE |
+| Productization | G14A-G15.4 | DONE |
+| Release | G16 | BLOCKED |
 
-## 归档入口
+已完成卡片继续保留在 [`goals/`](goals/) 中，作为当前 G16 的前置执行记录。G16 关闭后，再将整套 Studio 2.0 Goal 卡和闭环说明作为一个批次归档，避免在项目仍 active 时拆散依赖链。
 
-- Vision Agent 前一恢复治理阶段已关闭：[`../../归档/已关闭事项/2026-07-01-VisionAgent-恢复治理阶段归档/闭环说明.md`](../../归档/已关闭事项/2026-07-01-VisionAgent-恢复治理阶段归档/闭环说明.md)
+## 使用规则
+
+- 每轮只读取根 `AGENTS.md`、根 `TODO.md` 的必要段落、当前 Goal 卡和该卡列出的代码锚点。
+- 禁止同时执行两个 Goal，禁止跳过前置 Goal。
+- 如果卡片、本文与仓库当前代码事实冲突，以代码事实和根 `TODO.md` 为准，并先修正文档状态。
+
+## 历史归档
+
+- [Vision Agent 恢复治理阶段闭环](../../归档/已关闭事项/2026-07-01-VisionAgent-恢复治理阶段归档/闭环说明.md)
+- [Vision Agent 被替代旧计划](../../归档/过期计划/VisionAgent-旧阶段计划/README.md)

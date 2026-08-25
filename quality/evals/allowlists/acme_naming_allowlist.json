@@ -7,7 +7,7 @@
       "reason": "The allowlist must name the deprecated legacy fragments it governs."
     },
     {
-      "path": "docs/进行中/当前计划/Naming_Package_Cleanup_Evidence_20260607.md",
+      "path": "docs/归档/已关闭事项/2026-07-01-VisionAgent-恢复治理阶段归档/Naming_Package_Cleanup_Evidence_20260607.md",
       "reason": "The cleanup scan report records the removed package artifacts and deprecated legacy naming policy."
     }
   ],

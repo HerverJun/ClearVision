@@ -5,7 +5,12 @@
 - [ClearVision-全面提升 TODO（2026-05-09）](./ClearVision-全面提升TODO-2026-05-09.md)
 - [ClearVision T01 测试与覆盖率治理总体计划（PROPOSED / AUDITED）](./测试治理/ClearVision_T01_测试与覆盖率治理总体计划_PROPOSED_AUDITED.md)
 
-Vision Agent 恢复治理阶段已在 2026-07-01 归档为 Studio 2.0 G00 基线，归档入口为 [`../../归档/已关闭事项/2026-07-01-VisionAgent-恢复治理阶段归档/闭环说明.md`](../../归档/已关闭事项/2026-07-01-VisionAgent-恢复治理阶段归档/闭环说明.md)。本目录中保留的 `VisionAgent_*` 历史证据页不再作为 active 计划入口。
+旧 Vision Agent 阶段材料已在 2026-08-25 完成治理迁移：
+
+- [已完成的实施、审计与 CI 证据](../../归档/已关闭事项/2026-07-01-VisionAgent-恢复治理阶段归档/闭环说明.md)
+- [未继续执行或已被替代的旧草案](../../归档/过期计划/VisionAgent-旧阶段计划/README.md)
+
+本目录不再保留 Vision Agent 历史证据，避免把历史材料误认为 active 计划。
 
 ## 维护规则
 

@@ -6,3 +6,4 @@
 
 - [结果面板后端能力补齐计划](./结果面板后端能力补齐计划.md)：原 `docs/active/后端能力补齐.md`，已从当前计划区移出，保留为结果面板与后端能力补齐的历史计划。
 - [旧计划缺失引用说明](./旧计划缺失引用说明.md)：记录历史文档仍引用、但当前工作区已不存在的旧 active 计划。
+- [Vision Agent 旧阶段计划](./VisionAgent-旧阶段计划/README.md)：旧工具调用 TODO、Real RuntimePreview Draft/Gate 和已失效的 Shadow Dry Run 入口；后续执行由 Studio 2.0 与当前测试治理计划承接。

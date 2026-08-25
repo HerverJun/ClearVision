@@ -6,7 +6,7 @@
 
 - [当前计划 README](./当前计划/README.md)
 - [ClearVision-全面提升 TODO（2026-05-09）](./当前计划/ClearVision-全面提升TODO-2026-05-09.md)：项目稳定性、质量、现场化、验证与发布提升总清单。
-- [Studio 2.0](./Studio2/README.md)：Foundation 阶段执行入口；G00 已归档旧 Vision Agent 恢复治理阶段，下一项为 G01。
+- [Studio 2.0](./Studio2/README.md)：Release 阶段执行入口；G00-G15.4 已完成，当前 G16 为 `BLOCKED`。
 
 近期已关闭计划见 [2026-05-22 当前计划闭环归档](../归档/已关闭事项/2026-05-22-当前计划闭环归档/闭环说明.md) 和 [已关闭事项索引](../归档/已关闭事项/索引.md)。
 
