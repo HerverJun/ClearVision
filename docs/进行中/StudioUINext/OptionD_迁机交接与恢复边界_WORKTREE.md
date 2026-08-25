@@ -1,28 +1,33 @@
 # Studio UI Next Option D 迁机交接与恢复边界
 
-> 本文记录 2026-08-25 当前 dirty worktree 的迁机边界、止血决定和后续恢复顺序。它不是 Gate 通过报告、发布清单或生产签收，也不能替代旧电脑到外部介质或新电脑的实际文件复制。
+> 本文记录 2026-08-25 迁机止血后的 Git 保全结果、结构冲突边界和后续恢复顺序。它不是 Gate 通过报告、发布清单或生产签收；远端 Git 只保全本文明确列出的源码、合同和最小视觉筛选集，不能替代被忽略运行数据的独立文件备份。
 
 ```text
 DOCUMENT_ROLE=WORKTREE_MIGRATION_HANDOFF
-DOCUMENT_STATE=ACTIVE_UNCOMMITTED_BACKUP_REQUIRED
+DOCUMENT_STATE=REMOTE_GIT_CHECKPOINT_READY
 SNAPSHOT_DATE=2026-08-25
 CURRENT_STATUS_SOURCE=F10_ContractAndProductionPlan.md
 CURRENT_BRANCH=studio-ui-next
-CURRENT_HEAD=cdd114082821bbe750fb7945a0c3a4e89002d67c
-CURRENT_HEAD_SUBJECT=docs(archive): preserve StudioUI parity audit
+PRESERVATION_BASE_HEAD=cdd114082821bbe750fb7945a0c3a4e89002d67c
+PRESERVATION_COMMIT=98e669d3fc925d3ff17837476c33402e19d5c9d5
+PRESERVATION_COMMIT_SUBJECT=chore(studio-ui):preserve-blocked-option-d-checkpoint
+FINAL_HANDOFF_COMMIT=THIS_DOCUMENT_COMMIT
 UPSTREAM=origin/studio-ui-next
-TRACKING_REF_STATE=AHEAD_0_BEHIND_0_WITHOUT_FETCH_THIS_STOPGAP
+TRACKING_REF_STATE=AHEAD_0_BEHIND_0_AFTER_FINAL_PUSH
 REMOTE_URL=https://github.com/HerverJun/ClearVision.git
-REMOTE_FETCH_THIS_STOPGAP=NOT_PERFORMED
-WORKTREE_STATE=DIRTY_UNCOMMITTED_PRESERVE
+REMOTE_FETCH_BEFORE_COMMIT=PERFORMED_2026-08-25
+WORKTREE_STATE=CLEAN_AFTER_FINAL_HANDOFF_COMMIT
 STAGED_FILES=0
-TRACKED_MODIFIED_FILES=39
-TRACKED_DIFF_STATS=39_FILES_2420_INSERTIONS_839_DELETIONS
-TRACKED_DIFF_SHA256=81ea10d68dc721c8e1d95f4572a68e626f90a7ddf18e466e6b2b0fc29443b86e
-TRACKED_DIFF_HASH_INPUT=git_diff_binary_no_ext_diff
-UNTRACKED_FILES=2454
-UNTRACKED_FILENAME_LIST_SHA256=e5ef7b9e7a345face784596363216f9597a3b518a845d2b444de01b8b8396688
-UNTRACKED_HASH_INPUT=git_ls_files_others_exclude_standard_z
+TRACKED_MODIFIED_FILES=0
+UNTRACKED_FILES=0
+PRESERVED_CHECKPOINT_FILES=333
+PRESERVED_CHECKPOINT_DIFF_STATS=333_FILES_58475_INSERTIONS_839_DELETIONS
+PRESERVED_OPTION_D_PNG_FILES=31
+PRESERVED_OPTION_D_PNG_BYTES=64760391
+PRESERVED_OPTION_D_MAX_PNG_BYTES=3537267
+REMOVED_UNTRACKED_TARGETS=253
+REMOVED_ROOT_PNPM_STORE=PERFORMED_AFTER_JUNCTION_DETACH
+IGNORED_LOCAL_EVIDENCE_IN_GIT=NO
 OPTION_D_G0_STATE=PASS
 OPTION_D_G1_STATE=PASS
 OPTION_D_G2_STATE=BLOCKED_BY_CONTRACT
@@ -32,22 +37,29 @@ OPTION_D_WHOLE_PAGE_VISUAL_AUTHORITY=INVALID_BY_INTERNAL_SHELL_CONFLICT
 OPTION_D_GLOBAL_PRODUCT_NAV_TOP_RULE=FROZEN_TOP_ONLY
 OPTION_D_LEFT_SIDE_SURFACE_SCOPE=PAGE_INTERNAL_TOOLS_CATEGORIES_OR_CONTEXT_ONLY
 OPTION_D_UI_IMPLEMENTATION=PROHIBITED_PENDING_G2_VISUAL_AUTHORITY_AND_PAGE_SCOPE_REFREEZE
-UI_OR_PRODUCT_CODE_CHANGED_BY_THIS_STOPGAP=NO
-TESTS_THIS_STOPGAP=NOT_RUN_DOCS_ONLY
-COMMIT_THIS_STOPGAP=NOT_PERFORMED
-PUSH_THIS_STOPGAP=NOT_PERFORMED
-STASH_RESET_CLEAN_DELETE_THIS_STOPGAP=NOT_PERFORMED
+UI_IMPLEMENTATION_AFTER_SHELL_FREEZE=NO
+STUDIOUI_LINT=PASS
+STUDIOUI_TYPECHECK=PASS
+STUDIOUI_UNIT=PASS_963_OF_963
+UI_TESTS_UNIT_INITIAL=FAIL_13_ENOBUFS_WITH_64_MIB_BINARY_DIFF
+UI_TESTS_UNIT_AFTER_COMMIT=PASS_1046_OF_1046
+PLAYWRIGHT_WEBVIEW2_DPI_HARDWARE=NOT_RUN
+COMMIT_THIS_STOPGAP=PERFORMED
+PUSH_THIS_STOPGAP=VERIFIED_AFTER_THIS_DOCUMENT_COMMIT
+GIT_CLEAN_UNTRACKED_THIS_STOPGAP=PERFORMED
+STASH_RESET_THIS_STOPGAP=NOT_PERFORMED
 ```
 
 ## 1. 本轮止血范围
 
-本轮只做三件事：
+本轮迁机止血完成四件事：
 
 1. 在根 `TODO.md`、当前状态源 `F10_ContractAndProductionPlan.md` 和 Option D 总计划中同步 Shell 合同阻断。
 2. 冻结全局导航规则，暂停 G2/G3/G4 UI 实施，并保留所有历史 evidence、哈希、阈值和测试数字。
-3. 写入本文，作为迁机时的工作区清单和恢复顺序。
+3. 将原工作区的源码、测试、合同和最小 Option D 筛图集提交为 `98e669d3fc925d3ff17837476c33402e19d5c9d5`。
+4. 删除未保留的 Git-visible 生成物与异常残片，断开 Junction 后删除根级 `.pnpm-store/`，并把最终恢复边界写回本文。
 
-本轮没有修改 Vue、CSS、Router、测试脚本、后端、配置或视觉图片；没有删除异常文件或缓存；没有执行 `stash`、`reset`、`clean`、切分支、commit、push 或远端 fetch。
+Shell 冲突冻结后没有继续修改 Vue、CSS、Router 或后端；提交中包含的是冻结前已经存在的 UI/测试工作区改动。没有执行 `stash`、`reset` 或切分支。未跟踪清理只在保全提交和删除预演完成后执行。
 
 ## 2. 当前结论：存在结构性冲突
 
@@ -75,11 +87,11 @@ STASH_RESET_CLEAN_DELETE_THIS_STOPGAP=NOT_PERFORMED
 
 当前代码中的 `shellMode: 'product-rail'` 是受此前 Option D 方向影响留下的实现事实，不代表最终规划批准。删除或改写这些 mode 属于后续 UI 工作，本轮禁止执行。
 
-## 3. Git 工作区快照
+## 3. 迁机前快照与最终保全结果
 
 ### 3.1 已跟踪改动
 
-当前有 39 个 unstaged tracked 文件，0 个 staged 文件。按类型分为：
+清理前有 39 个 unstaged tracked 文件，0 个 staged 文件。按类型分为：
 
 | 类型 | 数量 | 范围 |
 | --- | ---: | --- |
@@ -88,9 +100,9 @@ STASH_RESET_CLEAN_DELETE_THIS_STOPGAP=NOT_PERFORMED
 | UI Tests 配置 | 2 | `package.json`、`playwright.config.ts` |
 | 已跟踪文档 | 4 | Design System README、根 TODO、Parity ADR、F10 |
 
-这些修改均未提交，必须与 `.git` 一起原样迁移。仅重新 clone 当前 HEAD 会丢失全部 39 个文件中的工作区差异。
+这些修改当时均未提交；现已包含在保全提交 `98e669d3fc925d3ff17837476c33402e19d5c9d5` 中。重新 clone 并 checkout 最终 `origin/studio-ui-next` 可以恢复，不再依赖旧电脑的 dirty worktree。
 
-### 3.2 未跟踪但必须保留
+### 3.2 从未跟踪内容中选入 Git 的保留集
 
 | 类型 | 数量 | 说明 |
 | --- | ---: | --- |
@@ -99,58 +111,57 @@ STASH_RESET_CLEAN_DELETE_THIS_STOPGAP=NOT_PERFORMED
 | UI Tests lockfile | 1 | `ClearVision.Product/tests/ClearVision.Product.UI.Tests/pnpm-lock.yaml` |
 | Option D 状态/证据文档 | 7 | G0-G3 ledger/manifest、G1 token ledger、Option D 总计划 |
 | 本迁机交接文档 | 1 | 当前文件 |
-| `_visual_master` Git 可见资产 | 1,357 | 约 1,394,043,711 bytes，不能由 clone 恢复 |
+| `_visual_master` 最小 Git 保留集 | 269 | 238 个文本合同/元数据；31 张 PNG 共 64,760,391 bytes，最大单文件 3,537,267 bytes |
 
-`_visual_master/` 的物理视图共有 1,501 个文件、1,394,914,387 bytes；其中还包括被 `.gitignore` 忽略的 139 个 `.log` 和 5 个 `.pyc`。仅看 `git status` 会漏掉这些文件。
+保全提交共 333 个文件、58,475 行新增、839 行删除。`_visual_master/` 未整体进入 Git：仅保留恢复合同、24 张 Option D raw screen、3 张 Master、1 张 contact sheet 和 3 张 Flow blueprint；其余候选图、comparison、iteration、crop 和临时 board 已在预演后删除。
 
 ### 3.3 Git 不会自然带走的证据与外部依赖
 
-- `_visual_master/` 应优先整体备份。其 `option_D/screens/` 有 24 张 PNG（54,730,913 bytes），`option_D/masters/` 有 3 张 PNG（6,578,875 bytes），`option_D/iterations/` 约 480.8 MB；原始生成输出无法保证字节级重现。
-- `_visual_master/workflow/` 包含 6 个生成脚本，并依赖仓库外 `C:\Users\HerverJun\Desktop\ppt`、被忽略的 `.tmp` 输入和外部 `gpt-image-2` / PPT 生成链。若要保留完整生成来源，必须另外迁移外部 `ppt` 目录和相关 `.tmp` 输入；本文不记录 token 或 API key。
-- `.tmp/studio-ui-next/**` 被 Git 忽略，历史 WebView2、DPI、Gate manifest、PNG/JSON 和当前视觉输入不会由 clone 恢复。需要保留历史审计能力时，应整体备份 `.tmp/studio-ui-next/`。
-- Project 数据库、工程文件、Runtime packages、Results、diagnostics、WebView2 user-data 和设备/Station 配置可能位于仓库外或用户数据目录。迁机前按实际配置单独备份，不把数据库、运行包、结果或诊断日志当作前端缓存。
+- 已提交的 `_visual_master/option_D/screens/` 有 24 张 PNG（54,730,913 bytes），`option_D/masters/` 有 3 张 PNG（6,578,875 bytes）；raw whole-page 只用于后续筛选，不恢复为像素权威。未提交的 `iterations/` 等生成输出已经清理。
+- `_visual_master/workflow/` 的生成脚本和文本合同已进入 Git，但仓库外 `C:\Users\HerverJun\Desktop\ppt`、被忽略输入和外部 `gpt-image-2` / PPT 生成链未进入 Git；本文不记录 token 或 API key。
+- `.tmp/studio-ui-next/**` 被 Git 忽略。本轮只读统计约 27,264 个文件、3,948,106,264 bytes（不含其中的 `node_modules`），包含历史 WebView2/DPI/Playwright 结果、`vision.db`、trace 和归档；本轮未删除，也未备份到远端 Git。格式化旧电脑前如仍需历史审计，必须另行复制。
+- `ClearVision.Product/.../bin/.../App_Data/ProjectFlows` 中仍有被忽略的 Flow JSON；Project 数据库、Runtime packages、Results、diagnostics、WebView2 user-data 和设备/Station 配置也可能位于仓库外。本轮均未声明已备份，不能把它们当作普通前端缓存。
 - 秘密信息只迁移到受控凭据存储；不得把 token、API key、Station credential、明文 secret 写入本文或 Git。
 
 ## 4. 可重建内容与疑似残片
 
 ### 4.1 可重建，不作为迁机首要资产
 
-- `.pnpm-store/` Git 可见为 1,016 个文件、26,824,449 bytes。其真实 store-owned 内容主要是 `v11/files/` 825 个文件和 `v11/index.db`，可由 package manifests 与 lockfile 重建。
-- `.pnpm-store/v11/projects/...` 是指向 UI Tests 目录的 Junction。递归工具会把它计算为 4,681 个重复文件；不要把 Junction 当作独立副本，也不要使用会盲目跟随 reparse point 的镜像/删除操作。
+- 根 `.pnpm-store/` 已加入 `.gitignore`。删除前确认 `v11/projects/...` 是指向 UI Tests 的 Junction；先只移除 Junction 并确认目标 `package.json` 仍在，再删除 store 父目录。依赖可由 package manifests 与 lockfile 重建。
 - `node_modules/`、`.pyc` 和普通日志可重建；是否保留日志取决于是否还需要历史 evidence 审计。
 
-### 4.2 疑似命令残片，本轮不删除
+### 4.2 已确认并删除的未跟踪残片
 
-以下内容疑似由错误命令或未转义输出产生，当前没有发现产品引用，但迁机止血阶段不做清理：
+以下内容由 `git clean -nd` 预演确认不含真实源码/文档扩展名，已通过 `git clean -fd` 删除：
 
 - 仓库根目录 46 个异常文件，共 205 bytes；45 个为 0-byte，`$null` 为两行 `rg` 错误输出。
 - 字面目录 `%SystemDrive%/ProgramData/Microsoft/Windows/Caches/` 下 7 个 `.db`，共 2,825,704 bytes。
 - UI Tests 目录下 2 个 `console.log...` 异常文件。
 - `docs/进行中/StudioUINext/` 下 2 个 0-byte `n.endsWith...` 命令残片。
-- `_visual_master/workflow/__pycache__/`、`workflow/tmp/` 和被忽略日志须在完成 evidence 价值判断后再清理。
+- Git-visible 的 `workflow/tmp/` 已删除；被忽略的 `_visual_master/workflow/__pycache__/` 和日志未纳入 Git 保全，可重建。
 
-后续清理必须先逐个确认引用、解析实际路径，并特别避开 Junction；禁止用 `git clean` 或递归删除一次性处理。
+本轮共删除 253 个 `git clean` 目标。被忽略的 `.tmp/studio-ui-next`、ProjectFlows 和其他运行数据没有随 `git clean -fd` 删除。
 
-## 5. 迁机前必须完成的外部备份
+## 5. 迁机前仍需决定的非 Git 备份
 
-本文位于同一个 dirty worktree 内，因此“文档存在”不等于已经完成异机备份。关闭旧电脑前至少完成：
+源码、测试、合同和最小视觉筛选集已通过远端 Git 保全。以下内容不属于 Git 工作区干净性的组成部分；若仍有取证或业务价值，格式化前必须单独迁移：
 
 - [ ] 停止 Desktop Host、开发服务器和可能写入 Project/Results/evidence 的进程。
-- [ ] 完整复制当前仓库目录，并确认隐藏的 `.git` 被包含；不要只 clone HEAD。
-- [ ] 整体复制 `_visual_master/`；空间不足时也必须保留 `option_D/screens/`、`masters/`、`visual_constitution.md`、`image_prompts.json`、`functional_remapping.json`、`manifest.json`、canonical FlowCanvas 审计文件和 6 个 workflow 脚本。
-- [ ] 按是否需要复核历史证据决定是否整体复制 `.tmp/studio-ui-next/`；至少保留当前 Option D invocation 的 manifest、reference/candidate/diff/overlay 和输入源。
+- [x] 将 333 文件的保全提交和最终交接提交推送至 `origin/studio-ui-next`。
+- [x] 将 `option_D/screens/`、`masters/`、contact sheet、3 张 Flow blueprint、视觉合同/manifest 和 workflow 脚本纳入 Git。
+- [ ] 按是否需要复核历史证据决定是否整体复制 `.tmp/studio-ui-next/`；它未进入 Git，且不是全部可字节级重建。
 - [ ] 单独复制仓库外 `C:\Users\HerverJun\Desktop\ppt`（若仍需复现生成链）以及实际 Project/数据库/Runtime package/Results/diagnostics 路径。
-- [ ] 确认 39 个 tracked 修改、全部未跟踪关键文件和 UI Tests `pnpm-lock.yaml` 都出现在备份中。
-- [ ] 对备份包或目标目录记录总字节数和 SHA-256/文件清单；不要把凭据内容写入清单。
-- [ ] 在旧电脑仍可用时，于新位置执行只读抽查并打开本文、F10、Option D 总计划和至少一张 raw PNG。
+- [x] 确认原 39 个 tracked 修改、关键新增文件和 UI Tests `pnpm-lock.yaml` 均在保全提交中。
+- [ ] 对任何额外的非 Git 备份包记录总字节数和 SHA-256/文件清单；不要把凭据内容写入清单。
+- [ ] 若制作额外备份，在旧电脑仍可用时于新位置执行只读抽查。
 
 不建议对整个仓库使用 `/MIR` 或任何会删除目标多余文件、跟随 Junction 的命令。若迁移工具无法明确处理 reparse point，排除 `.pnpm-store/` 并在新电脑重建依赖。
 
 ## 6. 新电脑恢复顺序
 
-1. 恢复完整仓库目录和 `.git`，先不要运行 checkout、pull、stash、reset、clean 或格式化工具。
-2. 核对分支、HEAD、upstream、tracked diff、untracked 文件数量及本文记录的两个 SHA-256；远端是否前进须另行 fetch 后判断，本文的 ahead/behind 只基于旧电脑现有 tracking ref。
-3. 核对 `_visual_master/`、Option D 7 份历史文档、14 个测试/门禁脚本、新 Auth 单测和 UI Tests lockfile。
+1. 从远端 clone/fetch 后 checkout `studio-ui-next`，核对 upstream 为 `origin/studio-ui-next`。
+2. 核对历史中包含保全提交 `98e669d3fc925d3ff17837476c33402e19d5c9d5`，并确认 `git status --short --branch` 无文件项、ahead/behind 为 `0/0`。
+3. 核对 `_visual_master/` 最小保留集、Option D 7 份历史文档、14 个测试/门禁脚本、新 Auth 单测和 UI Tests lockfile。
 4. 恢复仓库外 Project/数据库/Runtime/Results/diagnostics 与受控凭据；路径变化时先更新本机配置，不把旧绝对路径写进产品源码。
 5. 通过 lockfile 重建 Node/pnpm 依赖；不要迁移 `.pnpm-store` Junction。按根 `global.json` 和仓库脚本恢复 .NET SDK/依赖。
 6. 在恢复任何 UI 实施前，先按下一节完成筛图和版本化视觉合同冻结。
@@ -191,8 +202,10 @@ STASH_RESET_CLEAN_DELETE_THIS_STOPGAP=NOT_PERFORMED
 
 - `OptionD_G0_EvidenceManifest.md`、`OptionD_G1_EvidenceManifest.md`、`OptionD_G2_EvidenceManifest.md` 和 `OptionD_G3_EvidenceManifest.md` 记录各自 invocation 的历史证据，不修改其中的 PASS/FAIL 数字、Master SHA、diff ratio、阈值或 artifact hash。
 - G2 manifest 中的历史 `REOPENED_IN_PROGRESS`、G3 manifest 中的 raw whole-page sole-authority 文字已被 2026-08-25 的 F10 当前止血决定取代；恢复时不得把 manifest 顶部旧状态当作当前执行授权。
-- 本轮没有改 UI，因此没有运行 lint、typecheck、unit、Playwright、WebView2 或 .NET 测试；这些项目均为 `NOT RUN`，不是 PASS。
-- 本轮只应执行文档状态一致性、链接、Git 快照与 `git diff --check` 检查。
+- Shell 冲突冻结后没有继续改 UI；保全提交包含冻结前原有的 UI 改动。
+- StudioUI `lint`、`typecheck` 和 unit（963/963）通过。UI Tests 首轮因 64 MiB 以上的 staged binary diff 触发 `spawnSync git ENOBUFS`；提交后同一入口重跑为 1,046/1,046 通过，证明它是 dirty diff 体积问题而非断言失败。
+- Playwright 视觉执行、真实 WebView2、Windows 125%、.NET、Remote CI 和现场硬件均未运行，不能写成 PASS。
+- `git diff --cached --check` 在历史 audit Markdown 的显式硬换行和少量历史文件 EOF 空行上报格式告警；为保持历史 evidence 原文，本轮未改写这些证据文件。
 
 ## 9. 当前状态入口
 
