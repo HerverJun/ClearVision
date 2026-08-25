@@ -17,3 +17,6 @@ ClearVision.Product/src/ClearVision.Product.Infrastructure/Operators/IndustrialC
 ClearVision.Product/src/ClearVision.Product.Infrastructure/Operators/GeometryRefinementKernel.cs text eol=lf
 ClearVision.Product/src/ClearVision.Product.Infrastructure/Operators/OperatorBase.cs text eol=lf
 quality/evals/reports/operator-quality-phase5-evidence.json text eol=lf
+
+# Operator-library audit records also hash exact bytes for traceability.
+docs/**/operator-library-quality-audit-* text eol=lf

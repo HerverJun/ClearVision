@@ -1,0 +1,56 @@
+{
+  "schemaVersion": "2026-07-10.operator-audit-summary.v3",
+  "sourceCommitSha": "e76c74e392bb14ffe02ef9ea9c7a614cb8987f04",
+  "canonicalOperatorCount": 158,
+  "legacyAliasCount": 4,
+  "scannerCount": 158,
+  "factoryCount": 158,
+  "catalogCount": 157,
+  "operatorLibraryCount": null,
+  "aiContractVisibleCount": 158,
+  "confirmedCount": 2,
+  "candidateCount": 778,
+  "notReproducedCount": 0,
+  "confirmedBaselineCount": 2,
+  "newConfirmedCount": 0,
+  "duplicateCount": 0,
+  "missingCount": 1,
+  "sourceDifferenceCount": 1,
+  "schemaValid": true,
+  "deterministic": true,
+  "surfaceCounts": {
+    "aiContract": 158,
+    "catalog": 157,
+    "factory": 158,
+    "infrastructureSource": 158,
+    "operatorLibrary": null,
+    "scanner": 158,
+    "scannerCanonical": 158
+  },
+  "findingCounts": {
+    "candidate": 778,
+    "confirmed": 2,
+    "not-reproduced": 0
+  },
+  "review": {
+    "sampleCount": 15,
+    "reviewedCount": 15,
+    "staticDifferenceCount": 10,
+    "resolvedDifferenceCount": 5,
+    "productionReachableCount": 11,
+    "fixedProductionDefectCount": 5,
+    "openProductionDefectCount": 1,
+    "candidateCount": 2,
+    "intentionalDifferenceCount": 6,
+    "auditFalsePositiveCount": 1,
+    "categories": [
+      "\u5339\u914D\u4E0E\u5B9A\u4F4D",
+      "\u56FE\u50CF\u9884\u5904\u7406",
+      "\u6570\u636E\u5904\u7406",
+      "\u6D41\u7A0B\u63A7\u5236",
+      "\u6D4B\u91CF",
+      "\u8F93\u51FA\u4E0E\u8F85\u52A9",
+      "\u901A\u4FE1"
+    ]
+  }
+}

@@ -4,10 +4,25 @@
 
 ## 当前入口
 
+- [算子库质量审计报告（2026-08-25）](./operator-library-quality-audit-2026-08-25.md)
+- [算子库质量审计矩阵（158/158）](./operator-library-quality-audit-matrix-2026-08-25.csv)
+- [算子库质量审计记录（机器可读）](./operator-library-quality-audit-record-2026-08-25.json)
 - [算子工业级审计 TODO](./TODO.md)
 - [审计执行标准](./审计执行标准.md)
 - [类别审计报告模板](./类别审计报告模板.md)
 - [Week5 入口卡片](./Week5-入口卡片.md)
+
+## 2026-08-25 全量质量审计
+
+本批次按 158 个规范算子逐项核查端口、属性、运行时和预览工作台，确认严重问题 5 项、一般问题 2 项，另保留待确认风险 4 项。审计只产出报告和证据，不修改产品源码；开放问题及验证边界已同步到 [`TODO.md`](./TODO.md)。
+
+| 证据 | 用途 |
+|---|---|
+| [`operator-library-quality-audit-2026-08-25.md`](./operator-library-quality-audit-2026-08-25.md) | 最终人工结论、证据、复现、影响和修复建议 |
+| [`operator-library-quality-audit-matrix-2026-08-25.csv`](./operator-library-quality-audit-matrix-2026-08-25.csv) | 158 个算子的端口、属性、静态信号和预览复核矩阵 |
+| [`operator-library-quality-audit-record-2026-08-25.json`](./operator-library-quality-audit-record-2026-08-25.json) | 最终数量口径、测试边界、文件 SHA-256 和优先级 |
+| [`operator-library-quality-audit-static-evidence-2026-08-25.json`](./operator-library-quality-audit-static-evidence-2026-08-25.json) | 完整机器可读静态证据 |
+| [`operator-library-quality-audit-static-summary-2026-08-25.json`](./operator-library-quality-audit-static-summary-2026-08-25.json) | 静态扫描摘要；其中 `confirmedCount=2` 不是最终人工缺陷总数 |
 
 ## 文档分工
 
@@ -19,6 +34,7 @@
 | `WeekN-修复优先级清单.md` | 已核验证据支撑的问题池 |
 | `WeekN-审计周报.md` | 阶段结论、遗留和移交 |
 | `TODO.md` | 全局分类状态和滚动 DoD |
+| `operator-library-quality-audit-*` | 2026-08-25 全量端口、属性、执行和预览审计证据包 |
 
 ## 维护规则
 

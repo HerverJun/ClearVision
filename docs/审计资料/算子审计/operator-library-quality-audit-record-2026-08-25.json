@@ -1,0 +1,103 @@
+{
+  "schemaVersion": "2026-08-25.operator-library-quality-audit-record.v1",
+  "auditDate": "2026-08-25",
+  "recordedAtUtc": "2026-08-25T13:44:32.893Z",
+  "status": "open-findings-recorded",
+  "auditMode": "read-only",
+  "sourceCommitSha": "e76c74e392bb14ffe02ef9ea9c7a614cb8987f04",
+  "currentHeadAtAudit": "ee00cc7aa83ef2b2548e31ffafaff141e2606c5f",
+  "relevantSourceDiffFromAuditBase": 0,
+  "coverage": {
+    "canonicalOperatorCount": 158,
+    "reviewedOperatorCount": 158,
+    "omittedOperatorCount": 0,
+    "legacyAliasCount": 4,
+    "categoryCount": 14,
+    "scannerCount": 158,
+    "factoryCount": 158,
+    "infrastructureSourceCount": 158,
+    "aiContractCount": 158,
+    "packagePublicCatalogCount": 157,
+    "intentionalInternalCatalogExclusions": [
+      "FrameChangeTrigger"
+    ]
+  },
+  "finalFindings": {
+    "confirmedTotal": 7,
+    "blocker": 0,
+    "severe": 5,
+    "general": 2,
+    "recommendation": 1,
+    "pendingRisk": 4,
+    "confirmedIds": [
+      "F01",
+      "F02",
+      "F03",
+      "F04",
+      "F05",
+      "F06",
+      "F07"
+    ],
+    "pendingRiskIds": [
+      "R01",
+      "R02",
+      "R03",
+      "R04"
+    ],
+    "recommendationIds": [
+      "S01"
+    ]
+  },
+  "staticAudit": {
+    "candidateSignalCount": 778,
+    "acceptedConfirmedBaselineIdentityCount": 2,
+    "runtimeOutputUndocumented": 648,
+    "runtimeOutputDynamicUnproven": 98,
+    "getParamDefaultMismatch": 19,
+    "outputKeyNoSuccessPath": 13
+  },
+  "validation": {
+    "passed": 484,
+    "failed": 0,
+    "productDotNetPassed": 190,
+    "desktopDotNetPassed": 80,
+    "uiNodePassed": 214,
+    "dotNetExecutionMode": "existing-debug-assemblies-via-dotnet-vstest",
+    "cleanSourceRebuildCompleted": false,
+    "cleanSourceRebuildBlocker": "NuGet restore failed with NU1301 due to source TLS/credential access",
+    "uiTestsRanAgainstCurrentJavaScriptSource": true
+  },
+  "artifacts": {
+    "report": {
+      "path": "docs/审计资料/算子审计/operator-library-quality-audit-2026-08-25.md",
+      "sha256": "16c9b16f2ca04d4900b632a923a3f7f70d7333d51df2298dcead18acb0b6c473"
+    },
+    "operatorMatrix": {
+      "path": "docs/审计资料/算子审计/operator-library-quality-audit-matrix-2026-08-25.csv",
+      "sha256": "fb4229ccf95a7c58eff4111be3ebe52d02110597eaa311a439d51520bec3cb4c",
+      "rowCount": 158,
+      "uniqueOperatorCount": 158
+    },
+    "staticEvidence": {
+      "path": "docs/审计资料/算子审计/operator-library-quality-audit-static-evidence-2026-08-25.json",
+      "sha256": "8b1ccb46e1c044b38056ef7a38e7e56c3672641d7634dbfe67fd36941d3759cc"
+    },
+    "staticSummary": {
+      "path": "docs/审计资料/算子审计/operator-library-quality-audit-static-summary-2026-08-25.json",
+      "sha256": "1183b1c75c19ab4b87a028458b8efae4ee5f2e2244a2305c890191aa5c929ccb"
+    }
+  },
+  "priorityOrder": [
+    "F01",
+    "F02",
+    "F03+F06",
+    "F05+F04",
+    "F07",
+    "R01"
+  ],
+  "scopeLimitations": [
+    "No product source code was modified in this audit round.",
+    "No exhaustive real camera, PLC, database, HTTP service, filesystem, or AI model integration run was performed for all 158 operators.",
+    "External deployment plugins not present in the repository were outside the auditable inventory."
+  ]
+}
