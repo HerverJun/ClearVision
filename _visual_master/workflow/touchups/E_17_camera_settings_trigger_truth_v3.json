@@ -1,0 +1,33 @@
+{
+  "schema_version": "clearvision-controlled-picture-layer-touchup.v1",
+  "entry_id": "E_17_camera_settings",
+  "source_iteration": "option_E/iterations/17_camera_settings_v6.png",
+  "source_sha256": "87ea0e227a0379d23a11ad2e00444a8d508f9804bf8fe3bb2bbe27e164660743",
+  "purpose": "Restore the real Trigger diagnostics entry while keeping the no-evidence state neutral.",
+  "operations": [
+    {
+      "type": "replace_text",
+      "box": [1350, 938, 1780, 980],
+      "fill": [255, 255, 255],
+      "position": [1372, 949],
+      "text": "Trigger diagnostics",
+      "font_path": "C:\\Windows\\Fonts\\msyhbd.ttc",
+      "font_sha256": "06e1a30f687ab7d39f533447b21e84d51e0cecdaa6bfa060c87136b168811bdc",
+      "font_size": 16,
+      "text_fill": [45, 57, 70],
+      "purpose": "Expose the existing trigger-diagnostics entry without asserting a device result."
+    },
+    {
+      "type": "replace_text",
+      "box": [1350, 981, 1950, 1032],
+      "fill": [255, 255, 255],
+      "position": [1372, 994],
+      "text": "暂无诊断信息 · 开始预览后显示",
+      "font_path": "C:\\Windows\\Fonts\\msyh.ttc",
+      "font_sha256": "e4b3b9d058750fb80899c24f68e35beda606ca92694eff0e9f7f91eec7a846aa",
+      "font_size": 14,
+      "text_fill": [120, 132, 145],
+      "purpose": "Keep the trigger diagnostic state explicitly neutral until real preview evidence exists."
+    }
+  ]
+}

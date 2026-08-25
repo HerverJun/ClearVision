@@ -1,0 +1,37 @@
+{
+  "schema_version": "clearvision-controlled-picture-layer-touchup.v1",
+  "entry_id": "E_06_flow_validation_error",
+  "source_iteration": "option_E/iterations/06_flow_validation_error_v6.png",
+  "source_sha256": "7a21e01d04e40cbcaf831df88fcec80178e4c6730c027deb849ba717370a80eb",
+  "purpose": "Keep the accepted single-Inspector Canvas-dominant gpt-image-2 body while replacing only its corrupted title bar and invented flow metadata with the audited same-option E Flow Master command shell.",
+  "operations": [
+    {
+      "type": "paste_master_reference",
+      "box": [0, 0, 2047, 184],
+      "reference_path": "option_E/masters/05_flow_editor.png",
+      "reference_sha256": "c5ae4d5cb8da2069dd99aa8a49a9affb4a7071847c32224bd5b82e5d6d1f8e0f",
+      "source_box": [0, 0, 2047, 197],
+      "purpose": "Restore the complete E_FLOW_MASTER product, project, status and workspace command bands without adding any new capability."
+    },
+    {
+      "type": "paste_master_reference",
+      "box": [135, 204, 1485, 264],
+      "reference_path": "option_E/masters/05_flow_editor.png",
+      "reference_sha256": "c5ae4d5cb8da2069dd99aa8a49a9affb4a7071847c32224bd5b82e5d6d1f8e0f",
+      "source_box": [304, 237, 1435, 295],
+      "purpose": "Restore only the audited Canvas edit and zoom commands from E_FLOW_MASTER."
+    },
+    {
+      "type": "replace_text",
+      "box": [1718, 654, 1788, 688],
+      "fill": [255, 255, 255],
+      "position": [1728, 661],
+      "text": "11",
+      "font_path": "C:\\Windows\\Fonts\\msyh.ttc",
+      "font_sha256": "e4b3b9d058750fb80899c24f68e35beda606ca92694eff0e9f7f91eec7a846aa",
+      "font_size": 16,
+      "text_fill": [27, 32, 38],
+      "purpose": "Restore the verified validation fixture value that triggers Count greater than 10."
+    }
+  ]
+}

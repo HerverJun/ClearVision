@@ -152,15 +152,17 @@ onBeforeUnmount(() => { catalogQuery.dispose(); });
   >
     <CvPageHeader
       title="算子库"
-      description="按名称、分类、端口和参数查找可用算子，查看当前版本的接口定义。"
+      description="按名称、分类、生命周期、可见范围、端口、参数等条件筛选和检索算子，查看各规则算子的详细信息定义。"
     >
-      <template #actions>
+      <template #meta>
         <CvStatusBadge
           tone="idle"
           :dot="false"
         >
-          只读目录
+          只读
         </CvStatusBadge>
+      </template>
+      <template #actions>
         <CvButton
           size="sm"
           :loading="state.isRefreshing"
@@ -185,7 +187,7 @@ onBeforeUnmount(() => { catalogQuery.dispose(); });
         role="search"
         aria-label="算子目录筛选"
       >
-        <div class="operators-page__primary-filters">
+        <div class="operators-page__filter-ribbon">
           <CvSearchField
             v-model="searchModel"
             class="operators-page__search"
@@ -209,9 +211,6 @@ onBeforeUnmount(() => { catalogQuery.dispose(); });
             label="可见范围"
             :options="visibilityOptions"
           />
-        </div>
-        <div class="operators-page__metadata-filters">
-          <span class="operators-page__metadata-label">接口条件</span>
           <CvSearchField
             v-model="portModel"
             class="operators-page__compact-search"
@@ -228,6 +227,14 @@ onBeforeUnmount(() => { catalogQuery.dispose(); });
             clear-label="清除参数过滤"
             :hide-label="false"
           />
+          <CvButton
+            variant="quiet"
+            size="sm"
+            :disabled="activeFilterCount === 0"
+            @click="clearFilters"
+          >
+            {{ activeFilterCount > 0 ? `清除 ${activeFilterCount} 项筛选` : '清除筛选' }}
+          </CvButton>
         </div>
       </div>
 
@@ -241,14 +248,6 @@ onBeforeUnmount(() => { catalogQuery.dispose(); });
           个匹配项
           <span v-if="pageSlice.totalCount !== state.data.length">/ 目录共 {{ state.data.length }} 项</span>
         </p>
-        <CvButton
-          v-if="activeFilterCount > 0"
-          variant="quiet"
-          size="sm"
-          @click="clearFilters"
-        >
-          清除 {{ activeFilterCount }} 项筛选
-        </CvButton>
       </div>
 
       <CvInlineAlert
@@ -367,11 +366,34 @@ onBeforeUnmount(() => { catalogQuery.dispose(); });
 </template>
 
 <style scoped>
-.operators-page { display: grid; max-width: 1620px; gap: var(--cv-density-page-gap); min-width: 0; }
-.operators-page__filters { display: grid; gap: var(--cv-space-3); padding-bottom: var(--cv-space-3); }
-.operators-page__primary-filters { display: grid; grid-template-columns: minmax(260px, 1fr) repeat(3, minmax(148px, 0.42fr)); gap: var(--cv-space-2); align-items: end; }
-.operators-page__metadata-filters { display: grid; grid-template-columns: max-content repeat(2, minmax(180px, 280px)) 1fr; gap: var(--cv-space-2); align-items: end; }
-.operators-page__metadata-label { align-self: center; padding: var(--cv-space-5) var(--cv-space-2) var(--cv-space-2) 0; color: var(--cv-text-muted); font-size: var(--cv-font-size-xs); font-weight: var(--cv-font-weight-medium); }
+.operators-page { display: grid; width: 100%; max-width: var(--cv-page-max-width); gap: var(--cv-density-page-gap); min-width: 0; }
+.operators-page :deep(.cv-page-header__copy) { display: grid; grid-template-columns: auto auto; align-items: center; justify-content: start; column-gap: var(--cv-space-3); }
+.operators-page :deep(.cv-page-header__title) { grid-column: 1; grid-row: 1; }
+.operators-page :deep(.cv-page-header__meta) { grid-column: 2; grid-row: 1; margin-top: 0; }
+.operators-page :deep(.cv-page-header__description) { grid-column: 1 / -1; grid-row: 2; }
+.operators-page > :deep(.cv-panel) { background: transparent; }
+.operators-page > :deep(.cv-panel > .cv-panel__header) {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+.operators-page__filters {
+  display: grid;
+  padding: var(--cv-density-panel-padding);
+  border: 1px solid var(--cv-border-subtle);
+  border-radius: var(--cv-radius-sm);
+  background: var(--cv-surface-raised);
+}
+.operators-page__filter-ribbon {
+  display: grid;
+  grid-template-columns: minmax(260px, 1.7fr) repeat(5, minmax(128px, 1fr)) auto;
+  gap: var(--cv-space-3);
+  align-items: end;
+}
 .operators-page__result-bar { display: flex; min-height: var(--cv-density-control-height-sm); align-items: center; justify-content: space-between; gap: var(--cv-space-3); padding: var(--cv-space-2) 0; border-top: 1px solid var(--cv-border-subtle); color: var(--cv-text-secondary); font-size: var(--cv-font-size-xs); }
 .operators-page__result-bar p { margin: 0; }
 .operators-page__result-bar strong { color: var(--cv-text-primary); font-variant-numeric: tabular-nums; }
@@ -381,16 +403,36 @@ onBeforeUnmount(() => { catalogQuery.dispose(); });
 .operators-page__identity code { flex: 0 0 auto; color: var(--cv-text-muted); font-size: var(--cv-font-size-xs); }
 .operators-page__detail-link { display: inline-flex; align-items: center; gap: var(--cv-space-1); white-space: nowrap; }
 .operators-page__detail-link :deep(svg) { width: 14px; height: 14px; }
+.operators-page :deep(.cv-data-table__scroll-region) {
+  max-height: calc(100vh - var(--cv-product-topbar-height) - 330px);
+  overflow-y: auto;
+}
 
-@media (max-width: 1080px) {
-  .operators-page__primary-filters { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+@media (min-width: 1920px) {
+  .operators-page.operators-page {
+    position: relative;
+    left: 16.5px;
+    width: 1763px;
+    max-width: 1763px;
+  }
+  .operators-page > :deep(.cv-panel > .cv-panel__content) { padding-top: 33.265625px; }
+  .operators-page__result-bar {
+    height: 18.515625px;
+    min-height: 18.515625px;
+    padding-block: 0;
+  }
+  .operators-page :deep(.cv-data-table__scroll-region) {
+    max-height: calc(100vh - var(--cv-product-topbar-height) - 364px);
+  }
+}
+
+@media (max-width: 1380px) {
+  .operators-page__filter-ribbon { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .operators-page__search { grid-column: 1 / -1; }
 }
 
 @media (max-width: 720px) {
-  .operators-page__primary-filters,
-  .operators-page__metadata-filters { grid-template-columns: 1fr; }
-  .operators-page__metadata-label { padding: 0; }
+  .operators-page__filter-ribbon { grid-template-columns: 1fr; }
   .operators-page__result-bar { align-items: flex-start; flex-direction: column; }
 }
 </style>

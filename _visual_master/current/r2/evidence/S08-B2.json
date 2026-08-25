@@ -1,0 +1,167 @@
+{
+  "schemaVersion": "r2-final-matrix-capture.v1",
+  "scene": "S08",
+  "variant": "B2",
+  "route": "#/stations/station-a",
+  "state": "detail",
+  "role": "Engineer",
+  "flags": {
+    "Studio2.StationsRead": true
+  },
+  "owner": {
+    "capability": "F02-stations",
+    "mounted": 1,
+    "subscriptions": 0,
+    "writes": 0
+  },
+  "requests": [
+    "GET /api/auth/setup-status",
+    "GET /api/auth/me",
+    "GET /health",
+    "GET /api/stations",
+    "GET /api/stations/station-a/results",
+    "GET /api/stations/station-a/health",
+    "GET /api/stations/events",
+    "GET /api/stations",
+    "GET /api/stations/station-a/results",
+    "GET /api/stations/station-a/health"
+  ],
+  "runtimeRequests": [
+    {
+      "method": "GET",
+      "path": "/api/auth/setup-status",
+      "url": "http://127.0.0.1:5421/api/auth/setup-status"
+    },
+    {
+      "method": "GET",
+      "path": "/api/auth/me",
+      "url": "http://127.0.0.1:5421/api/auth/me"
+    },
+    {
+      "method": "GET",
+      "path": "/health",
+      "url": "http://127.0.0.1:5421/health"
+    },
+    {
+      "method": "GET",
+      "path": "/api/stations",
+      "url": "http://127.0.0.1:5421/api/stations"
+    },
+    {
+      "method": "GET",
+      "path": "/api/stations/station-a/results",
+      "url": "http://127.0.0.1:5421/api/stations/station-a/results?take=50"
+    },
+    {
+      "method": "GET",
+      "path": "/api/stations/station-a/health",
+      "url": "http://127.0.0.1:5421/api/stations/station-a/health?take=50"
+    },
+    {
+      "method": "GET",
+      "path": "/api/stations/events",
+      "url": "http://127.0.0.1:5421/api/stations/events"
+    },
+    {
+      "method": "GET",
+      "path": "/api/stations",
+      "url": "http://127.0.0.1:5421/api/stations"
+    },
+    {
+      "method": "GET",
+      "path": "/api/stations/station-a/results",
+      "url": "http://127.0.0.1:5421/api/stations/station-a/results?take=50"
+    },
+    {
+      "method": "GET",
+      "path": "/api/stations/station-a/health",
+      "url": "http://127.0.0.1:5421/api/stations/station-a/health?take=50"
+    }
+  ],
+  "allowedWrites": [],
+  "runtime": {
+    "consoleErrors": [],
+    "pageErrors": [],
+    "failedRequests": [],
+    "httpErrors": [],
+    "expectedHttpErrors": [],
+    "observedExpectedHttpErrors": [],
+    "unexpectedWrites": []
+  },
+  "requiredCriticalActions": [
+    "[data-testid=\"station-open-results\"]"
+  ],
+  "motion": {
+    "layoutShifts": [
+      {
+        "value": 0.2862884354947583,
+        "hadRecentInput": false
+      },
+      {
+        "value": 0.0030464946654690677,
+        "hadRecentInput": false
+      }
+    ],
+    "longTasks": [
+      {
+        "startTime": 77.60000002384186,
+        "duration": 58
+      },
+      {
+        "startTime": 167.40000000596046,
+        "duration": 52
+      }
+    ]
+  },
+  "notes": [],
+  "dom": {
+    "url": "http://127.0.0.1:5421/studio/index.html#/stations/station-a",
+    "viewport": {
+      "width": 1366,
+      "height": 768,
+      "dpr": 1
+    },
+    "theme": "light",
+    "density": "compact",
+    "reducedMotion": "false",
+    "focus": {
+      "tagName": "BUTTON",
+      "id": "",
+      "testId": null
+    },
+    "landmarks": {
+      "main": 1,
+      "nav": 1,
+      "dialogs": 0
+    },
+    "mainBox": {
+      "x": 0,
+      "y": 52,
+      "width": 1366,
+      "height": 1660.296875
+    },
+    "horizontalOverflow": 0,
+    "pageScroll": {
+      "x": 0,
+      "y": 0
+    },
+    "criticalActions": [
+      {
+        "selector": "[data-testid=\"station-open-results\"]",
+        "testId": "station-open-results",
+        "text": "查看结果",
+        "box": {
+          "x": 1084,
+          "y": 130,
+          "width": 64,
+          "height": 28
+        },
+        "truncated": false,
+        "inViewport": true,
+        "reachable": true,
+        "enabled": true,
+        "unobscured": true
+      }
+    ]
+  }
+}

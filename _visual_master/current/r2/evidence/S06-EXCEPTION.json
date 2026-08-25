@@ -1,0 +1,191 @@
+{
+  "schemaVersion": "r2-final-matrix-capture.v1",
+  "scene": "S06",
+  "variant": "EXCEPTION",
+  "route": "#/projects/11111111-1111-4111-8111-111111111111/workspace",
+  "state": "admission-blocked",
+  "role": "Engineer",
+  "flags": {
+    "Studio2.Workspace": true
+  },
+  "owner": {
+    "capability": "F03-formal-run",
+    "mounted": 1,
+    "subscriptions": 0,
+    "writes": 0
+  },
+  "requests": [
+    "GET /api/auth/setup-status",
+    "GET /api/auth/me",
+    "GET /health",
+    "POST /api/projects/11111111-1111-4111-8111-111111111111/open",
+    "GET /api/projects/11111111-1111-4111-8111-111111111111",
+    "GET /api/operators/library",
+    "POST /api/inspection/decision-configuration/validate",
+    "GET /api/templates",
+    "GET /api/cameras/bindings",
+    "GET /api/inspection/realtime/11111111-1111-4111-8111-111111111111/state",
+    "POST /api/inspection/admission",
+    "POST /api/inspection/admission"
+  ],
+  "runtimeRequests": [
+    {
+      "method": "GET",
+      "path": "/api/auth/setup-status",
+      "url": "http://127.0.0.1:5421/api/auth/setup-status"
+    },
+    {
+      "method": "GET",
+      "path": "/api/auth/me",
+      "url": "http://127.0.0.1:5421/api/auth/me"
+    },
+    {
+      "method": "GET",
+      "path": "/health",
+      "url": "http://127.0.0.1:5421/health"
+    },
+    {
+      "method": "POST",
+      "path": "/api/projects/11111111-1111-4111-8111-111111111111/open",
+      "url": "http://127.0.0.1:5421/api/projects/11111111-1111-4111-8111-111111111111/open"
+    },
+    {
+      "method": "GET",
+      "path": "/api/projects/11111111-1111-4111-8111-111111111111",
+      "url": "http://127.0.0.1:5421/api/projects/11111111-1111-4111-8111-111111111111"
+    },
+    {
+      "method": "GET",
+      "path": "/api/operators/library",
+      "url": "http://127.0.0.1:5421/api/operators/library?includeCompatibility=true"
+    },
+    {
+      "method": "POST",
+      "path": "/api/inspection/decision-configuration/validate",
+      "url": "http://127.0.0.1:5421/api/inspection/decision-configuration/validate"
+    },
+    {
+      "method": "GET",
+      "path": "/api/templates",
+      "url": "http://127.0.0.1:5421/api/templates"
+    },
+    {
+      "method": "GET",
+      "path": "/api/cameras/bindings",
+      "url": "http://127.0.0.1:5421/api/cameras/bindings"
+    },
+    {
+      "method": "GET",
+      "path": "/api/inspection/realtime/11111111-1111-4111-8111-111111111111/state",
+      "url": "http://127.0.0.1:5421/api/inspection/realtime/11111111-1111-4111-8111-111111111111/state"
+    },
+    {
+      "method": "POST",
+      "path": "/api/inspection/admission",
+      "url": "http://127.0.0.1:5421/api/inspection/admission"
+    },
+    {
+      "method": "POST",
+      "path": "/api/inspection/admission",
+      "url": "http://127.0.0.1:5421/api/inspection/admission"
+    }
+  ],
+  "allowedWrites": [
+    "POST /api/projects/11111111-1111-4111-8111-111111111111/open",
+    "POST /api/inspection/decision-configuration/validate",
+    "POST /api/inspection/admission"
+  ],
+  "runtime": {
+    "consoleErrors": [],
+    "pageErrors": [],
+    "failedRequests": [],
+    "httpErrors": [],
+    "expectedHttpErrors": [],
+    "observedExpectedHttpErrors": [],
+    "unexpectedWrites": []
+  },
+  "requiredCriticalActions": [
+    "[aria-label=\"关闭运行详情\"]"
+  ],
+  "motion": {
+    "layoutShifts": [
+      {
+        "value": 0.0014407305222469296,
+        "hadRecentInput": false
+      },
+      {
+        "value": 0.0003719943021164486,
+        "hadRecentInput": false
+      },
+      {
+        "value": 0.0008585411445929057,
+        "hadRecentInput": true
+      },
+      {
+        "value": 0.0003601371093423425,
+        "hadRecentInput": true
+      }
+    ],
+    "longTasks": [
+      {
+        "startTime": 72.10000002384186,
+        "duration": 64
+      },
+      {
+        "startTime": 145.10000002384186,
+        "duration": 54
+      }
+    ]
+  },
+  "notes": [],
+  "dom": {
+    "url": "http://127.0.0.1:5421/studio/index.html#/projects/11111111-1111-4111-8111-111111111111/workspace",
+    "viewport": {
+      "width": 1366,
+      "height": 768,
+      "dpr": 1
+    },
+    "theme": "light",
+    "density": "compact",
+    "reducedMotion": "false",
+    "focus": {
+      "tagName": "BUTTON",
+      "id": "",
+      "testId": null
+    },
+    "landmarks": {
+      "main": 1,
+      "nav": 3,
+      "dialogs": 1
+    },
+    "mainBox": {
+      "x": 0,
+      "y": 46,
+      "width": 1366,
+      "height": 722
+    },
+    "horizontalOverflow": 0,
+    "pageScroll": {
+      "x": 0,
+      "y": 0
+    },
+    "criticalActions": [
+      {
+        "selector": "[aria-label=\"关闭运行详情\"]",
+        "testId": null,
+        "text": "",
+        "box": {
+          "x": 1051,
+          "y": 47.625,
+          "width": 28,
+          "height": 28
+        },
+        "truncated": false,
+        "inViewport": true,
+        "reachable": true,
+        "enabled": true,
+        "unobscured": true
+      }
+    ]
+  }
+}

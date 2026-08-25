@@ -1,0 +1,57 @@
+{
+  "schema_version": "clearvision-controlled-picture-layer-touchup.v1",
+  "entry_id": "E_07_flow_preview_roi",
+  "source_iteration": "option_E/iterations/07_flow_preview_roi_v3.png",
+  "source_sha256": "24ef7418735bccd082f726d5972cbd7656e9f28c80fd597423041ce292095311",
+  "purpose": "Preserve the accepted E07 v3 current-dominant ROI composition and exact result object while correcting only the product identity, the real additional-result heading, and the fixture's empty diagnostics state.",
+  "operations": [
+    {
+      "type": "fill_rect",
+      "box": [76, 8, 265, 58],
+      "fill": [254, 254, 255],
+      "purpose": "Clear only the generated ClearVision Flow text while preserving the existing mark and product shell."
+    },
+    {
+      "type": "replace_text",
+      "box": [76, 8, 205, 58],
+      "fill": [254, 254, 255],
+      "position": [80, 15],
+      "text": "ClearVision",
+      "font_path": "C:\\Windows\\Fonts\\msyhbd.ttc",
+      "font_sha256": "06e1a30f687ab7d39f533447b21e84d51e0cecdaa6bfa060c87136b168811bdc",
+      "font_size": 20,
+      "text_fill": [28, 33, 38],
+      "purpose": "Restore the exact product name without changing any workflow control or state."
+    },
+    {
+      "type": "replace_text",
+      "box": [206, 8, 265, 58],
+      "fill": [254, 254, 255],
+      "position": [209, 25],
+      "text": "STUDIO",
+      "font_path": "C:\\Windows\\Fonts\\msyh.ttc",
+      "font_sha256": "e4b3b9d058750fb80899c24f68e35beda606ca92694eff0e9f7f91eec7a846aa",
+      "font_size": 12,
+      "text_fill": [103, 113, 123],
+      "purpose": "Replace the false Flow suffix with the real Studio identity."
+    },
+    {
+      "type": "replace_text",
+      "box": [1498, 985, 1640, 1030],
+      "fill": [247, 247, 249],
+      "position": [1508, 997],
+      "text": "附加结果",
+      "font_path": "C:\\Windows\\Fonts\\msyhbd.ttc",
+      "font_sha256": "06e1a30f687ab7d39f533447b21e84d51e0cecdaa6bfa060c87136b168811bdc",
+      "font_size": 14,
+      "text_fill": [32, 39, 46],
+      "purpose": "Restore the current PreviewPanel section name for the one outputImage artifact instead of inventing a separate output-image module."
+    },
+    {
+      "type": "fill_rect",
+      "box": [1492, 1058, 2047, 1098],
+      "fill": [247, 248, 250],
+      "purpose": "Remove the generated diagnostics count because the audited S05-B2 fixture has diagnostics=[] and missingResources=[]."
+    }
+  ]
+}

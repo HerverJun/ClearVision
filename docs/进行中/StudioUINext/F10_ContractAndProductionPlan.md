@@ -33,6 +33,7 @@ REMOTE_CI=BLOCKED_BY_ENVIRONMENT
 FINAL_GATE=PARTIAL
 PRODUCTION_ACCEPTANCE=NOT_GRANTED
 LEGACY_RETIREMENT=NOT_APPROVED
+UNPREFIXED_G1_G10_KEYS=HISTORICAL_F10_GATES_NOT_OPTION_D_GATES
 G1_STATE=DONE
 G1_BASELINE_HEAD=21105d57de7e5b4ce41365c7827ed14e64ca7ba5
 G1_IMPLEMENTATION_HEAD=98cb8c7f54d2d51ea5b59ca534aafd51544b773f
@@ -85,11 +86,46 @@ VIEW_POLISH_DOTNET_TESTS=NOT_RUN_THIS_REFINEMENT
 VIEW_POLISH_OWNER_SIGNOFF=NOT_PERFORMED
 FIELD_CAMERA_PLC_STATION_AI=NOT_PERFORMED
 PRODUCTION_SOAK=NOT_PERFORMED
-PARITY_ALIGNMENT_PLAN=PROPOSED_FOR_OWNER_REVIEW
+PARITY_ALIGNMENT_PLAN=APPROVED
 PARITY_ALIGNMENT_BASELINE_HEAD=22a3d26a00a2d3b8098165aab5489ce54f5bc95b
-PARITY_ALIGNMENT_W0_STATE=BLOCKED_BY_CONTRACT
-PARITY_ALIGNMENT_W0_CONTRACT_PACKET=PROPOSED_FOR_OWNER_REVIEW
-PARITY_ALIGNMENT_W0_OWNER_APPROVAL=NOT_PERFORMED
+PARITY_ALIGNMENT_W0_STATE=DONE
+PARITY_ALIGNMENT_W0_CONTRACT_PACKET=APPROVED
+PARITY_ALIGNMENT_W0_OWNER_APPROVAL=APPROVED_HERVERJUN_2026_08_23
+OPTION_D_G0_STATE=PASS
+OPTION_D_G0_BASELINE_HEAD=cdd114082821bbe750fb7945a0c3a4e89002d67c
+OPTION_D_G0_VISUAL_BASELINE=PASS_24_OF_24_3840X2160_SHA_BOUND
+OPTION_D_G0_CAPABILITY_LEDGER=PASS_ZERO_UNKNOWN_ZERO_UNMAPPED_ZERO_UNAUTHORIZED
+OPTION_D_G0_STUDIOUI_VITEST=PASS_144_FILES_946_TESTS
+OPTION_D_G0_PLAYWRIGHT=PASS_6_OF_6_SERIAL_WORKER
+OPTION_D_G0_DETERMINISTIC_FIXTURE=PASS
+OPTION_D_G0_OWNER_APPROVAL=APPROVED_HERVERJUN_2026_08_23
+OPTION_D_G1_STATE=PASS
+OPTION_D_G1_STARTED=TRUE_2026_08_23
+OPTION_D_G1_SOURCE_HEAD=cdd114082821bbe750fb7945a0c3a4e89002d67c
+OPTION_D_G1_MASTER_MEASUREMENT=PASS_17_GEOMETRY_18_COLOR_3_SHA
+OPTION_D_G1_VISUAL_GATE=PASS_4_OF_4_NO_MASKS
+OPTION_D_G1_HARD_GATE=PASS_17_OF_17
+OPTION_D_G1_STUDIOUI_VITEST=PASS_144_FILES_953_TESTS
+OPTION_D_G2_STATE=BLOCKED_BY_CONTRACT
+OPTION_D_G2_STARTED=TRUE_2026_08_24
+OPTION_D_G2_HISTORICAL_MASTER_MEASUREMENT=PASS_12_GEOMETRY_8_COLOR_2_SHA
+OPTION_D_G2_HISTORICAL_DETERMINISM_GATE=PASS_6_OF_6_ZERO_DIFF_NO_MASKS
+OPTION_D_G2_RAW_MASTER_PIXEL_GATE=NOT_RUN_AFTER_REOPEN
+OPTION_D_G2_AFFECTED_REGRESSION=NOT_RUN_AFTER_REOPEN
+OPTION_D_G2_INDEPENDENT_REVIEW=NOT_PERFORMED_AFTER_REOPEN
+OPTION_D_G3_STATE=BLOCKED_BY_DEPENDENCY
+OPTION_D_G3_STARTED=TRUE_2026_08_24
+OPTION_D_G3_DETERMINISM_GATE=PASS_REFERENCE_6_OF_6_CANDIDATE_6_OF_6_ZERO_DIFF_NO_MASKS
+OPTION_D_G3_MASTER_PIXEL_GATE=FAIL_0_OF_6_CHANGED_RATIO_8_5124_TO_36_3066_PERCENT
+OPTION_D_G4_STATE=BLOCKED_BY_DEPENDENCY
+OPTION_D_G2_G3_REOPEN_APPROVAL=APPROVED_HERVERJUN_2026_08_24
+OPTION_D_G2_G3_REOPEN_SIGNER_ROLES=PRODUCT_SECURITY_QA_RELEASE_CAPABILITY_OWNER
+OPTION_D_WHOLE_PAGE_VISUAL_AUTHORITY=INVALID_BY_INTERNAL_SHELL_CONFLICT
+OPTION_D_GLOBAL_PRODUCT_NAV_TOP_RULE=FROZEN_TOP_ONLY
+OPTION_D_LEFT_SIDE_SURFACE_SCOPE=PAGE_INTERNAL_TOOLS_CATEGORIES_OR_CONTEXT_ONLY
+OPTION_D_UI_IMPLEMENTATION=PROHIBITED_PENDING_G2_VISUAL_AUTHORITY_AND_PAGE_SCOPE_REFREEZE
+OPTION_D_CAPABILITY_PRESERVATION=APPROVED_RELOCATION_OR_PROGRESSIVE_DISCLOSURE
+OPTION_D_G4_START_AUTHORIZATION=NOT_GRANTED
 ```
 
 ## G0 候选冻结与稳定线语义同步
@@ -182,9 +218,77 @@ G0_WORKTREE_STATE=IMPLEMENTATION_CLEAN_BEFORE_DOCUMENTATION_COMMIT
 | G8_NO_NODE | PARTIAL | `aba696269...` 本机 publish 静态扫描、合法 Vite 图片资产、Desktop 进程树无 Node child、sanitized-path 启动均 PASS；独立无 Node 目标机仍为 `NOT_PERFORMED`。 |
 | G9_FIELD_HARDWARE | NOT_PERFORMED | 当前环境没有现场 Camera、PLC、Station 验证条件。 |
 | G10_FINAL_CI | PARTIAL | `bf662c838...` 视觉实现的软件 gates 与 `aba696269...` 本机 WebView2 100% 证据通过；本轮 .NET tests `NOT RUN`。S00-S13 Browser 全矩阵、clean-checkout Remote CI、125% DPI、独立目标机、现场硬件、生产 soak 和产品签收未完成，不授予 production acceptance。 |
-| PARITY_ALIGNMENT_W0 | BLOCKED_BY_CONTRACT | 本次 Legacy parity 审计确认 Canvas run-to-node/subgraph、Inspector recommendation、Station high-risk confirmation 与六项产品处置尚无签字。事实、拟议边界、风险表和批准记录见 [ADR-ParityAlignment-Wave0](./ADR-ParityAlignment-Wave0-ContractFreeze.md)；不得将本行当作 W1/W2 实现完成。 |
+| PARITY_ALIGNMENT_W0 | DONE | `HerverJun` 于 2026-08-23 代表 Product、Security 及相关 owner 具名批准本轮处置：Canvas run-to-node/active-node 和 Inspector recommendation `DEFERRED`，subgraph `NOT_APPLICABLE`，Station 保持现有 owner/admission/reconcile，六项产品处置已冻结。本行不表示延后能力已实现。 |
+| OPTION_D_G0 | PASS | 24/24 Option D PNG/Master/宪章/canonical restore、24 named routes、截图外 routes、C01-C75 与 functional audit 已冻结；Owner approval 为 `APPROVED_HERVERJUN_2026_08_23`；`option-d-g0-deterministic.v1` 与 owner cleanup 已通过 Playwright，StudioUI Vitest 144/946、受影响 Playwright 6/6 PASS。三路独立 close review 与补充 disposition review 均无 P0-P3 finding，最终 machine manifest、hash、whitespace/status 已冻结。 |
+| OPTION_D_G1 | PASS | Design System 与 Design/Canvas Labs 已完成；Master measurement 17 geometry / 18 color / 3 SHA、reference 与 candidate hard gate 各 17/17、4/4 视觉比较 `NO_MASKS`、StudioUI 144 files / 953 tests、lint/typecheck/build/bundle 均 PASS。code/Owner、visual/gate、documentation/status 三路独立终审无未处置 P0-P3 finding；G2 仅转为 `READY`，尚未实施。 |
+| OPTION_D_G2 | BLOCKED_BY_CONTRACT | 全局产品导航已冻结为顶部唯一；raw whole-page Master 集合内部混用顶部导航与左侧全局 rail，当前视觉权威失效。须先筛图并重新冻结页面范围和版本化视觉基准，期间禁止 UI 实施。 |
+| OPTION_D_G3 | BLOCKED_BY_DEPENDENCY | G3 依赖 G2 合同、页面范围与视觉权威重新冻结；旧 raw Master diff、功能回归和 deterministic capture 仅保留为历史证据。G4 继续阻断。 |
 
-状态枚举：`DONE`、`PARTIAL`、`BLOCKED_BY_CONTRACT`、`BLOCKED_BY_ENVIRONMENT`、`NOT_PERFORMED`、`FAILED_RELATED`、`FAILED_UNRELATED`、`DEFERRED`。
+状态枚举：`DONE`、`PASS`、`REVIEW_PENDING`、`PARTIAL`、`BLOCKED_BY_DEPENDENCY`、`BLOCKED_BY_CONTRACT`、`BLOCKED_BY_ENVIRONMENT`、`NOT_PERFORMED`、`FAILED_RELATED`、`FAILED_UNRELATED`、`DEFERRED`。
+
+### Option D G0 checkpoint（2026-08-23）
+
+Option D 视觉方向由当前 requester 明确确认；`HerverJun` 又于 2026-08-23 具名批准 G0，
+并声明有权代表 Product、Security、QA/Release 及相关 capability owner。该批准与 `image_prompts.json` 中三个 Master 的
+`selected-for-chain-not-product-owner-approved` metadata、以及尚未发生的 production signoff 分别记录。
+本 checkpoint 没有修改 `_visual_master`，也没有开始 Design System 或页面改造。
+
+- 当前代码/F10 继续作为功能与架构 authority；图片仅作为视觉 authority。
+- Project、Flow、GlobalVariables 与正式 assets 继续进入既有 Application Service / `ProjectSaveCoordinator`；未新增 transport、HostBridge、EventBus、Canvas/ImageCanvas 或保存链。
+- Preview、Formal Run、Continuous Inspection、历史 Results 与 Station 上报已分别建账；AI Handoff 仍为 `projectSaved=false` 的 staged draft。
+- `ODD-G0-01..07` 的基线、台账、Owner 批准和单一 fixture 均已有本地证据；subgraph 为已签 `NOT_APPLICABLE`，不是隐藏缺口。
+- `option-d-g0-deterministic.v1` 将 Project/Preview/Formal Run/Results response seed 分层冻结；正式结果证据未写入 Project payload。
+- StudioUI 串行 Vitest 144 files / 946 tests PASS；Playwright 单 worker 受影响回归 6/6 PASS，包含 1920/1366 golden journey 和 20-cycle owner cleanup。
+- G0 未修改产品 UI，因此 visual candidate/diff/overlay 为 `NOT_APPLICABLE`；reference/hash/Master/canonical restore 轨为 PASS，未使用 mask。
+- 独立 fixture/contract、documentation consistency、visual/hash/canonical restore 复核均为 PASS，补充 disposition/contract 复核亦为 PASS；P0-P3 finding 为 0，最终 manifest 与定向 whitespace/status 已冻结。
+- 真实 WebView2、Windows 125%、独立 no-Node、Remote CI、现场硬件和生产签收均未被本 checkpoint 外推为 PASS。
+
+### Option D G1 review checkpoint（2026-08-24）
+
+G1 仅修改共享 Design System、内部 Design/Canvas Labs、capability-local tests 与门禁证据；没有实施 G2 页面，
+也没有改动 `_visual_master`、后端合同、权限、保存链、Runtime/Station authority 或 canonical FlowCanvas 节点语义。
+
+- Master measurement v2 对 D05/D13/D16 的 3 个冻结 SHA、17 个 geometry anchor 与 18 个 RGBA sample 全部 PASS；manifest SHA-256 为 `0815b823d2c8d8ad73024dd2ab1fc287c1ad5351a97e9cbc21f5f4ada76595f1`。
+- 1920×1080 CSS、DSF2 的 Design/Canvas light/dark 四路 reference/candidate/diff/overlay 全部 PASS，`NO_MASKS`；schema-v2 reference/candidate manifest SHA-256 分别为 `13d034c8c040682e898e7b3e0ab2ebd044d58acad543b17c59fbe7459c8f9cac` / `7e839374f6a77024207aa98022b29ef82621731088c2da3fead4fdc2601b6908`。
+- Canvas Lab 复用 `createCanonicalFlowCanvasHost`，保持一个 owner/订阅集合；20 次 mount/unmount 与失败路径清理归零，并断言 connection identity 与 facade listener cleanup。
+- 最终本地验证：G1 hard gate 17/17、StudioUI Vitest 144 files / 953 tests、lint、typecheck、production build、bundle gate 均 PASS。
+- Web Interface Guidelines 来源为 `vercel-labs/web-interface-guidelines/command.md` commit `e3d624baaf29dc1fc645aff3e38f03e564d2d6b1`（2026-08-24 获取）；G1 范围无未处置阻断。
+- 真实 WebView2、Windows 125%、独立 no-Node、Remote CI、现场硬件与生产签收仍分别为 `NOT_PERFORMED` / `NOT_RUN`；不由 Chromium 或本地 build 替代。
+- 独立 code/Owner、visual/gate、documentation/status 终审均已闭合；终审发现的 schema-v1 reference manifest 与 G0-era stale wording 已修复并由全新审查者复核为无适用 P0-P3 finding。最终 whitespace/status 证据通过，G1 为 `PASS`，G2 为 `READY`，未开始 G2 实施。
+
+### Option D G2 review checkpoint（2026-08-24）
+
+G2 仅收口 Product Shell、Auth、共享产品状态和 route admission；没有实施 G3 capability 页面，没有修改后端合同、保存链、Runtime/Station authority 或 canonical FlowCanvas production 内核。
+
+- D01/D24 的 Master measurement v2 对 2 个冻结 SHA、12 个 geometry anchor 和 8 个 RGBA sample 全部 PASS；manifest SHA-256 为 `1b2f386d08b0e22641e05653289638ca03a2852cc9b235f36b1a0c009f71fc15`。
+- `1920x1080`、`1536x864`、`1366x768` 三个 CSS viewport 均以 DSF2 生成 reference/candidate/diff/overlay；六组 reference/candidate 二进制一致、changed pixels/ratio/max delta 均为零，`NO_MASKS`。
+- role/profile/flag admission 继续在 capability mount 前完成；公共 Auth 路由不挂载 ProductRuntime；未新增 transport、HostBridge、EventBus、ServiceRegistry、Owner 或写入 authority。
+- canonical FlowCanvas production 文件和节点/端口/连线语义未改；大流程回归只修正测试侧世界坐标变换，并在真实选中一个节点后才拖动和验证 cleanup。
+- 最终本地验证：StudioUI lint/typecheck、145 files / 959 tests、production build、bundle budget/reproducibility、UI.Tests unit 1046/1046、Agent UI contract 390/390、完整 Playwright 193 passed / 101 declared skips / 0 failed。
+- code/Owner/security 终审的一个 P3 空断言已收紧并定向 1/1 PASS；固定深色 rail 的 P2 经 D13/D16 浅色 Master 复核为不适用。fresh code re-review、visual/gate 与 documentation/status 均返回无适用 P0-P3 finding。
+- 真实 WebView2、Windows 125%、独立 no-Node、Remote CI、现场 Camera/PLC/Station/AI 与 production signoff 仍分别为 `NOT_PERFORMED` / `NOT_RUN`；G2 不授予 production acceptance 或 Legacy retirement。
+- 证据见 [OptionD_G2_EvidenceManifest](./OptionD_G2_EvidenceManifest.md)。G2 为 `PASS`；G3 Goal 随后已单独建立，并在 raw Master 像素门禁后转为 `BLOCKED_BY_CONTRACT`，不得实施 G4。
+
+### Option D G3 blocked checkpoint（2026-08-24）
+
+G3 已完成 Overview、Projects populated/empty、Operators、Diagnostics 与 About 的 capability 实现、状态语义修复、功能回归和 owner cleanup；未修改后端合同、保存链、Runtime/Station authority、canonical FlowCanvas 或 G4 Workspace cluster。
+
+- 定向 StudioUI Vitest 7 files / 51 tests、受影响 Playwright 16 passed / 44 declared skips、Project lifecycle 1/1 均 PASS。
+- StudioUI lint/typecheck/build、145 files / 963 tests，UI.Tests unit 46 files / 1046 tests，完整 Playwright 193 passed / 101 declared skips / 0 failed均 PASS。
+- 1920x1080 CSS、DSF2、light/compact 的 invocation-bound reference/candidate 各 6/6 PASS，`NO_MASKS`、零 overflow、owner cleanup PASS；这一路只证明 deterministic capture。
+- 新增 raw Master-to-candidate 全图审计后，D02/D03/D04/D15/D22/D23 changed-pixel ratio 为 `8.5124% / 16.4402% / 16.7529% / 20.0981% / 14.3678% / 36.3066%`，全部超过计划冻结的 `1%`，因此 Master pixel gate 为 `FAIL_0_OF_6`。
+- 独立 gate 复核发现 raw comparator 未锁 Master 哈希/尺寸、未强绑定 candidate manifest，以及 anchor 负值可绕过三处缺口；现已收紧为 schema v2 invocation-bound manifest、固定 3840x2160/六个 Master SHA、精确 artifact hash/path 与绝对 anchor delta。加固后 candidate 6/6 捕获 PASS，raw Master 仍为 0/6，hard gate 如实非零退出。
+- 独立 D02 视觉复核给出 P1：reference SHA 等于当前实现截图而不是 Master，原始 Master 与 candidate 明显不一致；该 finding 与机器全图审计一致。其他视觉探子超出 10 分钟后终止，不冒充 PASS。
+- G3 继承已冻结的 G2 Product Shell，但当前没有获批的 multi-authority composite reference；计划又禁止 mask Shell、删除真实功能、降低阈值或私建 fallback。需 Product/UX 与 QA/Release 选择重开 G2/G3 raw Master 对齐，或批准精确边界的 G2 Shell + G3 Master 版本化组合 reference；若 route/capability placement 改变，还需相关 capability/security owner 签字。
+- 证据、六组 raw Master diff/overlay/hash 与外部 `NOT_PERFORMED` / `NOT_RUN` 边界见 [OptionD_G3_EvidenceManifest](./OptionD_G3_EvidenceManifest.md)。G3 为 `BLOCKED_BY_CONTRACT`；G4 保持 `BLOCKED_BY_DEPENDENCY`。
+
+### Option D 当前止血决定（2026-08-25，取代后续实施状态）
+
+- 旧正式前端与当前标准 Shell 均以顶部横向导航承载全局产品入口；当前 Next 代码另存在 `workspace` / `product-rail` 模式，AI、Settings 与 Workspace 会显示左侧全局 product rail，并隐藏顶部产品主导航。
+- raw Option D whole-page Master 内部同时出现顶部全局导航与左侧全局导航，因此 24 张图片不能继续作为一组唯一像素权威。这是 Shell 与信息架构合同冲突，不只是视觉质量问题；当前未发现第二个 mounted Product Shell owner。
+- 当前冻结规则为：全局产品导航始终位于顶部；左侧只能出现页面内部的工具、分类或上下文面板，不能替代或重复全局导航。D05-D08 的算子/Inspector/Preview 与 D16-D21 的 Settings 分组属于页面内部结构，筛图时必须与左侧全局 product rail 分开判断。
+- `shellMode: 'product-rail'` 是受此前 Option D 方向影响留下的当前实现事实，不代表最终规划批准。G2 改为 `BLOCKED_BY_CONTRACT`；G3/G4 保持 `BLOCKED_BY_DEPENDENCY`；在图片筛选、页面范围和版本化视觉权威重新冻结前，禁止继续 Option D UI 实施。
+- 上述决定不改写 G0/G1/G2/G3 历史 invocation 的 PASS、FAIL、哈希、阈值和测试数量；历史 evidence manifest 只作为当时证据，不再是当前状态源。
 
 ## 架构权威
 
@@ -416,7 +520,7 @@ WebView2 前置失败如实保留：`59e3f1f8e` 的 `matrix-100-r1` 在首路以
 HostBridge、Canvas、保存链、EventBus、query owner 或 write owner。G7/G8 继续为 `PARTIAL`，因为本机
 WebView2/local no-Node PASS 不能替代真实 Windows 125% 或独立无 Node 目标机；G10 继续为 `PARTIAL`。
 
-### G3 产品体验、视觉、中文与 Vue 工程收口
+### 历史 F10 G3：产品体验、视觉、中文与 Vue 工程收口
 
 - G3 产品实现提交为 `a3c043e77ff9bcbc80fbf638f8f9f52a217fa8a8`；Station 健康态 evidence fixture
   修正提交为 `1c6e61e5a53d59ac3a7f78054af5eab3e86ec667`。后者只把健康 Station 的待回放计数归零，
@@ -430,7 +534,7 @@ WebView2/local no-Node PASS 不能替代真实 Windows 125% 或独立无 Node �
 - 架构审计未发现第二 API transport、EventBus、ServiceRegistry、Canvas kernel、HostBridge 执行通道、
   Project 保存链、query owner 或 write owner；Project/Flow/Runtime/Station/Results authority 未改变。
 
-#### G3 checkpoint 验证
+#### 历史 F10 G3 checkpoint 验证
 
 | 证据 | 状态 | 当前结果与边界 |
 | --- | --- | --- |
@@ -444,12 +548,13 @@ WebView2/local no-Node PASS 不能替代真实 Windows 125% 或独立无 Node �
 | 视觉复审 | `PASS_BROWSER_DIRECTIONAL` | 已复审 Projects、Results、Stations、Diagnostics、About、Station Admin 与 Workspace 的 light/dark、compact/comfortable、1920x1080/1536x864/1366x768 代表截图；未发现遮挡、截断、非预期滚动或卡片套卡片。 |
 | Windows DPI / native WebView2 | `NOT_PERFORMED`（G3 当时） | F02/F03 均明确记录 `BROWSER_FIXTURE`、`HARNESS_SEEDED_SESSION` 与 `windowsDpi/nativeDpi=NOT_PERFORMED`；当前 G5 已取得本机 Debug/Release 100% 自动证据，仍不把方向性 fixture 冒充 Windows 125%。 |
 
-G3 退出条件已满足并解锁 G4。浏览器 fixture 只承担方向性视觉、交互和 owner 投影证据。当前 G5 已补齐
+历史 F10 G3 退出条件已满足并解锁历史 F10 G4。该历史结论不代表 Option D G3 通过；Option D G2 当前为
+`BLOCKED_BY_CONTRACT`，Option D G3/G4 为 `BLOCKED_BY_DEPENDENCY`。浏览器 fixture 只承担方向性视觉、交互和 owner 投影证据。当前 G5 已补齐
 本机真实 WebView2 Debug/Release 100%；Windows 125%、独立 no-Node 目标机、现场硬件、Remote CI、生产 soak
 与产品 Owner 签收继续留在 G6，`PRODUCTION_ACCEPTANCE=NOT_GRANTED`、`LEGACY_RETIREMENT=NOT_APPROVED`
 保持不变。
 
-### G4 Legacy profile 隔离、rollback 与退役准备
+### 历史 F10 G4：Legacy profile 隔离、rollback 与退役准备
 
 - Host/profile 隔离实现提交为 `245e9cec9398cbcc2bc42d3d3cc79176634a76bb`；真实 WebView2 harness 的
   G3 启动字段与只读请求合同漂移分别在 `893159d88`、`1c8ad67f3` 修正。最终证据只绑定后者，
@@ -474,7 +579,7 @@ G3 退出条件已满足并解锁 G4。浏览器 fixture 只承担方向性视�
   数据/客户支持迁移方案、独立 ADR、回退窗口、备份策略和发布审批；当前
   `LEGACY_RETIREMENT=NOT_APPROVED`。
 
-#### G4 checkpoint 验证
+#### 历史 F10 G4 checkpoint 验证
 
 | 证据 | 状态 | 当前结果与边界 |
 | --- | --- | --- |
@@ -486,7 +591,7 @@ G3 退出条件已满足并解锁 G4。浏览器 fixture 只承担方向性视�
 | 失败样本 | `FAILED_THEN_FIXED_NOT_COUNTED_AS_PASS` | `g4-245e9cec9` 因 G3 新增 product/host version 后 smoke 旧字段集失败；`g4-893159d88` 因 Template/Results 正式只读请求未进入旧 allowlist 失败。两者均在首阶段停止并完成清理，最终 manifest 未复用其数据。 |
 | G6 外部环境 | `PARTIAL` | G4 当时只覆盖本机 Debug、scale 1.0 自动化；当前 G5 已补齐本机 Debug/Release scale 1.0。Windows 125%、独立 no-Node 目标机、Remote CI、现场硬件、长时间生产 soak 与产品 Owner 签收仍未执行。 |
 
-G4 退出条件已满足并解锁 G5。该结论只批准继续收集同一 clean SHA 的本地软件证据，不授予生产接受，
+历史 F10 G4 退出条件已满足并解锁历史 F10 G5。该历史结论不代表 Option D G4 已开始；该结论只批准继续收集同一 clean SHA 的本地软件证据，不授予生产接受，
 也不批准 Legacy 物理退役。
 
 ### G1 请求/写入生命周期与跨工程状态安全

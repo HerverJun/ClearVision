@@ -1,0 +1,133 @@
+{
+  "schema_version": "clearvision-controlled-picture-layer-touchup.v1",
+  "entry_id": "E_07_flow_preview_roi",
+  "source_iteration": "option_E/iterations/07_flow_preview_roi_v8.png",
+  "source_sha256": "b1bf5a56e727b0b5e5b0a139d6368f50cdf8368a3e157f5afb0e93f84fd0934b",
+  "purpose": "Preserve the accepted one-Canvas, one-Inspector and single bottom Preview/ROI/Result architecture while restoring the audited Master shell and replacing the generated operator taxonomy with only real CURRENT categories.",
+  "operations": [
+    {
+      "type": "copy_resize",
+      "box": [0, 185, 2047, 1151],
+      "source_box": [0, 151, 2047, 1151],
+      "purpose": "Move the accepted workspace below the complete Master command shell without adding or dropping any workspace panel."
+    },
+    {
+      "type": "paste_master_reference",
+      "box": [0, 0, 2047, 184],
+      "reference_path": "option_E/masters/05_flow_editor.png",
+      "reference_sha256": "c5ae4d5cb8da2069dd99aa8a49a9affb4a7071847c32224bd5b82e5d6d1f8e0f",
+      "source_box": [0, 0, 2047, 197],
+      "purpose": "Restore the same-option product, project, status and workspace command bands."
+    },
+    {
+      "type": "fill_rect",
+      "box": [0, 185, 193, 1151],
+      "fill": [24, 33, 42],
+      "purpose": "Remove the generated source/position/detection/measurement/OCR/logic/communication taxonomy that is not present in CURRENT."
+    },
+    {
+      "type": "replace_text",
+      "box": [18, 215, 175, 270],
+      "fill": [24, 33, 42],
+      "position": [58, 230],
+      "text": "搜索",
+      "font_path": "C:\\Windows\\Fonts\\msyh.ttc",
+      "font_sha256": "e4b3b9d058750fb80899c24f68e35beda606ca92694eff0e9f7f91eec7a846aa",
+      "font_size": 16,
+      "text_fill": [238, 242, 246],
+      "purpose": "Restore the real operator search entry."
+    },
+    {
+      "type": "replace_text",
+      "box": [18, 295, 175, 350],
+      "fill": [24, 33, 42],
+      "position": [58, 310],
+      "text": "最近",
+      "font_path": "C:\\Windows\\Fonts\\msyh.ttc",
+      "font_sha256": "e4b3b9d058750fb80899c24f68e35beda606ca92694eff0e9f7f91eec7a846aa",
+      "font_size": 16,
+      "text_fill": [238, 242, 246],
+      "purpose": "Restore the real recent-operator entry."
+    },
+    {
+      "type": "replace_text",
+      "box": [18, 375, 175, 430],
+      "fill": [24, 33, 42],
+      "position": [58, 390],
+      "text": "收藏",
+      "font_path": "C:\\Windows\\Fonts\\msyh.ttc",
+      "font_sha256": "e4b3b9d058750fb80899c24f68e35beda606ca92694eff0e9f7f91eec7a846aa",
+      "font_size": 16,
+      "text_fill": [238, 242, 246],
+      "purpose": "Restore the real favorite-operator entry."
+    },
+    {
+      "type": "replace_text",
+      "box": [18, 455, 175, 510],
+      "fill": [24, 33, 42],
+      "position": [58, 470],
+      "text": "采集",
+      "font_path": "C:\\Windows\\Fonts\\msyh.ttc",
+      "font_sha256": "e4b3b9d058750fb80899c24f68e35beda606ca92694eff0e9f7f91eec7a846aa",
+      "font_size": 16,
+      "text_fill": [238, 242, 246],
+      "purpose": "Restore the real acquisition category."
+    },
+    {
+      "type": "replace_text",
+      "box": [18, 535, 175, 590],
+      "fill": [24, 33, 42],
+      "position": [34, 550],
+      "text": "图像预处理",
+      "font_path": "C:\\Windows\\Fonts\\msyh.ttc",
+      "font_sha256": "e4b3b9d058750fb80899c24f68e35beda606ca92694eff0e9f7f91eec7a846aa",
+      "font_size": 16,
+      "text_fill": [238, 242, 246],
+      "purpose": "Restore the real image-preprocessing category."
+    },
+    {
+      "type": "replace_text",
+      "box": [18, 615, 175, 670],
+      "fill": [24, 33, 42],
+      "position": [34, 630],
+      "text": "分割与区域",
+      "font_path": "C:\\Windows\\Fonts\\msyh.ttc",
+      "font_sha256": "e4b3b9d058750fb80899c24f68e35beda606ca92694eff0e9f7f91eec7a846aa",
+      "font_size": 16,
+      "text_fill": [238, 242, 246],
+      "purpose": "Restore the real segmentation-and-region category."
+    },
+    {
+      "type": "replace_text",
+      "box": [18, 695, 175, 750],
+      "fill": [24, 33, 42],
+      "position": [42, 710],
+      "text": "特征提取",
+      "font_path": "C:\\Windows\\Fonts\\msyh.ttc",
+      "font_sha256": "e4b3b9d058750fb80899c24f68e35beda606ca92694eff0e9f7f91eec7a846aa",
+      "font_size": 16,
+      "text_fill": [238, 242, 246],
+      "purpose": "Restore the real feature-extraction category."
+    },
+    {
+      "type": "replace_text",
+      "box": [1625, 133, 2047, 184],
+      "fill": [250, 251, 252],
+      "position": [1647, 151],
+      "text": "ROI Rectangle",
+      "font_path": "C:\\Windows\\Fonts\\msyhbd.ttc",
+      "font_sha256": "06e1a30f687ab7d39f533447b21e84d51e0cecdaa6bfa060c87136b168811bdc",
+      "font_size": 16,
+      "text_fill": [27, 32, 38],
+      "purpose": "Replace the inherited Inspector Source dock title with the verified selected ROI node name."
+    },
+    {
+      "type": "paste_master_reference",
+      "box": [212, 185, 1476, 250],
+      "reference_path": "option_E/masters/05_flow_editor.png",
+      "reference_sha256": "c5ae4d5cb8da2069dd99aa8a49a9affb4a7071847c32224bd5b82e5d6d1f8e0f",
+      "source_box": [304, 237, 1435, 295],
+      "purpose": "Remove generated extra Canvas controls and restore only the audited E_FLOW_MASTER edit and zoom commands."
+    }
+  ]
+}

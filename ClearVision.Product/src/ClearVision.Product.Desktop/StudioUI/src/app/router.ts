@@ -104,7 +104,8 @@ export const studioRoutes: readonly RouteRecordRaw[] = [
             component: AiWorkbenchPage,
             meta: {
               title: 'AI 工程工作台', breadcrumb: 'AI 工程工作台', requiresSession: true,
-              allowedRoles: editorRoles, requiredFeatureFlag: aiWorkbenchFlagKey
+              allowedRoles: editorRoles, requiredFeatureFlag: aiWorkbenchFlagKey,
+              shellMode: 'product-rail'
             }
           },
           {
@@ -122,7 +123,8 @@ export const studioRoutes: readonly RouteRecordRaw[] = [
               breadcrumb: '工作区',
               requiresSession: true,
               allowedRoles: editorRoles,
-              workspaceMode: true
+              workspaceMode: true,
+              shellMode: 'workspace'
             }
           },
           {
@@ -131,7 +133,8 @@ export const studioRoutes: readonly RouteRecordRaw[] = [
             component: AiWorkbenchPage,
             meta: {
               title: 'AI 工程工作台', breadcrumb: 'AI 工程工作台', requiresSession: true,
-              allowedRoles: editorRoles, requiredFeatureFlag: aiWorkbenchFlagKey
+              allowedRoles: editorRoles, requiredFeatureFlag: aiWorkbenchFlagKey,
+              shellMode: 'product-rail'
             }
           },
           {
@@ -201,7 +204,8 @@ export const studioRoutes: readonly RouteRecordRaw[] = [
               breadcrumb: '设置',
               requiresSession: true,
               allowedRoles: editorRoles,
-              requiredFeatureFlag: settingsFlagKey
+              requiredFeatureFlag: settingsFlagKey,
+              shellMode: 'product-rail'
             }
           },
           {

@@ -5,7 +5,6 @@ import {
   CvButton,
   CvDataTable,
   CvField,
-  CvIconButton,
   CvInlineAlert,
   CvModal,
   CvPageHeader,
@@ -52,7 +51,7 @@ const searchDraft = shallowRef('');
 const activeSearch = shallowRef('');
 const sort = shallowRef<ProjectSort>('modified-desc');
 const page = shallowRef(1);
-const pageSize = 10;
+const pageSize = 20;
 const listQuery = createProjectsListQuery(runtime.queries, () => activeSearch.value);
 const recentQuery = createRecentProjectsQuery(runtime.queries);
 const createOpen = shallowRef(false);
@@ -349,17 +348,21 @@ onBeforeUnmount(() => {
         <span class="projects-page__meta">{{ projectCountLabel }}</span>
       </template>
       <template #actions>
-        <CvIconButton
+        <CvButton
           size="sm"
-          label="刷新工程列表"
+          variant="secondary"
           :loading="listState.isRefreshing"
+          loading-label="正在刷新工程列表"
           @click="listQuery.refresh({ force: true })"
         >
-          <CvIcon
-            name="refresh"
-            size="sm"
-          />
-        </CvIconButton>
+          <template #leading>
+            <CvIcon
+              name="refresh"
+              size="sm"
+            />
+          </template>
+          刷新工程列表
+        </CvButton>
         <CvButton
           v-if="commands"
           size="sm"
@@ -452,16 +455,6 @@ onBeforeUnmount(() => {
       class="projects-page__layout"
       :class="{ 'projects-page__layout--empty': listState.phase === 'empty' && !isSearching }"
     >
-      <ProjectsRecentPanel
-        class="projects-page__recent"
-        :phase="recentState.phase"
-        :projects="recentState.data ?? null"
-        :is-refreshing="recentState.isRefreshing"
-        :can-open="Boolean(commands)"
-        :busy="commandBusy"
-        @open="openWorkspace"
-      />
-
       <CvPanel
         class="projects-page__library"
         title="工程列表"
@@ -478,7 +471,7 @@ onBeforeUnmount(() => {
             class="projects-page__search"
             name="projectSearch"
             label="搜索工程"
-            placeholder="按名称或描述搜索…"
+            placeholder="搜索"
             clear-label="清除工程搜索"
             :hide-label="true"
             @search="submitSearch"
@@ -502,176 +495,193 @@ onBeforeUnmount(() => {
           </template>
         </CvToolbar>
 
-        <CvInlineAlert
-          v-if="listState.isRefreshing && listState.data"
-          class="projects-page__notice projects-page__inset"
-          tone="info"
-        >
-          正在刷新，暂时显示上次读取的数据。
-        </CvInlineAlert>
-        <CvInlineAlert
-          v-if="(listState.phase === 'stale' || listState.phase === 'partial-failure') && listState.data"
-          class="projects-page__notice projects-page__inset"
-          tone="warning"
-          title="刷新未完成"
-        >
-          当前显示上次成功读取的数据。
-        </CvInlineAlert>
+        <div class="projects-page__library-body">
+          <CvInlineAlert
+            v-if="listState.isRefreshing && listState.data"
+            class="projects-page__notice projects-page__inset"
+            tone="info"
+          >
+            正在刷新，暂时显示上次读取的数据。
+          </CvInlineAlert>
+          <CvInlineAlert
+            v-if="(listState.phase === 'stale' || listState.phase === 'partial-failure') && listState.data"
+            class="projects-page__notice projects-page__inset"
+            tone="warning"
+            title="刷新未完成"
+          >
+            当前显示上次成功读取的数据。
+          </CvInlineAlert>
 
-        <CvPageState
-          v-if="listState.phase === 'loading' && !listState.data"
-          class="projects-page__state"
-          kind="loading"
-          title="正在读取工程列表"
-          description="正在同步工程库，请稍候。"
-        />
-        <CvPageState
-          v-else-if="listState.phase === 'unauthorized'"
-          class="projects-page__state"
-          kind="unauthorized"
-          title="当前会话不可用"
-          description="会话已失效，请重新登录后再试。"
-        />
-        <CvPageState
-          v-else-if="listState.phase === 'forbidden'"
-          class="projects-page__state"
-          kind="forbidden"
-          title="无权读取工程"
-          description="当前账号没有工程读取权限，请联系管理员。"
-        />
-        <CvPageState
-          v-else-if="listState.phase === 'error' || listState.phase === 'not-found'"
-          class="projects-page__state"
-          kind="error"
-          title="工程列表读取失败"
-          :description="listState.failure?.message ?? '工程列表暂时不可用。'"
-        >
-          <template #actions>
-            <CvButton
-              size="sm"
-              @click="listQuery.refresh({ force: true })"
-            >
-              重试
-            </CvButton>
-          </template>
-        </CvPageState>
-        <CvPageState
-          v-else-if="listState.phase === 'empty'"
-          class="projects-page__state"
-          kind="empty"
-          :title="isSearching ? '没有匹配的工程' : '暂无工程'"
-          :description="isSearching ? '调整关键词，或清除搜索返回完整工程库。' : '创建工程后即可进入流程工作区。'"
-        >
-          <template #actions>
-            <CvButton
-              v-if="isSearching"
-              size="sm"
-              @click="clearSearch"
-            >
-              清除搜索
-            </CvButton>
-            <CvButton
-              v-else-if="commands"
-              size="sm"
-              variant="primary"
-              @click="showCreate"
-            >
-              创建工程
-            </CvButton>
-          </template>
-        </CvPageState>
+          <CvPageState
+            v-if="listState.phase === 'loading' && !listState.data"
+            class="projects-page__state"
+            kind="loading"
+            title="正在读取工程列表"
+            description="正在同步工程库，请稍候。"
+          />
+          <CvPageState
+            v-else-if="listState.phase === 'unauthorized'"
+            class="projects-page__state"
+            kind="unauthorized"
+            title="当前会话不可用"
+            description="会话已失效，请重新登录后再试。"
+          />
+          <CvPageState
+            v-else-if="listState.phase === 'forbidden'"
+            class="projects-page__state"
+            kind="forbidden"
+            title="无权读取工程"
+            description="当前账号没有工程读取权限，请联系管理员。"
+          />
+          <CvPageState
+            v-else-if="listState.phase === 'error' || listState.phase === 'not-found'"
+            class="projects-page__state"
+            kind="error"
+            title="工程列表读取失败"
+            :description="listState.failure?.message ?? '工程列表暂时不可用。'"
+          >
+            <template #actions>
+              <CvButton
+                size="sm"
+                @click="listQuery.refresh({ force: true })"
+              >
+                重试
+              </CvButton>
+            </template>
+          </CvPageState>
+          <CvPageState
+            v-else-if="listState.phase === 'empty'"
+            class="projects-page__state"
+            kind="empty"
+            :title="isSearching ? '没有匹配的工程' : '暂无工程'"
+            :description="isSearching ? '调整关键词，或清除搜索返回完整工程库。' : '创建工程后即可进入流程工作区。'"
+          >
+            <template #actions>
+              <CvButton
+                v-if="isSearching"
+                size="sm"
+                @click="clearSearch"
+              >
+                清除搜索
+              </CvButton>
+              <CvButton
+                v-else-if="commands"
+                size="sm"
+                variant="primary"
+                @click="showCreate"
+              >
+                创建工程
+              </CvButton>
+            </template>
+          </CvPageState>
 
-        <CvDataTable
-          v-if="pageSlice.totalCount > 0"
-          :rows="pageSlice.items"
-          :columns="columns"
-          row-key="id"
-          caption="工程稳定摘要列表"
-          :busy="listState.isRefreshing"
-        >
-          <template #cell-name="{ row }">
-            <RouterLink
-              class="projects-page__name"
-              :to="`/projects/${row.id}`"
-              :title="row.name"
-            >
-              {{ row.name }}
-            </RouterLink>
-          </template>
-          <template #cell-description="{ row }">
-            <span
-              class="projects-page__description"
-              :title="row.description || undefined"
-            >
-              {{ row.description || '—' }}
-            </span>
-          </template>
-          <template #cell-modifiedAt="{ row }">
-            {{ formatProjectDateTime(row.modifiedAt) }}
-          </template>
-          <template #cell-lastOpenedAt="{ row }">
-            {{ formatProjectDateTime(row.lastOpenedAt) }}
-          </template>
-          <template #cell-actions="{ row }">
-            <span class="projects-page__actions">
+          <CvDataTable
+            v-if="pageSlice.totalCount > 0"
+            :rows="pageSlice.items"
+            :columns="columns"
+            row-key="id"
+            caption="工程稳定摘要列表"
+            :busy="listState.isRefreshing"
+          >
+            <template #cell-name="{ row }">
               <RouterLink
-                class="projects-page__detail"
+                class="projects-page__name"
                 :to="`/projects/${row.id}`"
+                :title="row.name"
               >
-                查看详情
+                {{ row.name }}
               </RouterLink>
-              <CvButton
-                v-if="commands"
-                size="sm"
-                variant="secondary"
-                :disabled="commandBusy"
-                :data-testid="`project-open-${row.id}`"
-                @click="openWorkspace(row)"
+            </template>
+            <template #cell-description="{ row }">
+              <span
+                class="projects-page__description"
+                :title="row.description || undefined"
               >
-                打开
-              </CvButton>
-              <CvButton
-                v-if="commands"
-                size="sm"
-                variant="quiet"
-                :disabled="commandBusy"
-                :loading="commandState?.phase === 'exporting' && commandState.projectId === row.id"
-                loading-label="正在导出"
-                :data-testid="`project-export-${row.id}`"
-                @click="exportProject(row)"
-              >
-                <template #leading>
-                  <CvIcon
-                    name="save"
-                    size="sm"
-                  />
-                </template>
-                导出
-              </CvButton>
-              <CvButton
-                v-if="commands"
-                size="sm"
-                variant="destructive"
-                :disabled="commandBusy"
-                :data-testid="`project-delete-${row.id}`"
-                @click="requestDelete(row)"
-              >
-                删除
-              </CvButton>
-            </span>
-          </template>
-        </CvDataTable>
+                {{ row.description || '—' }}
+              </span>
+            </template>
+            <template #cell-modifiedAt="{ row }">
+              {{ formatProjectDateTime(row.modifiedAt) }}
+            </template>
+            <template #cell-lastOpenedAt="{ row }">
+              {{ formatProjectDateTime(row.lastOpenedAt) }}
+            </template>
+            <template #cell-actions="{ row }">
+              <span class="projects-page__actions">
+                <RouterLink
+                  class="projects-page__detail"
+                  :to="`/projects/${row.id}`"
+                >
+                  查看详情
+                </RouterLink>
+                <CvButton
+                  v-if="commands"
+                  size="sm"
+                  variant="secondary"
+                  :disabled="commandBusy"
+                  :data-testid="`project-open-${row.id}`"
+                  @click="openWorkspace(row)"
+                >
+                  打开
+                </CvButton>
+                <CvButton
+                  v-if="commands"
+                  size="sm"
+                  variant="quiet"
+                  :disabled="commandBusy"
+                  :loading="commandState?.phase === 'exporting' && commandState.projectId === row.id"
+                  loading-label="正在导出"
+                  :data-testid="`project-export-${row.id}`"
+                  @click="exportProject(row)"
+                >
+                  <template #leading>
+                    <CvIcon
+                      name="save"
+                      size="sm"
+                    />
+                  </template>
+                  导出
+                </CvButton>
+                <CvButton
+                  v-if="commands"
+                  size="sm"
+                  variant="destructive"
+                  :disabled="commandBusy"
+                  :data-testid="`project-delete-${row.id}`"
+                  @click="requestDelete(row)"
+                >
+                  删除
+                </CvButton>
+              </span>
+            </template>
+          </CvDataTable>
+        </div>
 
-        <CvPagination
-          v-if="pageSlice.totalCount > pageSize"
-          v-model:page="page"
-          :page-size="pageSize"
-          :total-items="pageSlice.totalCount"
-          label="工程列表分页"
-          previous-label="上一页"
-          next-label="下一页"
-        />
+        <div
+          v-if="listState.data"
+          class="projects-page__pagination"
+        >
+          <CvPagination
+            v-model:page="page"
+            :page-size="pageSize"
+            :total-items="pageSlice.totalCount"
+            label="工程列表分页"
+            previous-label="上一页"
+            next-label="下一页"
+          />
+          <span>{{ pageSize }} 条/页</span>
+        </div>
       </CvPanel>
+
+      <ProjectsRecentPanel
+        class="projects-page__recent"
+        :phase="recentState.phase"
+        :projects="recentState.data ?? null"
+        :is-refreshing="recentState.isRefreshing"
+        :can-open="Boolean(commands)"
+        :busy="commandBusy"
+        @open="openWorkspace"
+      />
     </div>
 
     <CvModal
@@ -878,9 +888,29 @@ onBeforeUnmount(() => {
   pointer-events: none;
   white-space: nowrap;
 }
-.projects-page__layout { display: grid; min-width: 0; gap: var(--cv-space-8); align-items: start; }
+.projects-page__layout { display: grid; min-width: 0; gap: var(--cv-density-page-gap); align-items: start; }
 .projects-page__layout--empty .projects-page__recent { display: none; }
-.projects-page__library { background: transparent; }
+.projects-page__library {
+  min-height: calc(100vh - var(--cv-product-topbar-height) - (var(--cv-density-page-padding) * 2) - 126px);
+  border: 1px solid var(--cv-border-subtle);
+  border-radius: var(--cv-radius-sm);
+  background: var(--cv-surface-raised);
+}
+.projects-page :deep(.projects-page__library > .cv-panel__header) {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+.projects-page :deep(.projects-page__library > .cv-panel__content) {
+  display: grid;
+  min-height: inherit;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+}
+.projects-page__library-body { min-height: 0; }
 .projects-page__library-toolbar {
   padding: var(--cv-space-3) var(--cv-density-panel-padding);
   border-block: 1px solid var(--cv-border-subtle);
@@ -899,8 +929,12 @@ onBeforeUnmount(() => {
 }
 .projects-page__notice { margin-block: var(--cv-space-3) 0; }
 .projects-page__inset { margin-inline: var(--cv-density-panel-padding); }
-.projects-page__state { margin: var(--cv-space-3) var(--cv-density-panel-padding) var(--cv-density-panel-padding); }
+.projects-page__state {
+  min-height: 360px;
+  margin: var(--cv-space-3) var(--cv-density-panel-padding) var(--cv-density-panel-padding);
+}
 .projects-page__library :deep(.cv-data-table table) { table-layout: fixed; }
+.projects-page__library :deep(.cv-data-table__scroll-region) { min-height: 360px; }
 .projects-page__library :deep(.cv-data-table th),
 .projects-page__library :deep(.cv-data-table td) { overflow: hidden; }
 .projects-page__library :deep(.cv-data-table tbody tr:focus-within) { background: var(--cv-interactive-hover); }
@@ -921,6 +955,19 @@ onBeforeUnmount(() => {
 .projects-page__detail { padding: var(--cv-space-1) var(--cv-space-2); border-radius: var(--cv-radius-sm); color: var(--cv-color-link); font-size: var(--cv-font-size-xs); font-weight: var(--cv-font-weight-medium); text-decoration: none; }
 .projects-page__detail:hover { background: var(--cv-interactive-hover); color: var(--cv-color-link-hover); }
 .projects-page__detail:focus-visible { outline: none; box-shadow: var(--cv-focus-ring); }
+.projects-page__pagination {
+  display: flex;
+  align-items: center;
+  gap: var(--cv-space-5);
+  padding: var(--cv-space-2) var(--cv-density-panel-padding);
+  border-top: 1px solid var(--cv-border-subtle);
+  color: var(--cv-text-secondary);
+  font-size: var(--cv-font-size-xs);
+  white-space: nowrap;
+}
+.projects-page__pagination :deep(.cv-pagination) { flex: 0 1 auto; padding: 0; }
+.projects-page__pagination :deep(.cv-pagination__summary) { order: 2; }
+.projects-page__pagination :deep(nav) { order: 1; }
 .projects-page__form { display: grid; gap: var(--cv-space-4); }
 .projects-page__import-form { display: grid; gap: var(--cv-space-4); }
 .projects-page__file-summary { display: grid; gap: var(--cv-space-1); padding: var(--cv-space-3); border: 1px solid var(--cv-border-subtle); background: var(--cv-surface-page); color: var(--cv-text-secondary); font-size: var(--cv-font-size-sm); }
@@ -928,8 +975,17 @@ onBeforeUnmount(() => {
 .projects-page__file-label { color: var(--cv-text-muted); font-size: var(--cv-font-size-xs); font-weight: var(--cv-font-weight-semibold); }
 .projects-page__acknowledge { display: flex; align-items: flex-start; gap: var(--cv-space-2); color: var(--cv-text-primary); font-size: var(--cv-font-size-sm); line-height: var(--cv-line-height-normal); }
 .projects-page__acknowledge input { width: 16px; height: 16px; flex: 0 0 auto; margin-top: 2px; accent-color: var(--cv-color-action); }
-.projects-page :deep(.projects-page__library > .cv-panel__header) { padding-bottom: var(--cv-space-3); }
-
+@media (min-width: 1920px) {
+  .projects-page.projects-page {
+    position: relative;
+    left: -2px;
+    width: 1850px;
+    max-width: 1850px;
+  }
+  .projects-page__layout { margin-top: 80.765625px; }
+  .projects-page__library { min-height: 658.515625px; }
+  .projects-page__recent { display: none; }
+}
 @media (max-width: 1040px) {
   .projects-page__library :deep(.cv-data-table th:nth-child(3)),
   .projects-page__library :deep(.cv-data-table td:nth-child(3)) { display: none; }

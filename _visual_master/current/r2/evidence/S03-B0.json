@@ -1,0 +1,179 @@
+{
+  "schemaVersion": "r2-final-matrix-capture.v1",
+  "scene": "S03",
+  "variant": "B0",
+  "route": "#/projects/11111111-1111-4111-8111-111111111111/workspace",
+  "state": "flow-main",
+  "role": "Engineer",
+  "flags": {
+    "Studio2.Workspace": true
+  },
+  "owner": {
+    "capability": "F03-workspace",
+    "mounted": 1,
+    "subscriptions": 0,
+    "writes": 0
+  },
+  "requests": [
+    "GET /api/auth/setup-status",
+    "GET /api/auth/me",
+    "GET /health",
+    "POST /api/projects/11111111-1111-4111-8111-111111111111/open",
+    "GET /api/projects/11111111-1111-4111-8111-111111111111",
+    "GET /api/operators/library",
+    "POST /api/inspection/decision-configuration/validate",
+    "GET /api/templates",
+    "GET /api/cameras/bindings",
+    "GET /api/inspection/realtime/11111111-1111-4111-8111-111111111111/state",
+    "POST /api/inspection/admission"
+  ],
+  "runtimeRequests": [
+    {
+      "method": "GET",
+      "path": "/api/auth/setup-status",
+      "url": "http://127.0.0.1:5421/api/auth/setup-status"
+    },
+    {
+      "method": "GET",
+      "path": "/api/auth/me",
+      "url": "http://127.0.0.1:5421/api/auth/me"
+    },
+    {
+      "method": "GET",
+      "path": "/health",
+      "url": "http://127.0.0.1:5421/health"
+    },
+    {
+      "method": "POST",
+      "path": "/api/projects/11111111-1111-4111-8111-111111111111/open",
+      "url": "http://127.0.0.1:5421/api/projects/11111111-1111-4111-8111-111111111111/open"
+    },
+    {
+      "method": "GET",
+      "path": "/api/projects/11111111-1111-4111-8111-111111111111",
+      "url": "http://127.0.0.1:5421/api/projects/11111111-1111-4111-8111-111111111111"
+    },
+    {
+      "method": "GET",
+      "path": "/api/operators/library",
+      "url": "http://127.0.0.1:5421/api/operators/library?includeCompatibility=true"
+    },
+    {
+      "method": "POST",
+      "path": "/api/inspection/decision-configuration/validate",
+      "url": "http://127.0.0.1:5421/api/inspection/decision-configuration/validate"
+    },
+    {
+      "method": "GET",
+      "path": "/api/templates",
+      "url": "http://127.0.0.1:5421/api/templates"
+    },
+    {
+      "method": "GET",
+      "path": "/api/cameras/bindings",
+      "url": "http://127.0.0.1:5421/api/cameras/bindings"
+    },
+    {
+      "method": "GET",
+      "path": "/api/inspection/realtime/11111111-1111-4111-8111-111111111111/state",
+      "url": "http://127.0.0.1:5421/api/inspection/realtime/11111111-1111-4111-8111-111111111111/state"
+    },
+    {
+      "method": "POST",
+      "path": "/api/inspection/admission",
+      "url": "http://127.0.0.1:5421/api/inspection/admission"
+    }
+  ],
+  "allowedWrites": [
+    "POST /api/projects/11111111-1111-4111-8111-111111111111/open",
+    "POST /api/inspection/decision-configuration/validate",
+    "POST /api/inspection/admission"
+  ],
+  "runtime": {
+    "consoleErrors": [],
+    "pageErrors": [],
+    "failedRequests": [],
+    "httpErrors": [],
+    "expectedHttpErrors": [],
+    "observedExpectedHttpErrors": [],
+    "unexpectedWrites": []
+  },
+  "requiredCriticalActions": [
+    "[data-testid=\"workspace-run-details\"]"
+  ],
+  "motion": {
+    "layoutShifts": [
+      {
+        "value": 0.000518584059099111,
+        "hadRecentInput": false
+      },
+      {
+        "value": 0.00020736882716049384,
+        "hadRecentInput": false
+      }
+    ],
+    "longTasks": [
+      {
+        "startTime": 75.7999999821186,
+        "duration": 73
+      },
+      {
+        "startTime": 166,
+        "duration": 60
+      }
+    ]
+  },
+  "notes": [
+    "Non-GET startup requests are existing admission and project-open authority checks; no Project save or formal execution write is issued."
+  ],
+  "dom": {
+    "url": "http://127.0.0.1:5421/studio/index.html#/projects/11111111-1111-4111-8111-111111111111/workspace",
+    "viewport": {
+      "width": 1920,
+      "height": 1080,
+      "dpr": 1
+    },
+    "theme": "light",
+    "density": "compact",
+    "reducedMotion": "false",
+    "focus": {
+      "tagName": "CANVAS",
+      "id": "flow-canvas-11111111111141118111111111111111",
+      "testId": "flow-canvas"
+    },
+    "landmarks": {
+      "main": 1,
+      "nav": 3,
+      "dialogs": 0
+    },
+    "mainBox": {
+      "x": 0,
+      "y": 46,
+      "width": 1920,
+      "height": 1034
+    },
+    "horizontalOverflow": 0,
+    "pageScroll": {
+      "x": 0,
+      "y": 0
+    },
+    "criticalActions": [
+      {
+        "selector": "[data-testid=\"workspace-run-details\"]",
+        "testId": "workspace-run-details",
+        "text": "运行详情",
+        "box": {
+          "x": 1806,
+          "y": 88.5,
+          "width": 102,
+          "height": 28
+        },
+        "truncated": false,
+        "inViewport": true,
+        "reachable": true,
+        "enabled": true,
+        "unobscured": true
+      }
+    ]
+  }
+}

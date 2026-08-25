@@ -1,0 +1,107 @@
+{
+  "schemaVersion": "r2-final-matrix-capture.v1",
+  "scene": "S10",
+  "variant": "EXCEPTION",
+  "route": "#/forbidden",
+  "state": "403",
+  "role": "Operator",
+  "flags": {
+    "Studio2.Settings": true
+  },
+  "owner": {
+    "capability": "F07-settings",
+    "mounted": 1,
+    "subscriptions": 0,
+    "writes": 0
+  },
+  "requests": [
+    "GET /api/auth/setup-status",
+    "GET /api/auth/me",
+    "GET /health"
+  ],
+  "runtimeRequests": [
+    {
+      "method": "GET",
+      "path": "/api/auth/setup-status",
+      "url": "http://127.0.0.1:5421/api/auth/setup-status"
+    },
+    {
+      "method": "GET",
+      "path": "/api/auth/me",
+      "url": "http://127.0.0.1:5421/api/auth/me"
+    },
+    {
+      "method": "GET",
+      "path": "/health",
+      "url": "http://127.0.0.1:5421/health"
+    }
+  ],
+  "allowedWrites": [],
+  "runtime": {
+    "consoleErrors": [],
+    "pageErrors": [],
+    "failedRequests": [],
+    "httpErrors": [],
+    "expectedHttpErrors": [],
+    "observedExpectedHttpErrors": [],
+    "unexpectedWrites": []
+  },
+  "requiredCriticalActions": [
+    "[data-auth-page=\"forbidden\"] a[href=\"#/projects\"]"
+  ],
+  "motion": {
+    "layoutShifts": [],
+    "longTasks": []
+  },
+  "notes": [],
+  "dom": {
+    "url": "http://127.0.0.1:5421/studio/index.html#/forbidden",
+    "viewport": {
+      "width": 1366,
+      "height": 768,
+      "dpr": 1
+    },
+    "theme": "light",
+    "density": "compact",
+    "reducedMotion": "false",
+    "focus": {
+      "tagName": "BODY",
+      "id": "",
+      "testId": null
+    },
+    "landmarks": {
+      "main": 1,
+      "nav": 0,
+      "dialogs": 0
+    },
+    "mainBox": {
+      "x": 0,
+      "y": 0,
+      "width": 1366,
+      "height": 768
+    },
+    "horizontalOverflow": 0,
+    "pageScroll": {
+      "x": 0,
+      "y": 0
+    },
+    "criticalActions": [
+      {
+        "selector": "[data-auth-page=\"forbidden\"] a[href=\"#/projects\"]",
+        "testId": null,
+        "text": "返回工程库",
+        "box": {
+          "x": 650.5,
+          "y": 515.78125,
+          "width": 65,
+          "height": 19.5
+        },
+        "truncated": false,
+        "inViewport": true,
+        "reachable": true,
+        "enabled": true,
+        "unobscured": true
+      }
+    ]
+  }
+}

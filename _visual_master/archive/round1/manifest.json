@@ -1,0 +1,37 @@
+{
+  "schema_version": "clearvision-visual-delivery.v1",
+  "title": "ClearVision UI Visual Master",
+  "created_at": "2026-08-15",
+  "source_revision": "cdd114082821bbe750fb7945a0c3a4e89002d67c",
+  "implementation_authorized": false,
+  "model_policy": {
+    "required_model": "gpt-image-2",
+    "fallback_allowed": false,
+    "preflight": "GET <OPENAI_BASE_URL>/models must contain exact id gpt-image-2"
+  },
+  "artifacts": {
+    "current_baseline": "current/baseline_manifest.json",
+    "screen_inventory": "screen_inventory.md",
+    "visual_constitution": "visual_constitution.md",
+    "image_prompts": "image_prompts.json",
+    "candidates": "candidates/",
+    "masters": "masters/",
+    "final_candidate": "final_candidate/",
+    "audit_index": "audit/audit_index.md",
+    "workflow": "workflow/visual_master.py"
+  },
+  "planned_visual_reference_count": 19,
+  "planned_anchor_count": 6,
+  "planned_local_count": 13,
+  "delivery_status": {
+    "current_baseline_screens": 48,
+    "generated_candidates": 19,
+    "master_references": 4,
+    "comparison_sheets": 19,
+    "failed_entries": 0,
+    "requested_generation_size": "2K / 16:9",
+    "actual_uniform_output_size": "1672x941",
+    "model_preflight": "PASSED: exact gpt-image-2 discovered before generation"
+  },
+  "approval_gate": "Generated and Approved-Candidate images remain unapproved until explicit product-owner review."
+}

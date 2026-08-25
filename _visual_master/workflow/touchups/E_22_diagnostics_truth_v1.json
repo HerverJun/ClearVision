@@ -1,0 +1,105 @@
+{
+  "schema_version": "clearvision-controlled-picture-layer-touchup.v1",
+  "entry_id": "E_22_diagnostics",
+  "source_iteration": "option_E/iterations/22_diagnostics_v2.png",
+  "source_sha256": "e6c02f65e08bee7ee9ecc3c4438354b050739c24ddc2c4b4894abc59da077f33",
+  "purpose": "Preserve the Option E diagnostics layout while restoring CURRENT product branding and the three verified status identities.",
+  "operations": [
+    {
+      "type": "replace_text",
+      "box": [96, 0, 355, 91],
+      "fill": [251, 251, 252],
+      "position": [103, 24],
+      "text": "ClearVision STUDIO",
+      "font_path": "C:\\Windows\\Fonts\\msyhbd.ttc",
+      "font_sha256": "06e1a30f687ab7d39f533447b21e84d51e0cecdaa6bfa060c87136b168811bdc",
+      "font_size": 24,
+      "text_fill": [28, 35, 43],
+      "purpose": "Restore the exact product brand casing."
+    },
+    {
+      "type": "replace_text",
+      "box": [145, 395, 650, 430],
+      "fill": [249, 249, 250],
+      "position": [156, 400],
+      "text": "本地服务",
+      "font_path": "C:\\Windows\\Fonts\\msyhbd.ttc",
+      "font_sha256": "06e1a30f687ab7d39f533447b21e84d51e0cecdaa6bfa060c87136b168811bdc",
+      "font_size": 18,
+      "text_fill": [28, 35, 43],
+      "purpose": "Restore the first CURRENT status identity."
+    },
+    {
+      "type": "replace_text",
+      "box": [145, 430, 650, 468],
+      "fill": [249, 249, 250],
+      "position": [156, 437],
+      "text": "工程数据与运行接口 · 本地服务在线",
+      "font_path": "C:\\Windows\\Fonts\\msyh.ttc",
+      "font_sha256": "e4b3b9d058750fb80899c24f68e35beda606ca92694eff0e9f7f91eec7a846aa",
+      "font_size": 15,
+      "text_fill": [78, 88, 98],
+      "purpose": "Keep the verified service status adjacent to its CURRENT descriptor."
+    },
+    {
+      "type": "replace_text",
+      "box": [805, 395, 1290, 430],
+      "fill": [249, 249, 250],
+      "position": [816, 400],
+      "text": "当前会话",
+      "font_path": "C:\\Windows\\Fonts\\msyhbd.ttc",
+      "font_sha256": "06e1a30f687ab7d39f533447b21e84d51e0cecdaa6bfa060c87136b168811bdc",
+      "font_size": 18,
+      "text_fill": [28, 35, 43],
+      "purpose": "Restore the second CURRENT status identity."
+    },
+    {
+      "type": "replace_text",
+      "box": [805, 430, 1290, 468],
+      "fill": [249, 249, 250],
+      "position": [816, 437],
+      "text": "现场工程师 · 会话有效",
+      "font_path": "C:\\Windows\\Fonts\\msyh.ttc",
+      "font_sha256": "e4b3b9d058750fb80899c24f68e35beda606ca92694eff0e9f7f91eec7a846aa",
+      "font_size": 15,
+      "text_fill": [78, 88, 98],
+      "purpose": "Keep the verified session status adjacent to its CURRENT role."
+    },
+    {
+      "type": "replace_text",
+      "box": [1425, 395, 1935, 430],
+      "fill": [249, 249, 250],
+      "position": [1436, 400],
+      "text": "桌面宿主",
+      "font_path": "C:\\Windows\\Fonts\\msyhbd.ttc",
+      "font_sha256": "06e1a30f687ab7d39f533447b21e84d51e0cecdaa6bfa060c87136b168811bdc",
+      "font_size": 18,
+      "text_fill": [28, 35, 43],
+      "purpose": "Restore the third CURRENT status identity."
+    },
+    {
+      "type": "replace_text",
+      "box": [1425, 430, 1935, 468],
+      "fill": [249, 249, 250],
+      "position": [1436, 437],
+      "text": "窗口与本机能力 · 浏览器测试环境",
+      "font_path": "C:\\Windows\\Fonts\\msyh.ttc",
+      "font_sha256": "e4b3b9d058750fb80899c24f68e35beda606ca92694eff0e9f7f91eec7a846aa",
+      "font_size": 15,
+      "text_fill": [78, 88, 98],
+      "purpose": "Keep the verified host projection adjacent to its CURRENT descriptor."
+    },
+    {
+      "type": "replace_text",
+      "box": [260, 858, 900, 904],
+      "fill": [249, 249, 250],
+      "position": [270, 869],
+      "text": "启动协议、接口来源和查询资源",
+      "font_path": "C:\\Windows\\Fonts\\msyh.ttc",
+      "font_sha256": "e4b3b9d058750fb80899c24f68e35beda606ca92694eff0e9f7f91eec7a846aa",
+      "font_size": 14,
+      "text_fill": [78, 88, 98],
+      "purpose": "Restore the verified technical-diagnostics scope."
+    }
+  ]
+}

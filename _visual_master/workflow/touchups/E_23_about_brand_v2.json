@@ -1,0 +1,21 @@
+{
+  "schema_version": "clearvision-controlled-picture-layer-touchup.v1",
+  "entry_id": "E_23_about",
+  "source_iteration": "option_E/iterations/23_about_v4.png",
+  "source_sha256": "afac5536d59bcb06106d3a24664aeada83c129a11d24df19e12cb4e375e48df9",
+  "purpose": "Preserve the accepted About screen and add only the verified small STUDIO suffix after the existing ClearVision wordmark.",
+  "operations": [
+    {
+      "type": "replace_text",
+      "box": [239, 18, 303, 79],
+      "fill": [254, 254, 254],
+      "position": [241, 34],
+      "text": "STUDIO",
+      "font_path": "C:\\Windows\\Fonts\\msyh.ttc",
+      "font_sha256": "e4b3b9d058750fb80899c24f68e35beda606ca92694eff0e9f7f91eec7a846aa",
+      "font_size": 17,
+      "text_fill": [73, 81, 90],
+      "purpose": "Add only the CURRENT brand suffix without covering ClearVision or the Overview navigation item."
+    }
+  ]
+}

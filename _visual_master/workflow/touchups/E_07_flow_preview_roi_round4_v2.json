@@ -1,0 +1,185 @@
+{
+  "schema_version": "clearvision-controlled-picture-layer-touchup.v1",
+  "entry_id": "E_07_flow_preview_roi",
+  "source_iteration": "option_E/iterations/07_flow_preview_roi_v15.png",
+  "source_sha256": "2d37be7cd986bc68309e65fb5326bf082ee5338c45fd6c8a8d25ab4f1c5b55d5",
+  "purpose": "Preserve the accepted current-dominant E07 composition, enforce exact geometry, restore the audited raw CURRENT bitmap and render the verified ROI overlay without duplicate bitmap text.",
+  "operations": [
+    {
+      "type": "copy_resize",
+      "source_box": [0, 188, 103, 1110],
+      "box": [0, 188, 94, 1110],
+      "purpose": "Match the E Flow Master 95px operator rail."
+    },
+    {
+      "type": "copy_resize",
+      "source_box": [104, 188, 1292, 1110],
+      "box": [95, 188, 1319, 1110],
+      "purpose": "Set FlowCanvas to 59.8 percent of the 2048px frame."
+    },
+    {
+      "type": "copy_resize",
+      "source_box": [1293, 188, 2047, 1110],
+      "box": [1320, 188, 2047, 1110],
+      "purpose": "Keep one integrated 35.5 percent Preview, ROI and Result context."
+    },
+    {
+      "type": "fill_rect",
+      "box": [1332, 302, 2032, 606],
+      "fill": [15, 21, 29],
+      "purpose": "Clear the model-redrawn preview and every generated metadata or ROI-value overlay."
+    },
+    {
+      "type": "paste_reference",
+      "reference_path": "current/assets/f03-preview-bitmap-100x100.png",
+      "reference_sha256": "743aefc2299260923475866134e9218560b182d92bfc282660f9c0e4f18ea815",
+      "source_box": [0, 0, 99, 99],
+      "box": [1574, 305, 1874, 605],
+      "purpose": "Restore the exact deterministic CURRENT preview bitmap without screenshot metadata."
+    },
+    {
+      "type": "replace_text",
+      "box": [1340, 313, 1570, 430],
+      "fill": [15, 21, 29],
+      "position": [1348, 322],
+      "text": "尺寸: 100 × 100\n缩放: 207.9%\n标注: 1\n移动鼠标查看像素坐标和值",
+      "font_path": "C:\\Windows\\Fonts\\msyh.ttc",
+      "font_sha256": "e4b3b9d058750fb80899c24f68e35beda606ca92694eff0e9f7f91eec7a846aa",
+      "font_size": 13,
+      "text_fill": [245, 247, 249],
+      "purpose": "Restore only verified preview metadata outside the bitmap."
+    },
+    {
+      "type": "fill_rect",
+      "box": [1604, 335, 1694, 337],
+      "fill": [19, 130, 219],
+      "purpose": "ROI rectangle top edge derived from X=10, Y=10, Width=30, Height=20."
+    },
+    {
+      "type": "fill_rect",
+      "box": [1604, 393, 1694, 395],
+      "fill": [19, 130, 219],
+      "purpose": "ROI rectangle bottom edge."
+    },
+    {
+      "type": "fill_rect",
+      "box": [1604, 335, 1606, 395],
+      "fill": [19, 130, 219],
+      "purpose": "ROI rectangle left edge."
+    },
+    {
+      "type": "fill_rect",
+      "box": [1692, 335, 1694, 395],
+      "fill": [19, 130, 219],
+      "purpose": "ROI rectangle right edge."
+    },
+    {
+      "type": "fill_rect",
+      "box": [1599, 330, 1609, 340],
+      "fill": [19, 130, 219],
+      "purpose": "ROI top-left handle border."
+    },
+    {
+      "type": "fill_rect",
+      "box": [1602, 333, 1606, 337],
+      "fill": [255, 255, 255],
+      "purpose": "ROI top-left handle."
+    },
+    {
+      "type": "fill_rect",
+      "box": [1690, 330, 1700, 340],
+      "fill": [19, 130, 219],
+      "purpose": "ROI top-right handle border."
+    },
+    {
+      "type": "fill_rect",
+      "box": [1693, 333, 1697, 337],
+      "fill": [255, 255, 255],
+      "purpose": "ROI top-right handle."
+    },
+    {
+      "type": "fill_rect",
+      "box": [1599, 390, 1609, 400],
+      "fill": [19, 130, 219],
+      "purpose": "ROI bottom-left handle border."
+    },
+    {
+      "type": "fill_rect",
+      "box": [1602, 393, 1606, 397],
+      "fill": [255, 255, 255],
+      "purpose": "ROI bottom-left handle."
+    },
+    {
+      "type": "fill_rect",
+      "box": [1690, 390, 1700, 400],
+      "fill": [19, 130, 219],
+      "purpose": "ROI bottom-right handle border."
+    },
+    {
+      "type": "fill_rect",
+      "box": [1693, 393, 1697, 397],
+      "fill": [255, 255, 255],
+      "purpose": "ROI bottom-right handle."
+    },
+    {
+      "type": "fill_rect",
+      "box": [1644, 330, 1654, 340],
+      "fill": [19, 130, 219],
+      "purpose": "ROI top-middle handle border."
+    },
+    {
+      "type": "fill_rect",
+      "box": [1647, 333, 1651, 337],
+      "fill": [255, 255, 255],
+      "purpose": "ROI top-middle handle."
+    },
+    {
+      "type": "fill_rect",
+      "box": [1644, 390, 1654, 400],
+      "fill": [19, 130, 219],
+      "purpose": "ROI bottom-middle handle border."
+    },
+    {
+      "type": "fill_rect",
+      "box": [1647, 393, 1651, 397],
+      "fill": [255, 255, 255],
+      "purpose": "ROI bottom-middle handle."
+    },
+    {
+      "type": "fill_rect",
+      "box": [1599, 360, 1609, 370],
+      "fill": [19, 130, 219],
+      "purpose": "ROI left-middle handle border."
+    },
+    {
+      "type": "fill_rect",
+      "box": [1602, 363, 1606, 367],
+      "fill": [255, 255, 255],
+      "purpose": "ROI left-middle handle."
+    },
+    {
+      "type": "fill_rect",
+      "box": [1690, 360, 1700, 370],
+      "fill": [19, 130, 219],
+      "purpose": "ROI right-middle handle border."
+    },
+    {
+      "type": "fill_rect",
+      "box": [1693, 363, 1697, 367],
+      "fill": [255, 255, 255],
+      "purpose": "ROI right-middle handle."
+    },
+    {
+      "type": "replace_text",
+      "box": [1332, 610, 1645, 664],
+      "fill": [255, 255, 255],
+      "position": [1342, 627],
+      "text": "Rectangle · X 10 · Y 10 · W 30 · H 20",
+      "font_path": "C:\\Windows\\Fonts\\msyh.ttc",
+      "font_sha256": "e4b3b9d058750fb80899c24f68e35beda606ca92694eff0e9f7f91eec7a846aa",
+      "font_size": 13,
+      "text_fill": [45, 57, 70],
+      "purpose": "Keep verified ROI values in the functional context instead of overlaying the bitmap."
+    }
+  ]
+}

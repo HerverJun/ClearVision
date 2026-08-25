@@ -1,0 +1,123 @@
+{
+  "schema_version": "clearvision-controlled-picture-layer-touchup.v1",
+  "entry_id": "D_05_flow_editor",
+  "source_iteration": "option_D/iterations/05_flow_editor_v6.png",
+  "source_sha256": "5c5cc3bf124ea1003cea4801afebb6a4b0fd6176fc9e5e38bbfdeb6c75011c91",
+  "purpose": "Apply only audited factual corrections: remove duplicated or unconfirmed affordances, restore CURRENT labels and status, and convert invented tabs into non-interactive continuous section headings.",
+  "operations": [
+    {
+      "type": "fill_rect",
+      "box": [300, 0, 900, 63],
+      "fill": [249, 249, 249],
+      "purpose": "Remove the duplicated top product navigation after it was remapped to the slim left rail."
+    },
+    {
+      "type": "fill_rect",
+      "box": [725, 66, 852, 143],
+      "fill": [250, 250, 251],
+      "purpose": "Remove the first duplicate Final Decision label while retaining the verified icon command."
+    },
+    {
+      "type": "replace_text",
+      "box": [165, 623, 315, 660],
+      "fill": [249, 248, 249],
+      "position": [168, 631],
+      "text": "分割与区域",
+      "font_path": "C:\\Windows\\Fonts\\msyhbd.ttc",
+      "font_sha256": "06e1a30f687ab7d39f533447b21e84d51e0cecdaa6bfa060c87136b168811bdc",
+      "font_size": 17,
+      "text_fill": [44, 53, 62],
+      "purpose": "Replace the image-model copy error with the exact CURRENT category label."
+    },
+    {
+      "type": "fill_rect",
+      "box": [1565, 748, 2047, 788],
+      "fill": [250, 250, 251],
+      "purpose": "Remove the invented segmented Preview/Result/ROI tab control."
+    },
+    {
+      "type": "replace_text",
+      "box": [1585, 752, 1675, 784],
+      "fill": [250, 250, 251],
+      "position": [1590, 757],
+      "text": "预览",
+      "font_path": "C:\\Windows\\Fonts\\msyhbd.ttc",
+      "font_sha256": "06e1a30f687ab7d39f533447b21e84d51e0cecdaa6bfa060c87136b168811bdc",
+      "font_size": 17,
+      "text_fill": [44, 53, 62],
+      "purpose": "Restore a non-interactive Preview section heading."
+    },
+    {
+      "type": "replace_text",
+      "box": [1820, 752, 1940, 784],
+      "fill": [250, 250, 251],
+      "position": [1825, 757],
+      "text": "结果摘要",
+      "font_path": "C:\\Windows\\Fonts\\msyhbd.ttc",
+      "font_sha256": "06e1a30f687ab7d39f533447b21e84d51e0cecdaa6bfa060c87136b168811bdc",
+      "font_size": 17,
+      "text_fill": [44, 53, 62],
+      "purpose": "Restore a non-interactive Result Summary section heading."
+    },
+    {
+      "type": "fill_rect",
+      "box": [1565, 787, 2047, 788],
+      "fill": [221, 225, 230],
+      "purpose": "Separate the continuous Preview and Result sections from their content."
+    },
+    {
+      "type": "fill_rect",
+      "box": [1600, 1086, 2047, 1151],
+      "fill": [252, 252, 252],
+      "purpose": "Remove the invented fully-compatible data fact from the status strip."
+    },
+    {
+      "type": "replace_text",
+      "box": [1615, 1100, 1900, 1145],
+      "fill": [252, 252, 252],
+      "position": [1620, 1110],
+      "text": "含兼容字段，保存时将原样保留",
+      "font_path": "C:\\Windows\\Fonts\\msyh.ttc",
+      "font_sha256": "e4b3b9d058750fb80899c24f68e35beda606ca92694eff0e9f7f91eec7a846aa",
+      "font_size": 15,
+      "text_fill": [155, 106, 19],
+      "purpose": "Restore the exact CURRENT compatibility warning."
+    },
+    {
+      "type": "fill_rect",
+      "box": [1910, 1100, 1911, 1140],
+      "fill": [221, 225, 230],
+      "purpose": "Separate compatibility status from the verified Technical Status entry."
+    },
+    {
+      "type": "replace_text",
+      "box": [1930, 1100, 2040, 1145],
+      "fill": [252, 252, 252],
+      "position": [1935, 1110],
+      "text": "技术状态",
+      "font_path": "C:\\Windows\\Fonts\\msyh.ttc",
+      "font_sha256": "e4b3b9d058750fb80899c24f68e35beda606ca92694eff0e9f7f91eec7a846aa",
+      "font_size": 15,
+      "text_fill": [74, 85, 97],
+      "purpose": "Restore the verified CURRENT Technical Status entry."
+    },
+    {
+      "type": "fill_rect",
+      "box": [1585, 281, 1675, 312],
+      "fill": [249, 248, 249],
+      "purpose": "Remove the invented description field label while retaining the real node description."
+    },
+    {
+      "type": "fill_rect",
+      "box": [1175, 148, 1205, 196],
+      "fill": [253, 252, 253],
+      "purpose": "Remove the invented zoom preset dropdown affordance."
+    },
+    {
+      "type": "fill_rect",
+      "box": [18, 1023, 62, 1085],
+      "fill": [25, 32, 38],
+      "purpose": "Remove the unconfirmed slim-rail collapse command."
+    }
+  ]
+}

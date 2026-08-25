@@ -1,0 +1,307 @@
+{
+  "schemaVersion": "r2-final-matrix-capture.v1",
+  "scene": "S08",
+  "variant": "EXCEPTION",
+  "route": "#/stations/station-a",
+  "state": "admin-feedback",
+  "role": "Admin",
+  "flags": {
+    "Studio2.StationsRead": true
+  },
+  "owner": {
+    "capability": "F02-stations",
+    "mounted": 1,
+    "subscriptions": 0,
+    "writes": 1
+  },
+  "requests": [
+    "GET /api/auth/setup-status",
+    "GET /api/auth/me",
+    "GET /health",
+    "GET /api/stations/station-a",
+    "GET /api/stations/station-a/logs",
+    "GET /api/stations/station-a/commands",
+    "GET /api/stations/audit",
+    "GET /api/station-packages",
+    "GET /api/stations",
+    "GET /api/stations/station-a/results",
+    "GET /api/stations/station-a/health",
+    "GET /api/stations/station-a",
+    "GET /api/stations/station-a/logs",
+    "GET /api/stations/station-a/commands",
+    "GET /api/stations/audit",
+    "GET /api/station-packages",
+    "GET /api/stations/events",
+    "GET /api/stations",
+    "GET /api/stations/station-a/results",
+    "GET /api/stations/station-a/health",
+    "GET /api/stations/station-a",
+    "GET /api/stations/station-a/logs",
+    "GET /api/stations/station-a/commands",
+    "GET /api/stations/audit",
+    "GET /api/station-packages",
+    "POST /api/stations/station-a/commands",
+    "GET /api/stations/station-a",
+    "GET /api/stations/station-a/logs",
+    "GET /api/stations/station-a/commands",
+    "GET /api/stations/audit",
+    "GET /api/station-packages"
+  ],
+  "runtimeRequests": [
+    {
+      "method": "GET",
+      "path": "/api/auth/setup-status",
+      "url": "http://127.0.0.1:5421/api/auth/setup-status"
+    },
+    {
+      "method": "GET",
+      "path": "/api/auth/me",
+      "url": "http://127.0.0.1:5421/api/auth/me"
+    },
+    {
+      "method": "GET",
+      "path": "/health",
+      "url": "http://127.0.0.1:5421/health"
+    },
+    {
+      "method": "GET",
+      "path": "/api/stations/station-a",
+      "url": "http://127.0.0.1:5421/api/stations/station-a"
+    },
+    {
+      "method": "GET",
+      "path": "/api/stations/station-a/logs",
+      "url": "http://127.0.0.1:5421/api/stations/station-a/logs?take=50"
+    },
+    {
+      "method": "GET",
+      "path": "/api/stations/station-a/commands",
+      "url": "http://127.0.0.1:5421/api/stations/station-a/commands?take=50"
+    },
+    {
+      "method": "GET",
+      "path": "/api/stations/audit",
+      "url": "http://127.0.0.1:5421/api/stations/audit?stationId=station-a&take=50"
+    },
+    {
+      "method": "GET",
+      "path": "/api/station-packages",
+      "url": "http://127.0.0.1:5421/api/station-packages"
+    },
+    {
+      "method": "GET",
+      "path": "/api/stations",
+      "url": "http://127.0.0.1:5421/api/stations"
+    },
+    {
+      "method": "GET",
+      "path": "/api/stations/station-a/results",
+      "url": "http://127.0.0.1:5421/api/stations/station-a/results?take=50"
+    },
+    {
+      "method": "GET",
+      "path": "/api/stations/station-a/health",
+      "url": "http://127.0.0.1:5421/api/stations/station-a/health?take=50"
+    },
+    {
+      "method": "GET",
+      "path": "/api/stations/station-a",
+      "url": "http://127.0.0.1:5421/api/stations/station-a"
+    },
+    {
+      "method": "GET",
+      "path": "/api/stations/station-a/logs",
+      "url": "http://127.0.0.1:5421/api/stations/station-a/logs?take=50"
+    },
+    {
+      "method": "GET",
+      "path": "/api/stations/station-a/commands",
+      "url": "http://127.0.0.1:5421/api/stations/station-a/commands?take=50"
+    },
+    {
+      "method": "GET",
+      "path": "/api/stations/audit",
+      "url": "http://127.0.0.1:5421/api/stations/audit?stationId=station-a&take=50"
+    },
+    {
+      "method": "GET",
+      "path": "/api/station-packages",
+      "url": "http://127.0.0.1:5421/api/station-packages"
+    },
+    {
+      "method": "GET",
+      "path": "/api/stations/events",
+      "url": "http://127.0.0.1:5421/api/stations/events"
+    },
+    {
+      "method": "GET",
+      "path": "/api/stations",
+      "url": "http://127.0.0.1:5421/api/stations"
+    },
+    {
+      "method": "GET",
+      "path": "/api/stations/station-a/results",
+      "url": "http://127.0.0.1:5421/api/stations/station-a/results?take=50"
+    },
+    {
+      "method": "GET",
+      "path": "/api/stations/station-a/health",
+      "url": "http://127.0.0.1:5421/api/stations/station-a/health?take=50"
+    },
+    {
+      "method": "GET",
+      "path": "/api/stations/station-a",
+      "url": "http://127.0.0.1:5421/api/stations/station-a"
+    },
+    {
+      "method": "GET",
+      "path": "/api/stations/station-a/logs",
+      "url": "http://127.0.0.1:5421/api/stations/station-a/logs?take=50"
+    },
+    {
+      "method": "GET",
+      "path": "/api/stations/station-a/commands",
+      "url": "http://127.0.0.1:5421/api/stations/station-a/commands?take=50"
+    },
+    {
+      "method": "GET",
+      "path": "/api/stations/audit",
+      "url": "http://127.0.0.1:5421/api/stations/audit?stationId=station-a&take=50"
+    },
+    {
+      "method": "GET",
+      "path": "/api/station-packages",
+      "url": "http://127.0.0.1:5421/api/station-packages"
+    },
+    {
+      "method": "POST",
+      "path": "/api/stations/station-a/commands",
+      "url": "http://127.0.0.1:5421/api/stations/station-a/commands"
+    },
+    {
+      "method": "GET",
+      "path": "/api/stations/station-a",
+      "url": "http://127.0.0.1:5421/api/stations/station-a"
+    },
+    {
+      "method": "GET",
+      "path": "/api/stations/station-a/logs",
+      "url": "http://127.0.0.1:5421/api/stations/station-a/logs?take=50"
+    },
+    {
+      "method": "GET",
+      "path": "/api/stations/station-a/commands",
+      "url": "http://127.0.0.1:5421/api/stations/station-a/commands?take=50"
+    },
+    {
+      "method": "GET",
+      "path": "/api/stations/audit",
+      "url": "http://127.0.0.1:5421/api/stations/audit?stationId=station-a&take=50"
+    },
+    {
+      "method": "GET",
+      "path": "/api/station-packages",
+      "url": "http://127.0.0.1:5421/api/station-packages"
+    }
+  ],
+  "allowedWrites": [
+    "POST /api/stations/station-a/commands"
+  ],
+  "runtime": {
+    "consoleErrors": [],
+    "pageErrors": [],
+    "failedRequests": [],
+    "httpErrors": [],
+    "expectedHttpErrors": [],
+    "observedExpectedHttpErrors": [],
+    "unexpectedWrites": []
+  },
+  "requiredCriticalActions": [
+    "[data-product-nav=\"/stations\"]"
+  ],
+  "motion": {
+    "layoutShifts": [
+      {
+        "value": 0.32723680462128063,
+        "hadRecentInput": false
+      },
+      {
+        "value": 0.0069774555241388335,
+        "hadRecentInput": false
+      },
+      {
+        "value": 0.0030464946654690677,
+        "hadRecentInput": false
+      },
+      {
+        "value": 0.025545975717898316,
+        "hadRecentInput": true
+      },
+      {
+        "value": 0.000059073829536530695,
+        "hadRecentInput": true
+      }
+    ],
+    "longTasks": [
+      {
+        "startTime": 71.59999999403954,
+        "duration": 71
+      },
+      {
+        "startTime": 184.2000000178814,
+        "duration": 58
+      }
+    ]
+  },
+  "notes": [],
+  "dom": {
+    "url": "http://127.0.0.1:5421/studio/index.html#/stations/station-a",
+    "viewport": {
+      "width": 1366,
+      "height": 768,
+      "dpr": 1
+    },
+    "theme": "light",
+    "density": "compact",
+    "reducedMotion": "false",
+    "focus": {
+      "tagName": "BODY",
+      "id": "",
+      "testId": null
+    },
+    "landmarks": {
+      "main": 1,
+      "nav": 1,
+      "dialogs": 0
+    },
+    "mainBox": {
+      "x": 0,
+      "y": -1348,
+      "width": 1366,
+      "height": 2623.53125
+    },
+    "horizontalOverflow": 0,
+    "pageScroll": {
+      "x": 0,
+      "y": 1400
+    },
+    "criticalActions": [
+      {
+        "selector": "[data-product-nav=\"/stations\"]",
+        "testId": null,
+        "text": "工作站",
+        "box": {
+          "x": 277,
+          "y": 7.5,
+          "width": 55,
+          "height": 36
+        },
+        "truncated": false,
+        "inViewport": true,
+        "reachable": true,
+        "enabled": true,
+        "unobscured": true
+      }
+    ]
+  }
+}

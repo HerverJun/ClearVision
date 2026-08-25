@@ -1,0 +1,177 @@
+{
+  "schemaVersion": "r2-final-matrix-capture.v1",
+  "scene": "S07",
+  "variant": "B2",
+  "route": "#/results?source=local&projectId=11111111-1111-4111-8111-111111111111&resultId=22222222-2222-4222-8222-222222222222&outcome=Ng",
+  "state": "data-ng-first",
+  "role": "Engineer",
+  "flags": {},
+  "owner": {
+    "capability": "F02-results",
+    "mounted": 1,
+    "subscriptions": 0,
+    "writes": 0
+  },
+  "requests": [
+    "GET /api/auth/setup-status",
+    "GET /api/auth/me",
+    "GET /health",
+    "GET /api/projects",
+    "GET /api/inspection/history/11111111-1111-4111-8111-111111111111",
+    "GET /api/inspection/statistics/11111111-1111-4111-8111-111111111111",
+    "GET /api/analysis/defect-distribution/11111111-1111-4111-8111-111111111111",
+    "GET /api/analysis/trend/11111111-1111-4111-8111-111111111111",
+    "GET /api/analysis/report/11111111-1111-4111-8111-111111111111",
+    "GET /api/inspection/history/11111111-1111-4111-8111-111111111111/22222222-2222-4222-8222-222222222222",
+    "GET /api/inspection/history/11111111-1111-4111-8111-111111111111/22222222-2222-4222-8222-222222222222/evidence/manifest",
+    "GET /api/images/66666666-6666-4666-8666-666666666666"
+  ],
+  "runtimeRequests": [
+    {
+      "method": "GET",
+      "path": "/api/auth/setup-status",
+      "url": "http://127.0.0.1:5421/api/auth/setup-status"
+    },
+    {
+      "method": "GET",
+      "path": "/api/auth/me",
+      "url": "http://127.0.0.1:5421/api/auth/me"
+    },
+    {
+      "method": "GET",
+      "path": "/health",
+      "url": "http://127.0.0.1:5421/health"
+    },
+    {
+      "method": "GET",
+      "path": "/api/projects",
+      "url": "http://127.0.0.1:5421/api/projects"
+    },
+    {
+      "method": "GET",
+      "path": "/api/inspection/history/11111111-1111-4111-8111-111111111111",
+      "url": "http://127.0.0.1:5421/api/inspection/history/11111111-1111-4111-8111-111111111111?status=Ng&pageIndex=0&pageSize=20"
+    },
+    {
+      "method": "GET",
+      "path": "/api/inspection/statistics/11111111-1111-4111-8111-111111111111",
+      "url": "http://127.0.0.1:5421/api/inspection/statistics/11111111-1111-4111-8111-111111111111?status=Ng"
+    },
+    {
+      "method": "GET",
+      "path": "/api/analysis/defect-distribution/11111111-1111-4111-8111-111111111111",
+      "url": "http://127.0.0.1:5421/api/analysis/defect-distribution/11111111-1111-4111-8111-111111111111?status=Ng"
+    },
+    {
+      "method": "GET",
+      "path": "/api/analysis/trend/11111111-1111-4111-8111-111111111111",
+      "url": "http://127.0.0.1:5421/api/analysis/trend/11111111-1111-4111-8111-111111111111?interval=Hour&startTime=2026-08-14T15%3A24%3A43.927Z&endTime=2026-08-15T15%3A24%3A43.927Z&status=Ng"
+    },
+    {
+      "method": "GET",
+      "path": "/api/analysis/report/11111111-1111-4111-8111-111111111111",
+      "url": "http://127.0.0.1:5421/api/analysis/report/11111111-1111-4111-8111-111111111111?status=Ng"
+    },
+    {
+      "method": "GET",
+      "path": "/api/inspection/history/11111111-1111-4111-8111-111111111111/22222222-2222-4222-8222-222222222222",
+      "url": "http://127.0.0.1:5421/api/inspection/history/11111111-1111-4111-8111-111111111111/22222222-2222-4222-8222-222222222222"
+    },
+    {
+      "method": "GET",
+      "path": "/api/inspection/history/11111111-1111-4111-8111-111111111111/22222222-2222-4222-8222-222222222222/evidence/manifest",
+      "url": "http://127.0.0.1:5421/api/inspection/history/11111111-1111-4111-8111-111111111111/22222222-2222-4222-8222-222222222222/evidence/manifest"
+    },
+    {
+      "method": "GET",
+      "path": "/api/images/66666666-6666-4666-8666-666666666666",
+      "url": "http://127.0.0.1:5421/api/images/66666666-6666-4666-8666-666666666666"
+    }
+  ],
+  "allowedWrites": [],
+  "runtime": {
+    "consoleErrors": [],
+    "pageErrors": [],
+    "failedRequests": [],
+    "httpErrors": [],
+    "expectedHttpErrors": [],
+    "observedExpectedHttpErrors": [],
+    "unexpectedWrites": []
+  },
+  "requiredCriticalActions": [
+    "[data-testid=\"results-refresh\"]"
+  ],
+  "motion": {
+    "layoutShifts": [
+      {
+        "value": 0.0017439870634677346,
+        "hadRecentInput": false
+      },
+      {
+        "value": 0.0011878796981279302,
+        "hadRecentInput": false
+      },
+      {
+        "value": 0.00280053327891976,
+        "hadRecentInput": false
+      }
+    ],
+    "longTasks": [
+      {
+        "startTime": 76,
+        "duration": 72
+      }
+    ]
+  },
+  "notes": [],
+  "dom": {
+    "url": "http://127.0.0.1:5421/studio/index.html#/results?source=local&projectId=11111111-1111-4111-8111-111111111111&resultId=22222222-2222-4222-8222-222222222222&outcome=Ng",
+    "viewport": {
+      "width": 1366,
+      "height": 768,
+      "dpr": 1
+    },
+    "theme": "light",
+    "density": "compact",
+    "reducedMotion": "false",
+    "focus": {
+      "tagName": "BUTTON",
+      "id": "",
+      "testId": null
+    },
+    "landmarks": {
+      "main": 1,
+      "nav": 2,
+      "dialogs": 0
+    },
+    "mainBox": {
+      "x": 0,
+      "y": 52,
+      "width": 1366,
+      "height": 1536.3125
+    },
+    "horizontalOverflow": 0,
+    "pageScroll": {
+      "x": 0,
+      "y": 0
+    },
+    "criticalActions": [
+      {
+        "selector": "[data-testid=\"results-refresh\"]",
+        "testId": "results-refresh",
+        "text": "",
+        "box": {
+          "x": 1314,
+          "y": 78.109375,
+          "width": 28,
+          "height": 28
+        },
+        "truncated": false,
+        "inViewport": true,
+        "reachable": true,
+        "enabled": true,
+        "unobscured": true
+      }
+    ]
+  }
+}

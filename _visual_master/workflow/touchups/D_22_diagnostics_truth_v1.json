@@ -1,0 +1,33 @@
+{
+  "schema_version": "clearvision-controlled-picture-layer-touchup.v1",
+  "entry_id": "D_22_diagnostics",
+  "source_iteration": "option_D/iterations/22_diagnostics_v3.png",
+  "source_sha256": "29a8cdc52c6ee31feb9617ab91c7d79126dd06370a83e29fba3773849d4b5d82",
+  "purpose": "Correct two generated copy drifts using the CURRENT diagnostics projection.",
+  "operations": [
+    {
+      "type": "replace_text",
+      "box": [190, 447, 495, 486],
+      "fill": [255, 255, 255],
+      "position": [199, 454],
+      "text": "工程数据与运行接口",
+      "font_path": "C:\\Windows\\Fonts\\msyh.ttc",
+      "font_sha256": "e4b3b9d058750fb80899c24f68e35beda606ca92694eff0e9f7f91eec7a846aa",
+      "font_size": 17,
+      "text_fill": [91, 105, 120],
+      "purpose": "Restore the verified local-service subtitle."
+    },
+    {
+      "type": "replace_text",
+      "box": [840, 447, 1048, 486],
+      "fill": [255, 255, 255],
+      "position": [848, 454],
+      "text": "现场工程师",
+      "font_path": "C:\\Windows\\Fonts\\msyh.ttc",
+      "font_sha256": "e4b3b9d058750fb80899c24f68e35beda606ca92694eff0e9f7f91eec7a846aa",
+      "font_size": 17,
+      "text_fill": [91, 105, 120],
+      "purpose": "Restore the verified current-session user label."
+    }
+  ]
+}

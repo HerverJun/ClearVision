@@ -1,0 +1,113 @@
+{
+  "schema_version": "clearvision-controlled-picture-layer-touchup.v1",
+  "entry_id": "D_07_flow_preview_roi",
+  "source_iteration": "option_D/iterations/07_flow_preview_roi_v18.png",
+  "source_sha256": "e23b0284487977f78fd8c0bef03fb2d5dd3cdf4888a8701b8d306d4c79abc9e2",
+  "purpose": "Preserve the verified Round 3 ROI and result content while enforcing the audited D07 geometry and CURRENT operator rail.",
+  "operations": [
+    {
+      "type": "copy_resize",
+      "source_box": [0, 135, 111, 1151],
+      "box": [0, 164, 67, 1125],
+      "purpose": "Reserve the 68px operator rail below the restored status band."
+    },
+    {
+      "type": "copy_resize",
+      "source_box": [112, 135, 1146, 1151],
+      "box": [68, 164, 1319, 1125],
+      "purpose": "Expand FlowCanvas to 61 percent of the full canvas."
+    },
+    {
+      "type": "copy_resize",
+      "source_box": [1147, 135, 2047, 1151],
+      "box": [1320, 164, 2047, 1125],
+      "purpose": "Keep one integrated Preview, ROI and Result workspace."
+    },
+    {
+      "type": "fill_rect",
+      "box": [0, 164, 67, 1125],
+      "fill": [29, 38, 46],
+      "purpose": "Remove every generated operator entry before restoring CURRENT entries."
+    },
+    {
+      "type": "paste_reference",
+      "reference_path": "current/r2/S05-B2.png",
+      "reference_sha256": "df7b56d9d40d0582d394dd7a9b7633f5c045becd12879e541baf96d134ef0468",
+      "source_box": [0, 121, 67, 202],
+      "box": [0, 175, 67, 256],
+      "purpose": "Restore CURRENT Search entry."
+    },
+    {
+      "type": "paste_reference",
+      "reference_path": "current/r2/S05-B2.png",
+      "reference_sha256": "df7b56d9d40d0582d394dd7a9b7633f5c045becd12879e541baf96d134ef0468",
+      "source_box": [0, 202, 67, 278],
+      "box": [0, 270, 67, 346],
+      "purpose": "Restore CURRENT Recent entry."
+    },
+    {
+      "type": "paste_reference",
+      "reference_path": "current/r2/S05-B2.png",
+      "reference_sha256": "df7b56d9d40d0582d394dd7a9b7633f5c045becd12879e541baf96d134ef0468",
+      "source_box": [0, 278, 67, 353],
+      "box": [0, 365, 67, 440],
+      "purpose": "Restore CURRENT Favorites entry."
+    },
+    {
+      "type": "paste_reference",
+      "reference_path": "current/r2/S05-B2.png",
+      "reference_sha256": "df7b56d9d40d0582d394dd7a9b7633f5c045becd12879e541baf96d134ef0468",
+      "source_box": [0, 353, 67, 428],
+      "box": [0, 460, 67, 535],
+      "purpose": "Restore CURRENT Acquisition entry."
+    },
+    {
+      "type": "paste_reference",
+      "reference_path": "current/r2/S05-B2.png",
+      "reference_sha256": "df7b56d9d40d0582d394dd7a9b7633f5c045becd12879e541baf96d134ef0468",
+      "source_box": [0, 428, 67, 503],
+      "box": [0, 555, 67, 630],
+      "purpose": "Restore CURRENT Image Preprocessing entry."
+    },
+    {
+      "type": "paste_reference",
+      "reference_path": "current/r2/S05-B2.png",
+      "reference_sha256": "df7b56d9d40d0582d394dd7a9b7633f5c045becd12879e541baf96d134ef0468",
+      "source_box": [0, 503, 67, 578],
+      "box": [0, 650, 67, 725],
+      "purpose": "Restore CURRENT Segmentation and Region entry."
+    },
+    {
+      "type": "paste_reference",
+      "reference_path": "current/r2/S05-B2.png",
+      "reference_sha256": "df7b56d9d40d0582d394dd7a9b7633f5c045becd12879e541baf96d134ef0468",
+      "source_box": [0, 578, 67, 653],
+      "box": [0, 745, 67, 820],
+      "purpose": "Restore CURRENT Feature Extraction entry."
+    },
+    {
+      "type": "replace_text",
+      "box": [0, 135, 2047, 163],
+      "fill": [249, 250, 252],
+      "position": [90, 140],
+      "text": "正式运行就绪    状态已读取    运行检查通过",
+      "font_path": "C:\\Windows\\Fonts\\msyh.ttc",
+      "font_sha256": "e4b3b9d058750fb80899c24f68e35beda606ca92694eff0e9f7f91eec7a846aa",
+      "font_size": 14,
+      "text_fill": [45, 57, 70],
+      "purpose": "Restore the verified compact state strip."
+    },
+    {
+      "type": "replace_text",
+      "box": [0, 1126, 2047, 1151],
+      "fill": [249, 250, 252],
+      "position": [16, 1130],
+      "text": "工程：瓶盖检测 A    已保存    正式运行就绪    节点: 1    连接: 0    已选: 1",
+      "font_path": "C:\\Windows\\Fonts\\msyh.ttc",
+      "font_sha256": "e4b3b9d058750fb80899c24f68e35beda606ca92694eff0e9f7f91eec7a846aa",
+      "font_size": 13,
+      "text_fill": [45, 57, 70],
+      "purpose": "Restore verified bottom project and graph context."
+    }
+  ]
+}

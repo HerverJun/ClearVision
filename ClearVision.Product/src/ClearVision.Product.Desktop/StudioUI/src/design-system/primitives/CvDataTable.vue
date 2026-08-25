@@ -25,7 +25,7 @@ const props = withDefaults(defineProps<{
   caption: '数据表',
   captionVisible: false,
   busy: false,
-  loadingLabel: '正在加载数据',
+  loadingLabel: '正在加载数据…',
   emptyLabel: '暂无数据',
   missingValueLabel: '—',
   sortKey: undefined,
@@ -72,7 +72,7 @@ function ariaSort(column: CvDataTableColumn<Row>): CvSortDirection | 'none' | un
 }
 
 function requestSort(column: CvDataTableColumn<Row>): void {
-  if (!column.sortable) return;
+  if (props.busy || !column.sortable) return;
   const direction: CvSortDirection = props.sortKey === column.key && props.sortDirection === 'ascending'
     ? 'descending'
     : 'ascending';
@@ -109,6 +109,7 @@ function requestSort(column: CvDataTableColumn<Row>): void {
                 v-if="column.sortable"
                 class="cv-data-table__sort"
                 type="button"
+                :disabled="busy"
                 :aria-label="`按${column.label}排序`"
                 @click="requestSort(column)"
               >
@@ -252,6 +253,7 @@ tbody tr:hover { background: var(--cv-interactive-hover); }
 }
 
 .cv-data-table__sort:hover { background: var(--cv-interactive-hover); color: var(--cv-text-primary); }
+.cv-data-table__sort:disabled { cursor: wait; opacity: 0.58; }
 .cv-data-table__sort-icon { opacity: 0.35; transform: rotate(90deg); }
 .cv-data-table__sort-icon--active { color: var(--cv-color-action-text); opacity: 1; }
 .cv-data-table__sort-icon--descending { transform: rotate(-90deg); }

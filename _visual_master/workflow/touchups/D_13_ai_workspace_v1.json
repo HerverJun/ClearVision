@@ -1,0 +1,171 @@
+{
+  "schema_version": "clearvision-controlled-picture-layer-touchup.v1",
+  "entry_id": "D_13_ai_workspace",
+  "source_iteration": "option_D/iterations/13_ai_workspace_v3.png",
+  "source_sha256": "c7b6ee9533eb146deb194a277a0fc13a991e7185058cdb09548d9763e923a656",
+  "purpose": "Apply only audited factual corrections to the accepted D AI shell: remove duplicate or unconfirmed affordances and restore CURRENT wording without changing the three-zone layout.",
+  "operations": [
+    {
+      "type": "fill_rect",
+      "box": [426, 103, 452, 142],
+      "fill": [255, 254, 255],
+      "purpose": "Remove the invented dropdown affordance from the non-interactive 独立方案 subtitle."
+    },
+    {
+      "type": "fill_rect",
+      "box": [170, 236, 465, 302],
+      "fill": [254, 254, 254],
+      "purpose": "Clear the generated unbound-project explanation before restoring the CURRENT semantic boundary."
+    },
+    {
+      "type": "replace_text",
+      "box": [174, 241, 456, 266],
+      "fill": [254, 254, 254],
+      "position": [176, 244],
+      "text": "可先完成任务理解与方案规划，",
+      "font_path": "C:\\Windows\\Fonts\\msyh.ttc",
+      "font_sha256": "e4b3b9d058750fb80899c24f68e35beda606ca92694eff0e9f7f91eec7a846aa",
+      "font_size": 14,
+      "text_fill": [74, 85, 97],
+      "purpose": "Restore the first line of the CURRENT unbound-project explanation."
+    },
+    {
+      "type": "replace_text",
+      "box": [174, 268, 456, 295],
+      "fill": [254, 254, 254],
+      "position": [176, 270],
+      "text": "当前不会创建或写入工程。",
+      "font_path": "C:\\Windows\\Fonts\\msyh.ttc",
+      "font_sha256": "e4b3b9d058750fb80899c24f68e35beda606ca92694eff0e9f7f91eec7a846aa",
+      "font_size": 14,
+      "text_fill": [74, 85, 97],
+      "purpose": "Restore the second line of the CURRENT unbound-project explanation."
+    },
+    {
+      "type": "fill_rect",
+      "box": [535, 245, 950, 315],
+      "fill": [255, 254, 255],
+      "purpose": "Clear generated wording in the Application Preview identity block."
+    },
+    {
+      "type": "replace_text",
+      "box": [538, 252, 850, 278],
+      "fill": [255, 254, 255],
+      "position": [540, 254],
+      "text": "未保存的新工程",
+      "font_path": "C:\\Windows\\Fonts\\msyhbd.ttc",
+      "font_sha256": "06e1a30f687ab7d39f533447b21e84d51e0cecdaa6bfa060c87136b168811bdc",
+      "font_size": 17,
+      "text_fill": [44, 53, 62],
+      "purpose": "Restore the exact CURRENT application-preview identity."
+    },
+    {
+      "type": "replace_text",
+      "box": [538, 286, 850, 311],
+      "fill": [255, 254, 255],
+      "position": [540, 288],
+      "text": "尚无工程保存基线",
+      "font_path": "C:\\Windows\\Fonts\\msyh.ttc",
+      "font_sha256": "e4b3b9d058750fb80899c24f68e35beda606ca92694eff0e9f7f91eec7a846aa",
+      "font_size": 14,
+      "text_fill": [74, 85, 97],
+      "purpose": "Restore the exact CURRENT save-baseline statement."
+    },
+    {
+      "type": "fill_rect",
+      "box": [584, 344, 1432, 391],
+      "fill": [254, 246, 238],
+      "purpose": "Clear generated local-draft warning copy while preserving the verified warning container."
+    },
+    {
+      "type": "replace_text",
+      "box": [590, 347, 1080, 368],
+      "fill": [254, 246, 238],
+      "position": [592, 348],
+      "text": "交接后进入工作区本地草稿",
+      "font_path": "C:\\Windows\\Fonts\\msyhbd.ttc",
+      "font_sha256": "06e1a30f687ab7d39f533447b21e84d51e0cecdaa6bfa060c87136b168811bdc",
+      "font_size": 14,
+      "text_fill": [155, 106, 19],
+      "purpose": "Restore the exact CURRENT local-draft warning title."
+    },
+    {
+      "type": "replace_text",
+      "box": [590, 369, 1418, 389],
+      "fill": [254, 246, 238],
+      "position": [592, 370],
+      "text": "交接只会让工作区加载候选草稿，不会自动保存工程、运行流程或部署运行包。",
+      "font_path": "C:\\Windows\\Fonts\\msyh.ttc",
+      "font_sha256": "e4b3b9d058750fb80899c24f68e35beda606ca92694eff0e9f7f91eec7a846aa",
+      "font_size": 13,
+      "text_fill": [120, 83, 19],
+      "purpose": "Restore the exact CURRENT local-draft warning consequence."
+    },
+    {
+      "type": "replace_text",
+      "box": [535, 716, 720, 752],
+      "fill": [255, 254, 255],
+      "position": [540, 723],
+      "text": "算子与连接",
+      "font_path": "C:\\Windows\\Fonts\\msyhbd.ttc",
+      "font_sha256": "06e1a30f687ab7d39f533447b21e84d51e0cecdaa6bfa060c87136b168811bdc",
+      "font_size": 16,
+      "text_fill": [74, 85, 97],
+      "purpose": "Replace the generated 算子增量 label with the CURRENT semantic label."
+    },
+    {
+      "type": "replace_text",
+      "box": [920, 716, 1100, 752],
+      "fill": [255, 254, 255],
+      "position": [925, 723],
+      "text": "参数输入",
+      "font_path": "C:\\Windows\\Fonts\\msyhbd.ttc",
+      "font_sha256": "06e1a30f687ab7d39f533447b21e84d51e0cecdaa6bfa060c87136b168811bdc",
+      "font_size": 16,
+      "text_fill": [74, 85, 97],
+      "purpose": "Replace the generated 参数确认 label with the CURRENT semantic label."
+    },
+    {
+      "type": "replace_text",
+      "box": [920, 758, 1180, 793],
+      "fill": [255, 254, 255],
+      "position": [925, 765],
+      "text": "阈值分割 · 分割阈值：128",
+      "font_path": "C:\\Windows\\Fonts\\msyh.ttc",
+      "font_sha256": "e4b3b9d058750fb80899c24f68e35beda606ca92694eff0e9f7f91eec7a846aa",
+      "font_size": 14,
+      "text_fill": [74, 85, 97],
+      "purpose": "Restore the CURRENT parameter fact and threshold value."
+    },
+    {
+      "type": "replace_text",
+      "box": [1180, 758, 1505, 793],
+      "fill": [255, 254, 255],
+      "position": [1185, 765],
+      "text": "候选不包含已确认的资源绑定。",
+      "font_path": "C:\\Windows\\Fonts\\msyh.ttc",
+      "font_sha256": "e4b3b9d058750fb80899c24f68e35beda606ca92694eff0e9f7f91eec7a846aa",
+      "font_size": 14,
+      "text_fill": [74, 85, 97],
+      "purpose": "Restore the exact CURRENT resource-binding statement."
+    },
+    {
+      "type": "replace_text",
+      "box": [1612, 484, 1760, 523],
+      "fill": [255, 254, 254],
+      "position": [1620, 491],
+      "text": "清单预检",
+      "font_path": "C:\\Windows\\Fonts\\msyhbd.ttc",
+      "font_sha256": "06e1a30f687ab7d39f533447b21e84d51e0cecdaa6bfa060c87136b168811bdc",
+      "font_size": 17,
+      "text_fill": [44, 53, 62],
+      "purpose": "Replace the generated 清单归档 error with the exact CURRENT validation label."
+    },
+    {
+      "type": "fill_rect",
+      "box": [145, 940, 466, 1011],
+      "fill": [254, 254, 254],
+      "purpose": "Remove the duplicated local-draft warning from the left context column; the verified warning remains in Application Preview."
+    }
+  ]
+}

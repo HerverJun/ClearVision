@@ -1,0 +1,146 @@
+{
+  "schema_version": "clearvision-option-d-canonical-node-restoration-audit.v1",
+  "audit_date": "2026-08-22",
+  "scope": "Restore only the canvas operator-node styling in Option D D05, D06, and D07 to the existing canonical FlowCanvas treatment.",
+  "user_invariants": [
+    "Keep the canvas operator style unchanged from the established CURRENT/canonical FlowCanvas baseline.",
+    "Do not repeatedly redraw or alter unrelated page regions.",
+    "Do not change any of the other 21 Option D screen PNGs."
+  ],
+  "execution": {
+    "route": "controlled deterministic Picture Layer touchup",
+    "model_call_this_round": false,
+    "external_upload_this_round": false,
+    "preserved_generation_model": "gpt-image-2",
+    "preserved_generation_quality": "high",
+    "output_contract": "PNG 3840x2160 (4K)",
+    "reason": "The requested correction is a bounded restoration of existing code-authoritative FlowCanvas geometry. A deterministic layer avoids model-driven drift outside the operator nodes."
+  },
+  "targets": [
+    {
+      "id": "D_05_flow_editor",
+      "output": "option_D/screens/05_flow_editor.png",
+      "before_sha256": "2439efc51799d8ff40fc9ca242a401396b05fb9e873a5737082d356f0ef40bd1",
+      "after_sha256": "247efff95e87fdd626f36dfae2dced6d94465d0c697408dca62e69d6ccacedc3",
+      "dimensions": {
+        "width": 3840,
+        "height": 2160
+      },
+      "actual_difference_box_exclusive": [
+        960,
+        720,
+        2441,
+        971
+      ],
+      "allowed_difference_box_exclusive": [
+        960,
+        720,
+        2441,
+        971
+      ],
+      "changed_pixels": 338866,
+      "changed_pixels_outside_allowed_box": 0,
+      "result": "PASS"
+    },
+    {
+      "id": "D_06_flow_validation_error",
+      "output": "option_D/screens/06_flow_validation_error.png",
+      "before_sha256": "3d7bf697b6b4903585673d1c5971da190e874f37c23f181f9843a6cd386d8438",
+      "after_sha256": "779422ebda60af052314108ccad147de36b621eecf4924dc9046e40e6c3c0d16",
+      "dimensions": {
+        "width": 3840,
+        "height": 2160
+      },
+      "actual_difference_box_exclusive": [
+        960,
+        720,
+        2441,
+        971
+      ],
+      "allowed_difference_box_exclusive": [
+        960,
+        720,
+        2441,
+        971
+      ],
+      "changed_pixels": 338866,
+      "changed_pixels_outside_allowed_box": 0,
+      "result": "PASS"
+    },
+    {
+      "id": "D_07_flow_preview_roi",
+      "output": "option_D/screens/07_flow_preview_roi.png",
+      "before_sha256": "18e7fe7e9bfa0fa2949f3a0ce0ee36b38e66f8606c0240ceaadba000a8c510db",
+      "after_sha256": "51e856548b1b4cc67d2737f287ca9a0de8056a6e8c5fc77a3a5f785028dd5957",
+      "dimensions": {
+        "width": 3840,
+        "height": 2160
+      },
+      "actual_difference_box_exclusive": [
+        1067,
+        660,
+        1553,
+        858
+      ],
+      "allowed_difference_box_exclusive": [
+        1048,
+        639,
+        1560,
+        872
+      ],
+      "changed_pixels": 75640,
+      "changed_pixels_outside_allowed_box": 0,
+      "result": "PASS"
+    }
+  ],
+  "baseline_reconstruction": {
+    "method": "Deterministically rebuild the immediately preceding outputs from their frozen controlled-touchup specs, then compare RGB pixels against the new outputs.",
+    "previous_d05_master_sha256_verified": "2439efc51799d8ff40fc9ca242a401396b05fb9e873a5737082d356f0ef40bd1",
+    "result": "PASS"
+  },
+  "non_target_outputs": {
+    "count": 21,
+    "pre_touchup_snapshot_comparison": "21/21 byte-identical",
+    "manifest_hash_comparison": "21/21 match",
+    "result": "PASS"
+  },
+  "master_and_dependency_evidence": {
+    "promoted_master": "D_05_flow_editor",
+    "d05_master_sha256": "247efff95e87fdd626f36dfae2dced6d94465d0c697408dca62e69d6ccacedc3",
+    "metadata_only_reference_rebind_ids": [
+      "D_06_flow_validation_error",
+      "D_07_flow_preview_roi",
+      "D_08_run_ng_modal",
+      "D_09_results_investigation",
+      "D_10_stations_list",
+      "D_11_station_detail",
+      "D_12_inspection",
+      "D_13_ai_workspace",
+      "D_16_system_settings"
+    ],
+    "candidate_pixels_changed_by_rebind": false,
+    "option_d_master_count": 3,
+    "result": "PASS"
+  },
+  "validation": {
+    "option_d_status": {
+      "Approved-Candidate": 3,
+      "Generated": 21,
+      "Failed": 0,
+      "Needs-Manual": 0,
+      "Pending": 0
+    },
+    "option_d_strict_output_count": 24,
+    "option_d_strict_master_count": 3,
+    "option_d_strict_errors": [],
+    "contract_mutation_probes": "10/10 PASS",
+    "evidence_security_mutation_probes": "55/55 PASS",
+    "pixel_boundary_result": "PASS"
+  },
+  "review_artifacts": {
+    "D_05_flow_editor": "option_D/comparison/05_flow_editor.png",
+    "D_06_flow_validation_error": "option_D/comparison/06_flow_validation_error.png",
+    "D_07_flow_preview_roi": "option_D/comparison/07_flow_preview_roi.png",
+    "option_d_contact_sheet": "option_D/comparison/contact_sheet.png"
+  }
+}

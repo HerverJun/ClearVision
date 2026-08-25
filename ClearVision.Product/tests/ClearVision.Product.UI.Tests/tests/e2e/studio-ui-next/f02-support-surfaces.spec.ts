@@ -108,6 +108,9 @@ test('Diagnostics makes a degraded local service actionable without opening prot
   const diagnostics = page.locator('[data-studio-page="diagnostics"]');
   await expect(diagnostics.getByText('本地服务需要处理', { exact: true })).toBeVisible();
   await expect(diagnostics.getByText('本地服务状态：Degraded', { exact: true })).toBeVisible();
+  const serviceStatus = diagnostics.locator('.diagnostics-page__status-list > div').filter({ hasText: '本地服务' });
+  await expect(serviceStatus).toHaveCount(1);
+  await expect(serviceStatus.locator('.diagnostics-page__status-icon')).toHaveAttribute('data-tone', 'error');
   await expect(diagnostics.locator('details')).not.toHaveAttribute('open', '');
   expect(expectGetOnly(audit)).toBe(true);
 });

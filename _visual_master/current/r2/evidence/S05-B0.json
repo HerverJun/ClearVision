@@ -1,0 +1,829 @@
+{
+  "schemaVersion": "r2-final-matrix-capture.v1",
+  "scene": "S05",
+  "variant": "B0",
+  "route": "#/projects/11111111-1111-4111-8111-111111111111/workspace",
+  "state": "preview-ready",
+  "role": "Engineer",
+  "flags": {
+    "Studio2.Workspace": true
+  },
+  "owner": {
+    "capability": "F03-preview-roi",
+    "mounted": 1,
+    "subscriptions": 0,
+    "writes": 0
+  },
+  "requests": [
+    "GET /api/auth/setup-status",
+    "GET /api/auth/me",
+    "GET /health",
+    "POST /api/projects/11111111-1111-4111-8111-111111111111/open",
+    "GET /api/projects/11111111-1111-4111-8111-111111111111",
+    "GET /api/operators/library",
+    "POST /api/inspection/decision-configuration/validate",
+    "GET /api/templates",
+    "GET /api/cameras/bindings",
+    "GET /api/inspection/realtime/11111111-1111-4111-8111-111111111111/state",
+    "POST /api/inspection/admission",
+    "POST /api/flows/preview-node",
+    "GET /api/preview-artifacts/2dpcOke-P7umDBv1G3-62ojAqwUkIjX6BGhl-JfDuCA"
+  ],
+  "runtimeRequests": [
+    {
+      "method": "GET",
+      "path": "/api/auth/setup-status",
+      "url": "http://127.0.0.1:5421/api/auth/setup-status"
+    },
+    {
+      "method": "GET",
+      "path": "/api/auth/me",
+      "url": "http://127.0.0.1:5421/api/auth/me"
+    },
+    {
+      "method": "GET",
+      "path": "/health",
+      "url": "http://127.0.0.1:5421/health"
+    },
+    {
+      "method": "POST",
+      "path": "/api/projects/11111111-1111-4111-8111-111111111111/open",
+      "url": "http://127.0.0.1:5421/api/projects/11111111-1111-4111-8111-111111111111/open"
+    },
+    {
+      "method": "GET",
+      "path": "/api/projects/11111111-1111-4111-8111-111111111111",
+      "url": "http://127.0.0.1:5421/api/projects/11111111-1111-4111-8111-111111111111"
+    },
+    {
+      "method": "GET",
+      "path": "/api/operators/library",
+      "url": "http://127.0.0.1:5421/api/operators/library?includeCompatibility=true"
+    },
+    {
+      "method": "POST",
+      "path": "/api/inspection/decision-configuration/validate",
+      "url": "http://127.0.0.1:5421/api/inspection/decision-configuration/validate"
+    },
+    {
+      "method": "GET",
+      "path": "/api/templates",
+      "url": "http://127.0.0.1:5421/api/templates"
+    },
+    {
+      "method": "GET",
+      "path": "/api/cameras/bindings",
+      "url": "http://127.0.0.1:5421/api/cameras/bindings"
+    },
+    {
+      "method": "GET",
+      "path": "/api/inspection/realtime/11111111-1111-4111-8111-111111111111/state",
+      "url": "http://127.0.0.1:5421/api/inspection/realtime/11111111-1111-4111-8111-111111111111/state"
+    },
+    {
+      "method": "POST",
+      "path": "/api/inspection/admission",
+      "url": "http://127.0.0.1:5421/api/inspection/admission"
+    },
+    {
+      "method": "POST",
+      "path": "/api/flows/preview-node",
+      "url": "http://127.0.0.1:5421/api/flows/preview-node"
+    },
+    {
+      "method": "GET",
+      "path": "/api/preview-artifacts/2dpcOke-P7umDBv1G3-62ojAqwUkIjX6BGhl-JfDuCA",
+      "url": "http://127.0.0.1:5421/api/preview-artifacts/2dpcOke-P7umDBv1G3-62ojAqwUkIjX6BGhl-JfDuCA"
+    }
+  ],
+  "allowedWrites": [
+    "POST /api/projects/11111111-1111-4111-8111-111111111111/open",
+    "POST /api/inspection/decision-configuration/validate",
+    "POST /api/inspection/admission",
+    "POST /api/flows/preview-node"
+  ],
+  "runtime": {
+    "consoleErrors": [],
+    "pageErrors": [],
+    "failedRequests": [],
+    "httpErrors": [],
+    "expectedHttpErrors": [],
+    "observedExpectedHttpErrors": [],
+    "unexpectedWrites": []
+  },
+  "requiredCriticalActions": [
+    "[data-testid=\"preview-run\"]"
+  ],
+  "motion": {
+    "layoutShifts": [
+      {
+        "value": 0.00004652235243055555,
+        "hadRecentInput": false
+      },
+      {
+        "value": 0.0004222370979717239,
+        "hadRecentInput": false
+      },
+      {
+        "value": 0.00018393132716049382,
+        "hadRecentInput": false
+      },
+      {
+        "value": 0.00023174672067901233,
+        "hadRecentInput": true
+      },
+      {
+        "value": 0.025506041726948304,
+        "hadRecentInput": false
+      }
+    ],
+    "longTasks": [
+      {
+        "startTime": 72.59999999403954,
+        "duration": 72
+      },
+      {
+        "startTime": 159.59999999403954,
+        "duration": 58
+      }
+    ]
+  },
+  "notes": [
+    "Preview and artifact requests use the existing F03 debug lifecycle; ROI edits remain an unsaved local draft."
+  ],
+  "bitmapEvidence": {
+    "source": {
+      "path": "source-final.png",
+      "sha256": "743aefc2299260923475866134e9218560b182d92bfc282660f9c0e4f18ea815",
+      "byteLength": 2384,
+      "contentType": "image/png",
+      "status": 200,
+      "response": {
+        "source": "PLAYWRIGHT_ROUTE_FULFILL_RESPONSE_SNAPSHOT",
+        "method": "GET",
+        "path": "/api/preview-artifacts/2dpcOke-P7umDBv1G3-62ojAqwUkIjX6BGhl-JfDuCA",
+        "url": "http://127.0.0.1:5421/api/preview-artifacts/2dpcOke-P7umDBv1G3-62ojAqwUkIjX6BGhl-JfDuCA",
+        "status": 200,
+        "contentType": "image/png",
+        "sha256": "743aefc2299260923475866134e9218560b182d92bfc282660f9c0e4f18ea815",
+        "byteLength": 2384
+      }
+    },
+    "beforeAction": {
+      "contract": {
+        "schemaVersion": "f03-preview-bitmap.v1",
+        "contentType": "image/png",
+        "sha256": "743aefc2299260923475866134e9218560b182d92bfc282660f9c0e4f18ea815",
+        "byteLength": 2384,
+        "width": 100,
+        "height": 100,
+        "channels": 4,
+        "samples": [
+          {
+            "x": 5,
+            "y": 85,
+            "rgba": [
+              24,
+              31,
+              38,
+              255
+            ]
+          },
+          {
+            "x": 95,
+            "y": 85,
+            "rgba": [
+              24,
+              31,
+              38,
+              255
+            ]
+          },
+          {
+            "x": 5,
+            "y": 60,
+            "rgba": [
+              47,
+              55,
+              62,
+              255
+            ]
+          },
+          {
+            "x": 95,
+            "y": 60,
+            "rgba": [
+              47,
+              55,
+              62,
+              255
+            ]
+          },
+          {
+            "x": 58,
+            "y": 57,
+            "rgba": [
+              204,
+              208,
+              208,
+              255
+            ]
+          },
+          {
+            "x": 45,
+            "y": 57,
+            "rgba": [
+              165,
+              171,
+              174,
+              255
+            ]
+          },
+          {
+            "x": 70,
+            "y": 57,
+            "rgba": [
+              168,
+              174,
+              177,
+              255
+            ]
+          },
+          {
+            "x": 70,
+            "y": 70,
+            "rgba": [
+              70,
+              79,
+              86,
+              255
+            ]
+          },
+          {
+            "x": 58,
+            "y": 82,
+            "rgba": [
+              158,
+              165,
+              170,
+              255
+            ]
+          }
+        ]
+      },
+      "canvas": {
+        "readable": true,
+        "error": null,
+        "backing": {
+          "width": 339,
+          "height": 387
+        },
+        "css": {
+          "x": 1581,
+          "y": 198,
+          "width": 339,
+          "height": 387
+        },
+        "inViewport": true,
+        "byteLength": 524772,
+        "nonTransparentPixels": 131193,
+        "uniqueColorCount": 257,
+        "sha256": "c508eb5e912401bf5e0d37ce56e56d45e5719784a8d1550b54d4b42dbdd84f98",
+        "sourceSamples": [
+          {
+            "x": 5,
+            "y": 85,
+            "expected": [
+              24,
+              31,
+              38,
+              255
+            ],
+            "observed": [
+              24,
+              31,
+              38,
+              255
+            ],
+            "backingX": 32,
+            "backingY": 300,
+            "maxChannelDelta": 0
+          },
+          {
+            "x": 95,
+            "y": 85,
+            "expected": [
+              24,
+              31,
+              38,
+              255
+            ],
+            "observed": [
+              24,
+              31,
+              38,
+              255
+            ],
+            "backingX": 306,
+            "backingY": 300,
+            "maxChannelDelta": 0
+          },
+          {
+            "x": 5,
+            "y": 60,
+            "expected": [
+              47,
+              55,
+              62,
+              255
+            ],
+            "observed": [
+              47,
+              55,
+              62,
+              255
+            ],
+            "backingX": 32,
+            "backingY": 224,
+            "maxChannelDelta": 0
+          },
+          {
+            "x": 95,
+            "y": 60,
+            "expected": [
+              47,
+              55,
+              62,
+              255
+            ],
+            "observed": [
+              47,
+              55,
+              62,
+              255
+            ],
+            "backingX": 306,
+            "backingY": 224,
+            "maxChannelDelta": 0
+          },
+          {
+            "x": 58,
+            "y": 57,
+            "expected": [
+              204,
+              208,
+              208,
+              255
+            ],
+            "observed": [
+              204,
+              208,
+              208,
+              255
+            ],
+            "backingX": 195,
+            "backingY": 216,
+            "maxChannelDelta": 0
+          },
+          {
+            "x": 45,
+            "y": 57,
+            "expected": [
+              165,
+              171,
+              174,
+              255
+            ],
+            "observed": [
+              165,
+              171,
+              174,
+              255
+            ],
+            "backingX": 156,
+            "backingY": 214,
+            "maxChannelDelta": 0
+          },
+          {
+            "x": 70,
+            "y": 57,
+            "expected": [
+              168,
+              174,
+              177,
+              255
+            ],
+            "observed": [
+              168,
+              174,
+              177,
+              255
+            ],
+            "backingX": 231,
+            "backingY": 215,
+            "maxChannelDelta": 0
+          },
+          {
+            "x": 70,
+            "y": 70,
+            "expected": [
+              70,
+              79,
+              86,
+              255
+            ],
+            "observed": [
+              70,
+              79,
+              86,
+              255
+            ],
+            "backingX": 230,
+            "backingY": 254,
+            "maxChannelDelta": 0
+          },
+          {
+            "x": 58,
+            "y": 82,
+            "expected": [
+              158,
+              165,
+              170,
+              255
+            ],
+            "observed": [
+              158,
+              165,
+              170,
+              255
+            ],
+            "backingX": 193,
+            "backingY": 292,
+            "maxChannelDelta": 0
+          }
+        ]
+      },
+      "roi": {
+        "phase": "ready",
+        "kind": "rectangle",
+        "x": 10,
+        "y": 10,
+        "width": 30,
+        "height": 20
+      }
+    },
+    "capture": {
+      "contract": {
+        "schemaVersion": "f03-preview-bitmap.v1",
+        "contentType": "image/png",
+        "sha256": "743aefc2299260923475866134e9218560b182d92bfc282660f9c0e4f18ea815",
+        "byteLength": 2384,
+        "width": 100,
+        "height": 100,
+        "channels": 4,
+        "samples": [
+          {
+            "x": 5,
+            "y": 85,
+            "rgba": [
+              24,
+              31,
+              38,
+              255
+            ]
+          },
+          {
+            "x": 95,
+            "y": 85,
+            "rgba": [
+              24,
+              31,
+              38,
+              255
+            ]
+          },
+          {
+            "x": 5,
+            "y": 60,
+            "rgba": [
+              47,
+              55,
+              62,
+              255
+            ]
+          },
+          {
+            "x": 95,
+            "y": 60,
+            "rgba": [
+              47,
+              55,
+              62,
+              255
+            ]
+          },
+          {
+            "x": 58,
+            "y": 57,
+            "rgba": [
+              204,
+              208,
+              208,
+              255
+            ]
+          },
+          {
+            "x": 45,
+            "y": 57,
+            "rgba": [
+              165,
+              171,
+              174,
+              255
+            ]
+          },
+          {
+            "x": 70,
+            "y": 57,
+            "rgba": [
+              168,
+              174,
+              177,
+              255
+            ]
+          },
+          {
+            "x": 70,
+            "y": 70,
+            "rgba": [
+              70,
+              79,
+              86,
+              255
+            ]
+          },
+          {
+            "x": 58,
+            "y": 82,
+            "rgba": [
+              158,
+              165,
+              170,
+              255
+            ]
+          }
+        ]
+      },
+      "canvas": {
+        "readable": true,
+        "error": null,
+        "backing": {
+          "width": 339,
+          "height": 387
+        },
+        "css": {
+          "x": 1581,
+          "y": 198,
+          "width": 339,
+          "height": 387
+        },
+        "inViewport": true,
+        "byteLength": 524772,
+        "nonTransparentPixels": 131193,
+        "uniqueColorCount": 257,
+        "sha256": "c508eb5e912401bf5e0d37ce56e56d45e5719784a8d1550b54d4b42dbdd84f98",
+        "sourceSamples": [
+          {
+            "x": 5,
+            "y": 85,
+            "expected": [
+              24,
+              31,
+              38,
+              255
+            ],
+            "observed": [
+              24,
+              31,
+              38,
+              255
+            ],
+            "backingX": 32,
+            "backingY": 300,
+            "maxChannelDelta": 0
+          },
+          {
+            "x": 95,
+            "y": 85,
+            "expected": [
+              24,
+              31,
+              38,
+              255
+            ],
+            "observed": [
+              24,
+              31,
+              38,
+              255
+            ],
+            "backingX": 306,
+            "backingY": 300,
+            "maxChannelDelta": 0
+          },
+          {
+            "x": 5,
+            "y": 60,
+            "expected": [
+              47,
+              55,
+              62,
+              255
+            ],
+            "observed": [
+              47,
+              55,
+              62,
+              255
+            ],
+            "backingX": 32,
+            "backingY": 224,
+            "maxChannelDelta": 0
+          },
+          {
+            "x": 95,
+            "y": 60,
+            "expected": [
+              47,
+              55,
+              62,
+              255
+            ],
+            "observed": [
+              47,
+              55,
+              62,
+              255
+            ],
+            "backingX": 306,
+            "backingY": 224,
+            "maxChannelDelta": 0
+          },
+          {
+            "x": 58,
+            "y": 57,
+            "expected": [
+              204,
+              208,
+              208,
+              255
+            ],
+            "observed": [
+              204,
+              208,
+              208,
+              255
+            ],
+            "backingX": 195,
+            "backingY": 216,
+            "maxChannelDelta": 0
+          },
+          {
+            "x": 45,
+            "y": 57,
+            "expected": [
+              165,
+              171,
+              174,
+              255
+            ],
+            "observed": [
+              165,
+              171,
+              174,
+              255
+            ],
+            "backingX": 156,
+            "backingY": 214,
+            "maxChannelDelta": 0
+          },
+          {
+            "x": 70,
+            "y": 57,
+            "expected": [
+              168,
+              174,
+              177,
+              255
+            ],
+            "observed": [
+              168,
+              174,
+              177,
+              255
+            ],
+            "backingX": 231,
+            "backingY": 215,
+            "maxChannelDelta": 0
+          },
+          {
+            "x": 70,
+            "y": 70,
+            "expected": [
+              70,
+              79,
+              86,
+              255
+            ],
+            "observed": [
+              70,
+              79,
+              86,
+              255
+            ],
+            "backingX": 230,
+            "backingY": 254,
+            "maxChannelDelta": 0
+          },
+          {
+            "x": 58,
+            "y": 82,
+            "expected": [
+              158,
+              165,
+              170,
+              255
+            ],
+            "observed": [
+              158,
+              165,
+              170,
+              255
+            ],
+            "backingX": 193,
+            "backingY": 292,
+            "maxChannelDelta": 0
+          }
+        ]
+      },
+      "roi": {
+        "phase": "ready",
+        "kind": "rectangle",
+        "x": 10,
+        "y": 10,
+        "width": 30,
+        "height": 20
+      }
+    }
+  },
+  "dom": {
+    "url": "http://127.0.0.1:5421/studio/index.html#/projects/11111111-1111-4111-8111-111111111111/workspace",
+    "viewport": {
+      "width": 1920,
+      "height": 1080,
+      "dpr": 1
+    },
+    "theme": "light",
+    "density": "compact",
+    "reducedMotion": "false",
+    "focus": {
+      "tagName": "CANVAS",
+      "id": "flow-canvas-11111111111141118111111111111111",
+      "testId": "flow-canvas"
+    },
+    "landmarks": {
+      "main": 1,
+      "nav": 3,
+      "dialogs": 0
+    },
+    "mainBox": {
+      "x": 0,
+      "y": 46,
+      "width": 1920,
+      "height": 1034
+    },
+    "horizontalOverflow": 0,
+    "pageScroll": {
+      "x": 0,
+      "y": 0
+    },
+    "criticalActions": [
+      {
+        "selector": "[data-testid=\"preview-run\"]",
+        "testId": "preview-run",
+        "text": "手动预览",
+        "box": {
+          "x": 1774,
+          "y": 128.5,
+          "width": 102,
+          "height": 28
+        },
+        "truncated": false,
+        "inViewport": true,
+        "reachable": true,
+        "enabled": true,
+        "unobscured": true
+      }
+    ]
+  }
+}

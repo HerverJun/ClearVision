@@ -1,0 +1,111 @@
+{
+  "schema_version": "clearvision-controlled-picture-layer-touchup.v1",
+  "entry_id": "D_16_system_settings",
+  "source_iteration": "option_D/iterations/16_system_settings_v3.png",
+  "source_sha256": "2dff4850856966278c5000eda4ab0f2cc18499aba2ce1f493619a381c51e5f31",
+  "purpose": "Remove the invented language control and restore CURRENT grouping and helper semantics with bounded factual corrections and locally sampled backgrounds.",
+  "operations": [
+    {
+      "type": "replace_text",
+      "box": [1248, 15, 1410, 72],
+      "fill": [254, 254, 254],
+      "position": [1258, 26],
+      "text": "外观：浅色·紧凑",
+      "font_path": "C:\\Windows\\Fonts\\msyh.ttc",
+      "font_sha256": "e4b3b9d058750fb80899c24f68e35beda606ca92694eff0e9f7f91eec7a846aa",
+      "font_size": 16,
+      "text_fill": [45, 57, 70],
+      "purpose": "Restore the exact CURRENT appearance projection."
+    },
+    {
+      "type": "fill_rect",
+      "box": [1415, 15, 1630, 72],
+      "fill": [254, 254, 254],
+      "purpose": "Remove the invented language selector without touching the top-bar divider."
+    },
+    {
+      "type": "replace_text",
+      "box": [145, 202, 400, 245],
+      "fill": [250, 250, 252],
+      "position": [150, 207],
+      "text": "可查看并管理全部分组",
+      "font_path": "C:\\Windows\\Fonts\\msyh.ttc",
+      "font_sha256": "e4b3b9d058750fb80899c24f68e35beda606ca92694eff0e9f7f91eec7a846aa",
+      "font_size": 13,
+      "text_fill": [101, 110, 120],
+      "purpose": "Restore the CURRENT Settings rail description."
+    },
+    {
+      "type": "replace_text",
+      "box": [145, 300, 345, 325],
+      "fill": [249, 250, 251],
+      "position": [150, 302],
+      "text": "基础设置",
+      "font_path": "C:\\Windows\\Fonts\\msyhbd.ttc",
+      "font_sha256": "06e1a30f687ab7d39f533447b21e84d51e0cecdaa6bfa060c87136b168811bdc",
+      "font_size": 13,
+      "text_fill": [101, 110, 120],
+      "purpose": "Restore the real basic-settings group boundary."
+    },
+    {
+      "type": "replace_text",
+      "box": [145, 570, 390, 600],
+      "fill": [249, 250, 251],
+      "position": [150, 576],
+      "text": "设备与通信",
+      "font_path": "C:\\Windows\\Fonts\\msyhbd.ttc",
+      "font_sha256": "06e1a30f687ab7d39f533447b21e84d51e0cecdaa6bfa060c87136b168811bdc",
+      "font_size": 13,
+      "text_fill": [101, 110, 120],
+      "purpose": "Restore the real device-and-communication group boundary."
+    },
+    {
+      "type": "replace_text",
+      "box": [145, 820, 390, 850],
+      "fill": [249, 250, 251],
+      "position": [150, 826],
+      "text": "系统服务",
+      "font_path": "C:\\Windows\\Fonts\\msyhbd.ttc",
+      "font_sha256": "06e1a30f687ab7d39f533447b21e84d51e0cecdaa6bfa060c87136b168811bdc",
+      "font_size": 13,
+      "text_fill": [101, 110, 120],
+      "purpose": "Restore the real system-services group boundary."
+    },
+    {
+      "type": "replace_text",
+      "box": [525, 415, 1300, 456],
+      "fill": [253, 253, 253],
+      "position": [530, 422],
+      "text": "设置软件标题和默认主题。顶栏中的个人外观偏好不会被此处覆盖。",
+      "font_path": "C:\\Windows\\Fonts\\msyh.ttc",
+      "font_sha256": "e4b3b9d058750fb80899c24f68e35beda606ca92694eff0e9f7f91eec7a846aa",
+      "font_size": 15,
+      "text_fill": [74, 85, 97],
+      "purpose": "Restore the exact CURRENT General description."
+    },
+    {
+      "type": "replace_text",
+      "box": [830, 560, 1220, 600],
+      "fill": [254, 254, 254],
+      "position": [835, 567],
+      "text": "显示在软件窗口和产品标识附近。",
+      "font_path": "C:\\Windows\\Fonts\\msyh.ttc",
+      "font_sha256": "e4b3b9d058750fb80899c24f68e35beda606ca92694eff0e9f7f91eec7a846aa",
+      "font_size": 14,
+      "text_fill": [101, 110, 120],
+      "purpose": "Restore the exact CURRENT software-title helper."
+    },
+    {
+      "type": "replace_text",
+      "box": [830, 696, 1250, 735],
+      "fill": [253, 253, 253],
+      "position": [835, 703],
+      "text": "作为未设置个人外观偏好时的默认主题。",
+      "font_path": "C:\\Windows\\Fonts\\msyh.ttc",
+      "font_sha256": "e4b3b9d058750fb80899c24f68e35beda606ca92694eff0e9f7f91eec7a846aa",
+      "font_size": 14,
+      "text_fill": [101, 110, 120],
+      "purpose": "Restore the exact CURRENT product-theme helper."
+    }
+  ]
+}

@@ -1,0 +1,2076 @@
+{
+  "schema_version": "clearvision-ui-visual-options-delivery.v3",
+  "generated_at": "2026-08-22T04:59:08.471317Z",
+  "approval_status": "awaiting-product-owner-selection",
+  "model": "gpt-image-2",
+  "configured_model_fallback_allowed": false,
+  "screen_count": 24,
+  "option_count": 2,
+  "entry_count": 48,
+  "options": [
+    "D",
+    "E"
+  ],
+  "identical_coverage": true,
+  "functional_audit": {
+    "passed": 48,
+    "total": 48
+  },
+  "preflight": {
+    "performed": true,
+    "exact_model": "gpt-image-2",
+    "model_discovered": true,
+    "model_fallback_allowed": false,
+    "approved_upload_host": "sub.oracle.19970219.xyz",
+    "approved_upload_scope": "models-and-clearvision-composite-reference-boards",
+    "transport_policy": "approved-host-only-https-no-redirects-no-proxy-fixed-generator-v2",
+    "secure_launcher_sha256": "9478da7a229f5cb2b93f5ae0d7d6aa3cdcc6f3ecd4fc7061cce7fcca43635d11",
+    "ppt_image_generator_sha256": "f7e93d02cba0019d99d2558e0b8a1c00ecd6b89e3d837c9ea8495443b4189fea",
+    "checked_at": "2026-08-21T00:53:38.235413Z",
+    "evidence_sha256": "0c928e5ef0870058cb5e0d89c5afc1903aca8eb7d819c3d29a36fad96a44207e"
+  },
+  "status_counts": {
+    "Approved-Candidate": 3,
+    "Failed": 0,
+    "Generated": 21,
+    "Needs-Manual": 24,
+    "Pending": 0
+  },
+  "masters": {
+    "D": [
+      {
+        "id": "D_05_flow_editor",
+        "role": "flow",
+        "path": "option_D/masters/05_flow_editor.png",
+        "exists": true,
+        "sha256": "247efff95e87fdd626f36dfae2dced6d94465d0c697408dca62e69d6ccacedc3",
+        "status": "Approved-Candidate",
+        "ready": true
+      },
+      {
+        "id": "D_13_ai_workspace",
+        "role": "ai",
+        "path": "option_D/masters/13_ai_workspace.png",
+        "exists": true,
+        "sha256": "0e2875749de6fc6d1971517a530f6a9daae4f935456f035482dc85bf6cf91b1d",
+        "status": "Approved-Candidate",
+        "ready": true
+      },
+      {
+        "id": "D_16_system_settings",
+        "role": "settings",
+        "path": "option_D/masters/16_system_settings.png",
+        "exists": true,
+        "sha256": "525b960075f34db309f2a4871afef54fb100474f2d6479f2447262a2ad98a35e",
+        "status": "Approved-Candidate",
+        "ready": true
+      }
+    ],
+    "E": [
+      {
+        "id": "E_05_flow_editor",
+        "role": "flow",
+        "path": "option_E/masters/05_flow_editor.png",
+        "exists": true,
+        "sha256": "c5ae4d5cb8da2069dd99aa8a49a9affb4a7071847c32224bd5b82e5d6d1f8e0f",
+        "status": "Needs-Manual",
+        "ready": false
+      },
+      {
+        "id": "E_13_ai_workspace",
+        "role": "ai",
+        "path": "option_E/masters/13_ai_workspace.png",
+        "exists": true,
+        "sha256": "db44f210a514ca4013df2952f790aeb39785d1a996e29021c486482b9318b8cb",
+        "status": "Needs-Manual",
+        "ready": false
+      },
+      {
+        "id": "E_16_system_settings",
+        "role": "settings",
+        "path": "option_E/masters/16_system_settings.png",
+        "exists": true,
+        "sha256": "8afe900714c99d933f07cea134441a5da6a830f058bcfcc430070736fa9c50ed",
+        "status": "Needs-Manual",
+        "ready": false
+      }
+    ]
+  },
+  "readiness": {
+    "overall": "NOT_READY",
+    "manifest_contracts_valid": true,
+    "preflight_ready": true,
+    "masters_ready": 3,
+    "masters_total": 6,
+    "outputs_ready": 24,
+    "outputs_total": 48,
+    "reviews_ready": 24,
+    "reviews_total": 48,
+    "blockers": [
+      "Master Screens ready 3/6",
+      "generated outputs ready 24/48",
+      "manual Reject Gates ready 24/48"
+    ]
+  },
+  "copy_and_data_policy": "Generated copy and data are not product authority.",
+  "entries": [
+    {
+      "id": "D_01_login",
+      "option": "D",
+      "screen_id": "01_login",
+      "filename": "01_login.png",
+      "status": "Generated",
+      "contract_sha256": "e23081cc257c9a606d3e1883d63c89e94fde4c92dfc8259527405510198fdd56",
+      "functional_audit": "passed",
+      "current_reference": "current/r2/S00-B0.png",
+      "master_references": [
+        "option_D/masters/16_system_settings.png"
+      ],
+      "output": "option_D/screens/01_login.png",
+      "output_sha256": "bf3adebb2451161ca76902d531f9953c38bd6c6f1484145f4b4818935b50a241",
+      "output_ready": true,
+      "reject_gate": "passed",
+      "review_ready": true
+    },
+    {
+      "id": "D_02_overview",
+      "option": "D",
+      "screen_id": "02_overview",
+      "filename": "02_overview.png",
+      "status": "Generated",
+      "contract_sha256": "e7a5d28b902563014121342d4733429c32d8b1ac53ea2e162f17cbaee9d922e9",
+      "functional_audit": "passed",
+      "current_reference": "current/r2/S01-B0.png",
+      "master_references": [
+        "option_D/masters/16_system_settings.png"
+      ],
+      "output": "option_D/screens/02_overview.png",
+      "output_sha256": "a6a902196b5486817f80c094d469fa4d96e8c934fb2a36c5e7947fc3d5f24769",
+      "output_ready": true,
+      "reject_gate": "passed",
+      "review_ready": true
+    },
+    {
+      "id": "D_03_projects_data",
+      "option": "D",
+      "screen_id": "03_projects_data",
+      "filename": "03_projects_data.png",
+      "status": "Generated",
+      "contract_sha256": "5032bc78411ed44366f572f1b298530baf8f73bdd01866e5c53b89ca10f179cd",
+      "functional_audit": "passed",
+      "current_reference": "current/r2/S02-B0.png",
+      "master_references": [
+        "option_D/masters/16_system_settings.png"
+      ],
+      "output": "option_D/screens/03_projects_data.png",
+      "output_sha256": "fe6d5e6c368573de83d0a6a0ed46148a2f0e6f01d9e002565c63c6d4047c5e94",
+      "output_ready": true,
+      "reject_gate": "passed",
+      "review_ready": true
+    },
+    {
+      "id": "D_04_projects_empty",
+      "option": "D",
+      "screen_id": "04_projects_empty",
+      "filename": "04_projects_empty.png",
+      "status": "Generated",
+      "contract_sha256": "48dd386926c58164077e0439160929d3e4b169a9c2755e2b7a29d211d44a6201",
+      "functional_audit": "passed",
+      "current_reference": "current/r2/S02-EMPTY.png",
+      "master_references": [
+        "option_D/masters/16_system_settings.png"
+      ],
+      "output": "option_D/screens/04_projects_empty.png",
+      "output_sha256": "a0117dcd2b62a5cef6c499f4e0f658a4c3de255ae3da783640f6d6952f030087",
+      "output_ready": true,
+      "reject_gate": "passed",
+      "review_ready": true
+    },
+    {
+      "id": "D_05_flow_editor",
+      "option": "D",
+      "screen_id": "05_flow_editor",
+      "filename": "05_flow_editor.png",
+      "status": "Approved-Candidate",
+      "contract_sha256": "e0970d5718077f335ac8733146bfcd0e3f847aabdbabd568f80d14d24eb4108d",
+      "functional_audit": "passed",
+      "current_reference": "current/r2/S04-B0.png",
+      "master_references": [],
+      "output": "option_D/screens/05_flow_editor.png",
+      "output_sha256": "247efff95e87fdd626f36dfae2dced6d94465d0c697408dca62e69d6ccacedc3",
+      "output_ready": true,
+      "reject_gate": "passed",
+      "review_ready": true
+    },
+    {
+      "id": "D_06_flow_validation_error",
+      "option": "D",
+      "screen_id": "06_flow_validation_error",
+      "filename": "06_flow_validation_error.png",
+      "status": "Generated",
+      "contract_sha256": "77cd50dcba8a62e84d5972942c5bbf3095bb82cd2815c80efa9e8c47be13975e",
+      "functional_audit": "passed",
+      "current_reference": "current/r2/S04-B2.png",
+      "master_references": [
+        "option_D/masters/05_flow_editor.png"
+      ],
+      "output": "option_D/screens/06_flow_validation_error.png",
+      "output_sha256": "779422ebda60af052314108ccad147de36b621eecf4924dc9046e40e6c3c0d16",
+      "output_ready": true,
+      "reject_gate": "passed",
+      "review_ready": true
+    },
+    {
+      "id": "D_07_flow_preview_roi",
+      "option": "D",
+      "screen_id": "07_flow_preview_roi",
+      "filename": "07_flow_preview_roi.png",
+      "status": "Generated",
+      "contract_sha256": "6609e5ff0ff0df6a9858a40a754a24af48ff26564114d3872a6dee413eba2ee8",
+      "functional_audit": "passed",
+      "current_reference": "current/r2/S05-B2.png",
+      "master_references": [
+        "option_D/masters/05_flow_editor.png"
+      ],
+      "output": "option_D/screens/07_flow_preview_roi.png",
+      "output_sha256": "51e856548b1b4cc67d2737f287ca9a0de8056a6e8c5fc77a3a5f785028dd5957",
+      "output_ready": true,
+      "reject_gate": "passed",
+      "review_ready": true
+    },
+    {
+      "id": "D_08_run_ng_modal",
+      "option": "D",
+      "screen_id": "08_run_ng_modal",
+      "filename": "08_run_ng_modal.png",
+      "status": "Generated",
+      "contract_sha256": "aed178f2d21a5671238212d8720d9b01b83aaacb9e9c2e62431ad3b6fb2848ed",
+      "functional_audit": "passed",
+      "current_reference": "current/r2/S06-B0.png",
+      "master_references": [
+        "option_D/masters/05_flow_editor.png"
+      ],
+      "output": "option_D/screens/08_run_ng_modal.png",
+      "output_sha256": "8793b0983eda3caa25a652f28c900ab1d04a190fc9a2c39ef80bce9a199efa8b",
+      "output_ready": true,
+      "reject_gate": "passed",
+      "review_ready": true
+    },
+    {
+      "id": "D_09_results_investigation",
+      "option": "D",
+      "screen_id": "09_results_investigation",
+      "filename": "09_results_investigation.png",
+      "status": "Generated",
+      "contract_sha256": "e95adbdfdefe721843940df42400d4d7b3f66e73bed28430a2e8b728140b48fe",
+      "functional_audit": "passed",
+      "current_reference": "current/r2/S07-B0.png",
+      "master_references": [
+        "option_D/masters/05_flow_editor.png",
+        "option_D/masters/13_ai_workspace.png"
+      ],
+      "output": "option_D/screens/09_results_investigation.png",
+      "output_sha256": "8d716e0ab1fdffaef82075975c34219565fc8b79b973a7b44c80150252f0201a",
+      "output_ready": true,
+      "reject_gate": "passed",
+      "review_ready": true
+    },
+    {
+      "id": "D_10_stations_list",
+      "option": "D",
+      "screen_id": "10_stations_list",
+      "filename": "10_stations_list.png",
+      "status": "Generated",
+      "contract_sha256": "ba75513ad4074e3a89f645ff939cb608251b870e78805e44795d7f1f70c54378",
+      "functional_audit": "passed",
+      "current_reference": "current/r2/S08-B0.png",
+      "master_references": [
+        "option_D/masters/05_flow_editor.png",
+        "option_D/masters/13_ai_workspace.png"
+      ],
+      "output": "option_D/screens/10_stations_list.png",
+      "output_sha256": "939080aed9eaa4102702e5da3ccbe2e9f1b9f18cd8ca6184cfc6c6c228b374eb",
+      "output_ready": true,
+      "reject_gate": "passed",
+      "review_ready": true
+    },
+    {
+      "id": "D_11_station_detail",
+      "option": "D",
+      "screen_id": "11_station_detail",
+      "filename": "11_station_detail.png",
+      "status": "Generated",
+      "contract_sha256": "c0f8f746392b988d5a464f713a4f2756f49901b78169949c5af9ebc8925f5bd3",
+      "functional_audit": "passed",
+      "current_reference": "current/r2/S08-B2.png",
+      "master_references": [
+        "option_D/masters/05_flow_editor.png",
+        "option_D/masters/13_ai_workspace.png"
+      ],
+      "output": "option_D/screens/11_station_detail.png",
+      "output_sha256": "2ebb9f191210fa8ac76bb37270e630ea6f715e1ac6501b3817196b9fe097829a",
+      "output_ready": true,
+      "reject_gate": "passed",
+      "review_ready": true
+    },
+    {
+      "id": "D_12_inspection",
+      "option": "D",
+      "screen_id": "12_inspection",
+      "filename": "12_inspection.png",
+      "status": "Generated",
+      "contract_sha256": "19b81cb0885ebd49fb49e8948fdc0c87b91a02f679b7f594c114a0ed0944935e",
+      "functional_audit": "passed",
+      "current_reference": "current/r2/S09-B0.png",
+      "master_references": [
+        "option_D/masters/05_flow_editor.png",
+        "option_D/masters/13_ai_workspace.png"
+      ],
+      "output": "option_D/screens/12_inspection.png",
+      "output_sha256": "280c7fbaf8561bd4e8bd662fbdc1eb4852180161bcb1537311a22a809eb6cc60",
+      "output_ready": true,
+      "reject_gate": "passed",
+      "review_ready": true
+    },
+    {
+      "id": "D_13_ai_workspace",
+      "option": "D",
+      "screen_id": "13_ai_workspace",
+      "filename": "13_ai_workspace.png",
+      "status": "Approved-Candidate",
+      "contract_sha256": "51f91644b74271577ed74b2f1f6422a6e8b64f2058e4b2940d85788633baec0c",
+      "functional_audit": "passed",
+      "current_reference": "current/r2/S11-B0.png",
+      "master_references": [
+        "option_D/masters/05_flow_editor.png"
+      ],
+      "output": "option_D/screens/13_ai_workspace.png",
+      "output_sha256": "0e2875749de6fc6d1971517a530f6a9daae4f935456f035482dc85bf6cf91b1d",
+      "output_ready": true,
+      "reject_gate": "passed",
+      "review_ready": true
+    },
+    {
+      "id": "D_14_ai_failure_recovery",
+      "option": "D",
+      "screen_id": "14_ai_failure_recovery",
+      "filename": "14_ai_failure_recovery.png",
+      "status": "Generated",
+      "contract_sha256": "e4c6e16c415eb57be777f17f875beb411dfa900dc2af07cdc39c9f7c062dc387",
+      "functional_audit": "passed",
+      "current_reference": "current/r2/S11-EXCEPTION.png",
+      "master_references": [
+        "option_D/masters/13_ai_workspace.png"
+      ],
+      "output": "option_D/screens/14_ai_failure_recovery.png",
+      "output_sha256": "cf4540d7e4a25c8d928462dee9186e5b4b6d569db783d0e41a20ccf1ecaef6d3",
+      "output_ready": true,
+      "reject_gate": "passed",
+      "review_ready": true
+    },
+    {
+      "id": "D_15_operator_catalog",
+      "option": "D",
+      "screen_id": "15_operator_catalog",
+      "filename": "15_operator_catalog.png",
+      "status": "Generated",
+      "contract_sha256": "353dfd01286274211fbc96be3c6144cbb1fcbee45f22072c4f030e387e46c070",
+      "functional_audit": "passed",
+      "current_reference": "current/r2/S12-B0.png",
+      "master_references": [
+        "option_D/masters/16_system_settings.png"
+      ],
+      "output": "option_D/screens/15_operator_catalog.png",
+      "output_sha256": "a01ee6cfbcd1344c2340ce18ced5eb2cfce66450dd0509f5e87ccedead3a2d1f",
+      "output_ready": true,
+      "reject_gate": "passed",
+      "review_ready": true
+    },
+    {
+      "id": "D_16_system_settings",
+      "option": "D",
+      "screen_id": "16_system_settings",
+      "filename": "16_system_settings.png",
+      "status": "Approved-Candidate",
+      "contract_sha256": "668c88908606ec7b07c8ea53b3ea99cce1b61e75a8f1b4d9e8c03b78df0d7b9a",
+      "functional_audit": "passed",
+      "current_reference": "current/r2/S10-B0.png",
+      "master_references": [
+        "option_D/masters/05_flow_editor.png",
+        "option_D/masters/13_ai_workspace.png"
+      ],
+      "output": "option_D/screens/16_system_settings.png",
+      "output_sha256": "525b960075f34db309f2a4871afef54fb100474f2d6479f2447262a2ad98a35e",
+      "output_ready": true,
+      "reject_gate": "passed",
+      "review_ready": true
+    },
+    {
+      "id": "D_17_camera_settings",
+      "option": "D",
+      "screen_id": "17_camera_settings",
+      "filename": "17_camera_settings.png",
+      "status": "Generated",
+      "contract_sha256": "5430de897e4bd301a17bff3d330491d4d4b7ed2a7d3e3d20b367093544e00d37",
+      "functional_audit": "passed",
+      "current_reference": "current/settings/settings-camera-b0-1920x1080-light-compact.png",
+      "master_references": [
+        "option_D/masters/16_system_settings.png"
+      ],
+      "output": "option_D/screens/17_camera_settings.png",
+      "output_sha256": "0768b51c32225de4804d1e2d67e65b13a0cc4c53b13a6329afc61daa245dbdf0",
+      "output_ready": true,
+      "reject_gate": "passed",
+      "review_ready": true
+    },
+    {
+      "id": "D_18_plc_settings",
+      "option": "D",
+      "screen_id": "18_plc_settings",
+      "filename": "18_plc_settings.png",
+      "status": "Generated",
+      "contract_sha256": "afdf8978a3806d32be338a3b07c7efca8d11d1e5faf5c72caefefd8f969bfc5c",
+      "functional_audit": "passed",
+      "current_reference": "current/settings/settings-plc-b0-1920x1080-light-compact.png",
+      "master_references": [
+        "option_D/masters/16_system_settings.png"
+      ],
+      "output": "option_D/screens/18_plc_settings.png",
+      "output_sha256": "8f1bac13706adb645d5d03191917e1cbc47cc110ce3a6ab7c9e5600914d746c9",
+      "output_ready": true,
+      "reject_gate": "passed",
+      "review_ready": true
+    },
+    {
+      "id": "D_19_tcp_settings",
+      "option": "D",
+      "screen_id": "19_tcp_settings",
+      "filename": "19_tcp_settings.png",
+      "status": "Generated",
+      "contract_sha256": "45141cd9c14b9a7692719e496a6f69b92ece622ea10e5f26588d18d1b37ecd3d",
+      "functional_audit": "passed",
+      "current_reference": "current/settings/settings-tcp-b0-dark-1920x1080-dark-compact.png",
+      "master_references": [
+        "option_D/masters/16_system_settings.png"
+      ],
+      "output": "option_D/screens/19_tcp_settings.png",
+      "output_sha256": "d08f03523572cf2f976d5f90081903cfd46f264ea0263c213bdf095288b1df80",
+      "output_ready": true,
+      "reject_gate": "passed",
+      "review_ready": true
+    },
+    {
+      "id": "D_20_station_communication",
+      "option": "D",
+      "screen_id": "20_station_communication",
+      "filename": "20_station_communication.png",
+      "status": "Generated",
+      "contract_sha256": "2ffece15cb72219e582f57d7437edd8aea79b9284f9ae12c301d9b301d76bd19",
+      "functional_audit": "passed",
+      "current_reference": "current/settings/settings-station-1920x1080-dark-compact.png",
+      "master_references": [
+        "option_D/masters/16_system_settings.png"
+      ],
+      "output": "option_D/screens/20_station_communication.png",
+      "output_sha256": "e1a660e9e64ff17184cda8ff7341fcfaa2660934164bbf93f73bf67ad0e65cd1",
+      "output_ready": true,
+      "reject_gate": "passed",
+      "review_ready": true
+    },
+    {
+      "id": "D_21_ai_model_settings",
+      "option": "D",
+      "screen_id": "21_ai_model_settings",
+      "filename": "21_ai_model_settings.png",
+      "status": "Generated",
+      "contract_sha256": "797c56e7e85af50246fbf27ba86e5dfd9d2e32e306bf7549ba9ab9a2134c926c",
+      "functional_audit": "passed",
+      "current_reference": "current/settings/settings-ai-model-1920x1080-light-compact.png",
+      "master_references": [
+        "option_D/masters/16_system_settings.png"
+      ],
+      "output": "option_D/screens/21_ai_model_settings.png",
+      "output_sha256": "a3fbdefa534c897daa40630308e8d2cc5672decdb4ca16fe3af1b648c744b993",
+      "output_ready": true,
+      "reject_gate": "passed",
+      "review_ready": true
+    },
+    {
+      "id": "D_22_diagnostics",
+      "option": "D",
+      "screen_id": "22_diagnostics",
+      "filename": "22_diagnostics.png",
+      "status": "Generated",
+      "contract_sha256": "28abaa3a408c27974ce55424f50c0f83b1a05064843b9fb53039e2af85e263e5",
+      "functional_audit": "passed",
+      "current_reference": "current/r2/S13-B0.png",
+      "master_references": [
+        "option_D/masters/16_system_settings.png"
+      ],
+      "output": "option_D/screens/22_diagnostics.png",
+      "output_sha256": "0415729663e19fb6b2527956eec74d9f64284cefa8b1ba7be7f8c4d5c9e6ee97",
+      "output_ready": true,
+      "reject_gate": "passed",
+      "review_ready": true
+    },
+    {
+      "id": "D_23_about",
+      "option": "D",
+      "screen_id": "23_about",
+      "filename": "23_about.png",
+      "status": "Generated",
+      "contract_sha256": "823fe67aba06897cb2355d8c7bc2d0e3e5dd08bf8b08f72211020f5f0825fc18",
+      "functional_audit": "passed",
+      "current_reference": "current/r2/S13-B2.png",
+      "master_references": [
+        "option_D/masters/16_system_settings.png"
+      ],
+      "output": "option_D/screens/23_about.png",
+      "output_sha256": "4b085e25511b6fcffc72d6d6af33c39574baa9bfb7106729485b4035a77c8e84",
+      "output_ready": true,
+      "reject_gate": "passed",
+      "review_ready": true
+    },
+    {
+      "id": "D_24_forbidden",
+      "option": "D",
+      "screen_id": "24_forbidden",
+      "filename": "24_forbidden.png",
+      "status": "Generated",
+      "contract_sha256": "d4bcb28e234173ee04a9af72ba688226c60bb7d884f7ed2d826ac0c4941a23f7",
+      "functional_audit": "passed",
+      "current_reference": "current/r2/S10-EXCEPTION.png",
+      "master_references": [
+        "option_D/masters/16_system_settings.png"
+      ],
+      "output": "option_D/screens/24_forbidden.png",
+      "output_sha256": "e6171bedda03d2c06ae5bb6c66241a8993b08f360657ff35c8245ad7eeb208ca",
+      "output_ready": true,
+      "reject_gate": "passed",
+      "review_ready": true
+    },
+    {
+      "id": "E_01_login",
+      "option": "E",
+      "screen_id": "01_login",
+      "filename": "01_login.png",
+      "status": "Needs-Manual",
+      "contract_sha256": "d69c71bf2907cc15b8ea160310dcd97d8a43892b4d70ee3f655f41e290f3c543",
+      "functional_audit": "passed",
+      "current_reference": "current/r2/S00-B0.png",
+      "master_references": [
+        "option_E/masters/16_system_settings.png"
+      ],
+      "output": "option_E/screens/01_login.png",
+      "output_sha256": "9f8e13106b1ad72e98151a46a2c24dee0a28997c3384d8e4ef835abd06b6f056",
+      "output_ready": false,
+      "reject_gate": "pending",
+      "review_ready": false
+    },
+    {
+      "id": "E_02_overview",
+      "option": "E",
+      "screen_id": "02_overview",
+      "filename": "02_overview.png",
+      "status": "Needs-Manual",
+      "contract_sha256": "ce5f7efa2fa93fc68e29332d89af3b750bb947f24dd49629175e70b98edbad1c",
+      "functional_audit": "passed",
+      "current_reference": "current/r2/S01-B0.png",
+      "master_references": [
+        "option_E/masters/16_system_settings.png"
+      ],
+      "output": "option_E/screens/02_overview.png",
+      "output_sha256": "033eb8dadd49a70640b6e9f5a2fcd71ebfd08c612bf385a44a11d305e195a0d8",
+      "output_ready": false,
+      "reject_gate": "pending",
+      "review_ready": false
+    },
+    {
+      "id": "E_03_projects_data",
+      "option": "E",
+      "screen_id": "03_projects_data",
+      "filename": "03_projects_data.png",
+      "status": "Needs-Manual",
+      "contract_sha256": "1112dda2d3f3fc19ba4134c29b33be27264c1adfc521cd1680b507bcd9b4b147",
+      "functional_audit": "passed",
+      "current_reference": "current/r2/S02-B0.png",
+      "master_references": [
+        "option_E/masters/16_system_settings.png"
+      ],
+      "output": "option_E/screens/03_projects_data.png",
+      "output_sha256": "c9ced7c1004957c4322aaf423ec2371a4a77d86766ab7e69c9770c722c345e06",
+      "output_ready": false,
+      "reject_gate": "pending",
+      "review_ready": false
+    },
+    {
+      "id": "E_04_projects_empty",
+      "option": "E",
+      "screen_id": "04_projects_empty",
+      "filename": "04_projects_empty.png",
+      "status": "Needs-Manual",
+      "contract_sha256": "61ba98f76460041161b6779d92f6ec59849f7654172f5e300fe49a8818ff2e3e",
+      "functional_audit": "passed",
+      "current_reference": "current/r2/S02-EMPTY.png",
+      "master_references": [
+        "option_E/masters/16_system_settings.png"
+      ],
+      "output": "option_E/screens/04_projects_empty.png",
+      "output_sha256": "eda94f1ba5da1b4c1f9b3306bfda70e42c55c25259918e62cc55cf2680223db3",
+      "output_ready": false,
+      "reject_gate": "pending",
+      "review_ready": false
+    },
+    {
+      "id": "E_05_flow_editor",
+      "option": "E",
+      "screen_id": "05_flow_editor",
+      "filename": "05_flow_editor.png",
+      "status": "Needs-Manual",
+      "contract_sha256": "7d25062bac9a051ceb6ebde2a5307f8d1c4f17b04411b360c4e152cb53fa5dca",
+      "functional_audit": "passed",
+      "current_reference": "current/r2/S04-B0.png",
+      "master_references": [],
+      "output": "option_E/screens/05_flow_editor.png",
+      "output_sha256": "c5ae4d5cb8da2069dd99aa8a49a9affb4a7071847c32224bd5b82e5d6d1f8e0f",
+      "output_ready": false,
+      "reject_gate": "pending",
+      "review_ready": false
+    },
+    {
+      "id": "E_06_flow_validation_error",
+      "option": "E",
+      "screen_id": "06_flow_validation_error",
+      "filename": "06_flow_validation_error.png",
+      "status": "Needs-Manual",
+      "contract_sha256": "00a37853adfd1dd938e946f4fddbfbd6c7501c58c7431634bf882e390cae11b1",
+      "functional_audit": "passed",
+      "current_reference": "current/r2/S04-B2.png",
+      "master_references": [
+        "option_E/masters/05_flow_editor.png"
+      ],
+      "output": "option_E/screens/06_flow_validation_error.png",
+      "output_sha256": "ecc3aac2ac3aa86491dde486f8c92e36fc7dbd6a5c375d91bc3a405a93048607",
+      "output_ready": false,
+      "reject_gate": "pending",
+      "review_ready": false
+    },
+    {
+      "id": "E_07_flow_preview_roi",
+      "option": "E",
+      "screen_id": "07_flow_preview_roi",
+      "filename": "07_flow_preview_roi.png",
+      "status": "Needs-Manual",
+      "contract_sha256": "d004d1dd5783839f510f3c65732cc80084f38873b0bb5c356b2eb2a91663b6b0",
+      "functional_audit": "passed",
+      "current_reference": "current/r2/S05-B2.png",
+      "master_references": [
+        "option_E/masters/05_flow_editor.png"
+      ],
+      "output": "option_E/screens/07_flow_preview_roi.png",
+      "output_sha256": "dcbcce8ad57519a2de14d78317762c715128067002da3306f1b43fab40cec217",
+      "output_ready": false,
+      "reject_gate": "pending",
+      "review_ready": false
+    },
+    {
+      "id": "E_08_run_ng_modal",
+      "option": "E",
+      "screen_id": "08_run_ng_modal",
+      "filename": "08_run_ng_modal.png",
+      "status": "Needs-Manual",
+      "contract_sha256": "3e24385120e9e0285ec27a44aa181fe05de901680bed567aa57d943c135da48b",
+      "functional_audit": "passed",
+      "current_reference": "current/r2/S06-B0.png",
+      "master_references": [
+        "option_E/masters/05_flow_editor.png"
+      ],
+      "output": "option_E/screens/08_run_ng_modal.png",
+      "output_sha256": "4a4ceefd8f4518af50eb685066d6687a27fc4ef63526b92646863dd7106dc102",
+      "output_ready": false,
+      "reject_gate": "pending",
+      "review_ready": false
+    },
+    {
+      "id": "E_09_results_investigation",
+      "option": "E",
+      "screen_id": "09_results_investigation",
+      "filename": "09_results_investigation.png",
+      "status": "Needs-Manual",
+      "contract_sha256": "2c5bc9313f72a78108b962b055134279d800ebad3a4c5f52b7d97581906f001c",
+      "functional_audit": "passed",
+      "current_reference": "current/r2/S07-B0.png",
+      "master_references": [
+        "option_E/masters/05_flow_editor.png",
+        "option_E/masters/13_ai_workspace.png"
+      ],
+      "output": "option_E/screens/09_results_investigation.png",
+      "output_sha256": "85301995d4e085e498beb2d2476a24959aebe792f6b9fe6c2e844987e0e2a1be",
+      "output_ready": false,
+      "reject_gate": "pending",
+      "review_ready": false
+    },
+    {
+      "id": "E_10_stations_list",
+      "option": "E",
+      "screen_id": "10_stations_list",
+      "filename": "10_stations_list.png",
+      "status": "Needs-Manual",
+      "contract_sha256": "38b7f4cd5983260a07d0728ddfcc46fce3410dc175af700ba60e562d00f82f57",
+      "functional_audit": "passed",
+      "current_reference": "current/r2/S08-B0.png",
+      "master_references": [
+        "option_E/masters/05_flow_editor.png",
+        "option_E/masters/13_ai_workspace.png"
+      ],
+      "output": "option_E/screens/10_stations_list.png",
+      "output_sha256": "e11e75d8e4af7982c7b331027d5fa24c71884b65ab41c515dabaa2fc5ba639a2",
+      "output_ready": false,
+      "reject_gate": "pending",
+      "review_ready": false
+    },
+    {
+      "id": "E_11_station_detail",
+      "option": "E",
+      "screen_id": "11_station_detail",
+      "filename": "11_station_detail.png",
+      "status": "Needs-Manual",
+      "contract_sha256": "318452745bee6e6f2633ef00738ba5baa8d3b97c3fa1d7e67704146f718c884b",
+      "functional_audit": "passed",
+      "current_reference": "current/r2/S08-B2.png",
+      "master_references": [
+        "option_E/masters/05_flow_editor.png",
+        "option_E/masters/13_ai_workspace.png"
+      ],
+      "output": "option_E/screens/11_station_detail.png",
+      "output_sha256": "5c5e960ec071b03a94b00221705240afd408d44a986d148d4a6952ccf5e2d43f",
+      "output_ready": false,
+      "reject_gate": "pending",
+      "review_ready": false
+    },
+    {
+      "id": "E_12_inspection",
+      "option": "E",
+      "screen_id": "12_inspection",
+      "filename": "12_inspection.png",
+      "status": "Needs-Manual",
+      "contract_sha256": "8ca6de07463b4c52b9beba45c695bdbc4d1bca6229fdcf52c1a54b65bd4acf59",
+      "functional_audit": "passed",
+      "current_reference": "current/r2/S09-B0.png",
+      "master_references": [
+        "option_E/masters/05_flow_editor.png",
+        "option_E/masters/13_ai_workspace.png"
+      ],
+      "output": "option_E/screens/12_inspection.png",
+      "output_sha256": "a86393f6ed147e6eb2c12da98e26e93889350a0ce9649f385981c04bce17e9a7",
+      "output_ready": false,
+      "reject_gate": "pending",
+      "review_ready": false
+    },
+    {
+      "id": "E_13_ai_workspace",
+      "option": "E",
+      "screen_id": "13_ai_workspace",
+      "filename": "13_ai_workspace.png",
+      "status": "Needs-Manual",
+      "contract_sha256": "2ad0cb51d0ff4b1ecb8efe2f5ef323e70e9e90effcee66a33159c66df93ff130",
+      "functional_audit": "passed",
+      "current_reference": "current/r2/S11-B0.png",
+      "master_references": [
+        "option_E/masters/05_flow_editor.png"
+      ],
+      "output": "option_E/screens/13_ai_workspace.png",
+      "output_sha256": "db44f210a514ca4013df2952f790aeb39785d1a996e29021c486482b9318b8cb",
+      "output_ready": false,
+      "reject_gate": "pending",
+      "review_ready": false
+    },
+    {
+      "id": "E_14_ai_failure_recovery",
+      "option": "E",
+      "screen_id": "14_ai_failure_recovery",
+      "filename": "14_ai_failure_recovery.png",
+      "status": "Needs-Manual",
+      "contract_sha256": "5ace89836c742ca1f34aa5c856c623ebaef5ef871f713405f6b006ab185bb5b0",
+      "functional_audit": "passed",
+      "current_reference": "current/r2/S11-EXCEPTION.png",
+      "master_references": [
+        "option_E/masters/13_ai_workspace.png"
+      ],
+      "output": "option_E/screens/14_ai_failure_recovery.png",
+      "output_sha256": "259f959bbfc69e0e8325847bd554bce432a46cc67767e0481c23f65c6bb588c4",
+      "output_ready": false,
+      "reject_gate": "pending",
+      "review_ready": false
+    },
+    {
+      "id": "E_15_operator_catalog",
+      "option": "E",
+      "screen_id": "15_operator_catalog",
+      "filename": "15_operator_catalog.png",
+      "status": "Needs-Manual",
+      "contract_sha256": "f0578bdec50ad688e6d30ba7e71b7f97aacdd99fd2baf21872563340514cdeaa",
+      "functional_audit": "passed",
+      "current_reference": "current/r2/S12-B0.png",
+      "master_references": [
+        "option_E/masters/16_system_settings.png"
+      ],
+      "output": "option_E/screens/15_operator_catalog.png",
+      "output_sha256": "d932909283cdd4aee1ff6efc368edd95ce514cfdc001a10d75b1ee463f078a55",
+      "output_ready": false,
+      "reject_gate": "pending",
+      "review_ready": false
+    },
+    {
+      "id": "E_16_system_settings",
+      "option": "E",
+      "screen_id": "16_system_settings",
+      "filename": "16_system_settings.png",
+      "status": "Needs-Manual",
+      "contract_sha256": "6b1973962ab5621abb3f8ee35f262fabbfb666115adbccc730063af5bff5e636",
+      "functional_audit": "passed",
+      "current_reference": "current/r2/S10-B0.png",
+      "master_references": [
+        "option_E/masters/05_flow_editor.png",
+        "option_E/masters/13_ai_workspace.png"
+      ],
+      "output": "option_E/screens/16_system_settings.png",
+      "output_sha256": "8afe900714c99d933f07cea134441a5da6a830f058bcfcc430070736fa9c50ed",
+      "output_ready": false,
+      "reject_gate": "pending",
+      "review_ready": false
+    },
+    {
+      "id": "E_17_camera_settings",
+      "option": "E",
+      "screen_id": "17_camera_settings",
+      "filename": "17_camera_settings.png",
+      "status": "Needs-Manual",
+      "contract_sha256": "83f02d9c7c8a43a2a6d9161785c9c47c8a363e002231626c6a1fd966f6853c29",
+      "functional_audit": "passed",
+      "current_reference": "current/settings/settings-camera-b0-1920x1080-light-compact.png",
+      "master_references": [
+        "option_E/masters/16_system_settings.png"
+      ],
+      "output": "option_E/screens/17_camera_settings.png",
+      "output_sha256": "7144e018394f5dcecba27a79f81adc14b0d83572f4f5082fb7392dc29ca2885c",
+      "output_ready": false,
+      "reject_gate": "pending",
+      "review_ready": false
+    },
+    {
+      "id": "E_18_plc_settings",
+      "option": "E",
+      "screen_id": "18_plc_settings",
+      "filename": "18_plc_settings.png",
+      "status": "Needs-Manual",
+      "contract_sha256": "e98399d5eac55f206c7024f14786986f2d6ff4dbb1fdf37a818580e879893f84",
+      "functional_audit": "passed",
+      "current_reference": "current/settings/settings-plc-b0-1920x1080-light-compact.png",
+      "master_references": [
+        "option_E/masters/16_system_settings.png"
+      ],
+      "output": "option_E/screens/18_plc_settings.png",
+      "output_sha256": "98a2813b89e3a427e032fab9caef30eff1e2ff38694cae89a103ed4264b0d183",
+      "output_ready": false,
+      "reject_gate": "pending",
+      "review_ready": false
+    },
+    {
+      "id": "E_19_tcp_settings",
+      "option": "E",
+      "screen_id": "19_tcp_settings",
+      "filename": "19_tcp_settings.png",
+      "status": "Needs-Manual",
+      "contract_sha256": "8a25784c6ed94b3cf0e4f23ff6102fcbe69763684cd8119754054c118b35db55",
+      "functional_audit": "passed",
+      "current_reference": "current/settings/settings-tcp-b0-dark-1920x1080-dark-compact.png",
+      "master_references": [
+        "option_E/masters/16_system_settings.png"
+      ],
+      "output": "option_E/screens/19_tcp_settings.png",
+      "output_sha256": "0848daf90b6d3e0103046700bd1b066f293dfe4d23f3eeead7a61cef07e7e7f0",
+      "output_ready": false,
+      "reject_gate": "pending",
+      "review_ready": false
+    },
+    {
+      "id": "E_20_station_communication",
+      "option": "E",
+      "screen_id": "20_station_communication",
+      "filename": "20_station_communication.png",
+      "status": "Needs-Manual",
+      "contract_sha256": "59a61faf3cdd350d3077b70632f750cbde7226b38294e9ddbe7bc155835cbd92",
+      "functional_audit": "passed",
+      "current_reference": "current/settings/settings-station-1920x1080-dark-compact.png",
+      "master_references": [
+        "option_E/masters/16_system_settings.png"
+      ],
+      "output": "option_E/screens/20_station_communication.png",
+      "output_sha256": "f6f4268876d94cb358bfd30e0fb18390c58da31ae55feeed15f8930416dc4207",
+      "output_ready": false,
+      "reject_gate": "pending",
+      "review_ready": false
+    },
+    {
+      "id": "E_21_ai_model_settings",
+      "option": "E",
+      "screen_id": "21_ai_model_settings",
+      "filename": "21_ai_model_settings.png",
+      "status": "Needs-Manual",
+      "contract_sha256": "e54500b4f16b63fb4b4346ea73765bcedcf30e8a0806a171b5a669267778f53d",
+      "functional_audit": "passed",
+      "current_reference": "current/settings/settings-ai-model-1920x1080-light-compact.png",
+      "master_references": [
+        "option_E/masters/16_system_settings.png"
+      ],
+      "output": "option_E/screens/21_ai_model_settings.png",
+      "output_sha256": "fc45a750aac596553f4323868d8ef9a3585921dcf5737df57a53e20d79ba4abe",
+      "output_ready": false,
+      "reject_gate": "pending",
+      "review_ready": false
+    },
+    {
+      "id": "E_22_diagnostics",
+      "option": "E",
+      "screen_id": "22_diagnostics",
+      "filename": "22_diagnostics.png",
+      "status": "Needs-Manual",
+      "contract_sha256": "777b92b03e666ae8ec6c94159a18387d5fef3b5e2c0dd5e1a2bde8d90e87373d",
+      "functional_audit": "passed",
+      "current_reference": "current/r2/S13-B0.png",
+      "master_references": [
+        "option_E/masters/16_system_settings.png"
+      ],
+      "output": "option_E/screens/22_diagnostics.png",
+      "output_sha256": "d96a8c9579886e83e13547330d33818f5c5459a77591f98bb48caaf46b365af3",
+      "output_ready": false,
+      "reject_gate": "pending",
+      "review_ready": false
+    },
+    {
+      "id": "E_23_about",
+      "option": "E",
+      "screen_id": "23_about",
+      "filename": "23_about.png",
+      "status": "Needs-Manual",
+      "contract_sha256": "41a9e2dcb944449f56013806efccf070fbb2a1e968c35409d1df38f9ac0f9152",
+      "functional_audit": "passed",
+      "current_reference": "current/r2/S13-B2.png",
+      "master_references": [
+        "option_E/masters/16_system_settings.png"
+      ],
+      "output": "option_E/screens/23_about.png",
+      "output_sha256": "a4081ae2d7d7dbaac6e9356217d88841630786807b60a802b84355030a9d2a79",
+      "output_ready": false,
+      "reject_gate": "pending",
+      "review_ready": false
+    },
+    {
+      "id": "E_24_forbidden",
+      "option": "E",
+      "screen_id": "24_forbidden",
+      "filename": "24_forbidden.png",
+      "status": "Needs-Manual",
+      "contract_sha256": "a7046cc612d062adc80c3944c34414e9788fef100eacbd1295e138afe2396587",
+      "functional_audit": "passed",
+      "current_reference": "current/r2/S10-EXCEPTION.png",
+      "master_references": [
+        "option_E/masters/16_system_settings.png"
+      ],
+      "output": "option_E/screens/24_forbidden.png",
+      "output_sha256": "b6404221f2d1a82777867fbc933c2114ddf69d2fdcc1027b6f3e377790d4d123",
+      "output_ready": false,
+      "reject_gate": "pending",
+      "review_ready": false
+    }
+  ],
+  "screens": [
+    {
+      "screen_id": "01_login",
+      "filename": "01_login.png",
+      "page_name": "Login",
+      "purpose": "Public authentication and session recovery",
+      "current_reference": "current/r2/S00-B0.png",
+      "options": {
+        "D": {
+          "id": "D_01_login",
+          "option": "D",
+          "screen_id": "01_login",
+          "filename": "01_login.png",
+          "status": "Generated",
+          "contract_sha256": "e23081cc257c9a606d3e1883d63c89e94fde4c92dfc8259527405510198fdd56",
+          "functional_audit": "passed",
+          "current_reference": "current/r2/S00-B0.png",
+          "master_references": [
+            "option_D/masters/16_system_settings.png"
+          ],
+          "output": "option_D/screens/01_login.png",
+          "output_sha256": "bf3adebb2451161ca76902d531f9953c38bd6c6f1484145f4b4818935b50a241",
+          "output_ready": true,
+          "reject_gate": "passed",
+          "review_ready": true
+        },
+        "E": {
+          "id": "E_01_login",
+          "option": "E",
+          "screen_id": "01_login",
+          "filename": "01_login.png",
+          "status": "Needs-Manual",
+          "contract_sha256": "d69c71bf2907cc15b8ea160310dcd97d8a43892b4d70ee3f655f41e290f3c543",
+          "functional_audit": "passed",
+          "current_reference": "current/r2/S00-B0.png",
+          "master_references": [
+            "option_E/masters/16_system_settings.png"
+          ],
+          "output": "option_E/screens/01_login.png",
+          "output_sha256": "9f8e13106b1ad72e98151a46a2c24dee0a28997c3384d8e4ef835abd06b6f056",
+          "output_ready": false,
+          "reject_gate": "pending",
+          "review_ready": false
+        }
+      }
+    },
+    {
+      "screen_id": "02_overview",
+      "filename": "02_overview.png",
+      "page_name": "Overview",
+      "purpose": "System and recent-project operational overview",
+      "current_reference": "current/r2/S01-B0.png",
+      "options": {
+        "D": {
+          "id": "D_02_overview",
+          "option": "D",
+          "screen_id": "02_overview",
+          "filename": "02_overview.png",
+          "status": "Generated",
+          "contract_sha256": "e7a5d28b902563014121342d4733429c32d8b1ac53ea2e162f17cbaee9d922e9",
+          "functional_audit": "passed",
+          "current_reference": "current/r2/S01-B0.png",
+          "master_references": [
+            "option_D/masters/16_system_settings.png"
+          ],
+          "output": "option_D/screens/02_overview.png",
+          "output_sha256": "a6a902196b5486817f80c094d469fa4d96e8c934fb2a36c5e7947fc3d5f24769",
+          "output_ready": true,
+          "reject_gate": "passed",
+          "review_ready": true
+        },
+        "E": {
+          "id": "E_02_overview",
+          "option": "E",
+          "screen_id": "02_overview",
+          "filename": "02_overview.png",
+          "status": "Needs-Manual",
+          "contract_sha256": "ce5f7efa2fa93fc68e29332d89af3b750bb947f24dd49629175e70b98edbad1c",
+          "functional_audit": "passed",
+          "current_reference": "current/r2/S01-B0.png",
+          "master_references": [
+            "option_E/masters/16_system_settings.png"
+          ],
+          "output": "option_E/screens/02_overview.png",
+          "output_sha256": "033eb8dadd49a70640b6e9f5a2fcd71ebfd08c612bf385a44a11d305e195a0d8",
+          "output_ready": false,
+          "reject_gate": "pending",
+          "review_ready": false
+        }
+      }
+    },
+    {
+      "screen_id": "03_projects_data",
+      "filename": "03_projects_data.png",
+      "page_name": "Projects - Data",
+      "purpose": "Populated project discovery and lifecycle entry",
+      "current_reference": "current/r2/S02-B0.png",
+      "options": {
+        "D": {
+          "id": "D_03_projects_data",
+          "option": "D",
+          "screen_id": "03_projects_data",
+          "filename": "03_projects_data.png",
+          "status": "Generated",
+          "contract_sha256": "5032bc78411ed44366f572f1b298530baf8f73bdd01866e5c53b89ca10f179cd",
+          "functional_audit": "passed",
+          "current_reference": "current/r2/S02-B0.png",
+          "master_references": [
+            "option_D/masters/16_system_settings.png"
+          ],
+          "output": "option_D/screens/03_projects_data.png",
+          "output_sha256": "fe6d5e6c368573de83d0a6a0ed46148a2f0e6f01d9e002565c63c6d4047c5e94",
+          "output_ready": true,
+          "reject_gate": "passed",
+          "review_ready": true
+        },
+        "E": {
+          "id": "E_03_projects_data",
+          "option": "E",
+          "screen_id": "03_projects_data",
+          "filename": "03_projects_data.png",
+          "status": "Needs-Manual",
+          "contract_sha256": "1112dda2d3f3fc19ba4134c29b33be27264c1adfc521cd1680b507bcd9b4b147",
+          "functional_audit": "passed",
+          "current_reference": "current/r2/S02-B0.png",
+          "master_references": [
+            "option_E/masters/16_system_settings.png"
+          ],
+          "output": "option_E/screens/03_projects_data.png",
+          "output_sha256": "c9ced7c1004957c4322aaf423ec2371a4a77d86766ab7e69c9770c722c345e06",
+          "output_ready": false,
+          "reject_gate": "pending",
+          "review_ready": false
+        }
+      }
+    },
+    {
+      "screen_id": "04_projects_empty",
+      "filename": "04_projects_empty.png",
+      "page_name": "Projects - Empty",
+      "purpose": "Project library empty state",
+      "current_reference": "current/r2/S02-EMPTY.png",
+      "options": {
+        "D": {
+          "id": "D_04_projects_empty",
+          "option": "D",
+          "screen_id": "04_projects_empty",
+          "filename": "04_projects_empty.png",
+          "status": "Generated",
+          "contract_sha256": "48dd386926c58164077e0439160929d3e4b169a9c2755e2b7a29d211d44a6201",
+          "functional_audit": "passed",
+          "current_reference": "current/r2/S02-EMPTY.png",
+          "master_references": [
+            "option_D/masters/16_system_settings.png"
+          ],
+          "output": "option_D/screens/04_projects_empty.png",
+          "output_sha256": "a0117dcd2b62a5cef6c499f4e0f658a4c3de255ae3da783640f6d6952f030087",
+          "output_ready": true,
+          "reject_gate": "passed",
+          "review_ready": true
+        },
+        "E": {
+          "id": "E_04_projects_empty",
+          "option": "E",
+          "screen_id": "04_projects_empty",
+          "filename": "04_projects_empty.png",
+          "status": "Needs-Manual",
+          "contract_sha256": "61ba98f76460041161b6779d92f6ec59849f7654172f5e300fe49a8818ff2e3e",
+          "functional_audit": "passed",
+          "current_reference": "current/r2/S02-EMPTY.png",
+          "master_references": [
+            "option_E/masters/16_system_settings.png"
+          ],
+          "output": "option_E/screens/04_projects_empty.png",
+          "output_sha256": "eda94f1ba5da1b4c1f9b3306bfda70e42c55c25259918e62cc55cf2680223db3",
+          "output_ready": false,
+          "reject_gate": "pending",
+          "review_ready": false
+        }
+      }
+    },
+    {
+      "screen_id": "05_flow_editor",
+      "filename": "05_flow_editor.png",
+      "page_name": "Flow Editor",
+      "purpose": "Core Flow editor with selected-node Inspector",
+      "current_reference": "current/r2/S04-B0.png",
+      "options": {
+        "D": {
+          "id": "D_05_flow_editor",
+          "option": "D",
+          "screen_id": "05_flow_editor",
+          "filename": "05_flow_editor.png",
+          "status": "Approved-Candidate",
+          "contract_sha256": "e0970d5718077f335ac8733146bfcd0e3f847aabdbabd568f80d14d24eb4108d",
+          "functional_audit": "passed",
+          "current_reference": "current/r2/S04-B0.png",
+          "master_references": [],
+          "output": "option_D/screens/05_flow_editor.png",
+          "output_sha256": "247efff95e87fdd626f36dfae2dced6d94465d0c697408dca62e69d6ccacedc3",
+          "output_ready": true,
+          "reject_gate": "passed",
+          "review_ready": true
+        },
+        "E": {
+          "id": "E_05_flow_editor",
+          "option": "E",
+          "screen_id": "05_flow_editor",
+          "filename": "05_flow_editor.png",
+          "status": "Needs-Manual",
+          "contract_sha256": "7d25062bac9a051ceb6ebde2a5307f8d1c4f17b04411b360c4e152cb53fa5dca",
+          "functional_audit": "passed",
+          "current_reference": "current/r2/S04-B0.png",
+          "master_references": [],
+          "output": "option_E/screens/05_flow_editor.png",
+          "output_sha256": "c5ae4d5cb8da2069dd99aa8a49a9affb4a7071847c32224bd5b82e5d6d1f8e0f",
+          "output_ready": false,
+          "reject_gate": "pending",
+          "review_ready": false
+        }
+      }
+    },
+    {
+      "screen_id": "06_flow_validation_error",
+      "filename": "06_flow_validation_error.png",
+      "page_name": "Flow Validation Error",
+      "purpose": "Selected-node parameter validation state",
+      "current_reference": "current/r2/S04-B2.png",
+      "options": {
+        "D": {
+          "id": "D_06_flow_validation_error",
+          "option": "D",
+          "screen_id": "06_flow_validation_error",
+          "filename": "06_flow_validation_error.png",
+          "status": "Generated",
+          "contract_sha256": "77cd50dcba8a62e84d5972942c5bbf3095bb82cd2815c80efa9e8c47be13975e",
+          "functional_audit": "passed",
+          "current_reference": "current/r2/S04-B2.png",
+          "master_references": [
+            "option_D/masters/05_flow_editor.png"
+          ],
+          "output": "option_D/screens/06_flow_validation_error.png",
+          "output_sha256": "779422ebda60af052314108ccad147de36b621eecf4924dc9046e40e6c3c0d16",
+          "output_ready": true,
+          "reject_gate": "passed",
+          "review_ready": true
+        },
+        "E": {
+          "id": "E_06_flow_validation_error",
+          "option": "E",
+          "screen_id": "06_flow_validation_error",
+          "filename": "06_flow_validation_error.png",
+          "status": "Needs-Manual",
+          "contract_sha256": "00a37853adfd1dd938e946f4fddbfbd6c7501c58c7431634bf882e390cae11b1",
+          "functional_audit": "passed",
+          "current_reference": "current/r2/S04-B2.png",
+          "master_references": [
+            "option_E/masters/05_flow_editor.png"
+          ],
+          "output": "option_E/screens/06_flow_validation_error.png",
+          "output_sha256": "ecc3aac2ac3aa86491dde486f8c92e36fc7dbd6a5c375d91bc3a405a93048607",
+          "output_ready": false,
+          "reject_gate": "pending",
+          "review_ready": false
+        }
+      }
+    },
+    {
+      "screen_id": "07_flow_preview_roi",
+      "filename": "07_flow_preview_roi.png",
+      "page_name": "Flow Preview and ROI",
+      "purpose": "Node Preview with ROI editing draft",
+      "current_reference": "current/r2/S05-B2.png",
+      "options": {
+        "D": {
+          "id": "D_07_flow_preview_roi",
+          "option": "D",
+          "screen_id": "07_flow_preview_roi",
+          "filename": "07_flow_preview_roi.png",
+          "status": "Generated",
+          "contract_sha256": "6609e5ff0ff0df6a9858a40a754a24af48ff26564114d3872a6dee413eba2ee8",
+          "functional_audit": "passed",
+          "current_reference": "current/r2/S05-B2.png",
+          "master_references": [
+            "option_D/masters/05_flow_editor.png"
+          ],
+          "output": "option_D/screens/07_flow_preview_roi.png",
+          "output_sha256": "51e856548b1b4cc67d2737f287ca9a0de8056a6e8c5fc77a3a5f785028dd5957",
+          "output_ready": true,
+          "reject_gate": "passed",
+          "review_ready": true
+        },
+        "E": {
+          "id": "E_07_flow_preview_roi",
+          "option": "E",
+          "screen_id": "07_flow_preview_roi",
+          "filename": "07_flow_preview_roi.png",
+          "status": "Needs-Manual",
+          "contract_sha256": "d004d1dd5783839f510f3c65732cc80084f38873b0bb5c356b2eb2a91663b6b0",
+          "functional_audit": "passed",
+          "current_reference": "current/r2/S05-B2.png",
+          "master_references": [
+            "option_E/masters/05_flow_editor.png"
+          ],
+          "output": "option_E/screens/07_flow_preview_roi.png",
+          "output_sha256": "dcbcce8ad57519a2de14d78317762c715128067002da3306f1b43fab40cec217",
+          "output_ready": false,
+          "reject_gate": "pending",
+          "review_ready": false
+        }
+      }
+    },
+    {
+      "screen_id": "08_run_ng_modal",
+      "filename": "08_run_ng_modal.png",
+      "page_name": "Run Details NG Modal",
+      "purpose": "Formal-run NG details overlay",
+      "current_reference": "current/r2/S06-B0.png",
+      "options": {
+        "D": {
+          "id": "D_08_run_ng_modal",
+          "option": "D",
+          "screen_id": "08_run_ng_modal",
+          "filename": "08_run_ng_modal.png",
+          "status": "Generated",
+          "contract_sha256": "aed178f2d21a5671238212d8720d9b01b83aaacb9e9c2e62431ad3b6fb2848ed",
+          "functional_audit": "passed",
+          "current_reference": "current/r2/S06-B0.png",
+          "master_references": [
+            "option_D/masters/05_flow_editor.png"
+          ],
+          "output": "option_D/screens/08_run_ng_modal.png",
+          "output_sha256": "8793b0983eda3caa25a652f28c900ab1d04a190fc9a2c39ef80bce9a199efa8b",
+          "output_ready": true,
+          "reject_gate": "passed",
+          "review_ready": true
+        },
+        "E": {
+          "id": "E_08_run_ng_modal",
+          "option": "E",
+          "screen_id": "08_run_ng_modal",
+          "filename": "08_run_ng_modal.png",
+          "status": "Needs-Manual",
+          "contract_sha256": "3e24385120e9e0285ec27a44aa181fe05de901680bed567aa57d943c135da48b",
+          "functional_audit": "passed",
+          "current_reference": "current/r2/S06-B0.png",
+          "master_references": [
+            "option_E/masters/05_flow_editor.png"
+          ],
+          "output": "option_E/screens/08_run_ng_modal.png",
+          "output_sha256": "4a4ceefd8f4518af50eb685066d6687a27fc4ef63526b92646863dd7106dc102",
+          "output_ready": false,
+          "reject_gate": "pending",
+          "review_ready": false
+        }
+      }
+    },
+    {
+      "screen_id": "09_results_investigation",
+      "filename": "09_results_investigation.png",
+      "page_name": "Results Investigation",
+      "purpose": "NG-first inspection evidence review",
+      "current_reference": "current/r2/S07-B0.png",
+      "options": {
+        "D": {
+          "id": "D_09_results_investigation",
+          "option": "D",
+          "screen_id": "09_results_investigation",
+          "filename": "09_results_investigation.png",
+          "status": "Generated",
+          "contract_sha256": "e95adbdfdefe721843940df42400d4d7b3f66e73bed28430a2e8b728140b48fe",
+          "functional_audit": "passed",
+          "current_reference": "current/r2/S07-B0.png",
+          "master_references": [
+            "option_D/masters/05_flow_editor.png",
+            "option_D/masters/13_ai_workspace.png"
+          ],
+          "output": "option_D/screens/09_results_investigation.png",
+          "output_sha256": "8d716e0ab1fdffaef82075975c34219565fc8b79b973a7b44c80150252f0201a",
+          "output_ready": true,
+          "reject_gate": "passed",
+          "review_ready": true
+        },
+        "E": {
+          "id": "E_09_results_investigation",
+          "option": "E",
+          "screen_id": "09_results_investigation",
+          "filename": "09_results_investigation.png",
+          "status": "Needs-Manual",
+          "contract_sha256": "2c5bc9313f72a78108b962b055134279d800ebad3a4c5f52b7d97581906f001c",
+          "functional_audit": "passed",
+          "current_reference": "current/r2/S07-B0.png",
+          "master_references": [
+            "option_E/masters/05_flow_editor.png",
+            "option_E/masters/13_ai_workspace.png"
+          ],
+          "output": "option_E/screens/09_results_investigation.png",
+          "output_sha256": "85301995d4e085e498beb2d2476a24959aebe792f6b9fe6c2e844987e0e2a1be",
+          "output_ready": false,
+          "reject_gate": "pending",
+          "review_ready": false
+        }
+      }
+    },
+    {
+      "screen_id": "10_stations_list",
+      "filename": "10_stations_list.png",
+      "page_name": "Stations List",
+      "purpose": "Station fleet monitoring and scanable status",
+      "current_reference": "current/r2/S08-B0.png",
+      "options": {
+        "D": {
+          "id": "D_10_stations_list",
+          "option": "D",
+          "screen_id": "10_stations_list",
+          "filename": "10_stations_list.png",
+          "status": "Generated",
+          "contract_sha256": "ba75513ad4074e3a89f645ff939cb608251b870e78805e44795d7f1f70c54378",
+          "functional_audit": "passed",
+          "current_reference": "current/r2/S08-B0.png",
+          "master_references": [
+            "option_D/masters/05_flow_editor.png",
+            "option_D/masters/13_ai_workspace.png"
+          ],
+          "output": "option_D/screens/10_stations_list.png",
+          "output_sha256": "939080aed9eaa4102702e5da3ccbe2e9f1b9f18cd8ca6184cfc6c6c228b374eb",
+          "output_ready": true,
+          "reject_gate": "passed",
+          "review_ready": true
+        },
+        "E": {
+          "id": "E_10_stations_list",
+          "option": "E",
+          "screen_id": "10_stations_list",
+          "filename": "10_stations_list.png",
+          "status": "Needs-Manual",
+          "contract_sha256": "38b7f4cd5983260a07d0728ddfcc46fce3410dc175af700ba60e562d00f82f57",
+          "functional_audit": "passed",
+          "current_reference": "current/r2/S08-B0.png",
+          "master_references": [
+            "option_E/masters/05_flow_editor.png",
+            "option_E/masters/13_ai_workspace.png"
+          ],
+          "output": "option_E/screens/10_stations_list.png",
+          "output_sha256": "e11e75d8e4af7982c7b331027d5fa24c71884b65ab41c515dabaa2fc5ba639a2",
+          "output_ready": false,
+          "reject_gate": "pending",
+          "review_ready": false
+        }
+      }
+    },
+    {
+      "screen_id": "11_station_detail",
+      "filename": "11_station_detail.png",
+      "page_name": "Station Detail",
+      "purpose": "Selected station operational detail",
+      "current_reference": "current/r2/S08-B2.png",
+      "options": {
+        "D": {
+          "id": "D_11_station_detail",
+          "option": "D",
+          "screen_id": "11_station_detail",
+          "filename": "11_station_detail.png",
+          "status": "Generated",
+          "contract_sha256": "c0f8f746392b988d5a464f713a4f2756f49901b78169949c5af9ebc8925f5bd3",
+          "functional_audit": "passed",
+          "current_reference": "current/r2/S08-B2.png",
+          "master_references": [
+            "option_D/masters/05_flow_editor.png",
+            "option_D/masters/13_ai_workspace.png"
+          ],
+          "output": "option_D/screens/11_station_detail.png",
+          "output_sha256": "2ebb9f191210fa8ac76bb37270e630ea6f715e1ac6501b3817196b9fe097829a",
+          "output_ready": true,
+          "reject_gate": "passed",
+          "review_ready": true
+        },
+        "E": {
+          "id": "E_11_station_detail",
+          "option": "E",
+          "screen_id": "11_station_detail",
+          "filename": "11_station_detail.png",
+          "status": "Needs-Manual",
+          "contract_sha256": "318452745bee6e6f2633ef00738ba5baa8d3b97c3fa1d7e67704146f718c884b",
+          "functional_audit": "passed",
+          "current_reference": "current/r2/S08-B2.png",
+          "master_references": [
+            "option_E/masters/05_flow_editor.png",
+            "option_E/masters/13_ai_workspace.png"
+          ],
+          "output": "option_E/screens/11_station_detail.png",
+          "output_sha256": "5c5e960ec071b03a94b00221705240afd408d44a986d148d4a6952ccf5e2d43f",
+          "output_ready": false,
+          "reject_gate": "pending",
+          "review_ready": false
+        }
+      }
+    },
+    {
+      "screen_id": "12_inspection",
+      "filename": "12_inspection.png",
+      "page_name": "Inspection",
+      "purpose": "Continuous inspection recovery, readiness, metrics, and latest result",
+      "current_reference": "current/r2/S09-B0.png",
+      "options": {
+        "D": {
+          "id": "D_12_inspection",
+          "option": "D",
+          "screen_id": "12_inspection",
+          "filename": "12_inspection.png",
+          "status": "Generated",
+          "contract_sha256": "19b81cb0885ebd49fb49e8948fdc0c87b91a02f679b7f594c114a0ed0944935e",
+          "functional_audit": "passed",
+          "current_reference": "current/r2/S09-B0.png",
+          "master_references": [
+            "option_D/masters/05_flow_editor.png",
+            "option_D/masters/13_ai_workspace.png"
+          ],
+          "output": "option_D/screens/12_inspection.png",
+          "output_sha256": "280c7fbaf8561bd4e8bd662fbdc1eb4852180161bcb1537311a22a809eb6cc60",
+          "output_ready": true,
+          "reject_gate": "passed",
+          "review_ready": true
+        },
+        "E": {
+          "id": "E_12_inspection",
+          "option": "E",
+          "screen_id": "12_inspection",
+          "filename": "12_inspection.png",
+          "status": "Needs-Manual",
+          "contract_sha256": "8ca6de07463b4c52b9beba45c695bdbc4d1bca6229fdcf52c1a54b65bd4acf59",
+          "functional_audit": "passed",
+          "current_reference": "current/r2/S09-B0.png",
+          "master_references": [
+            "option_E/masters/05_flow_editor.png",
+            "option_E/masters/13_ai_workspace.png"
+          ],
+          "output": "option_E/screens/12_inspection.png",
+          "output_sha256": "a86393f6ed147e6eb2c12da98e26e93889350a0ce9649f385981c04bce17e9a7",
+          "output_ready": false,
+          "reject_gate": "pending",
+          "review_ready": false
+        }
+      }
+    },
+    {
+      "screen_id": "13_ai_workspace",
+      "filename": "13_ai_workspace.png",
+      "page_name": "AI Workspace",
+      "purpose": "AI clarification, build, validation, handoff, and recovery workbench",
+      "current_reference": "current/r2/S11-B0.png",
+      "options": {
+        "D": {
+          "id": "D_13_ai_workspace",
+          "option": "D",
+          "screen_id": "13_ai_workspace",
+          "filename": "13_ai_workspace.png",
+          "status": "Approved-Candidate",
+          "contract_sha256": "51f91644b74271577ed74b2f1f6422a6e8b64f2058e4b2940d85788633baec0c",
+          "functional_audit": "passed",
+          "current_reference": "current/r2/S11-B0.png",
+          "master_references": [
+            "option_D/masters/05_flow_editor.png"
+          ],
+          "output": "option_D/screens/13_ai_workspace.png",
+          "output_sha256": "0e2875749de6fc6d1971517a530f6a9daae4f935456f035482dc85bf6cf91b1d",
+          "output_ready": true,
+          "reject_gate": "passed",
+          "review_ready": true
+        },
+        "E": {
+          "id": "E_13_ai_workspace",
+          "option": "E",
+          "screen_id": "13_ai_workspace",
+          "filename": "13_ai_workspace.png",
+          "status": "Needs-Manual",
+          "contract_sha256": "2ad0cb51d0ff4b1ecb8efe2f5ef323e70e9e90effcee66a33159c66df93ff130",
+          "functional_audit": "passed",
+          "current_reference": "current/r2/S11-B0.png",
+          "master_references": [
+            "option_E/masters/05_flow_editor.png"
+          ],
+          "output": "option_E/screens/13_ai_workspace.png",
+          "output_sha256": "db44f210a514ca4013df2952f790aeb39785d1a996e29021c486482b9318b8cb",
+          "output_ready": false,
+          "reject_gate": "pending",
+          "review_ready": false
+        }
+      }
+    },
+    {
+      "screen_id": "14_ai_failure_recovery",
+      "filename": "14_ai_failure_recovery.png",
+      "page_name": "AI Failure Recovery",
+      "purpose": "AI blocked/failed recovery state",
+      "current_reference": "current/r2/S11-EXCEPTION.png",
+      "options": {
+        "D": {
+          "id": "D_14_ai_failure_recovery",
+          "option": "D",
+          "screen_id": "14_ai_failure_recovery",
+          "filename": "14_ai_failure_recovery.png",
+          "status": "Generated",
+          "contract_sha256": "e4c6e16c415eb57be777f17f875beb411dfa900dc2af07cdc39c9f7c062dc387",
+          "functional_audit": "passed",
+          "current_reference": "current/r2/S11-EXCEPTION.png",
+          "master_references": [
+            "option_D/masters/13_ai_workspace.png"
+          ],
+          "output": "option_D/screens/14_ai_failure_recovery.png",
+          "output_sha256": "cf4540d7e4a25c8d928462dee9186e5b4b6d569db783d0e41a20ccf1ecaef6d3",
+          "output_ready": true,
+          "reject_gate": "passed",
+          "review_ready": true
+        },
+        "E": {
+          "id": "E_14_ai_failure_recovery",
+          "option": "E",
+          "screen_id": "14_ai_failure_recovery",
+          "filename": "14_ai_failure_recovery.png",
+          "status": "Needs-Manual",
+          "contract_sha256": "5ace89836c742ca1f34aa5c856c623ebaef5ef871f713405f6b006ab185bb5b0",
+          "functional_audit": "passed",
+          "current_reference": "current/r2/S11-EXCEPTION.png",
+          "master_references": [
+            "option_E/masters/13_ai_workspace.png"
+          ],
+          "output": "option_E/screens/14_ai_failure_recovery.png",
+          "output_sha256": "259f959bbfc69e0e8325847bd554bce432a46cc67767e0481c23f65c6bb588c4",
+          "output_ready": false,
+          "reject_gate": "pending",
+          "review_ready": false
+        }
+      }
+    },
+    {
+      "screen_id": "15_operator_catalog",
+      "filename": "15_operator_catalog.png",
+      "page_name": "Operator Catalog",
+      "purpose": "Read-only operator discovery and integrity",
+      "current_reference": "current/r2/S12-B0.png",
+      "options": {
+        "D": {
+          "id": "D_15_operator_catalog",
+          "option": "D",
+          "screen_id": "15_operator_catalog",
+          "filename": "15_operator_catalog.png",
+          "status": "Generated",
+          "contract_sha256": "353dfd01286274211fbc96be3c6144cbb1fcbee45f22072c4f030e387e46c070",
+          "functional_audit": "passed",
+          "current_reference": "current/r2/S12-B0.png",
+          "master_references": [
+            "option_D/masters/16_system_settings.png"
+          ],
+          "output": "option_D/screens/15_operator_catalog.png",
+          "output_sha256": "a01ee6cfbcd1344c2340ce18ced5eb2cfce66450dd0509f5e87ccedead3a2d1f",
+          "output_ready": true,
+          "reject_gate": "passed",
+          "review_ready": true
+        },
+        "E": {
+          "id": "E_15_operator_catalog",
+          "option": "E",
+          "screen_id": "15_operator_catalog",
+          "filename": "15_operator_catalog.png",
+          "status": "Needs-Manual",
+          "contract_sha256": "f0578bdec50ad688e6d30ba7e71b7f97aacdd99fd2baf21872563340514cdeaa",
+          "functional_audit": "passed",
+          "current_reference": "current/r2/S12-B0.png",
+          "master_references": [
+            "option_E/masters/16_system_settings.png"
+          ],
+          "output": "option_E/screens/15_operator_catalog.png",
+          "output_sha256": "d932909283cdd4aee1ff6efc368edd95ce514cfdc001a10d75b1ee463f078a55",
+          "output_ready": false,
+          "reject_gate": "pending",
+          "review_ready": false
+        }
+      }
+    },
+    {
+      "screen_id": "16_system_settings",
+      "filename": "16_system_settings.png",
+      "page_name": "System Settings",
+      "purpose": "General system configuration and Settings shell",
+      "current_reference": "current/r2/S10-B0.png",
+      "options": {
+        "D": {
+          "id": "D_16_system_settings",
+          "option": "D",
+          "screen_id": "16_system_settings",
+          "filename": "16_system_settings.png",
+          "status": "Approved-Candidate",
+          "contract_sha256": "668c88908606ec7b07c8ea53b3ea99cce1b61e75a8f1b4d9e8c03b78df0d7b9a",
+          "functional_audit": "passed",
+          "current_reference": "current/r2/S10-B0.png",
+          "master_references": [
+            "option_D/masters/05_flow_editor.png",
+            "option_D/masters/13_ai_workspace.png"
+          ],
+          "output": "option_D/screens/16_system_settings.png",
+          "output_sha256": "525b960075f34db309f2a4871afef54fb100474f2d6479f2447262a2ad98a35e",
+          "output_ready": true,
+          "reject_gate": "passed",
+          "review_ready": true
+        },
+        "E": {
+          "id": "E_16_system_settings",
+          "option": "E",
+          "screen_id": "16_system_settings",
+          "filename": "16_system_settings.png",
+          "status": "Needs-Manual",
+          "contract_sha256": "6b1973962ab5621abb3f8ee35f262fabbfb666115adbccc730063af5bff5e636",
+          "functional_audit": "passed",
+          "current_reference": "current/r2/S10-B0.png",
+          "master_references": [
+            "option_E/masters/05_flow_editor.png",
+            "option_E/masters/13_ai_workspace.png"
+          ],
+          "output": "option_E/screens/16_system_settings.png",
+          "output_sha256": "8afe900714c99d933f07cea134441a5da6a830f058bcfcc430070736fa9c50ed",
+          "output_ready": false,
+          "reject_gate": "pending",
+          "review_ready": false
+        }
+      }
+    },
+    {
+      "screen_id": "17_camera_settings",
+      "filename": "17_camera_settings.png",
+      "page_name": "Camera Settings",
+      "purpose": "Camera binding, acquisition, preview, and trigger input",
+      "current_reference": "current/settings/settings-camera-b0-1920x1080-light-compact.png",
+      "options": {
+        "D": {
+          "id": "D_17_camera_settings",
+          "option": "D",
+          "screen_id": "17_camera_settings",
+          "filename": "17_camera_settings.png",
+          "status": "Generated",
+          "contract_sha256": "5430de897e4bd301a17bff3d330491d4d4b7ed2a7d3e3d20b367093544e00d37",
+          "functional_audit": "passed",
+          "current_reference": "current/settings/settings-camera-b0-1920x1080-light-compact.png",
+          "master_references": [
+            "option_D/masters/16_system_settings.png"
+          ],
+          "output": "option_D/screens/17_camera_settings.png",
+          "output_sha256": "0768b51c32225de4804d1e2d67e65b13a0cc4c53b13a6329afc61daa245dbdf0",
+          "output_ready": true,
+          "reject_gate": "passed",
+          "review_ready": true
+        },
+        "E": {
+          "id": "E_17_camera_settings",
+          "option": "E",
+          "screen_id": "17_camera_settings",
+          "filename": "17_camera_settings.png",
+          "status": "Needs-Manual",
+          "contract_sha256": "83f02d9c7c8a43a2a6d9161785c9c47c8a363e002231626c6a1fd966f6853c29",
+          "functional_audit": "passed",
+          "current_reference": "current/settings/settings-camera-b0-1920x1080-light-compact.png",
+          "master_references": [
+            "option_E/masters/16_system_settings.png"
+          ],
+          "output": "option_E/screens/17_camera_settings.png",
+          "output_sha256": "7144e018394f5dcecba27a79f81adc14b0d83572f4f5082fb7392dc29ca2885c",
+          "output_ready": false,
+          "reject_gate": "pending",
+          "review_ready": false
+        }
+      }
+    },
+    {
+      "screen_id": "18_plc_settings",
+      "filename": "18_plc_settings.png",
+      "page_name": "PLC Settings",
+      "purpose": "PLC connection and address mapping",
+      "current_reference": "current/settings/settings-plc-b0-1920x1080-light-compact.png",
+      "options": {
+        "D": {
+          "id": "D_18_plc_settings",
+          "option": "D",
+          "screen_id": "18_plc_settings",
+          "filename": "18_plc_settings.png",
+          "status": "Generated",
+          "contract_sha256": "afdf8978a3806d32be338a3b07c7efca8d11d1e5faf5c72caefefd8f969bfc5c",
+          "functional_audit": "passed",
+          "current_reference": "current/settings/settings-plc-b0-1920x1080-light-compact.png",
+          "master_references": [
+            "option_D/masters/16_system_settings.png"
+          ],
+          "output": "option_D/screens/18_plc_settings.png",
+          "output_sha256": "8f1bac13706adb645d5d03191917e1cbc47cc110ce3a6ab7c9e5600914d746c9",
+          "output_ready": true,
+          "reject_gate": "passed",
+          "review_ready": true
+        },
+        "E": {
+          "id": "E_18_plc_settings",
+          "option": "E",
+          "screen_id": "18_plc_settings",
+          "filename": "18_plc_settings.png",
+          "status": "Needs-Manual",
+          "contract_sha256": "e98399d5eac55f206c7024f14786986f2d6ff4dbb1fdf37a818580e879893f84",
+          "functional_audit": "passed",
+          "current_reference": "current/settings/settings-plc-b0-1920x1080-light-compact.png",
+          "master_references": [
+            "option_E/masters/16_system_settings.png"
+          ],
+          "output": "option_E/screens/18_plc_settings.png",
+          "output_sha256": "98a2813b89e3a427e032fab9caef30eff1e2ff38694cae89a103ed4264b0d183",
+          "output_ready": false,
+          "reject_gate": "pending",
+          "review_ready": false
+        }
+      }
+    },
+    {
+      "screen_id": "19_tcp_settings",
+      "filename": "19_tcp_settings.png",
+      "page_name": "TCP Settings",
+      "purpose": "TCP profiles, connection control, send/receive diagnostics",
+      "current_reference": "current/settings/settings-tcp-b0-dark-1920x1080-dark-compact.png",
+      "options": {
+        "D": {
+          "id": "D_19_tcp_settings",
+          "option": "D",
+          "screen_id": "19_tcp_settings",
+          "filename": "19_tcp_settings.png",
+          "status": "Generated",
+          "contract_sha256": "45141cd9c14b9a7692719e496a6f69b92ece622ea10e5f26588d18d1b37ecd3d",
+          "functional_audit": "passed",
+          "current_reference": "current/settings/settings-tcp-b0-dark-1920x1080-dark-compact.png",
+          "master_references": [
+            "option_D/masters/16_system_settings.png"
+          ],
+          "output": "option_D/screens/19_tcp_settings.png",
+          "output_sha256": "d08f03523572cf2f976d5f90081903cfd46f264ea0263c213bdf095288b1df80",
+          "output_ready": true,
+          "reject_gate": "passed",
+          "review_ready": true
+        },
+        "E": {
+          "id": "E_19_tcp_settings",
+          "option": "E",
+          "screen_id": "19_tcp_settings",
+          "filename": "19_tcp_settings.png",
+          "status": "Needs-Manual",
+          "contract_sha256": "8a25784c6ed94b3cf0e4f23ff6102fcbe69763684cd8119754054c118b35db55",
+          "functional_audit": "passed",
+          "current_reference": "current/settings/settings-tcp-b0-dark-1920x1080-dark-compact.png",
+          "master_references": [
+            "option_E/masters/16_system_settings.png"
+          ],
+          "output": "option_E/screens/19_tcp_settings.png",
+          "output_sha256": "0848daf90b6d3e0103046700bd1b066f293dfe4d23f3eeead7a61cef07e7e7f0",
+          "output_ready": false,
+          "reject_gate": "pending",
+          "review_ready": false
+        }
+      }
+    },
+    {
+      "screen_id": "20_station_communication",
+      "filename": "20_station_communication.png",
+      "page_name": "Station Communication",
+      "purpose": "Studio-to-Station communication configuration",
+      "current_reference": "current/settings/settings-station-1920x1080-dark-compact.png",
+      "options": {
+        "D": {
+          "id": "D_20_station_communication",
+          "option": "D",
+          "screen_id": "20_station_communication",
+          "filename": "20_station_communication.png",
+          "status": "Generated",
+          "contract_sha256": "2ffece15cb72219e582f57d7437edd8aea79b9284f9ae12c301d9b301d76bd19",
+          "functional_audit": "passed",
+          "current_reference": "current/settings/settings-station-1920x1080-dark-compact.png",
+          "master_references": [
+            "option_D/masters/16_system_settings.png"
+          ],
+          "output": "option_D/screens/20_station_communication.png",
+          "output_sha256": "e1a660e9e64ff17184cda8ff7341fcfaa2660934164bbf93f73bf67ad0e65cd1",
+          "output_ready": true,
+          "reject_gate": "passed",
+          "review_ready": true
+        },
+        "E": {
+          "id": "E_20_station_communication",
+          "option": "E",
+          "screen_id": "20_station_communication",
+          "filename": "20_station_communication.png",
+          "status": "Needs-Manual",
+          "contract_sha256": "59a61faf3cdd350d3077b70632f750cbde7226b38294e9ddbe7bc155835cbd92",
+          "functional_audit": "passed",
+          "current_reference": "current/settings/settings-station-1920x1080-dark-compact.png",
+          "master_references": [
+            "option_E/masters/16_system_settings.png"
+          ],
+          "output": "option_E/screens/20_station_communication.png",
+          "output_sha256": "f6f4268876d94cb358bfd30e0fb18390c58da31ae55feeed15f8930416dc4207",
+          "output_ready": false,
+          "reject_gate": "pending",
+          "review_ready": false
+        }
+      }
+    },
+    {
+      "screen_id": "21_ai_model_settings",
+      "filename": "21_ai_model_settings.png",
+      "page_name": "AI Model Settings",
+      "purpose": "Provider/model configuration and availability",
+      "current_reference": "current/settings/settings-ai-model-1920x1080-light-compact.png",
+      "options": {
+        "D": {
+          "id": "D_21_ai_model_settings",
+          "option": "D",
+          "screen_id": "21_ai_model_settings",
+          "filename": "21_ai_model_settings.png",
+          "status": "Generated",
+          "contract_sha256": "797c56e7e85af50246fbf27ba86e5dfd9d2e32e306bf7549ba9ab9a2134c926c",
+          "functional_audit": "passed",
+          "current_reference": "current/settings/settings-ai-model-1920x1080-light-compact.png",
+          "master_references": [
+            "option_D/masters/16_system_settings.png"
+          ],
+          "output": "option_D/screens/21_ai_model_settings.png",
+          "output_sha256": "a3fbdefa534c897daa40630308e8d2cc5672decdb4ca16fe3af1b648c744b993",
+          "output_ready": true,
+          "reject_gate": "passed",
+          "review_ready": true
+        },
+        "E": {
+          "id": "E_21_ai_model_settings",
+          "option": "E",
+          "screen_id": "21_ai_model_settings",
+          "filename": "21_ai_model_settings.png",
+          "status": "Needs-Manual",
+          "contract_sha256": "e54500b4f16b63fb4b4346ea73765bcedcf30e8a0806a171b5a669267778f53d",
+          "functional_audit": "passed",
+          "current_reference": "current/settings/settings-ai-model-1920x1080-light-compact.png",
+          "master_references": [
+            "option_E/masters/16_system_settings.png"
+          ],
+          "output": "option_E/screens/21_ai_model_settings.png",
+          "output_sha256": "fc45a750aac596553f4323868d8ef9a3585921dcf5737df57a53e20d79ba4abe",
+          "output_ready": false,
+          "reject_gate": "pending",
+          "review_ready": false
+        }
+      }
+    },
+    {
+      "screen_id": "22_diagnostics",
+      "filename": "22_diagnostics.png",
+      "page_name": "Diagnostics",
+      "purpose": "Local services, owner projection, and technical diagnostics",
+      "current_reference": "current/r2/S13-B0.png",
+      "options": {
+        "D": {
+          "id": "D_22_diagnostics",
+          "option": "D",
+          "screen_id": "22_diagnostics",
+          "filename": "22_diagnostics.png",
+          "status": "Generated",
+          "contract_sha256": "28abaa3a408c27974ce55424f50c0f83b1a05064843b9fb53039e2af85e263e5",
+          "functional_audit": "passed",
+          "current_reference": "current/r2/S13-B0.png",
+          "master_references": [
+            "option_D/masters/16_system_settings.png"
+          ],
+          "output": "option_D/screens/22_diagnostics.png",
+          "output_sha256": "0415729663e19fb6b2527956eec74d9f64284cefa8b1ba7be7f8c4d5c9e6ee97",
+          "output_ready": true,
+          "reject_gate": "passed",
+          "review_ready": true
+        },
+        "E": {
+          "id": "E_22_diagnostics",
+          "option": "E",
+          "screen_id": "22_diagnostics",
+          "filename": "22_diagnostics.png",
+          "status": "Needs-Manual",
+          "contract_sha256": "777b92b03e666ae8ec6c94159a18387d5fef3b5e2c0dd5e1a2bde8d90e87373d",
+          "functional_audit": "passed",
+          "current_reference": "current/r2/S13-B0.png",
+          "master_references": [
+            "option_E/masters/16_system_settings.png"
+          ],
+          "output": "option_E/screens/22_diagnostics.png",
+          "output_sha256": "d96a8c9579886e83e13547330d33818f5c5459a77591f98bb48caaf46b365af3",
+          "output_ready": false,
+          "reject_gate": "pending",
+          "review_ready": false
+        }
+      }
+    },
+    {
+      "screen_id": "23_about",
+      "filename": "23_about.png",
+      "page_name": "About",
+      "purpose": "Product, host, backend, license, and support identity",
+      "current_reference": "current/r2/S13-B2.png",
+      "options": {
+        "D": {
+          "id": "D_23_about",
+          "option": "D",
+          "screen_id": "23_about",
+          "filename": "23_about.png",
+          "status": "Generated",
+          "contract_sha256": "823fe67aba06897cb2355d8c7bc2d0e3e5dd08bf8b08f72211020f5f0825fc18",
+          "functional_audit": "passed",
+          "current_reference": "current/r2/S13-B2.png",
+          "master_references": [
+            "option_D/masters/16_system_settings.png"
+          ],
+          "output": "option_D/screens/23_about.png",
+          "output_sha256": "4b085e25511b6fcffc72d6d6af33c39574baa9bfb7106729485b4035a77c8e84",
+          "output_ready": true,
+          "reject_gate": "passed",
+          "review_ready": true
+        },
+        "E": {
+          "id": "E_23_about",
+          "option": "E",
+          "screen_id": "23_about",
+          "filename": "23_about.png",
+          "status": "Needs-Manual",
+          "contract_sha256": "41a9e2dcb944449f56013806efccf070fbb2a1e968c35409d1df38f9ac0f9152",
+          "functional_audit": "passed",
+          "current_reference": "current/r2/S13-B2.png",
+          "master_references": [
+            "option_E/masters/16_system_settings.png"
+          ],
+          "output": "option_E/screens/23_about.png",
+          "output_sha256": "a4081ae2d7d7dbaac6e9356217d88841630786807b60a802b84355030a9d2a79",
+          "output_ready": false,
+          "reject_gate": "pending",
+          "review_ready": false
+        }
+      }
+    },
+    {
+      "screen_id": "24_forbidden",
+      "filename": "24_forbidden.png",
+      "page_name": "Forbidden",
+      "purpose": "Authority boundary and recovery route",
+      "current_reference": "current/r2/S10-EXCEPTION.png",
+      "options": {
+        "D": {
+          "id": "D_24_forbidden",
+          "option": "D",
+          "screen_id": "24_forbidden",
+          "filename": "24_forbidden.png",
+          "status": "Generated",
+          "contract_sha256": "d4bcb28e234173ee04a9af72ba688226c60bb7d884f7ed2d826ac0c4941a23f7",
+          "functional_audit": "passed",
+          "current_reference": "current/r2/S10-EXCEPTION.png",
+          "master_references": [
+            "option_D/masters/16_system_settings.png"
+          ],
+          "output": "option_D/screens/24_forbidden.png",
+          "output_sha256": "e6171bedda03d2c06ae5bb6c66241a8993b08f360657ff35c8245ad7eeb208ca",
+          "output_ready": true,
+          "reject_gate": "passed",
+          "review_ready": true
+        },
+        "E": {
+          "id": "E_24_forbidden",
+          "option": "E",
+          "screen_id": "24_forbidden",
+          "filename": "24_forbidden.png",
+          "status": "Needs-Manual",
+          "contract_sha256": "a7046cc612d062adc80c3944c34414e9788fef100eacbd1295e138afe2396587",
+          "functional_audit": "passed",
+          "current_reference": "current/r2/S10-EXCEPTION.png",
+          "master_references": [
+            "option_E/masters/16_system_settings.png"
+          ],
+          "output": "option_E/screens/24_forbidden.png",
+          "output_sha256": "b6404221f2d1a82777867fbc933c2114ddf69d2fdcc1027b6f3e377790d4d123",
+          "output_ready": false,
+          "reject_gate": "pending",
+          "review_ready": false
+        }
+      }
+    }
+  ]
+}

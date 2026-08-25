@@ -1,0 +1,110 @@
+{
+  "schemaVersion": "r2-final-matrix-capture.v1",
+  "scene": "S13",
+  "variant": "B2",
+  "route": "#/about",
+  "state": "identity",
+  "role": "Engineer",
+  "flags": {},
+  "owner": {
+    "capability": "F02-support-surfaces",
+    "mounted": 1,
+    "subscriptions": 0,
+    "writes": 0
+  },
+  "requests": [
+    "GET /api/auth/setup-status",
+    "GET /api/auth/me",
+    "GET /health"
+  ],
+  "runtimeRequests": [
+    {
+      "method": "GET",
+      "path": "/api/auth/setup-status",
+      "url": "http://127.0.0.1:5421/api/auth/setup-status"
+    },
+    {
+      "method": "GET",
+      "path": "/api/auth/me",
+      "url": "http://127.0.0.1:5421/api/auth/me"
+    },
+    {
+      "method": "GET",
+      "path": "/health",
+      "url": "http://127.0.0.1:5421/health"
+    }
+  ],
+  "allowedWrites": [],
+  "runtime": {
+    "consoleErrors": [],
+    "pageErrors": [],
+    "failedRequests": [],
+    "httpErrors": [],
+    "expectedHttpErrors": [],
+    "observedExpectedHttpErrors": [],
+    "unexpectedWrites": []
+  },
+  "requiredCriticalActions": [
+    "[data-product-appearance] button"
+  ],
+  "motion": {
+    "layoutShifts": [],
+    "longTasks": [
+      {
+        "startTime": 66.40000000596046,
+        "duration": 62
+      }
+    ]
+  },
+  "notes": [],
+  "dom": {
+    "url": "http://127.0.0.1:5421/studio/index.html#/about",
+    "viewport": {
+      "width": 1366,
+      "height": 768,
+      "dpr": 1
+    },
+    "theme": "light",
+    "density": "compact",
+    "reducedMotion": "false",
+    "focus": {
+      "tagName": "BUTTON",
+      "id": "",
+      "testId": null
+    },
+    "landmarks": {
+      "main": 1,
+      "nav": 1,
+      "dialogs": 0
+    },
+    "mainBox": {
+      "x": 0,
+      "y": 52,
+      "width": 1366,
+      "height": 716
+    },
+    "horizontalOverflow": 0,
+    "pageScroll": {
+      "x": 0,
+      "y": 0
+    },
+    "criticalActions": [
+      {
+        "selector": "[data-product-appearance] button",
+        "testId": null,
+        "text": "外观浅色 · 紧凑",
+        "box": {
+          "x": 1025.8125,
+          "y": 11.5,
+          "width": 129.1875,
+          "height": 28
+        },
+        "truncated": false,
+        "inViewport": true,
+        "reachable": true,
+        "enabled": true,
+        "unobscured": true
+      }
+    ]
+  }
+}

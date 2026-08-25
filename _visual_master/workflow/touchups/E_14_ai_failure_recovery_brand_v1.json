@@ -1,0 +1,21 @@
+{
+  "schema_version": "clearvision-controlled-picture-layer-touchup.v1",
+  "entry_id": "E_14_ai_failure_recovery",
+  "source_iteration": "option_E/iterations/14_ai_failure_recovery_v2.png",
+  "source_sha256": "474d17966c22fec7e32dec3b4d86036f09e08b21d2eb5111074d0695f536b235",
+  "purpose": "Preserve the faithful AI failure-recovery page and restore the product brand only.",
+  "operations": [
+    {
+      "type": "replace_text",
+      "box": [96, 0, 320, 90],
+      "fill": [255, 254, 254],
+      "position": [102, 27],
+      "text": "ClearVision STUDIO",
+      "font_path": "C:\\Windows\\Fonts\\msyhbd.ttc",
+      "font_sha256": "06e1a30f687ab7d39f533447b21e84d51e0cecdaa6bfa060c87136b168811bdc",
+      "font_size": 24,
+      "text_fill": [24, 31, 38],
+      "purpose": "Replace generated ClearVision AI branding without changing the AI workspace capability."
+    }
+  ]
+}

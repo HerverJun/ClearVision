@@ -1,0 +1,105 @@
+{
+  "schema_version": "clearvision-controlled-picture-layer-touchup.v1",
+  "entry_id": "D_07_flow_preview_roi",
+  "source_iteration": "option_D/iterations/07_flow_preview_roi_v_final_consistency_source_4k.png",
+  "source_sha256": "2716d79e21eb78dfe4cf7187186d94087c345edbf6594c46b455e8b0d3b747c8",
+  "purpose": "Preserve the approved D05 Flow family and complete ROI Preview controls while replacing only the oversized ROI Rectangle node with the compact canonical FlowCanvas node contract.",
+  "operations": [
+    {
+      "type": "paste_master_reference",
+      "reference_path": "option_D/masters/05_flow_editor.png",
+      "reference_sha256": "247efff95e87fdd626f36dfae2dced6d94465d0c697408dca62e69d6ccacedc3",
+      "source_box": [0, 0, 3839, 2159],
+      "box": [0, 0, 3839, 2159],
+      "purpose": "Use the exact corrected D05 shell, project context, command bar, and panel geometry."
+    },
+    {
+      "type": "paste_reference",
+      "reference_path": "current/r2/S05-B2.png",
+      "reference_sha256": "df7b56d9d40d0582d394dd7a9b7633f5c045becd12879e541baf96d134ef0468",
+      "source_box": [352, 166, 1040, 724],
+      "box": [815, 518, 3013, 2048],
+      "purpose": "Restore the audited CURRENT canvas and authoritative one-node ROI topology before the bounded canonical-node correction."
+    },
+    {
+      "type": "copy_resize",
+      "source_box": [2686, 274, 3839, 2034],
+      "box": [3014, 405, 3839, 2049],
+      "purpose": "Retain the complete generated manual Preview and ROI surface, including image evidence, fields, actions, and disclosures."
+    },
+    {
+      "type": "replace_text",
+      "box": [20, 2060, 1120, 2145],
+      "fill": [254, 254, 254],
+      "position": [45, 2075],
+      "text": "节点 1    连线 0    已选 1    本地流程修订 0",
+      "font_path": "C:\\Windows\\Fonts\\msyh.ttc",
+      "font_sha256": "e4b3b9d058750fb80899c24f68e35beda606ca92694eff0e9f7f91eec7a846aa",
+      "font_size": 28,
+      "text_fill": [45, 57, 70],
+      "purpose": "Keep the footer counters aligned with the authoritative one-node ROI topology."
+    },
+    {
+      "type": "paste_reference",
+      "reference_path": "current/r2/S05-B2.png",
+      "reference_sha256": "df7b56d9d40d0582d394dd7a9b7633f5c045becd12879e541baf96d134ef0468",
+      "source_box": [425, 370, 585, 455],
+      "box": [1048, 639, 1559, 871],
+      "purpose": "Erase only the oversized ROI node with a phase-aligned blank patch from the same immutable CURRENT dotted canvas."
+    },
+    {
+      "type": "rounded_rect",
+      "box": [1165, 695, 1445, 815],
+      "fill": [232, 241, 246],
+      "outline": [20, 184, 166],
+      "width": 4,
+      "radius": 12,
+      "purpose": "Draw the selected ROI Rectangle body at the canonical 140x60 logical size and 6px logical radius."
+    },
+    {
+      "type": "rounded_rect",
+      "box": [1165, 695, 1445, 743],
+      "fill": [20, 184, 166],
+      "radius": 12,
+      "purpose": "Use the canonical RectangleRegion teal category header."
+    },
+    {
+      "type": "fill_rect",
+      "box": [1165, 731, 1445, 743],
+      "fill": [20, 184, 166],
+      "purpose": "Keep only the ROI header top corners rounded."
+    },
+    {
+      "type": "draw_text",
+      "box": [1177, 695, 1433, 743],
+      "position": [1185, 719],
+      "anchor": "lm",
+      "text": "ROI Rectangle",
+      "font_path": "C:\\Windows\\Fonts\\segoeuib.ttf",
+      "font_sha256": "1b242874a2f57529060e770ba313e027a99d40b3c36e1c7e8b2dece16ad6ed88",
+      "font_size": 22,
+      "text_fill": [255, 255, 255],
+      "purpose": "Use the canonical white bold 11px logical node title."
+    },
+    {
+      "type": "draw_text",
+      "box": [1365, 743, 1433, 815],
+      "position": [1429, 779],
+      "anchor": "rm",
+      "text": "Roi",
+      "font_path": "C:\\Windows\\Fonts\\segoeui.ttf",
+      "font_sha256": "ba32a222b23d727267cf1aba4e5296fe84ce99b9d910915103fc085d7931bc88",
+      "font_size": 16,
+      "text_fill": [95, 105, 117],
+      "purpose": "Restore the canonical right-aligned ROI output label."
+    },
+    {
+      "type": "ellipse",
+      "box": [1435, 769, 1455, 789],
+      "fill": [13, 148, 136],
+      "outline": [248, 249, 250],
+      "width": 2,
+      "purpose": "Draw the canonical Region-type output port at 5px logical radius."
+    }
+  ]
+}

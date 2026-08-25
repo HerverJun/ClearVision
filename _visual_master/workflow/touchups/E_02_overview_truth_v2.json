@@ -1,0 +1,45 @@
+{
+  "schema_version": "clearvision-controlled-picture-layer-touchup.v1",
+  "entry_id": "E_02_overview",
+  "source_iteration": "option_E/iterations/02_overview_v2.png",
+  "source_sha256": "643d576d97e887d831e44a77b0f18c6151b2df789e0281bd5a6dcacc85dd8dac",
+  "purpose": "Restore verified overview wording with tightly bounded replacements that preserve every title and divider.",
+  "operations": [
+    {
+      "type": "replace_text",
+      "box": [80, 626, 470, 657],
+      "fill": [250, 250, 251],
+      "position": [82, 631],
+      "text": "本地服务与当前会话的实时投影。",
+      "font_path": "C:\\Windows\\Fonts\\msyh.ttc",
+      "font_sha256": "e4b3b9d058750fb80899c24f68e35beda606ca92694eff0e9f7f91eec7a846aa",
+      "font_size": 15,
+      "text_fill": [72, 82, 91],
+      "purpose": "Restore CURRENT runtime projection terminology."
+    },
+    {
+      "type": "replace_text",
+      "box": [1210, 703, 1525, 735],
+      "fill": [250, 250, 252],
+      "position": [1216, 709],
+      "text": "配置流程与工程资产",
+      "font_path": "C:\\Windows\\Fonts\\msyh.ttc",
+      "font_sha256": "e4b3b9d058750fb80899c24f68e35beda606ca92694eff0e9f7f91eec7a846aa",
+      "font_size": 15,
+      "text_fill": [72, 82, 91],
+      "purpose": "Restore the verified Engineering workspace purpose."
+    },
+    {
+      "type": "replace_text",
+      "box": [1210, 862, 1585, 891],
+      "fill": [250, 250, 252],
+      "position": [1216, 866],
+      "text": "调查本机与工作站结果",
+      "font_path": "C:\\Windows\\Fonts\\msyh.ttc",
+      "font_sha256": "e4b3b9d058750fb80899c24f68e35beda606ca92694eff0e9f7f91eec7a846aa",
+      "font_size": 15,
+      "text_fill": [72, 82, 91],
+      "purpose": "Restore the verified Results workspace purpose without touching its title."
+    }
+  ]
+}

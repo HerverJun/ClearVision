@@ -1,0 +1,21 @@
+{
+  "schema_version": "clearvision-controlled-picture-layer-touchup.v1",
+  "entry_id": "E_11_station_detail",
+  "source_iteration": "option_E/iterations/11_station_detail_v2.png",
+  "source_sha256": "c5da2d91429efec15afb6bd4f50d9ba41ecee3d9d7925ee9fd4eadabe3f554eb",
+  "purpose": "Keep the faithful Station detail candidate with only CURRENT status overview and recent results, and restore the existing More menu affordance.",
+  "operations": [
+    {
+      "type": "replace_text",
+      "box": [1704, 9, 1740, 67],
+      "fill": [254, 254, 255],
+      "position": [1711, 22],
+      "text": "...",
+      "font_path": "C:\\Windows\\Fonts\\msyhbd.ttc",
+      "font_sha256": "06e1a30f687ab7d39f533447b21e84d51e0cecdaa6bfa060c87136b168811bdc",
+      "font_size": 16,
+      "text_fill": [73, 82, 91],
+      "purpose": "Restore the verified More menu without adding any Station action or data module."
+    }
+  ]
+}

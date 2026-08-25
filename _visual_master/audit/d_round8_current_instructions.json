@@ -1,0 +1,10 @@
+{
+  "schema_version": "clearvision-ui-iteration-instructions.v1",
+  "option": "D",
+  "round": 8,
+  "reference_mode": "current-dominant",
+  "functional_authority": "CURRENT screenshot plus current ClearVision code",
+  "instructions": {
+    "D_07_flow_preview_roi": "Rebuild from CURRENT S05-B2, the ClearVision-only D architecture blueprint, and D Flow Master; do not inherit the rejected Round 7 candidate. Use only the normal Product Shell; no top-level 流程, Windows controls, help, notification, or permanent capability rail. The operator picker is closed. The actual dotted FlowCanvas spans x approximately 70-1270 of the 2048px image, about 58-60% of the full viewport, and remains the visual center. The Preview/ROI context spans x approximately 1300-2048, about 36%, with no full parameter Inspector simultaneously open. Use the actual bound CURRENT 100x100 black artifact with its red patch/crack evidence, never a substitute image. Preserve only 手动预览, Rectangle X10 Y10 Width30 Height20, real image tools, result summary/key/structured/additional/diagnostic projection, ROI draft warning, undo, redo, discard, and apply. All other verified Flow commands remain discoverable through the normal D master context. No new state, value, tab, command, image, node, navigation, device ability, or save path."
+  }
+}

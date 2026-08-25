@@ -1,0 +1,118 @@
+{
+  "schemaVersion": "r2-final-matrix-capture.v1",
+  "scene": "S11",
+  "variant": "B2",
+  "route": "#/ai?sessionId=session_f06_01",
+  "state": "recovery",
+  "role": "Engineer",
+  "flags": {
+    "Studio2.AiWorkbench": true
+  },
+  "owner": {
+    "capability": "F06-ai-workbench",
+    "mounted": 1,
+    "subscriptions": 0,
+    "writes": 0
+  },
+  "requests": [
+    "GET /api/auth/setup-status",
+    "GET /api/auth/me",
+    "GET /health",
+    "GET /api/ai/sessions/session_f06_01"
+  ],
+  "runtimeRequests": [
+    {
+      "method": "GET",
+      "path": "/api/auth/setup-status",
+      "url": "http://127.0.0.1:5421/api/auth/setup-status"
+    },
+    {
+      "method": "GET",
+      "path": "/api/auth/me",
+      "url": "http://127.0.0.1:5421/api/auth/me"
+    },
+    {
+      "method": "GET",
+      "path": "/health",
+      "url": "http://127.0.0.1:5421/health"
+    },
+    {
+      "method": "GET",
+      "path": "/api/ai/sessions/session_f06_01",
+      "url": "http://127.0.0.1:5421/api/ai/sessions/session_f06_01"
+    }
+  ],
+  "allowedWrites": [],
+  "runtime": {
+    "consoleErrors": [],
+    "pageErrors": [],
+    "failedRequests": [],
+    "httpErrors": [],
+    "expectedHttpErrors": [],
+    "observedExpectedHttpErrors": [],
+    "unexpectedWrites": []
+  },
+  "requiredCriticalActions": [
+    "[aria-label=\"打开历史与恢复\"]"
+  ],
+  "motion": {
+    "layoutShifts": [],
+    "longTasks": [
+      {
+        "startTime": 81.90000000596046,
+        "duration": 87
+      }
+    ]
+  },
+  "notes": [],
+  "dom": {
+    "url": "http://127.0.0.1:5421/studio/index.html#/ai?sessionId=session_f06_01",
+    "viewport": {
+      "width": 1366,
+      "height": 768,
+      "dpr": 1
+    },
+    "theme": "light",
+    "density": "compact",
+    "reducedMotion": "false",
+    "focus": {
+      "tagName": "BUTTON",
+      "id": "",
+      "testId": null
+    },
+    "landmarks": {
+      "main": 1,
+      "nav": 1,
+      "dialogs": 0
+    },
+    "mainBox": {
+      "x": 0,
+      "y": 52,
+      "width": 1366,
+      "height": 965.921875
+    },
+    "horizontalOverflow": 0,
+    "pageScroll": {
+      "x": 0,
+      "y": 0
+    },
+    "criticalActions": [
+      {
+        "selector": "[aria-label=\"打开历史与恢复\"]",
+        "testId": null,
+        "text": "",
+        "box": {
+          "x": 1278,
+          "y": 80,
+          "width": 28,
+          "height": 28
+        },
+        "truncated": false,
+        "inViewport": true,
+        "reachable": true,
+        "enabled": true,
+        "unobscured": true
+      }
+    ]
+  }
+}

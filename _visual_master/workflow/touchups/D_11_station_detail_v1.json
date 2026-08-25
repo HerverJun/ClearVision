@@ -1,0 +1,57 @@
+{
+  "schema_version": "clearvision-controlled-picture-layer-touchup.v1",
+  "entry_id": "D_11_station_detail",
+  "source_iteration": "option_D/iterations/11_station_detail_v12.png",
+  "source_sha256": "2ed1586c152de943d29c14b45b4a055db8d0531a5426cadaec0dd1ac528fc1be",
+  "purpose": "Keep the audited Round 10 Station detail composition and correct only four malformed CURRENT version strings from 1.00 to 1.0.0.",
+  "operations": [
+    {
+      "type": "replace_text",
+      "box": [1450, 515, 1593, 552],
+      "fill": [254, 254, 254],
+      "position": [1461, 522],
+      "text": "瓶盖检测包 - 1.0.0",
+      "font_path": "C:\\Windows\\Fonts\\msyh.ttc",
+      "font_sha256": "e4b3b9d058750fb80899c24f68e35beda606ca92694eff0e9f7f91eec7a846aa",
+      "font_size": 16,
+      "text_fill": [45, 57, 70],
+      "purpose": "Restore the exact CURRENT package version in the first recent-result row."
+    },
+    {
+      "type": "replace_text",
+      "box": [1450, 626, 1593, 663],
+      "fill": [254, 254, 254],
+      "position": [1461, 633],
+      "text": "瓶盖检测包 - 1.0.0",
+      "font_path": "C:\\Windows\\Fonts\\msyh.ttc",
+      "font_sha256": "e4b3b9d058750fb80899c24f68e35beda606ca92694eff0e9f7f91eec7a846aa",
+      "font_size": 16,
+      "text_fill": [45, 57, 70],
+      "purpose": "Restore the exact CURRENT package version in the second recent-result row."
+    },
+    {
+      "type": "replace_text",
+      "box": [408, 855, 550, 892],
+      "fill": [254, 254, 254],
+      "position": [417, 861],
+      "text": "瓶盖检测包 - 1.0.0",
+      "font_path": "C:\\Windows\\Fonts\\msyh.ttc",
+      "font_sha256": "e4b3b9d058750fb80899c24f68e35beda606ca92694eff0e9f7f91eec7a846aa",
+      "font_size": 16,
+      "text_fill": [45, 57, 70],
+      "purpose": "Restore the exact CURRENT package name and version in the production trace."
+    },
+    {
+      "type": "replace_text",
+      "box": [716, 903, 780, 938],
+      "fill": [254, 254, 254],
+      "position": [726, 907],
+      "text": "1.0.0",
+      "font_path": "C:\\Windows\\Fonts\\msyh.ttc",
+      "font_sha256": "e4b3b9d058750fb80899c24f68e35beda606ca92694eff0e9f7f91eec7a846aa",
+      "font_size": 16,
+      "text_fill": [45, 57, 70],
+      "purpose": "Restore the exact CURRENT version value in the production trace."
+    }
+  ]
+}

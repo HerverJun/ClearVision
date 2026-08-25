@@ -1,0 +1,171 @@
+{
+  "schema_version": "clearvision-controlled-picture-layer-touchup.v1",
+  "entry_id": "E_13_ai_workspace",
+  "source_iteration": "option_E/iterations/13_ai_workspace_v3.png",
+  "source_sha256": "e1e73123cdc47cd0a057cb018dd1e4243f7606f3b77657603b03ff02d968b579",
+  "purpose": "Preserve the audited Round 3 single-owner AI review while restoring only CURRENT-confirmed page identity, unbound-project context, section labels, exact local-draft copy and candidate-difference facts in a deterministic 63/37 composition.",
+  "operations": [
+    {
+      "type": "fill_rect",
+      "box": [0, 85, 1331, 1151],
+      "fill": [248, 249, 250],
+      "purpose": "Clear the left work surface before moving the existing verified candidate content down to make room for the omitted CURRENT page context."
+    },
+    {
+      "type": "copy_rect",
+      "source_box": [50, 140, 1285, 1000],
+      "box": [50, 280, 1285, 1140],
+      "purpose": "Move the complete existing Application Preview, plan/build, candidate facts and collapsed technical-identity disclosure down without resizing or altering their content."
+    },
+    {
+      "type": "fill_rect",
+      "box": [1290, 85, 1334, 1151],
+      "fill": [247, 248, 250],
+      "purpose": "Move the visual column boundary to x=1290 so the composition is approximately 63/37 while preserving all right-owner content at native scale."
+    },
+    {
+      "type": "fill_rect",
+      "box": [1290, 85, 1291, 1151],
+      "fill": [205, 211, 218],
+      "purpose": "Draw the single fine separator for the right status, action and validation owner."
+    },
+    {
+      "type": "replace_text",
+      "box": [55, 108, 455, 154],
+      "fill": [248, 249, 250],
+      "position": [58, 111],
+      "text": "AI 工程工作台",
+      "font_path": "C:\\Windows\\Fonts\\msyhbd.ttc",
+      "font_sha256": "06e1a30f687ab7d39f533447b21e84d51e0cecdaa6bfa060c87136b168811bdc",
+      "font_size": 28,
+      "text_fill": [24, 29, 35],
+      "purpose": "Restore the exact CURRENT page title omitted by Round 3."
+    },
+    {
+      "type": "replace_text",
+      "box": [55, 158, 220, 187],
+      "fill": [248, 249, 250],
+      "position": [58, 161],
+      "text": "独立方案",
+      "font_path": "C:\\Windows\\Fonts\\msyh.ttc",
+      "font_sha256": "e4b3b9d058750fb80899c24f68e35beda606ca92694eff0e9f7f91eec7a846aa",
+      "font_size": 14,
+      "text_fill": [58, 66, 76],
+      "purpose": "Restore the exact CURRENT AI workbench subtitle."
+    },
+    {
+      "type": "replace_text",
+      "box": [85, 197, 315, 229],
+      "fill": [248, 249, 250],
+      "position": [90, 201],
+      "text": "尚未绑定工程",
+      "font_path": "C:\\Windows\\Fonts\\msyhbd.ttc",
+      "font_sha256": "06e1a30f687ab7d39f533447b21e84d51e0cecdaa6bfa060c87136b168811bdc",
+      "font_size": 16,
+      "text_fill": [35, 42, 50],
+      "purpose": "Restore the CURRENT unbound-project status heading."
+    },
+    {
+      "type": "replace_text",
+      "box": [85, 231, 700, 260],
+      "fill": [248, 249, 250],
+      "position": [90, 234],
+      "text": "可先完成任务理解与方案规划，当前不会创建或写入工程。",
+      "font_path": "C:\\Windows\\Fonts\\msyh.ttc",
+      "font_sha256": "e4b3b9d058750fb80899c24f68e35beda606ca92694eff0e9f7f91eec7a846aa",
+      "font_size": 13,
+      "text_fill": [74, 85, 97],
+      "purpose": "Restore the exact CURRENT unbound-project authority explanation."
+    },
+    {
+      "type": "replace_text",
+      "box": [470, 197, 615, 229],
+      "fill": [240, 242, 244],
+      "position": [482, 204],
+      "text": "未绑定工程",
+      "font_path": "C:\\Windows\\Fonts\\msyh.ttc",
+      "font_sha256": "e4b3b9d058750fb80899c24f68e35beda606ca92694eff0e9f7f91eec7a846aa",
+      "font_size": 13,
+      "text_fill": [88, 98, 108],
+      "purpose": "Restore the exact CURRENT passive unbound-project badge text without creating an action."
+    },
+    {
+      "type": "fill_rect",
+      "box": [110, 475, 1260, 531],
+      "fill": [239, 242, 245],
+      "purpose": "Clear the generated local-draft sentence before restoring the exact two-line CURRENT notice."
+    },
+    {
+      "type": "replace_text",
+      "box": [115, 477, 700, 501],
+      "fill": [239, 242, 245],
+      "position": [120, 479],
+      "text": "交接后进入工作区本地草稿",
+      "font_path": "C:\\Windows\\Fonts\\msyhbd.ttc",
+      "font_sha256": "06e1a30f687ab7d39f533447b21e84d51e0cecdaa6bfa060c87136b168811bdc",
+      "font_size": 14,
+      "text_fill": [52, 70, 88],
+      "purpose": "Restore the exact CURRENT local-draft notice title."
+    },
+    {
+      "type": "replace_text",
+      "box": [115, 503, 1250, 529],
+      "fill": [239, 242, 245],
+      "position": [120, 505],
+      "text": "交接只会让工作区加载候选草稿，不会自动保存工程、运行流程或部署运行包。",
+      "font_path": "C:\\Windows\\Fonts\\msyh.ttc",
+      "font_sha256": "e4b3b9d058750fb80899c24f68e35beda606ca92694eff0e9f7f91eec7a846aa",
+      "font_size": 13,
+      "text_fill": [65, 78, 91],
+      "purpose": "Restore the exact CURRENT local-draft consequence and remove the duplicated generated word."
+    },
+    {
+      "type": "replace_text",
+      "box": [55, 566, 270, 596],
+      "fill": [248, 249, 250],
+      "position": [58, 568],
+      "text": "方案与构建",
+      "font_path": "C:\\Windows\\Fonts\\msyhbd.ttc",
+      "font_sha256": "06e1a30f687ab7d39f533447b21e84d51e0cecdaa6bfa060c87136b168811bdc",
+      "font_size": 16,
+      "text_fill": [35, 42, 50],
+      "purpose": "Restore the CURRENT section identity above the preserved plan/build facts."
+    },
+    {
+      "type": "replace_text",
+      "box": [55, 860, 245, 890],
+      "fill": [248, 249, 250],
+      "position": [58, 862],
+      "text": "候选差异",
+      "font_path": "C:\\Windows\\Fonts\\msyhbd.ttc",
+      "font_sha256": "06e1a30f687ab7d39f533447b21e84d51e0cecdaa6bfa060c87136b168811bdc",
+      "font_size": 16,
+      "text_fill": [35, 42, 50],
+      "purpose": "Restore the CURRENT candidate-difference section identity."
+    },
+    {
+      "type": "replace_text",
+      "box": [1035, 860, 1275, 890],
+      "fill": [248, 249, 250],
+      "position": [1045, 864],
+      "text": "新增 3 / 修改 0 / 删除 0",
+      "font_path": "C:\\Windows\\Fonts\\msyh.ttc",
+      "font_sha256": "e4b3b9d058750fb80899c24f68e35beda606ca92694eff0e9f7f91eec7a846aa",
+      "font_size": 13,
+      "text_fill": [90, 100, 111],
+      "purpose": "Restore the exact CURRENT candidate-difference counts."
+    },
+    {
+      "type": "replace_text",
+      "box": [620, 895, 810, 930],
+      "fill": [248, 249, 250],
+      "position": [628, 901],
+      "text": "参数输入",
+      "font_path": "C:\\Windows\\Fonts\\msyhbd.ttc",
+      "font_sha256": "06e1a30f687ab7d39f533447b21e84d51e0cecdaa6bfa060c87136b168811bdc",
+      "font_size": 16,
+      "text_fill": [35, 42, 50],
+      "purpose": "Replace the generated 参数确认 label with the exact CURRENT label."
+    }
+  ]
+}

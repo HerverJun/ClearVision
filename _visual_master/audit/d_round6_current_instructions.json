@@ -1,0 +1,11 @@
+{
+  "schema_version": "clearvision-ui-iteration-instructions.v1",
+  "option": "D",
+  "round": 6,
+  "reference_mode": "current-dominant",
+  "functional_authority": "CURRENT screenshot plus current ClearVision code",
+  "instructions": {
+    "D_07_flow_preview_roi": "Rebuild the D Flow Preview ROI state from CURRENT and D Flow Master, without the rejected iteration target. Preserve the complete verified Flow workspace inventory and D canvas-first language. Use the normal Product Shell and workspace commands only; no Windows controls, no new top-level 流程 navigation, no dataset/run-debug/physical-device capability rail, no help or notification. Show one FlowCanvas, one on-demand operator picker using only search/categories/recent/favorites, one Preview context with only 手动预览, the bound 100x100 CURRENT artifact, Rectangle X10 Y10 Width30 Height20, real image tools, result summary/key/structured/additional/diagnostic projection, ROI draft warning, undo/redo/discard/apply. No new state, value, tab, command, image, or save path.",
+    "D_08_run_ng_modal": "Rebuild the D run-details NG state from CURRENT and D Flow Master, without the rejected iteration target. Preserve project 瓶盖检测 A, version 1.0.0, saved state, formal run completed and synchronized, judgment NG, and one bounded modal over FlowCanvas. The six metrics are exactly 总数, 判定OK/NG, 有效判定良率, 判定覆盖率, 平均节拍, 执行失败. Admission is exactly 6/7 with 保存修订, 流程与判定身份, 必要参数, 工程资源, 最终判定, 设备输入, 运行包. Keep 运行与设备：正式运行完成，判定NG, recent NG/result link/diagnostics, and technical 保存修订/执行快照/流程hash/判定hash/会话 with unknown values as --. Keep only 正式运行, 重新检查, close. No invented metric, duration, FPS, accuracy, check, identity, value, tab, export, approval, new node, Fit/fullscreen, or desktop control."
+  }
+}

@@ -1,0 +1,105 @@
+{
+  "schemaVersion": "r2-final-matrix-capture.v1",
+  "scene": "S00",
+  "variant": "EXCEPTION",
+  "route": "#/login",
+  "state": "auth-error",
+  "role": "Public",
+  "flags": {},
+  "owner": {
+    "capability": "F04-auth",
+    "mounted": 1,
+    "subscriptions": 0,
+    "writes": 0
+  },
+  "requests": [
+    "GET /api/auth/setup-status",
+    "POST /api/auth/login"
+  ],
+  "runtimeRequests": [
+    {
+      "method": "GET",
+      "path": "/api/auth/setup-status",
+      "url": "http://127.0.0.1:5421/api/auth/setup-status"
+    },
+    {
+      "method": "POST",
+      "path": "/api/auth/login",
+      "url": "http://127.0.0.1:5421/api/auth/login"
+    }
+  ],
+  "allowedWrites": [
+    "POST /api/auth/login"
+  ],
+  "runtime": {
+    "consoleErrors": [],
+    "pageErrors": [],
+    "failedRequests": [],
+    "httpErrors": [],
+    "expectedHttpErrors": [
+      "POST /api/auth/login: 401"
+    ],
+    "observedExpectedHttpErrors": [
+      "POST /api/auth/login: 401"
+    ],
+    "unexpectedWrites": []
+  },
+  "requiredCriticalActions": [
+    ".auth-form__submit"
+  ],
+  "motion": {
+    "layoutShifts": [],
+    "longTasks": []
+  },
+  "notes": [],
+  "dom": {
+    "url": "http://127.0.0.1:5421/studio/index.html#/login",
+    "viewport": {
+      "width": 1366,
+      "height": 768,
+      "dpr": 1
+    },
+    "theme": "light",
+    "density": "compact",
+    "reducedMotion": "false",
+    "focus": {
+      "tagName": "P",
+      "id": "",
+      "testId": null
+    },
+    "landmarks": {
+      "main": 1,
+      "nav": 0,
+      "dialogs": 0
+    },
+    "mainBox": {
+      "x": 0,
+      "y": 0,
+      "width": 1366,
+      "height": 768
+    },
+    "horizontalOverflow": 0,
+    "pageScroll": {
+      "x": 0,
+      "y": 0
+    },
+    "criticalActions": [
+      {
+        "selector": ".auth-form__submit",
+        "testId": null,
+        "text": "登录",
+        "box": {
+          "x": 473,
+          "y": 593.796875,
+          "width": 420,
+          "height": 44
+        },
+        "truncated": false,
+        "inViewport": true,
+        "reachable": true,
+        "enabled": true,
+        "unobscured": true
+      }
+    ]
+  }
+}

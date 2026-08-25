@@ -36,13 +36,13 @@ body {
 }
 
 *::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+  width: var(--cv-scrollbar-size);
+  height: var(--cv-scrollbar-size);
 }
 
 *::-webkit-scrollbar-track { background: var(--cv-scrollbar-track); }
 *::-webkit-scrollbar-thumb {
-  border: 2px solid transparent;
+  border: var(--cv-scrollbar-thumb-inset) solid transparent;
   border-radius: var(--cv-radius-pill);
   background: var(--cv-scrollbar-thumb);
   background-clip: padding-box;
@@ -86,40 +86,40 @@ input[type="checkbox"] {
 }
 
 :focus-visible {
-  outline: 2px solid var(--cv-focus-ring-color);
-  outline-offset: 2px;
+  outline: var(--cv-focus-ring-width) solid var(--cv-focus-ring-color);
+  outline-offset: var(--cv-focus-ring-offset);
 }
 
 .foundation-page {
-  width: min(760px, calc(100% - 32px));
-  margin: 32px auto;
-  padding: 24px;
-  border: 1px solid var(--cv-border-default);
+  width: min(var(--cv-content-measure-sm), calc(100% - (var(--cv-space-4) * 2)));
+  margin: var(--cv-space-8) auto;
+  padding: var(--cv-space-6);
+  border: var(--cv-border-width-thin) solid var(--cv-border-default);
   border-radius: var(--cv-radius-md);
   background: var(--cv-surface-1);
   box-shadow: var(--cv-elevation-1);
 }
 
 .foundation-page h1 {
-  margin: 0 0 12px;
-  font-size: 24px;
+  margin: 0 0 var(--cv-space-3);
+  font-size: var(--cv-font-size-xl);
 }
 
 .foundation-page p,
 .foundation-page li,
 .foundation-page dt,
 .foundation-page dd {
-  line-height: 1.6;
+  line-height: var(--cv-line-height-relaxed);
 }
 
 .foundation-page dl {
   display: grid;
-  grid-template-columns: minmax(140px, 0.7fr) minmax(0, 1.3fr);
-  gap: 8px 16px;
+  grid-template-columns: minmax(var(--cv-layout-label-column-min), 0.7fr) minmax(0, 1.3fr);
+  gap: var(--cv-space-2) var(--cv-space-4);
 }
 
 .foundation-page dt {
-  font-weight: 600;
+  font-weight: var(--cv-font-weight-semibold);
 }
 
 .foundation-page dd {
@@ -130,31 +130,31 @@ input[type="checkbox"] {
 
 .bootstrap-diagnostic pre {
   overflow: auto;
-  padding: 12px;
-  border: 1px solid var(--cv-border-default);
+  padding: var(--cv-space-3);
+  border: var(--cv-border-width-thin) solid var(--cv-border-default);
   border-radius: var(--cv-radius-sm);
   background: var(--cv-surface-2);
   white-space: pre-wrap;
 }
 
 .foundation-page.bootstrap-diagnostic {
-  margin-block: clamp(32px, 12vh, 120px);
+  margin-block: clamp(var(--cv-space-8), 12vh, calc(var(--cv-space-12) * 2.5));
 }
 
 .bootstrap-diagnostic__product {
-  margin: 0 0 8px;
+  margin: 0 0 var(--cv-space-2);
   color: var(--cv-color-link);
   font-size: var(--cv-font-size-xs);
   font-weight: var(--cv-font-weight-semibold);
 }
 
 .bootstrap-diagnostic__technical {
-  margin-top: 16px;
-  border-top: 1px solid var(--cv-border-subtle);
+  margin-top: var(--cv-space-4);
+  border-top: var(--cv-border-width-thin) solid var(--cv-border-subtle);
 }
 
 .bootstrap-diagnostic__technical summary {
-  padding: 12px 0;
+  padding: var(--cv-space-3) 0;
   color: var(--cv-color-link);
   cursor: pointer;
   font-size: var(--cv-font-size-sm);
@@ -164,20 +164,20 @@ input[type="checkbox"] {
 .bootstrap-diagnostic__actions {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
-  margin-top: 20px;
+  gap: var(--cv-space-2);
+  margin-top: var(--cv-space-5);
 }
 
 .bootstrap-diagnostic__copy-status {
   display: block;
-  min-height: 20px;
-  margin-top: 8px;
+  min-height: var(--cv-space-5);
+  margin-top: var(--cv-space-2);
   color: var(--cv-text-secondary);
   font-size: var(--cv-font-size-xs);
 }
 
 .bootstrap-diagnostic__guidance {
-  margin: 16px 0 0;
+  margin: var(--cv-space-4) 0 0;
   color: var(--cv-text-secondary);
   font-size: var(--cv-font-size-sm);
 }
@@ -185,7 +185,7 @@ input[type="checkbox"] {
 .bootstrap-diagnostic button {
   min-height: var(--cv-density-control-height);
   padding: 0 var(--cv-space-4);
-  border: 1px solid var(--cv-control-border);
+  border: var(--cv-border-width-thin) solid var(--cv-control-border);
   border-radius: var(--cv-radius-sm);
   background: var(--cv-surface-raised);
   color: var(--cv-text-primary);

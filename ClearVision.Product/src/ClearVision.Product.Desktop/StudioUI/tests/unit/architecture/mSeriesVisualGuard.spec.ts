@@ -33,8 +33,8 @@ describe('M-series shared visual and navigation guards', () => {
     const layout = read('src/app/layouts/product-layout.css');
     expect(layout).not.toMatch(/workspace-nav-item:nth-child/);
     expect(layout).toContain('overflow-x: auto;');
-    expect(layout).toMatch(/workspace-nav-item\.is-current[\s\S]*?background:\s*var\(--cv-color-action-soft\);/);
-    expect(layout).toMatch(/workspace-nav-item\.is-current[\s\S]*?box-shadow:\s*inset 3px 0 0 var\(--cv-color-action\);/);
+    expect(layout).toMatch(/workspace-nav-item\.is-current[\s\S]*?background:\s*transparent;/);
+    expect(layout).toMatch(/workspace-nav-item\.is-current[\s\S]*?box-shadow:\s*inset 0 -3px 0 var\(--cv-color-brand-500\);/);
     expect(layout).not.toMatch(/workspace-nav-item\.is-current::after/);
 
     const component = read('src/app/layouts/ProductLayout.vue');

@@ -1,0 +1,21 @@
+{
+  "schema_version": "clearvision-controlled-picture-layer-touchup.v1",
+  "entry_id": "E_05_flow_editor",
+  "source_iteration": "option_E/iterations/05_flow_editor_v12.png",
+  "source_sha256": "482be36f2d4a92e4ca080916150801e30ec4d3c7b11d1603e2ea1aa3e7719ce5",
+  "purpose": "Restore only the verified FilePath resource-binding identity omitted by the accepted E05 gpt-image-2 candidate; preserve every other pixel relationship, control, state and architectural decision.",
+  "operations": [
+    {
+      "type": "replace_text",
+      "box": [1646, 621, 1747, 640],
+      "fill": [252, 252, 253],
+      "position": [1647, 621],
+      "text": "FilePath",
+      "font_path": "C:\\Windows\\Fonts\\msyh.ttc",
+      "font_sha256": "e4b3b9d058750fb80899c24f68e35beda606ca92694eff0e9f7f91eec7a846aa",
+      "font_size": 13,
+      "text_fill": [63, 71, 80],
+      "purpose": "Restore the exact CURRENT resource-binding identity above the existing Host file-picker helper without adding a field, action or capability."
+    }
+  ]
+}

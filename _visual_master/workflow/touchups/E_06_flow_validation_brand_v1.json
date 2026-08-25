@@ -1,0 +1,39 @@
+{
+  "schema_version": "clearvision-controlled-picture-layer-touchup.v1",
+  "entry_id": "E_06_flow_validation_error",
+  "source_iteration": "option_E/iterations/06_flow_validation_error_v2.png",
+  "source_sha256": "e92ff1fcfff6c000607e22b56196d8e78d87879ac6cc16e2e94914bc1ff9ee58",
+  "purpose": "Preserve the accepted current-dominant E06 Flow validation composition while correcting only the generated product-brand suffix from Flow to the real ClearVision STUDIO identity.",
+  "operations": [
+    {
+      "type": "fill_rect",
+      "box": [64, 8, 259, 64],
+      "fill": [21, 26, 30],
+      "purpose": "Clear only the generated ClearVision Flow text while preserving the existing ClearVision mark and dark product rail."
+    },
+    {
+      "type": "replace_text",
+      "box": [64, 8, 191, 64],
+      "fill": [21, 26, 30],
+      "position": [66, 19],
+      "text": "ClearVision",
+      "font_path": "C:\\Windows\\Fonts\\msyhbd.ttc",
+      "font_sha256": "06e1a30f687ab7d39f533447b21e84d51e0cecdaa6bfa060c87136b168811bdc",
+      "font_size": 20,
+      "text_fill": [245, 247, 249],
+      "purpose": "Restore the real product name without changing any command, layout, state, or business fact."
+    },
+    {
+      "type": "replace_text",
+      "box": [192, 8, 259, 64],
+      "fill": [21, 26, 30],
+      "position": [195, 28],
+      "text": "STUDIO",
+      "font_path": "C:\\Windows\\Fonts\\msyh.ttc",
+      "font_sha256": "e4b3b9d058750fb80899c24f68e35beda606ca92694eff0e9f7f91eec7a846aa",
+      "font_size": 12,
+      "text_fill": [162, 171, 179],
+      "purpose": "Replace the false Flow suffix with the exact current Studio product identity."
+    }
+  ]
+}

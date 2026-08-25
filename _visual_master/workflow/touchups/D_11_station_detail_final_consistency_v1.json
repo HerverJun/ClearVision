@@ -1,0 +1,15 @@
+{
+  "schema_version": "clearvision-controlled-picture-layer-touchup.v1",
+  "entry_id": "D_11_station_detail",
+  "source_iteration": "option_D/iterations/11_station_detail_v21.png",
+  "source_sha256": "7e2464e736b5a75f14f89e4e08ed7460021e3a9c811fa7fd8ce6de589542371d",
+  "purpose": "Remove only the misplaced page-header trace action while preserving the authoritative result-row trace link.",
+  "operations": [
+    {
+      "type": "copy_rect",
+      "source_box": [2500, 380, 2769, 495],
+      "box": [3570, 380, 3839, 495],
+      "purpose": "Cover the header-only trace button with the adjacent page background without touching the warning band or the row-scoped trace link."
+    }
+  ]
+}

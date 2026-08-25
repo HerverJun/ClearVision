@@ -1,0 +1,69 @@
+{
+  "schema_version": "clearvision-controlled-picture-layer-touchup.v1",
+  "entry_id": "D_14_ai_failure_recovery",
+  "source_iteration": "option_D/iterations/14_ai_failure_recovery_v8.png",
+  "source_sha256": "47d19519687788696a0e4454a2f65b309826e5dcea2ce25c520e3ee2aba5422f",
+  "purpose": "Keep the immutable Round 8 no-sidebar gpt-image-2 composition and restore only frozen server-authority, recovery, history, and stage-five copy.",
+  "operations": [
+    {
+      "type": "replace_text",
+      "box": [510, 358, 1050, 404],
+      "fill": [254, 254, 254],
+      "position": [520, 368],
+      "text": "当前显示为服务端权威",
+      "font_path": "C:\\Windows\\Fonts\\msyh.ttc",
+      "font_sha256": "e4b3b9d058750fb80899c24f68e35beda606ca92694eff0e9f7f91eec7a846aa",
+      "font_size": 17,
+      "text_fill": [209, 47, 63],
+      "purpose": "Restore the frozen server-authority heading."
+    },
+    {
+      "type": "replace_text",
+      "box": [510, 405, 1135, 438],
+      "fill": [254, 254, 254],
+      "position": [520, 410],
+      "text": "恢复后的构建状态",
+      "font_path": "C:\\Windows\\Fonts\\msyh.ttc",
+      "font_sha256": "e4b3b9d058750fb80899c24f68e35beda606ca92694eff0e9f7f91eec7a846aa",
+      "font_size": 15,
+      "text_fill": [74, 85, 97],
+      "purpose": "Restore the frozen recovered-build-state copy."
+    },
+    {
+      "type": "replace_text",
+      "box": [1610, 190, 2025, 225],
+      "fill": [255, 250, 246],
+      "position": [1620, 196],
+      "text": "本页面为服务端视图 / 恢复后的权限状态，",
+      "font_path": "C:\\Windows\\Fonts\\msyh.ttc",
+      "font_sha256": "e4b3b9d058750fb80899c24f68e35beda606ca92694eff0e9f7f91eec7a846aa",
+      "font_size": 14,
+      "text_fill": [45, 57, 70],
+      "purpose": "Restore the frozen right-rail authority copy."
+    },
+    {
+      "type": "replace_text",
+      "box": [1585, 640, 2005, 680],
+      "fill": [254, 254, 254],
+      "position": [1595, 648],
+      "text": "查看本次会话的历史诊断证据。",
+      "font_path": "C:\\Windows\\Fonts\\msyh.ttc",
+      "font_sha256": "e4b3b9d058750fb80899c24f68e35beda606ca92694eff0e9f7f91eec7a846aa",
+      "font_size": 14,
+      "text_fill": [74, 85, 97],
+      "purpose": "Restore the verified history-evidence copy."
+    },
+    {
+      "type": "replace_text",
+      "box": [615, 938, 1465, 978],
+      "fill": [254, 254, 254],
+      "position": [625, 946],
+      "text": "已完成服务端回滚 / 覆盖，当前为权限状态。",
+      "font_path": "C:\\Windows\\Fonts\\msyh.ttc",
+      "font_sha256": "e4b3b9d058750fb80899c24f68e35beda606ca92694eff0e9f7f91eec7a846aa",
+      "font_size": 14,
+      "text_fill": [74, 85, 97],
+      "purpose": "Restore the frozen stage-five terminal authority state."
+    }
+  ]
+}

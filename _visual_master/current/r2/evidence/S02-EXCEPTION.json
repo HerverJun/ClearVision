@@ -1,0 +1,129 @@
+{
+  "schemaVersion": "r2-final-matrix-capture.v1",
+  "scene": "S02",
+  "variant": "EXCEPTION",
+  "route": "#/projects",
+  "state": "malformed-list",
+  "role": "Engineer",
+  "flags": {
+    "Studio2.ProjectPage": true
+  },
+  "owner": {
+    "capability": "F02-projects-read",
+    "mounted": 1,
+    "subscriptions": 0,
+    "writes": 0
+  },
+  "requests": [
+    "GET /api/auth/setup-status",
+    "GET /api/auth/me",
+    "GET /health",
+    "GET /api/projects",
+    "GET /api/projects/recent"
+  ],
+  "runtimeRequests": [
+    {
+      "method": "GET",
+      "path": "/api/auth/setup-status",
+      "url": "http://127.0.0.1:5421/api/auth/setup-status"
+    },
+    {
+      "method": "GET",
+      "path": "/api/auth/me",
+      "url": "http://127.0.0.1:5421/api/auth/me"
+    },
+    {
+      "method": "GET",
+      "path": "/health",
+      "url": "http://127.0.0.1:5421/health"
+    },
+    {
+      "method": "GET",
+      "path": "/api/projects",
+      "url": "http://127.0.0.1:5421/api/projects"
+    },
+    {
+      "method": "GET",
+      "path": "/api/projects/recent",
+      "url": "http://127.0.0.1:5421/api/projects/recent?count=5"
+    }
+  ],
+  "allowedWrites": [],
+  "runtime": {
+    "consoleErrors": [],
+    "pageErrors": [],
+    "failedRequests": [],
+    "httpErrors": [],
+    "expectedHttpErrors": [],
+    "observedExpectedHttpErrors": [],
+    "unexpectedWrites": []
+  },
+  "requiredCriticalActions": [
+    ".projects-page__state button"
+  ],
+  "motion": {
+    "layoutShifts": [
+      {
+        "value": 0.007129622831406529,
+        "hadRecentInput": false
+      }
+    ],
+    "longTasks": [
+      {
+        "startTime": 71,
+        "duration": 66
+      }
+    ]
+  },
+  "notes": [],
+  "dom": {
+    "url": "http://127.0.0.1:5421/studio/index.html#/projects",
+    "viewport": {
+      "width": 1366,
+      "height": 768,
+      "dpr": 1
+    },
+    "theme": "light",
+    "density": "compact",
+    "reducedMotion": "false",
+    "focus": {
+      "tagName": "BUTTON",
+      "id": "",
+      "testId": null
+    },
+    "landmarks": {
+      "main": 1,
+      "nav": 1,
+      "dialogs": 0
+    },
+    "mainBox": {
+      "x": 0,
+      "y": 52,
+      "width": 1366,
+      "height": 716
+    },
+    "horizontalOverflow": 0,
+    "pageScroll": {
+      "x": 0,
+      "y": 0
+    },
+    "criticalActions": [
+      {
+        "selector": ".projects-page__state button",
+        "testId": null,
+        "text": "重试",
+        "box": {
+          "x": 657,
+          "y": 591.46875,
+          "width": 52,
+          "height": 28
+        },
+        "truncated": false,
+        "inViewport": true,
+        "reachable": true,
+        "enabled": true,
+        "unobscured": true
+      }
+    ]
+  }
+}

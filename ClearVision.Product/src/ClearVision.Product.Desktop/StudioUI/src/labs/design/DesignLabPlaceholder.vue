@@ -8,13 +8,20 @@ interface DesignLabRootAttributeSnapshot {
 let designLabRootProjectionOwner: symbol | undefined;
 let designLabRootProjectionBaseline: DesignLabRootAttributeSnapshot | undefined;
 const designLabRootProjectionQueue = new Map<symbol, () => void>();
+let designLabDomIdSequence = 0;
+
+function nextDesignLabDomId(vueId: string): string {
+  designLabDomIdSequence += 1;
+  return `${vueId}-${designLabDomIdSequence}`;
+}
 </script>
 
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
+import { computed, onMounted, onUnmounted, ref, useId, watch } from 'vue';
 import {
   CvButton,
   CvDataTable,
+  CvDescriptionList,
   CvField,
   CvIconButton,
   CvInlineAlert,
@@ -32,25 +39,45 @@ import {
   CvToastRegion,
   CvTooltip,
   CvTypography,
+  CvViewTabs,
   type CvDataTableColumn,
+  type CvDescriptionItem,
   type CvSelectOption,
   type CvStatusTone,
   type CvToastItem
 } from '@/design-system/primitives';
 import { CvIcon } from '@/design-system/icons';
 import {
+  CvBreadcrumbs,
   CvPageHeader,
   CvPageState,
-  CvToolbar
+  CvToolbar,
+  type CvBreadcrumbItem
 } from '@/design-system/patterns';
 import './designLab.css';
 
 type Theme = 'light' | 'dark';
 type Density = 'compact' | 'comfortable';
 
-const theme = ref<Theme>('light');
-const density = ref<Density>('comfortable');
-const reducedMotion = ref(false);
+function currentRootTheme(): Theme {
+  return typeof document !== 'undefined' && document.documentElement.dataset.theme === 'dark'
+    ? 'dark'
+    : 'light';
+}
+
+function currentRootDensity(): Density {
+  return typeof document !== 'undefined' && document.documentElement.dataset.density === 'comfortable'
+    ? 'comfortable'
+    : 'compact';
+}
+
+function currentRootReducedMotion(): boolean {
+  return typeof document !== 'undefined' && document.documentElement.dataset.reducedMotion === 'true';
+}
+
+const theme = ref<Theme>(currentRootTheme());
+const density = ref<Density>(currentRootDensity());
+const reducedMotion = ref(currentRootReducedMotion());
 const modalOpen = ref(false);
 const menuOpen = ref(false);
 const showGuidance = ref(false);
@@ -58,9 +85,16 @@ const fieldValue = ref('CV-Station-01');
 const searchValue = ref('edge');
 const selectValue = ref('camera');
 const samplePage = ref(1);
+const readonlyView = ref('summary');
 const inspectorWidth = ref(292);
 const toasts = ref<CvToastItem[]>([]);
 const rootProjectionToken = Symbol('design-lab-root-projection');
+const designLabInstanceId = nextDesignLabDomId(useId());
+const compositionsTitleId = `${designLabInstanceId}-compositions-title`;
+const readonlySummaryTabId = `${designLabInstanceId}-readonly-tab-summary`;
+const readonlySummaryPanelId = `${designLabInstanceId}-readonly-panel-summary`;
+const readonlyStagesTabId = `${designLabInstanceId}-readonly-tab-stages`;
+const readonlyStagesPanelId = `${designLabInstanceId}-readonly-panel-stages`;
 let toastSequence = 0;
 let ownsRootProjection = false;
 
@@ -95,11 +129,40 @@ const tableColumns: readonly CvDataTableColumn<DesignLabTableRow>[] = Object.fre
   { key: 'status', label: '状态', width: '28%' },
   { key: 'duration', label: '耗时', align: 'end', width: '30%' }
 ]);
-const tableRows: readonly DesignLabTableRow[] = Object.freeze([
-  { id: 'acquire', stage: '图像采集', status: '完成', duration: '12.8 ms' },
-  { id: 'locate', stage: '边缘定位', status: '完成', duration: '7.4 ms' },
-  { id: 'decision', stage: '最终判定', status: '等待', duration: '—' }
-]);
+const readonlyFixture = Object.freeze({
+  id: 'option-d-g1-design-system.v1',
+  breadcrumbs: Object.freeze([
+    { label: '内部实验室', href: '#/labs/design' },
+    { label: 'Design System 2.0', current: true }
+  ] satisfies readonly CvBreadcrumbItem[]),
+  tabs: Object.freeze([
+    {
+      value: 'summary',
+      label: '摘要投影',
+      description: '查看冻结的只读摘要字段',
+      id: readonlySummaryTabId,
+      controls: readonlySummaryPanelId
+    },
+    {
+      value: 'stages',
+      label: '阶段明细',
+      description: '查看冻结的阶段表格',
+      id: readonlyStagesTabId,
+      controls: readonlyStagesPanelId
+    }
+  ]),
+  descriptionItems: Object.freeze([
+    { key: 'source', label: '数据来源', value: '本地冻结 fixture' },
+    { key: 'permission', label: '权限投影', value: '只读' },
+    { key: 'revision', label: '持久化版本', value: 'G1 / v1' },
+    { key: 'missing', label: '缺失值', value: null }
+  ] satisfies readonly CvDescriptionItem[]),
+  tableRows: Object.freeze([
+    { id: 'acquire', stage: '图像采集', status: '完成', duration: '12.8 ms' },
+    { id: 'locate', stage: '边缘定位', status: '完成', duration: '7.4 ms' },
+    { id: 'decision', stage: '最终判定', status: '等待', duration: '—' }
+  ] satisfies readonly DesignLabTableRow[])
+});
 
 const activeModeLabel = computed(() =>
   `${theme.value === 'light' ? '浅色' : '深色'} · ${density.value === 'compact' ? '紧凑' : '舒适'} · ${reducedMotion.value ? '减少动效' : '标准动效'}`
@@ -231,7 +294,7 @@ onUnmounted(() => {
           Quiet Precision · F02.1
         </CvTypography>
         <CvTypography
-          as="h2"
+          as="h1"
           variant="page-title"
           weight="semibold"
         >
@@ -330,7 +393,7 @@ onUnmounted(() => {
 
     <section
       class="design-lab__compositions"
-      aria-labelledby="design-compositions-title"
+      :aria-labelledby="compositionsTitleId"
       data-design-compositions="six"
     >
       <header class="design-lab__section-heading">
@@ -344,7 +407,7 @@ onUnmounted(() => {
             构图语言
           </CvTypography>
           <CvTypography
-            id="design-compositions-title"
+            :id="compositionsTitleId"
             as="h2"
             variant="title"
             weight="semibold"
@@ -649,7 +712,12 @@ onUnmounted(() => {
       description="Page header、筛选、提示、表格与分页共享同一套 2.0 表面和密度语义。"
       class="design-lab__wide-panel"
       variant="section"
+      :data-design-fixture="readonlyFixture.id"
     >
+      <CvBreadcrumbs
+        :items="readonlyFixture.breadcrumbs"
+        label="Design Lab 只读样本位置"
+      />
       <CvPageHeader
         eyebrow="只读样本"
         title="检测流程摘要"
@@ -670,7 +738,7 @@ onUnmounted(() => {
           v-model="searchValue"
           label="搜索阶段"
           :hide-label="false"
-          placeholder="名称或状态"
+          placeholder="例如：检测流程或已保存…"
         />
         <CvSelect
           v-model="selectValue"
@@ -685,12 +753,35 @@ onUnmounted(() => {
       >
         Info、Link 与 Focus 使用技术蓝；品牌丹红不承担普通系统事实。
       </CvInlineAlert>
-      <CvDataTable
-        :rows="tableRows"
-        :columns="tableColumns"
-        row-key="id"
-        caption="Design System 2.0 表格样本"
+      <CvViewTabs
+        v-model="readonlyView"
+        :options="readonlyFixture.tabs"
+        label="只读样本视图"
       />
+      <section
+        :id="readonlySummaryPanelId"
+        role="tabpanel"
+        :aria-labelledby="readonlySummaryTabId"
+        :hidden="readonlyView !== 'summary'"
+      >
+        <CvDescriptionList
+          :items="readonlyFixture.descriptionItems"
+          label="检测流程只读摘要"
+        />
+      </section>
+      <section
+        :id="readonlyStagesPanelId"
+        role="tabpanel"
+        :aria-labelledby="readonlyStagesTabId"
+        :hidden="readonlyView !== 'stages'"
+      >
+        <CvDataTable
+          :rows="readonlyFixture.tableRows"
+          :columns="tableColumns"
+          row-key="id"
+          caption="Design System 2.0 表格样本"
+        />
+      </section>
       <CvPagination
         v-model:page="samplePage"
         :page-size="3"
@@ -709,7 +800,7 @@ onUnmounted(() => {
         <CvPageState
           compact
           kind="loading"
-          title="正在读取"
+          title="正在读取…"
           :heading-level="3"
         />
         <CvPageState
@@ -822,6 +913,7 @@ onUnmounted(() => {
             variant="caption"
             tone="muted"
             mono
+            data-design-numeric-sample
           >
             {{ inspectorWidth }} px
           </CvTypography>

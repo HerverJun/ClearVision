@@ -1,0 +1,105 @@
+{
+  "schema_version": "clearvision-controlled-picture-layer-touchup.v1",
+  "entry_id": "D_13_ai_workspace",
+  "source_iteration": "option_D/iterations/13_ai_workspace_v11_model_source.png",
+  "source_sha256": "9a81f8c205fd89e7c5deb2e26a4b3b36b68c2b142836866e3afa14b030bbb353",
+  "purpose": "Preserve the approved D13 4K gpt-image-2 geometry while restoring the exact CURRENT authority wording and technical labels.",
+  "operations": [
+    {
+      "type": "replace_text",
+      "box": [330, 490, 900, 610],
+      "fill": [255, 255, 255],
+      "position": [345, 506],
+      "text": "可先完成任务理解与方案规划，\n当前不会创建或写入工程。",
+      "font_path": "C:\\Windows\\Fonts\\msyh.ttc",
+      "font_sha256": "e4b3b9d058750fb80899c24f68e35beda606ca92694eff0e9f7f91eec7a846aa",
+      "font_size": 28,
+      "text_fill": [84, 90, 106],
+      "purpose": "Restore the exact no-create/no-write authority boundary from CURRENT."
+    },
+    {
+      "type": "replace_text",
+      "box": [260, 1460, 930, 1595],
+      "fill": [255, 255, 255],
+      "position": [272, 1475],
+      "text": "可交接到工作区审核；\n交接不会自动保存或运行。",
+      "font_path": "C:\\Windows\\Fonts\\msyh.ttc",
+      "font_sha256": "e4b3b9d058750fb80899c24f68e35beda606ca92694eff0e9f7f91eec7a846aa",
+      "font_size": 28,
+      "text_fill": [84, 90, 106],
+      "purpose": "Remove the invented project/binding wording and restore the exact handoff boundary."
+    },
+    {
+      "type": "replace_text",
+      "box": [1165, 695, 1785, 750],
+      "fill": [254, 249, 239],
+      "position": [1174, 698],
+      "text": "交接后进入工作区本地草稿",
+      "font_path": "C:\\Windows\\Fonts\\msyh.ttc",
+      "font_sha256": "e4b3b9d058750fb80899c24f68e35beda606ca92694eff0e9f7f91eec7a846aa",
+      "font_size": 28,
+      "text_fill": [162, 102, 25],
+      "purpose": "Replace the invented snapshot title with the exact CURRENT local-draft title."
+    },
+    {
+      "type": "replace_text",
+      "box": [1165, 748, 2660, 805],
+      "fill": [254, 249, 239],
+      "position": [1174, 754],
+      "text": "交接只会让工作区加载候选草稿，不会自动保存工程、运行流程或部署运行包。",
+      "font_path": "C:\\Windows\\Fonts\\msyh.ttc",
+      "font_sha256": "e4b3b9d058750fb80899c24f68e35beda606ca92694eff0e9f7f91eec7a846aa",
+      "font_size": 26,
+      "text_fill": [126, 92, 48],
+      "purpose": "Restore the exact CURRENT handoff, save, run, and deployment boundary."
+    },
+    {
+      "type": "replace_text",
+      "box": [1870, 1050, 2170, 1135],
+      "fill": [255, 255, 255],
+      "position": [1900, 1070],
+      "text": "候选规模",
+      "font_path": "C:\\Windows\\Fonts\\msyh.ttc",
+      "font_sha256": "e4b3b9d058750fb80899c24f68e35beda606ca92694eff0e9f7f91eec7a846aa",
+      "font_size": 30,
+      "text_fill": [84, 90, 106],
+      "purpose": "Restore the exact CURRENT summary label."
+    },
+    {
+      "type": "replace_text",
+      "box": [2420, 1050, 2710, 1135],
+      "fill": [255, 255, 255],
+      "position": [2450, 1070],
+      "text": "输入版本",
+      "font_path": "C:\\Windows\\Fonts\\msyh.ttc",
+      "font_sha256": "e4b3b9d058750fb80899c24f68e35beda606ca92694eff0e9f7f91eec7a846aa",
+      "font_size": 30,
+      "text_fill": [84, 90, 106],
+      "purpose": "Replace the semantically incorrect input/output label with the exact CURRENT input-version label."
+    },
+    {
+      "type": "replace_text",
+      "box": [1800, 1495, 2235, 1585],
+      "fill": [255, 255, 255],
+      "position": [1825, 1513],
+      "text": "阈值分割 · 分割阈值：128",
+      "font_path": "C:\\Windows\\Fonts\\msyh.ttc",
+      "font_sha256": "e4b3b9d058750fb80899c24f68e35beda606ca92694eff0e9f7f91eec7a846aa",
+      "font_size": 26,
+      "text_fill": [84, 90, 106],
+      "purpose": "Restore the exact CURRENT operator and parameter description."
+    },
+    {
+      "type": "replace_text",
+      "box": [2235, 1495, 2780, 1585],
+      "fill": [255, 255, 255],
+      "position": [2260, 1513],
+      "text": "候选不包含已确认的资源绑定。",
+      "font_path": "C:\\Windows\\Fonts\\msyh.ttc",
+      "font_sha256": "e4b3b9d058750fb80899c24f68e35beda606ca92694eff0e9f7f91eec7a846aa",
+      "font_size": 26,
+      "text_fill": [84, 90, 106],
+      "purpose": "Remove the invented product-line claim and restore the exact CURRENT resource-binding fact."
+    }
+  ]
+}

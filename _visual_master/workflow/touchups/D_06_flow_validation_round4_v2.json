@@ -1,0 +1,57 @@
+{
+  "schema_version": "clearvision-controlled-picture-layer-touchup.v1",
+  "entry_id": "D_06_flow_validation_error",
+  "source_iteration": "option_D/iterations/06_flow_validation_error_v20.png",
+  "source_sha256": "477b5ca77332fa67b590ae9b16274f28a3f5ff81958cf226c70f8e14ac862171",
+  "purpose": "Preserve the accepted Round 4 D06 content while enforcing the audited D geometry, matching the output-count patch to the panel surface and removing unverified bottom facts.",
+  "operations": [
+    {
+      "type": "copy_resize",
+      "source_box": [0, 124, 94, 1080],
+      "box": [0, 124, 67, 1080],
+      "purpose": "Fit the existing verified workspace rail into the hard 68px strip."
+    },
+    {
+      "type": "copy_resize",
+      "source_box": [95, 124, 1318, 1080],
+      "box": [68, 124, 1501, 1080],
+      "purpose": "Expand the canonical FlowCanvas to the hard 1434px dominant region."
+    },
+    {
+      "type": "copy_resize",
+      "source_box": [1319, 124, 1693, 1080],
+      "box": [1502, 124, 1831, 1080],
+      "purpose": "Keep the complete selected-node Inspector as the contextual right dock."
+    },
+    {
+      "type": "copy_resize",
+      "source_box": [1694, 124, 2047, 1080],
+      "box": [1832, 124, 2047, 1080],
+      "purpose": "Keep Preview and Result as the narrow audited edge context."
+    },
+    {
+      "type": "replace_text",
+      "box": [1939, 527, 2005, 557],
+      "fill": [249, 250, 252],
+      "position": [1965, 533],
+      "text": "0",
+      "font_path": "C:\\Windows\\Fonts\\msyh.ttc",
+      "font_sha256": "e4b3b9d058750fb80899c24f68e35beda606ca92694eff0e9f7f91eec7a846aa",
+      "font_size": 14,
+      "text_fill": [45, 57, 70],
+      "purpose": "Restore CURRENT output-field count without leaving a contrasting rectangular patch."
+    },
+    {
+      "type": "replace_text",
+      "box": [0, 1081, 2047, 1151],
+      "fill": [249, 250, 252],
+      "position": [24, 1102],
+      "text": "工程：瓶盖检测 A    已保存    正式运行就绪    技术状态",
+      "font_path": "C:\\Windows\\Fonts\\msyh.ttc",
+      "font_sha256": "e4b3b9d058750fb80899c24f68e35beda606ca92694eff0e9f7f91eec7a846aa",
+      "font_size": 14,
+      "text_fill": [45, 57, 70],
+      "purpose": "Retain only verified bottom context and remove generated platform/version/timestamp facts."
+    }
+  ]
+}

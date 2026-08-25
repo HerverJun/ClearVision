@@ -12,6 +12,7 @@ declare module 'vue-router' {
     readonly requiredFeatureFlag?: string;
     readonly internal?: boolean;
     readonly workspaceMode?: boolean;
+    readonly shellMode?: 'standard' | 'workspace' | 'product-rail';
   }
 }
 

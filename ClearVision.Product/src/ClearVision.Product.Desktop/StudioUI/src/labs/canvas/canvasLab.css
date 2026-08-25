@@ -38,7 +38,7 @@
   color: var(--cv-color-brand-600);
   font-size: var(--cv-font-size-2xs);
   font-weight: var(--cv-font-weight-semibold);
-  letter-spacing: 0.08em;
+  letter-spacing: var(--cv-letter-spacing-caption);
   text-transform: uppercase;
 }
 
@@ -79,7 +79,7 @@
   font-family: var(--cv-font-mono);
   font-size: var(--cv-font-size-2xs);
   font-weight: var(--cv-font-weight-semibold);
-  letter-spacing: 0.03em;
+  letter-spacing: var(--cv-letter-spacing-caption);
   text-transform: uppercase;
 }
 
@@ -190,6 +190,7 @@
   background: var(--cv-color-status-ng-soft);
   color: var(--cv-color-status-ng-strong);
   font-size: var(--cv-font-size-xs);
+  overflow-wrap: anywhere;
 }
 
 .canvas-lab__workspace {
@@ -246,14 +247,29 @@
 }
 
 .canvas-lab__canvas-state strong {
+  max-width: 100%;
   color: var(--cv-text-primary);
   font-size: var(--cv-font-size-lg);
+  overflow-wrap: anywhere;
 }
 
 .canvas-lab__canvas-state span {
-  max-width: 520px;
+  max-width: min(520px, 100%);
   font-size: var(--cv-font-size-xs);
   line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.canvas-lab__visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  border: 0;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
 }
 
 .canvas-lab__interaction-guide {
@@ -554,6 +570,12 @@
 
 @media (prefers-reduced-motion: reduce) {
   .canvas-lab button {
+    transition: none !important;
     transform: none !important;
   }
+}
+
+html[data-reduced-motion="true"] .canvas-lab button {
+  transition: none !important;
+  transform: none !important;
 }

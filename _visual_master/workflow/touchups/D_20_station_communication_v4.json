@@ -1,0 +1,21 @@
+{
+  "schema_version": "clearvision-controlled-picture-layer-touchup.v1",
+  "entry_id": "D_20_station_communication",
+  "source_iteration": "option_D/iterations/20_station_communication_v6.png",
+  "source_sha256": "8300e8c9ccae6b0920a461ff5f7c66244eb0382f8c117812fd46b4546ad9cc35",
+  "purpose": "Remove only the invented desktop controls and collapse action from the immutable Round 6 gpt-image-2 candidate.",
+  "operations": [
+    {
+      "type": "fill_rect",
+      "box": [1907, 29, 2022, 50],
+      "fill": [12, 17, 22],
+      "purpose": "Remove unverified Windows minimize, maximize, and close glyphs without touching the user divider."
+    },
+    {
+      "type": "fill_rect",
+      "box": [30, 1077, 121, 1116],
+      "fill": [21, 27, 35],
+      "purpose": "Remove the unverified left-rail collapse control without touching the rail boundary."
+    }
+  ]
+}

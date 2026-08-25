@@ -1,0 +1,167 @@
+{
+  "schema_version": "clearvision-controlled-picture-layer-touchup.v1",
+  "entry_id": "D_05_flow_editor",
+  "source_iteration": "option_D/iterations/05_flow_editor_v20.png",
+  "source_sha256": "2a64aeac3f9ad7219e357a7c673c032a1d01563fe28fea029e125437054d1738",
+  "purpose": "Preserve the approved 4K Option D Flow workspace and replace only the two oversized generated canvas nodes with the compact canonical FlowCanvas node contract.",
+  "operations": [
+    {
+      "type": "replace_text",
+      "box": [3438, 1136, 3750, 1182],
+      "fill": [251, 252, 253],
+      "position": [3452, 1136],
+      "text": "FilePath",
+      "font_path": "C:\\Windows\\Fonts\\segoeui.ttf",
+      "font_sha256": "ba32a222b23d727267cf1aba4e5296fe84ce99b9d910915103fc085d7931bc88",
+      "font_size": 28,
+      "text_fill": [84, 90, 106],
+      "purpose": "Retain the previously audited exact secondary technical label."
+    },
+    {
+      "type": "replace_text",
+      "box": [3682, 1374, 3752, 1421],
+      "fill": [251, 252, 253],
+      "position": [3692, 1375],
+      "text": "6 项",
+      "font_path": "C:\\Windows\\Fonts\\msyh.ttc",
+      "font_sha256": "e4b3b9d058750fb80899c24f68e35beda606ca92694eff0e9f7f91eec7a846aa",
+      "font_size": 28,
+      "text_fill": [52, 62, 72],
+      "purpose": "Retain the previously audited verified common-parameter count."
+    },
+    {
+      "type": "replace_text",
+      "box": [3345, 432, 3530, 494],
+      "fill": [247, 247, 249],
+      "position": [3360, 436],
+      "text": "结果摘要",
+      "font_path": "C:\\Windows\\Fonts\\msyh.ttc",
+      "font_sha256": "e4b3b9d058750fb80899c24f68e35beda606ca92694eff0e9f7f91eec7a846aa",
+      "font_size": 36,
+      "text_fill": [44, 53, 62],
+      "purpose": "Retain the locked sibling terminology for the result-summary entry."
+    },
+    {
+      "type": "copy_rect",
+      "source_box": [960, 1200, 2440, 1450],
+      "box": [960, 720, 2440, 970],
+      "purpose": "Erase only the former nodes and connection using an aligned blank region from the same immutable dotted canvas."
+    },
+    {
+      "type": "line",
+      "box": [1398, 866, 2016, 870],
+      "points": [[1398, 868], [2016, 868]],
+      "fill": [22, 111, 159],
+      "width": 4,
+      "purpose": "Restore the single Binary-to-Image topology connection at the canonical 2x stroke."
+    },
+    {
+      "type": "rounded_rect",
+      "box": [1118, 784, 1398, 904],
+      "fill": [232, 241, 246],
+      "outline": [71, 115, 143],
+      "width": 4,
+      "radius": 12,
+      "purpose": "Draw the selected Inspector Source body at the canonical 140x60 logical size and 6px logical radius."
+    },
+    {
+      "type": "rounded_rect",
+      "box": [1118, 784, 1398, 832],
+      "fill": [71, 115, 143],
+      "radius": 12,
+      "purpose": "Draw the canonical 24px logical category header."
+    },
+    {
+      "type": "fill_rect",
+      "box": [1118, 820, 1398, 832],
+      "fill": [71, 115, 143],
+      "purpose": "Keep only the header top corners rounded."
+    },
+    {
+      "type": "draw_text",
+      "box": [1130, 784, 1380, 832],
+      "position": [1138, 808],
+      "anchor": "lm",
+      "text": "Inspector Source",
+      "font_path": "C:\\Windows\\Fonts\\segoeuib.ttf",
+      "font_sha256": "1b242874a2f57529060e770ba313e027a99d40b3c36e1c7e8b2dece16ad6ed88",
+      "font_size": 22,
+      "text_fill": [255, 255, 255],
+      "purpose": "Use the canonical white bold 11px logical node title."
+    },
+    {
+      "type": "draw_text",
+      "box": [1280, 832, 1386, 904],
+      "position": [1382, 868],
+      "anchor": "rm",
+      "text": "Binary",
+      "font_path": "C:\\Windows\\Fonts\\segoeui.ttf",
+      "font_sha256": "ba32a222b23d727267cf1aba4e5296fe84ce99b9d910915103fc085d7931bc88",
+      "font_size": 16,
+      "text_fill": [95, 105, 117],
+      "purpose": "Restore the canonical right-aligned output label."
+    },
+    {
+      "type": "ellipse",
+      "box": [1388, 858, 1408, 878],
+      "fill": [22, 163, 74],
+      "outline": [248, 249, 250],
+      "width": 2,
+      "purpose": "Draw the canonical Image-type output port at 5px logical radius."
+    },
+    {
+      "type": "rounded_rect",
+      "box": [2016, 784, 2296, 904],
+      "fill": [249, 250, 251],
+      "outline": [195, 200, 207],
+      "width": 2,
+      "radius": 12,
+      "purpose": "Draw the unselected Inspector Target body at the canonical compact size."
+    },
+    {
+      "type": "rounded_rect",
+      "box": [2016, 784, 2296, 832],
+      "fill": [71, 115, 143],
+      "radius": 12,
+      "purpose": "Draw the same canonical Flow header treatment for the target node."
+    },
+    {
+      "type": "fill_rect",
+      "box": [2016, 820, 2296, 832],
+      "fill": [71, 115, 143],
+      "purpose": "Keep only the target header top corners rounded."
+    },
+    {
+      "type": "draw_text",
+      "box": [2028, 784, 2284, 832],
+      "position": [2036, 808],
+      "anchor": "lm",
+      "text": "Inspector Target",
+      "font_path": "C:\\Windows\\Fonts\\segoeuib.ttf",
+      "font_sha256": "1b242874a2f57529060e770ba313e027a99d40b3c36e1c7e8b2dece16ad6ed88",
+      "font_size": 22,
+      "text_fill": [255, 255, 255],
+      "purpose": "Use the canonical target title typography."
+    },
+    {
+      "type": "draw_text",
+      "box": [2028, 832, 2140, 904],
+      "position": [2032, 868],
+      "anchor": "lm",
+      "text": "Image",
+      "font_path": "C:\\Windows\\Fonts\\segoeui.ttf",
+      "font_sha256": "ba32a222b23d727267cf1aba4e5296fe84ce99b9d910915103fc085d7931bc88",
+      "font_size": 16,
+      "text_fill": [95, 105, 117],
+      "purpose": "Restore the canonical left-aligned input label."
+    },
+    {
+      "type": "ellipse",
+      "box": [2006, 858, 2026, 878],
+      "fill": [22, 163, 74],
+      "outline": [248, 249, 250],
+      "width": 2,
+      "purpose": "Draw the matching canonical Image-type input port."
+    }
+  ]
+}

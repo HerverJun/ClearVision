@@ -1,0 +1,23 @@
+{
+  "schema_version": "clearvision-controlled-picture-layer-touchup.v1",
+  "entry_id": "D_07_flow_preview_roi",
+  "source_iteration": "option_D/iterations/07_flow_preview_roi_v_final_consistency_source_4k.png",
+  "source_sha256": "2716d79e21eb78dfe4cf7187186d94087c345edbf6594c46b455e8b0d3b747c8",
+  "purpose": "Use the approved D05 Flow shell while preserving the complete generated manual Preview and ROI workspace.",
+  "operations": [
+    {
+      "type": "paste_master_reference",
+      "reference_path": "option_D/masters/05_flow_editor.png",
+      "reference_sha256": "2439efc51799d8ff40fc9ca242a401396b05fb9e873a5737082d356f0ef40bd1",
+      "source_box": [0, 0, 3839, 2159],
+      "box": [0, 0, 3839, 2159],
+      "purpose": "Lock navigation, project context, command bar, Canvas, and status geometry to the approved D05 Master."
+    },
+    {
+      "type": "copy_resize",
+      "source_box": [2686, 274, 3839, 2034],
+      "box": [3014, 405, 3839, 2049],
+      "purpose": "Re-anchor the complete manual Preview and ROI surface, including image evidence, fields, actions, and result disclosures."
+    }
+  ]
+}

@@ -24,8 +24,11 @@ const passwordHint = computed(() => {
   if (policy?.requiresDigit) requirements.push('包含数字');
   return `密码要求：${requirements.join('，')}。`;
 });
-const messageTone = computed(() => root.auth.projection.errorCode ? 'error' : 'info');
-const prominentMessage = computed(() => Boolean(root.auth.projection.errorCode));
+const recoveryAvailable = computed(() => root.auth.projection.phase === 'protected-transition');
+const messageTone = computed(() => root.auth.projection.errorCode
+  ? 'error'
+  : recoveryAvailable.value ? 'warning' : 'info');
+const prominentMessage = computed(() => Boolean(root.auth.projection.errorCode) || recoveryAvailable.value);
 
 async function submit(): Promise<void> {
   const accepted = await root.auth.setupAdmin({
@@ -39,6 +42,15 @@ async function submit(): Promise<void> {
   }
   await nextTick();
   messageRoot.value?.focus();
+}
+
+async function retryRecovery(): Promise<void> {
+  await root.auth.refreshSession();
+  if (root.auth.projection.phase === 'authenticated') {
+    await router.replace('/projects');
+  } else if (root.auth.projection.phase === 'unauthenticated') {
+    await router.replace('/login');
+  }
 }
 </script>
 
@@ -144,6 +156,13 @@ async function submit(): Promise<void> {
           loading-label="正在初始化"
         >
           创建管理员并进入工程库
+        </CvButton>
+        <CvButton
+          v-if="recoveryAvailable"
+          type="button"
+          @click="retryRecovery"
+        >
+          重新确认会话
         </CvButton>
       </div>
     </form>

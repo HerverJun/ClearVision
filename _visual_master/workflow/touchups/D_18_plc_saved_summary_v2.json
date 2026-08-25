@@ -1,0 +1,45 @@
+{
+  "schema_version": "clearvision-controlled-picture-layer-touchup.v1",
+  "entry_id": "D_18_plc_settings",
+  "source_iteration": "option_D/iterations/18_plc_settings_v6.png",
+  "source_sha256": "7b4601706773663d242ca85f6b9df32008cbdba069cb628d136a6b25a6cf9398",
+  "purpose": "Restore the verified saved-protocol summary in the space vacated by the fabricated mismatch card.",
+  "operations": [
+    {
+      "type": "replace_text",
+      "box": [1504, 262, 1950, 302],
+      "fill": [255, 255, 255],
+      "position": [1518, 271],
+      "text": "已保存协议",
+      "font_path": "C:\\Windows\\Fonts\\msyh.ttc",
+      "font_sha256": "e4b3b9d058750fb80899c24f68e35beda606ca92694eff0e9f7f91eec7a846aa",
+      "font_size": 14,
+      "text_fill": [91, 105, 120],
+      "purpose": "Restore the CURRENT saved-protocol summary label."
+    },
+    {
+      "type": "replace_text",
+      "box": [1504, 303, 1950, 349],
+      "fill": [255, 255, 255],
+      "position": [1518, 311],
+      "text": "Siemens S7",
+      "font_path": "C:\\Windows\\Fonts\\msyhbd.ttc",
+      "font_sha256": "06e1a30f687ab7d39f533447b21e84d51e0cecdaa6bfa060c87136b168811bdc",
+      "font_size": 17,
+      "text_fill": [31, 42, 54],
+      "purpose": "Restore the verified saved protocol value."
+    },
+    {
+      "type": "replace_text",
+      "box": [1504, 350, 1950, 392],
+      "fill": [255, 255, 255],
+      "position": [1518, 359],
+      "text": "配置已保存",
+      "font_path": "C:\\Windows\\Fonts\\msyh.ttc",
+      "font_sha256": "e4b3b9d058750fb80899c24f68e35beda606ca92694eff0e9f7f91eec7a846aa",
+      "font_size": 14,
+      "text_fill": [91, 105, 120],
+      "purpose": "Restore the verified clean saved state."
+    }
+  ]
+}

@@ -1,0 +1,71 @@
+{
+  "schemaVersion": "f07-visual-evidence.v1",
+  "capturedAtUtc": "2026-08-15T15:28:27.199Z",
+  "sourceSha": "cdd114082821bbe750fb7945a0c3a4e89002d67c",
+  "DATA_SOURCE": "BROWSER_FIXTURE",
+  "AUTH_SOURCE": "HARNESS_SEEDED_SESSION",
+  "scenario": "settings-camera-b0",
+  "url": "http://127.0.0.1:5422/studio/index.html#/settings",
+  "viewport": {
+    "width": 1920,
+    "height": 1080
+  },
+  "observedViewport": {
+    "width": 1920,
+    "height": 1080
+  },
+  "theme": "light",
+  "observedTheme": "light",
+  "density": "compact",
+  "observedDensity": "compact",
+  "dpr": {
+    "type": "BROWSER_EMULATED_DPR",
+    "value": 1,
+    "windowsDpi": "NOT_PERFORMED"
+  },
+  "horizontalOverflow": 0,
+  "requestMethods": [
+    {
+      "method": "GET",
+      "path": "/api/auth/setup-status",
+      "url": "http://127.0.0.1:5422/api/auth/setup-status"
+    },
+    {
+      "method": "GET",
+      "path": "/api/auth/me",
+      "url": "http://127.0.0.1:5422/api/auth/me"
+    },
+    {
+      "method": "GET",
+      "path": "/health",
+      "url": "http://127.0.0.1:5422/health"
+    },
+    {
+      "method": "GET",
+      "path": "/api/settings",
+      "url": "http://127.0.0.1:5422/api/settings"
+    },
+    {
+      "method": "GET",
+      "path": "/api/cameras/bindings",
+      "url": "http://127.0.0.1:5422/api/cameras/bindings"
+    },
+    {
+      "method": "GET",
+      "path": "/api/trigger-input/diagnostics",
+      "url": "http://127.0.0.1:5422/api/trigger-input/diagnostics"
+    },
+    {
+      "method": "GET",
+      "path": "/api/trigger-input/serial-photoelectric-ports",
+      "url": "http://127.0.0.1:5422/api/trigger-input/serial-photoelectric-ports"
+    }
+  ],
+  "consoleErrors": [],
+  "pageErrors": [],
+  "screenshot": {
+    "fileName": "settings-camera-b0-1920x1080-light-compact.png",
+    "sha256": "86C93B6F4E7AC4B52480690B87D78C4839881D30D6D4E103086F91E192983C50",
+    "bytes": 122772
+  }
+}

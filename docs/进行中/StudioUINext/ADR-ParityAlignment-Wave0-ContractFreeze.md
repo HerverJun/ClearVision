@@ -1,7 +1,9 @@
 # ADR-ParityAlignment-Wave0：行为、风险与处置冻结包
 
-状态：`PROPOSED_FOR_OWNER_REVIEW`
-日期：2026-08-14
+状态：`APPROVED`
+提案日期：2026-08-14
+批准日期：2026-08-23
+签字人：`HerverJun`（声明有权代表 Product、Security、QA/Release 及本 ADR 涉及的 capability owner）
 适用分支：`studio-ui-next`
 审计基线：`22a3d26a00a2d3b8098165aab5489ce54f5bc95b` 加审计时 dirty working tree
 关联计划：[功能对齐 TODO 计划](../../归档/历史归档/2026-08-14-StudioUI-Parity-Alignment-Review-22a3d26/08_Parity_Alignment_TODO.md)
@@ -10,9 +12,9 @@
 ## 状态与边界
 
 本文件为本次 parity alignment 的 Wave 0 签字包，不改写 F10 中历史 G0/G1/G2 checkpoint 的结论。
-它记录当前代码与 Legacy 语义的已核事实、需要明确的产品/安全决定，以及 Wave 1/2 不得越过的
-authority 边界。所有 `PROPOSED` 行均未获 Product、Security 或对应后端 owner 批准；在签字前，
-对应工作包保持 `BLOCKED_BY_CONTRACT`，不得编写产品 UI、私有 endpoint、第二 owner 或替代状态机。
+它记录当前代码与 Legacy 语义的已核事实、已批准的 Option D G0 范围决定，以及后续 Gate 不得越过的 authority 边界。
+2026-08-23 的具名批准将 G0-01、G0-03、G0-04 和 G0-05 在本轮范围内结案；G0-02 明确为 `DEFERRED`，
+subgraph 明确为 `NOT_APPLICABLE`。延后或不适用不是功能 PASS，也不授权私有 endpoint、第二 owner 或替代状态机。
 
 本 ADR 不创建第二 API transport、HostBridge、Canvas、ImageCanvas、EventBus、ServiceRegistry、
 Project save client 或 Station command authority。Project、Flow、GlobalVariables 和正式 assets 仍由
@@ -31,14 +33,14 @@ Project save client 或 Station command authority。Project、Flow、GlobalVaria
 | Legacy 双击 | 旧 Canvas 对节点双击调用 `onNodeDoubleClicked(node)`。 | `wwwroot/src/core/canvas/flowCanvas.js:2435-2440` |
 | Next 子图 | 未发现 Next subgraph cursor、breadcrumb、enter/leave command 或其数据合同。 | 审计范围：`project-workspace/flow/` 与 `canonicalFlowCanvas.ts` |
 
-### 待签字的行为表
+### 已批准的本轮处置
 
-| 行为 | `PROPOSED` 归属与约束 | 仍需 owner 决定 |
+| 行为 | 本轮处置 | 约束 |
 | --- | --- | --- |
-| 运行到节点 | `FlowCanvasOwner` 只把已选 node identity 交给既有 Preview owner；由 Preview owner 使用现有 `flows/preview-node` transport、identity 与取消机制。结果明确标为“调试预览”，不等同正式运行。 | 哪些 operator/node 可预览；disabled、缺相机、无输入、运行中时的可用性规则；是否允许从 context menu、快捷键或两者进入。 |
-| active node | active node 只作为 Workspace/Preview 的可丢弃 UI 投影；不写 Flow，不替代选择 authority，不生成第二 Flow catalog。 | active node 与普通 selection 是否可不同；工程切换、节点删除、leave guard 时的清除与恢复语义。 |
-| stale / cancel | 新请求、node/flow revision 变化、工程切换、权限变化或 owner dispose 必须 abort/丢弃旧请求；identity 不匹配不得显示为当前预览。 | 用户主动取消入口、超时预算与用户可见中文文案。 |
-| 双击 / subgraph | 只在批准的 subgraph host 上响应；进入、退出和键盘返回均由同一 FlowCanvas/Workspace owner 管理，不复制 Flow state。 | 合法 host 类型、child flow identity、breadcrumb 表达、空子图、嵌套深度、保存与 leave guard 的确切语义。 |
+| 运行到节点 | `DEFERRED`；不纳入本轮 Option D | 保持 canonical FlowCanvas 当前全流程正式执行语义；不新增入口、快捷键、运行模式或状态模型 |
+| active node | `DEFERRED`；不纳入本轮 Option D | 不新增 active-node 投影、选择语义或持久化字段 |
+| 现有 Preview stale / cancel | `RETAIN_CURRENT` | 继续由现有 Preview owner 按 project/node/debugSession/requestSequence/flowRevision 取消和丢弃晚到结果；不扩展为 run-to-node |
+| 双击 / subgraph | `NOT_APPLICABLE` | 本轮 deterministic fixture 不包含 subgraph host；不新增 child flow、breadcrumb、嵌套、保存或 leave 语义 |
 
 ### 统一状态与错误矩阵
 
@@ -53,8 +55,8 @@ Project save client 或 Station command authority。Project、Flow、GlobalVaria
 
 ### 签字条件
 
-FlowCanvas owner、Preview/Run owner 与 Product owner 必须共同确认行为表、允许节点 fixture、状态矩阵和
-subgraph 数据模型。确认前，`W1-WS-01` 与 `W1-WS-02` 不得开始。
+`HerverJun` 已于 2026-08-23 代表 FlowCanvas、Preview/Run 和 Product owner 批准上述本轮处置。
+`W1-WS-01` / `W1-WS-02` 不进入本轮 Option D；未来重新进入时必须新建合同与 fixture，不得从本次 G0 PASS 外推授权。
 
 ## G0-02 Inspector 参数推荐合同
 
@@ -68,7 +70,7 @@ subgraph 数据模型。确认前，`W1-WS-01` 与 `W1-WS-02` 不得开始。
 | Next 缺口 | Inspector 当前只有参数草稿编辑；没有 recommendation owner、candidate diff、accept/revert 或 endpoint caller。 | `StudioUI/src/capabilities/project-workspace/inspector/InspectorPanel.vue` |
 | Legacy 权限行为 | Legacy recommendation button 只按 operator type 显示，前端不检查 role；当前 endpoint 也没有权限 filter，故 Operator 可能已能调用。 | `wwwroot/src/features/flow-editor/propertyPanel.js:428-443,2295-2298,2358-2379` |
 
-### 待签字的合同
+### 未来重新进入时的合同边界
 
 | 项目 | `PROPOSED` 合同 | 禁止事项 |
 | --- | --- | --- |
@@ -87,9 +89,9 @@ subgraph 数据模型。确认前，`W1-WS-01` 与 `W1-WS-02` 不得开始。
 
 ### 签字条件
 
-Inspector owner、ParameterRecommender backend owner 与 Product owner 必须批准 allowlist、candidate 字段、输入图来源、
-endpoint-specific authorization、权限投影、accept/revert 语义和上述 test fixtures。确认前，`W1-WS-03` 保持
-`BLOCKED_BY_CONTRACT`。
+本轮决定为 `DEFERRED`：保持当前 Inspector 参数编辑与校验能力，不调用 recommendation endpoint，
+不新增 candidate/accept/revert UI。`W1-WS-03` 不进入本轮 Option D；未来重新进入时，仍需 Inspector owner、
+ParameterRecommender backend owner 与 Product owner 对上述边界另行签字。
 
 ## G0-03 Station 命令风险矩阵
 
@@ -102,7 +104,7 @@ endpoint-specific authorization、权限投影、accept/revert 语义和上述 t
 | Legacy 语义 | Legacy 对停止、正式包部署、测试包下发使用确认；确认文本显示 Station、影响、包与审计提示。 | `wwwroot/src/features/stations/stationMonitorView.js:793-795,909-931,1232-1236` |
 | Next 缺口 | 既有 Next Station owner 能投影提交与 reconcile，但未保留风险分级确认。 | `StudioUI/src/capabilities/stations-read/` |
 
-### 风险表草案（必须由 Security + Product owner 批准）
+### 未来扩展时的风险表（本轮不实施）
 
 | 命令 | 已核事实 | 待批准的风险等级与确认要求 |
 | --- | --- | --- |
@@ -124,27 +126,28 @@ endpoint-specific authorization、权限投影、accept/revert 语义和上述 t
 
 ### 签字条件
 
-Station command owner、Security owner 与 Product owner 必须在风险表逐项填入风险等级、确认方式、审计字段、
-取消/超时/unknown-outcome 策略和验收人。确认前，`W1-ST-01` 不得实现。
+`HerverJun` 已于 2026-08-23 代表 Station command、Security 与 Product owner 批准
+`APPROVED_RETAIN_CURRENT`：保持现有 `StationAdminCommandOwner`、后端准入和 reconcile 行为；
+本轮不新增高风险命令、确认弹窗或命令入口。未来扩展才需对上述风险表另行签字。
 
 ## G0-04 产品处置板
 
-下表只记录待签字处置，不以现有 Legacy fallback、后端 endpoint 或旧 ADR 代替产品决定。`保守建议` 是基于
-当前 authority 与安全边界给审批人准备的起点，不是批准，也不会改变当前 UI、Legacy fallback 或对外状态。
+下表记录 2026-08-23 具名批准的 Option D 本轮处置。处置不删除后端 endpoint，不授权新 Next 写入入口，
+也不把 Legacy fallback 保留外推为 Legacy 退役批准。
 
-| 能力 | 当前事实 | 保守建议（未批准） | 必须选择的处置 | 必需签字人 | 目标波次 | 当前状态 |
+| 能力 | 当前事实 | 已批准处置 | 约束 | 签字人 | 目标波次 | 当前状态 |
 | --- | --- | --- | --- | --- | --- | --- |
-| Demo / 示例工程 | 后端 demo create/guide 仍在，Next 缺入口；不得复制 Flow JSON。 | `RETAIN_LEGACY_FALLBACK` | `MIGRATE` / `RETAIN_LEGACY_FALLBACK` / `RETIRE_WITH_APPROVAL` | Product + Project lifecycle owner | Wave 3 | `PENDING_DECISION` |
-| 独立本地图像加载 | Legacy 有独立调试入口；Next 未冻结 `FilePickerPort` 输入语义。 | `RETAIN_LEGACY_FALLBACK` | 同上 | Product + ImageCanvas/Host owner | Wave 2/3 | `PENDING_DECISION` |
-| Runtime Preview Pilot | 当前只允许 default-off、metadata-only、developer-only 的内部 pilot。 | `RETAIN_LEGACY_FALLBACK` | 同上 | Product + Runtime/Settings owner | Wave 3 | `PENDING_DECISION` |
-| Station token 安全分发 | 当前只支持 regenerate，长期明文 reveal 已被后端排除。 | `NO_RECOMMENDATION_SECURITY_REQUIRED` | 同上；不得将长期明文回显作为默认 | Security + Product + Station owner | Wave 2/3 | `PENDING_SECURITY_DECISION` |
-| Storage cleanup | 破坏性操作缺少 scope、backup、operation identity、审计与 reconcile 合同。 | `RETIRE_WITH_APPROVAL` | 同上；未批准前不加控制 | Security + Product + Settings owner | Wave 3 | `PENDING_CONTRACT` |
-| 工程/版本/FPS 持续状态 | P3，需先满足 125% 空间预算，不得挤压 Canvas/Inspector/Preview。 | `RETAIN_LEGACY_FALLBACK` | 同上 | Product + Shell owner | Wave 2/3 | `PENDING_DPI_BUDGET` |
+| Demo / 示例工程 | 后端 demo create/guide 仍在，Next 不得复制 Flow JSON。 | `RETAIN_LEGACY_FALLBACK` | 本轮不新增 Option D Demo UI | `HerverJun` | 本轮 | `APPROVED` |
+| 独立本地图像加载 | Legacy 有独立调试入口。 | `RETAIN_LEGACY_FALLBACK` | 不绕过 `FilePickerPort` / ImageCanvas owner | `HerverJun` | 本轮 | `APPROVED` |
+| Runtime Preview Pilot | 当前只允许 default-off、metadata-only、developer-only 的内部 pilot。 | `RETAIN_LEGACY_FALLBACK` | 继续 default-off/internal-only，不包装为正式能力 | `HerverJun` | 本轮 | `APPROVED` |
+| Station token 安全分发 | 当前只支持 regenerate，长期明文 reveal 已被后端排除。 | `RETAIN_CURRENT_REGENERATE_ONLY` | 不显示明文，不实现 preserve/replace | `HerverJun` | 本轮 | `APPROVED` |
+| Storage cleanup | 破坏性操作缺少 scope、backup、operation identity、审计与 reconcile 合同。 | `RETIRE_WITH_APPROVAL` | 本轮不提供破坏性入口 | `HerverJun` | 本轮 | `APPROVED` |
+| 工程/版本/FPS 持续状态 | P3，需先满足 125% 空间预算，不得挤压 Canvas/Inspector/Preview。 | `RETAIN_LEGACY_FALLBACK` | 等待 DPI budget，不挤压 Workspace 核心面 | `HerverJun` | 本轮 | `APPROVED` |
 
 ## G0-05 Fixture 与证据目录
 
-通过 G0 前至少冻结一个可复现工程 fixture，必须包含普通节点、可预览节点、批准的 subgraph host、全局变量绑定、
-ROI 和正式判定。每个证据运行必须写入：
+已冻结单一可复现工程 fixture，包含普通节点、Preview、ROI、双向全局变量绑定、正式判定和正式结果证据。
+subgraph 按 G0-01 记为 `NOT_APPLICABLE`，不是 fixture 缺口。每个证据运行必须写入：
 
 ```text
 .tmp/studio-ui-next/parity-alignment/<wave>/<sourceSha>/<runId>/
@@ -155,22 +158,21 @@ client/viewport size、fixture identity、配置、用户/权限、覆盖的成�
 owner cleanup、端口/user-data/database/result/publish cleanup。未执行的证据明确写 `NOT RUN` 或
 `NOT PERFORMED`。发布产物只能写入 `.tmp/publish-check/`。
 
-当前没有可直接通过本项的完整 fixture。`f03-workspace.spec.ts` 的 deterministic flow 已包含普通节点与 ROI，
-但 `decisionConfiguration` 为 `null`、全局变量绑定为空且没有 subgraph host；现有 WebView2 parity audit
-seed 已包含 preview、ROI 和正式判定，却同样没有明确的全局变量绑定或 subgraph host。因此它们只能作为
-新 fixture 的输入，不得作为 G0-05 通过证据。
+冻结代码：`ClearVision.Product/tests/ClearVision.Product.UI.Tests/tests/e2e/studio-ui-next/option-d-g0-deterministic-fixture.ts`。
+验收用例：`f03-workspace.spec.ts` 中 `Option D G0 consumes one frozen Project, Preview, Run and Results evidence fixture`。
+该用例实际通过，并证明初始草稿未产生 PUT、Preview 不冒充 Formal Run/Results、离开 Workspace 后全部 owner/resource 归零。
 
 ## 批准记录
 
-本 ADR 在下列签字均完成前不是 Wave 0 的完成证据：
+下列决定由 `HerverJun` 于 2026-08-23 具名批准；其授权声明覆盖表中全部必需角色。
 
 | 范围 | 必需批准人 | 批准状态 | 日期 / 证据 |
 | --- | --- | --- | --- |
-| G0-01 Canvas 行为合同 | FlowCanvas owner、Preview/Run owner、Product owner | `PENDING` | `NOT PERFORMED` |
-| G0-02 Inspector 推荐合同 | Inspector owner、ParameterRecommender backend owner、Product owner | `PENDING` | `NOT PERFORMED` |
-| G0-03 Station 风险矩阵 | Station command owner、Security owner、Product owner | `PENDING` | `NOT PERFORMED` |
-| G0-04 产品处置板 | 对应 capability owner、Product owner；涉及 token/cleanup 时另加 Security owner | `PENDING` | `NOT PERFORMED` |
-| G0-05 fixture/evidence | QA/Release owner、上述 capability owner | `PENDING` | `NOT PERFORMED` |
+| G0-01 Canvas 行为合同 | FlowCanvas owner、Preview/Run owner、Product owner | `APPROVED` | `HerverJun / 2026-08-23`；run-to-node/active-node `DEFERRED`，subgraph `NOT_APPLICABLE` |
+| G0-02 Inspector 推荐合同 | Inspector owner、ParameterRecommender backend owner、Product owner | `DEFERRED` | `HerverJun / 2026-08-23`；保持当前编辑/校验 |
+| G0-03 Station 风险矩阵 | Station command owner、Security owner、Product owner | `APPROVED_RETAIN_CURRENT` | `HerverJun / 2026-08-23` |
+| G0-04 产品处置板 | 对应 capability owner、Product owner；涉及 token/cleanup 时另加 Security owner | `APPROVED` | `HerverJun / 2026-08-23`；六项处置见上表 |
+| G0-05 fixture/evidence | QA/Release owner、上述 capability owner | `PASS` | `HerverJun / 2026-08-23`；冻结 fixture + Playwright/owner cleanup 证据 |
 
-批准后必须同步更新本 ADR、F10、功能对齐 TODO、能力矩阵、回归清单和 evidence index，并将相应
-`W1-*` 或 `W2-*` 工作包从 `BLOCKED_BY_CONTRACT` 移入唯一 owner 的串行实现队列。
+本次批准只解除 Option D G0 的前置阻塞。明确 `DEFERRED` / `NOT_APPLICABLE` 的工作包不进入实现队列；
+G1 只能在 G0 证据 manifest、独立复核与文档同步全部通过后标记 `READY`。

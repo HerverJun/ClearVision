@@ -34,6 +34,7 @@ interface CanvasResourceDiagnostics {
   readonly viewListenerCount: number;
   readonly selectionListenerCount: number;
   readonly interactionCleanupCount: number;
+  readonly facadeListenerCount: number;
 }
 
 interface CanvasRuntimeDiagnostics {
@@ -135,8 +136,16 @@ async function bootCanvasLab(page: Page): Promise<string[]> {
   const runtimeErrors = await installStudioStartup(page);
   await page.goto('/studio/index.html#/labs/canvas');
   await expect(page.locator('[data-canvas-lab="ready"]')).toBeVisible();
-  await expect(page.locator('#studio-ui-canonical-flow-canvas')).toBeVisible();
-  await expect(page.locator('#studio-ui-canonical-flow-canvas')).toHaveAttribute('aria-label', '流程编辑画布');
+  const canvas = page.locator('#studio-ui-canonical-flow-canvas');
+  await expect(canvas).toBeVisible();
+  await expect(canvas).toHaveAttribute('aria-label', '流程编辑画布');
+  const descriptionIds = (await canvas.getAttribute('aria-describedby'))?.split(/\s+/) ?? [];
+  expect(new Set(descriptionIds)).toEqual(new Set([
+    'studio-ui-canonical-flow-canvas-port-tooltip',
+    'studio-ui-canonical-flow-canvas-accessibility-status',
+    'studio-ui-canonical-flow-canvas-accessibility-help'
+  ]));
+  await expect(canvas).toHaveAttribute('aria-keyshortcuts', /Control\+A.*Delete.*Escape/);
   return runtimeErrors;
 }
 
@@ -225,6 +234,12 @@ test('canonical Canvas exposes the rejection matrix and preserves identity', asy
   expect(mounted.ownerCount).toBe(1);
   expect(await readLifecycleCanvasOwnerCount(page)).toBe(1);
   expect(mounted.fixtureId).toBe('canonical');
+  const liveStatus = page.locator('[data-canvas-live-status]');
+  await expect(liveStatus).toHaveAttribute('role', 'status');
+  await expect(liveStatus).toHaveAttribute('aria-live', 'polite');
+  await expect(liveStatus).toHaveAttribute('aria-atomic', 'true');
+  await expect(liveStatus)
+    .toContainText('F01 Canonical Canvas Contract；已挂载；节点 5；连线 3；连接校验 5/5');
   expect(mounted.validation.map(item => ({
     id: item.id,
     result: item.actual,
@@ -248,6 +263,8 @@ test('canonical Canvas exposes the rejection matrix and preserves identity', asy
 test('pointer gestures create legal connections and reject incompatible ports', async ({ page }) => {
   const runtimeErrors = await bootCanvasLab(page);
   await loadFixture(page, 'load-interaction', 'interaction', 5, 0);
+  await expect(page.locator('[data-canvas-live-status]'))
+    .toContainText('F01 Canvas Interaction Matrix；已挂载；节点 5；连线 0；连接校验 不适用');
 
   let diagnostics = await readDiagnostics(page);
   const acquisition = requireNode(diagnostics, 'ImageAcquisition');
@@ -278,6 +295,49 @@ test('pointer gestures create legal connections and reject incompatible ports', 
   await page.locator('[data-canvas-action="identity-roundtrip"]').click();
   await expect.poll(async () => (await readDiagnostics(page)).identity.state).toBe('pass');
   expect((await readDiagnostics(page)).runtime?.connectionCount).toBe(1);
+  expect(runtimeErrors).toEqual([]);
+});
+
+test('Canvas Lab error surfaces wrap long diagnostic tokens', async ({ page }) => {
+  const runtimeErrors = await bootCanvasLab(page);
+  const wrapPolicy = await page.locator('.canvas-lab').evaluate(root => {
+    const error = document.createElement('p');
+    error.className = 'canvas-lab__error';
+    const state = document.createElement('div');
+    state.className = 'canvas-lab__canvas-state';
+    const heading = document.createElement('strong');
+    const detail = document.createElement('span');
+    state.append(heading, detail);
+    root.append(error, state);
+    const result = {
+      error: getComputedStyle(error).overflowWrap,
+      heading: getComputedStyle(heading).overflowWrap,
+      detail: getComputedStyle(detail).overflowWrap
+    };
+    error.remove();
+    state.remove();
+    return result;
+  });
+
+  expect(wrapPolicy).toEqual({ error: 'anywhere', heading: 'anywhere', detail: 'anywhere' });
+  expect(runtimeErrors).toEqual([]);
+});
+
+test('Canvas Lab exposes an unavailable runtime through its live description', async ({ page }) => {
+  await page.addInitScript(() => {
+    Object.defineProperty(Navigator.prototype, 'userAgent', {
+      configurable: true,
+      get: () => 'Option D deterministic jsdom runtime'
+    });
+  });
+  const runtimeErrors = await installStudioStartup(page);
+  await page.goto('/studio/index.html#/labs/canvas');
+
+  await expect(page.locator('[data-canvas-lab="unavailable"]')).toBeVisible();
+  await expect(page.locator('[data-canvas-error]'))
+    .toContainText('当前测试环境不支持 Canvas 2D 运行时');
+  await expect(page.locator('[data-canvas-live-status]'))
+    .toContainText('画布运行时不可用；当前测试环境不支持 Canvas 2D 运行时');
   expect(runtimeErrors).toEqual([]);
 });
 
@@ -378,7 +438,8 @@ test('twenty route mount/unmount cycles retain one owner and release every resou
       structureListenerCount: 0,
       viewListenerCount: 0,
       selectionListenerCount: 0,
-      interactionCleanupCount: 0
+      interactionCleanupCount: 0,
+      facadeListenerCount: 0
     });
   }
 
@@ -419,6 +480,7 @@ test('DPR and viewport matrix keeps backing stores and hit-test geometry aligned
       expect(runtime.resources.structureListenerCount).toBe(1);
       expect(runtime.resources.viewListenerCount).toBe(1);
       expect(runtime.resources.selectionListenerCount).toBe(1);
+      expect(runtime.resources.facadeListenerCount).toBe(1);
 
       const acquisition = requireNode(diagnostics, 'ImageAcquisition');
       const output = acquisition.outputs[0];

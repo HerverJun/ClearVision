@@ -1,0 +1,33 @@
+{
+  "schema_version": "clearvision-controlled-picture-layer-touchup.v1",
+  "entry_id": "D_03_projects_data",
+  "source_iteration": "option_D/iterations/03_projects_data_v7.png",
+  "source_sha256": "ab8696170973c0565da37594894536f8fec14b168b2149a2845147fa7436a606",
+  "purpose": "Keep the immutable populated-project table and restore only the verified Search action and compact Shell projection.",
+  "operations": [
+    {
+      "type": "replace_text",
+      "box": [1678, 12, 1802, 72],
+      "fill": [254, 254, 254],
+      "position": [1682, 27],
+      "text": "外观 浅色·紧凑",
+      "font_path": "C:\\Windows\\Fonts\\msyh.ttc",
+      "font_sha256": "e4b3b9d058750fb80899c24f68e35beda606ca92694eff0e9f7f91eec7a846aa",
+      "font_size": 13,
+      "text_fill": [45, 57, 70],
+      "purpose": "Restore the exact CURRENT appearance and compact-density summary."
+    },
+    {
+      "type": "replace_text",
+      "box": [660, 326, 748, 380],
+      "fill": [248, 249, 251],
+      "position": [685, 342],
+      "text": "搜索",
+      "font_path": "C:\\Windows\\Fonts\\msyhbd.ttc",
+      "font_sha256": "06e1a30f687ab7d39f533447b21e84d51e0cecdaa6bfa060c87136b168811bdc",
+      "font_size": 16,
+      "text_fill": [45, 57, 70],
+      "purpose": "Restore the explicit CURRENT Search action beside the existing query field."
+    }
+  ]
+}

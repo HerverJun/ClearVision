@@ -1,0 +1,21 @@
+{
+  "schema_version": "clearvision-controlled-picture-layer-touchup.v1",
+  "entry_id": "D_04_projects_empty",
+  "source_iteration": "option_D/iterations/04_projects_empty_v10.png",
+  "source_sha256": "0a7f2c8a1be0bf0c3bf8f19a6d4b0ed9cd0efe130137ccab68f1cffbe5f47176",
+  "purpose": "Restore the verified More product-menu entry while retaining the empty project state exactly.",
+  "operations": [
+    {
+      "type": "replace_text",
+      "box": [1498, 10, 1810, 68],
+      "fill": [254, 254, 254],
+      "position": [1516, 24],
+      "text": "外观 浅色·紧凑     更多",
+      "font_path": "C:\\Windows\\Fonts\\msyh.ttc",
+      "font_sha256": "e4b3b9d058750fb80899c24f68e35beda606ca92694eff0e9f7f91eec7a846aa",
+      "font_size": 14,
+      "text_fill": [45, 57, 70],
+      "purpose": "Restore the compact appearance projection and existing More menu without adding another navigation item."
+    }
+  ]
+}

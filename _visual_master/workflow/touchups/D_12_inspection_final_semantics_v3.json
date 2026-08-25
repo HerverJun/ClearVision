@@ -1,0 +1,93 @@
+{
+  "schema_version": "clearvision-controlled-picture-layer-touchup.v1",
+  "entry_id": "D_12_inspection",
+  "source_iteration": "option_D/iterations/12_inspection_v_final_semantics_source_4k.png",
+  "source_sha256": "48eedeb9a4eadcf3b96b9ac3eb39099cf852141e09be31f7f1ccdf9f13ee9565",
+  "purpose": "Preserve the exact gpt-image-2 4K Inspection composition and CURRENT recovery scenario while correcting semantic state colors and enforcing the single Option D cinnabar navigation selection treatment.",
+  "operations": [
+    {
+      "type": "replace_text",
+      "box": [
+        165,
+        447,
+        210,
+        492
+      ],
+      "fill": [
+        249,
+        249,
+        249
+      ],
+      "position": [
+        166,
+        441
+      ],
+      "text": "●",
+      "font_path": "C:\\Windows\\Fonts\\msyh.ttc",
+      "font_sha256": "e4b3b9d058750fb80899c24f68e35beda606ca92694eff0e9f7f91eec7a846aa",
+      "font_size": 42,
+      "text_fill": [
+        155,
+        106,
+        19
+      ],
+      "purpose": "Use the frozen amber recovery role for 实时恢复中."
+    },
+    {
+      "type": "replace_text",
+      "box": [
+        150,
+        1464,
+        201,
+        1513
+      ],
+      "fill": [
+        255,
+        255,
+        255
+      ],
+      "position": [
+        151,
+        1456
+      ],
+      "text": "●",
+      "font_path": "C:\\Windows\\Fonts\\msyh.ttc",
+      "font_sha256": "e4b3b9d058750fb80899c24f68e35beda606ca92694eff0e9f7f91eec7a846aa",
+      "font_size": 44,
+      "text_fill": [
+        22,
+        111,
+        159
+      ],
+      "purpose": "Use the frozen running/action role for 连续检测已启动 instead of success green."
+    },
+    {
+      "type": "replace_text",
+      "box": [
+        1140,
+        42,
+        1385,
+        112
+      ],
+      "fill": [
+        254,
+        254,
+        254
+      ],
+      "position": [
+        1178,
+        40
+      ],
+      "text": "连续检测",
+      "font_path": "C:\\Windows\\Fonts\\msyh.ttc",
+      "font_sha256": "e4b3b9d058750fb80899c24f68e35beda606ca92694eff0e9f7f91eec7a846aa",
+      "font_size": 48,
+      "text_fill": [
+        250,
+        0,
+        0
+      ],
+      "purpose": "Use the same cinnabar active Product Shell navigation treatment as the rest of Option D."
+    }
+  ]
+}

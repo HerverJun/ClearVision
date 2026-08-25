@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref, shallowRef } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref, shallowRef, useTemplateRef } from 'vue';
 import {
   getCanvasLabDiagnostics,
   mountCanvasLab,
@@ -17,6 +17,27 @@ interface CanvasFixtureOption {
 }
 
 const canvasId = 'studio-ui-canonical-flow-canvas';
+const canvasStatusId = `${canvasId}-accessibility-status`;
+const canvasHelpId = `${canvasId}-accessibility-help`;
+const canvasDescriptionIds = `${canvasStatusId} ${canvasHelpId}`;
+const canvasKeyboardShortcuts = [
+  'Control+A',
+  'Meta+A',
+  'Control+C',
+  'Meta+C',
+  'Control+V',
+  'Meta+V',
+  'Control+Z',
+  'Meta+Z',
+  'Control+Shift+Z',
+  'Meta+Shift+Z',
+  'Control+Y',
+  'Meta+Y',
+  'Delete',
+  'Backspace',
+  'Escape'
+].join(' ');
+const canvasKeyboardHelp = '画布获得焦点后，可使用 Ctrl/Command+A 全选，Ctrl/Command+C 和 Ctrl/Command+V 复制粘贴，Ctrl/Command+Z 撤销，Ctrl/Command+Shift+Z 或 Ctrl/Command+Y 重做，Delete 或 Backspace 删除，Escape 取消选择。';
 const fixtureOptions: readonly CanvasFixtureOption[] = Object.freeze([
   {
     id: 'canonical',
@@ -47,6 +68,7 @@ const fixtureOptions: readonly CanvasFixtureOption[] = Object.freeze([
 const diagnostics = shallowRef<CanvasLabDiagnostics>(getCanvasLabDiagnostics());
 const mountError = ref<string | null>(null);
 const diagnosticsExpanded = ref(true);
+const canvasElement = useTemplateRef<HTMLCanvasElement>('canvasElement');
 let controller: CanvasLabController | undefined;
 
 const runtime = computed(() => diagnostics.value.runtime);
@@ -60,6 +82,20 @@ const labState = computed(() => {
 });
 const validationPassCount = computed(() =>
   diagnostics.value.validation.filter(item => item.passed).length);
+const validationSummary = computed(() => diagnostics.value.fixtureId === 'canonical'
+  ? `${validationPassCount.value}/${diagnostics.value.validation.length}`
+  : '不适用');
+const canvasStatusText = computed(() => {
+  if (mountError.value) {
+    return `${diagnostics.value.fixtureName ?? '无活动夹具'}；画布运行时不可用；${mountError.value}；节点 ${runtime.value?.nodeCount ?? 0}；连线 ${runtime.value?.connectionCount ?? 0}。`;
+  }
+  const status = diagnostics.value.status === 'mounted'
+    ? '已挂载'
+    : diagnostics.value.status === 'error'
+      ? '挂载失败'
+      : diagnostics.value.status;
+  return `${diagnostics.value.fixtureName ?? '无活动夹具'}；${status}；节点 ${runtime.value?.nodeCount ?? 0}；连线 ${runtime.value?.connectionCount ?? 0}；连接校验 ${validationSummary.value}。`;
+});
 const identityFingerprint = computed(() =>
   diagnostics.value.identity.afterFingerprint ?? diagnostics.value.identity.beforeFingerprint ?? '未运行');
 
@@ -111,6 +147,19 @@ function resizeCanvas(): void {
   runWithOwner(owner => owner.resize());
 }
 
+function mergeCanvasDescriptions(): void {
+  const canvas = canvasElement.value;
+  if (!canvas) {
+    throw new Error('Canvas Lab accessibility target is unavailable.');
+  }
+  const descriptionIds = new Set([
+    ...(canvas.getAttribute('aria-describedby')?.split(/\s+/).filter(Boolean) ?? []),
+    canvasStatusId,
+    canvasHelpId
+  ]);
+  canvas.setAttribute('aria-describedby', [...descriptionIds].join(' '));
+}
+
 function disposeOwnedController(reportError: boolean): void {
   const owner = controller;
   controller = undefined;
@@ -143,6 +192,7 @@ onMounted(() => {
         diagnostics.value = nextDiagnostics;
       }
     });
+    mergeCanvasDescriptions();
     controller.resize();
     refreshDiagnostics();
   } catch (error) {
@@ -257,12 +307,27 @@ onBeforeUnmount(() => {
         >
           <canvas
             :id="canvasId"
+            ref="canvasElement"
             data-canvas-surface
             tabindex="0"
             aria-label="流程编辑画布"
+            :aria-describedby="canvasDescriptionIds"
+            :aria-keyshortcuts="canvasKeyboardShortcuts"
           >
             FlowCanvas 需要 Canvas 2D 支持。
           </canvas>
+          <span
+            :id="canvasStatusId"
+            class="canvas-lab__visually-hidden"
+            role="status"
+            aria-live="polite"
+            aria-atomic="true"
+            data-canvas-live-status
+          >{{ canvasStatusText }}</span>
+          <span
+            :id="canvasHelpId"
+            class="canvas-lab__visually-hidden"
+          >{{ canvasKeyboardHelp }}</span>
           <div
             v-if="!isMounted"
             class="canvas-lab__canvas-state"
@@ -341,7 +406,9 @@ onBeforeUnmount(() => {
         <section class="canvas-lab__diagnostic-section">
           <div class="canvas-lab__section-heading canvas-lab__section-heading--compact">
             <h2>连线拒绝矩阵</h2>
-            <span>{{ validationPassCount }}/{{ diagnostics.validation.length }}</span>
+            <span data-canvas-validation-summary>
+              {{ validationSummary }}
+            </span>
           </div>
           <ul class="canvas-lab__validation-list">
             <li

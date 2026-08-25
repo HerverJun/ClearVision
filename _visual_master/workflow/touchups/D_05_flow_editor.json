@@ -1,0 +1,33 @@
+{
+  "schema_version": "clearvision-controlled-picture-layer-touchup.v1",
+  "entry_id": "D_05_flow_editor",
+  "source_iteration": "option_D/iterations/05_flow_editor_v6.png",
+  "source_sha256": "5c5cc3bf124ea1003cea4801afebb6a4b0fd6176fc9e5e38bbfdeb6c75011c91",
+  "purpose": "Remove duplicated navigation and command affordances, then restore the CURRENT operator category label without altering the audited UI composition.",
+  "operations": [
+    {
+      "type": "fill_rect",
+      "box": [300, 0, 900, 63],
+      "fill": [249, 249, 249],
+      "purpose": "Remove the duplicated top product navigation after it was remapped to the slim left rail."
+    },
+    {
+      "type": "fill_rect",
+      "box": [725, 66, 852, 143],
+      "fill": [250, 250, 251],
+      "purpose": "Remove the first duplicate Final Decision label while retaining the verified icon command."
+    },
+    {
+      "type": "replace_text",
+      "box": [165, 623, 315, 660],
+      "fill": [249, 248, 249],
+      "position": [168, 631],
+      "text": "分割与区域",
+      "font_path": "C:\\Windows\\Fonts\\msyhbd.ttc",
+      "font_sha256": "06e1a30f687ab7d39f533447b21e84d51e0cecdaa6bfa060c87136b168811bdc",
+      "font_size": 17,
+      "text_fill": [44, 53, 62],
+      "purpose": "Replace the image-model copy error with the exact CURRENT category label."
+    }
+  ]
+}

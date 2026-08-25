@@ -1,0 +1,191 @@
+{
+  "schemaVersion": "f04-product-visual-browser.v1",
+  "capturedAtUtc": "2026-08-15T15:48:13.796Z",
+  "sourceSha": "cdd114082821bbe750fb7945a0c3a4e89002d67c",
+  "evidencePhase": "f04",
+  "evidenceType": "BROWSER_FIXTURE",
+  "route": "http://127.0.0.1:5177/studio/index.html#/projects",
+  "scenario": "projects-empty",
+  "viewport": {
+    "width": 1600,
+    "height": 1000
+  },
+  "projection": {
+    "viewport": {
+      "width": 1600,
+      "height": 1000
+    },
+    "dpr": 1,
+    "theme": "light",
+    "density": "compact",
+    "reducedMotion": "false",
+    "horizontalOverflow": 0,
+    "verticalOverflow": 0,
+    "authPage": null,
+    "studioPage": null,
+    "capabilities": [
+      "projects-read"
+    ],
+    "workspaceState": null,
+    "workspacePersistencePhase": null,
+    "workspaceRunPhase": null,
+    "leaveGuardPhase": "allowed",
+    "workspaceInteractionState": {
+      "operatorCatalogPhase": null,
+      "operatorCategory": null,
+      "draggingOperator": null,
+      "canvasNodeCount": null,
+      "canvasConnectionCount": null,
+      "canvasSelectedCount": null,
+      "canvasSelectedDisabledCount": null,
+      "inspectorMode": null,
+      "inspectorMetadataPhase": null,
+      "inspectorValidationErrorCount": 0,
+      "previewPhase": null,
+      "previewStale": null,
+      "imagePhase": null,
+      "pixelProbePhase": null,
+      "roiPhase": null,
+      "portCompatibility": null,
+      "operatorFlyoutPresent": false,
+      "finalDecisionEntryPresent": false,
+      "globalVariablesEntryPresent": false
+    },
+    "workspaceGeometry": {
+      "appRoot": {
+        "x": 0,
+        "y": 0,
+        "width": 1600,
+        "height": 1000
+      },
+      "productLayout": {
+        "x": 0,
+        "y": 0,
+        "width": 1600,
+        "height": 1000
+      },
+      "productWorkspace": {
+        "x": 0,
+        "y": 0,
+        "width": 1600,
+        "height": 1000
+      },
+      "productContent": null,
+      "computedStyles": {
+        "appRoot": {
+          "display": "block",
+          "position": "static",
+          "width": "1600px",
+          "height": "1000px",
+          "minHeight": "100%",
+          "gridTemplateColumns": "none",
+          "gridTemplateRows": "none",
+          "transform": "none",
+          "zoom": "1"
+        },
+        "productLayout": {
+          "display": "grid",
+          "position": "static",
+          "width": "1600px",
+          "height": "1000px",
+          "minHeight": "1000px",
+          "gridTemplateColumns": "1600px",
+          "gridTemplateRows": "1000px",
+          "transform": "none",
+          "zoom": "1"
+        },
+        "productWorkspace": {
+          "display": "grid",
+          "position": "static",
+          "width": "1600px",
+          "height": "1000px",
+          "minHeight": "1000px",
+          "gridTemplateColumns": "1600px",
+          "gridTemplateRows": "52px 948px",
+          "transform": "none",
+          "zoom": "1"
+        },
+        "productContent": null
+      },
+      "productRail": null,
+      "productTopbar": null,
+      "workspaceToolbar": null,
+      "operatorRail": null,
+      "operatorSearch": null,
+      "operatorCategory": null,
+      "operatorFirstItem": null,
+      "flowToolbar": null,
+      "canvasStage": null,
+      "preview": null,
+      "previewDetails": null,
+      "imageToolbar": null,
+      "imageStage": null,
+      "previewSplitter": null,
+      "inspector": null,
+      "inspectorBody": null,
+      "inspectorFirstParameter": null,
+      "inspectorSplitter": null,
+      "workspaceStatusbar": null,
+      "saveCommand": null,
+      "runCommand": null,
+      "inspectorWidth": null,
+      "inspectorMinWidth": null,
+      "inspectorMaxWidth": null,
+      "previewHeight": null,
+      "previewMinHeight": null,
+      "previewMaxHeight": null,
+      "previewCollapsed": null,
+      "previewWidth": null,
+      "previewMinWidth": null,
+      "previewMaxWidth": null,
+      "internalOverflow": {
+        "operatorRail": null,
+        "flowToolbar": null,
+        "inspectorBody": null,
+        "previewBody": null,
+        "previewDetails": null,
+        "imageToolbar": null
+      }
+    },
+    "modalTitle": null,
+    "activeElement": {
+      "tagName": "BUTTON",
+      "testId": null,
+      "ariaLabel": "会话菜单，f04-engineer，工程师",
+      "text": "Ff04-engineer工程师"
+    }
+  },
+  "runtimeErrors": {
+    "consoleErrors": [],
+    "pageErrors": []
+  },
+  "requestAudit": [
+    {
+      "method": "GET",
+      "path": "/api/auth/setup-status"
+    },
+    {
+      "method": "GET",
+      "path": "/api/auth/me"
+    },
+    {
+      "method": "GET",
+      "path": "/api/projects"
+    },
+    {
+      "method": "GET",
+      "path": "/api/projects/recent?count=5"
+    }
+  ],
+  "notes": [],
+  "dpr": {
+    "type": "BROWSER_EMULATED_DPR",
+    "value": 1
+  },
+  "nativeWebView2Dpi": "NOT_PERFORMED_BY_THIS_EVIDENCE",
+  "screenshot": {
+    "fileName": "projects-empty-1600x1000-dpr-1.png",
+    "bytes": 37779,
+    "sha256": "4AF62B9DF4F3B1A7B75DAC46A58D1E4F5695AA9607E41A7E06D90F81527DE8E3"
+  }
+}

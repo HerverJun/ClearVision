@@ -12,6 +12,33 @@ PLANNING_DIVERGENCE=STABLE_ONLY_81_NEXT_ONLY_294
 REFS_REFRESHED_FOR_THIS_PLAN=YES
 CURRENT_STATUS_SOURCE=docs/进行中/StudioUINext/F10_ContractAndProductionPlan.md
 EXECUTION_POLICY=ONE_GATE_AT_A_TIME
+OPTION_D_PLAN=docs/进行中/StudioUINext/Studio_UI_Next_Option_D_像素级复刻与功能完整继承计划_PROPOSED_AUDITED.md
+OPTION_D_G0_STATE=PASS
+OPTION_D_G0_OWNER_APPROVAL=APPROVED_HERVERJUN_2026_08_23
+OPTION_D_G0_DETERMINISTIC_FIXTURE=PASS
+OPTION_D_G1_STATE=PASS
+OPTION_D_G1_STARTED=TRUE_2026_08_23
+OPTION_D_G1_HARD_GATE=PASS_17_OF_17
+OPTION_D_G1_STUDIOUI_VITEST=PASS_144_FILES_953_TESTS
+OPTION_D_G2_STATE=BLOCKED_BY_CONTRACT
+OPTION_D_G2_STARTED=TRUE_2026_08_24
+OPTION_D_G2_HISTORICAL_DETERMINISM_GATE=PASS_6_OF_6_ZERO_DIFF_NO_MASKS
+OPTION_D_G2_RAW_MASTER_PIXEL_GATE=NOT_RUN_AFTER_REOPEN
+OPTION_D_G2_AFFECTED_REGRESSION=NOT_RUN_AFTER_REOPEN
+OPTION_D_G2_INDEPENDENT_REVIEW=NOT_PERFORMED_AFTER_REOPEN
+OPTION_D_G3_STATE=BLOCKED_BY_DEPENDENCY
+OPTION_D_G3_STARTED=TRUE_2026_08_24
+OPTION_D_G3_DETERMINISM_GATE=PASS_REFERENCE_6_OF_6_CANDIDATE_6_OF_6_ZERO_DIFF_NO_MASKS
+OPTION_D_G3_MASTER_PIXEL_GATE=FAIL_0_OF_6_CHANGED_RATIO_8_5124_TO_36_3066_PERCENT
+OPTION_D_G4_STATE=BLOCKED_BY_DEPENDENCY
+OPTION_D_G2_G3_REOPEN_APPROVAL=APPROVED_HERVERJUN_2026_08_24
+OPTION_D_G2_G3_REOPEN_SIGNER_ROLES=PRODUCT_SECURITY_QA_RELEASE_CAPABILITY_OWNER
+OPTION_D_WHOLE_PAGE_VISUAL_AUTHORITY=INVALID_BY_INTERNAL_SHELL_CONFLICT
+OPTION_D_GLOBAL_PRODUCT_NAV_TOP_RULE=FROZEN_TOP_ONLY
+OPTION_D_LEFT_SIDE_SURFACE_SCOPE=PAGE_INTERNAL_TOOLS_CATEGORIES_OR_CONTEXT_ONLY
+OPTION_D_UI_IMPLEMENTATION=PROHIBITED_PENDING_G2_VISUAL_AUTHORITY_AND_PAGE_SCOPE_REFREEZE
+OPTION_D_CAPABILITY_PRESERVATION=APPROVED_RELOCATION_OR_PROGRESSIVE_DISCLOSURE
+OPTION_D_G4_START_AUTHORIZATION=NOT_GRANTED
 G0_STATE=DONE
 G0_IMPLEMENTATION_HEAD=21105d57de7e5b4ce41365c7827ed14e64ca7ba5
 G0_STABLE_COMMITS_AUDITED=81
@@ -19,6 +46,7 @@ G0_STABLE_COMMITS_LEFT_ONLY=77
 G0_STABLE_COMMITS_PATCH_EQUIVALENT=4
 G0_GENERATED_ARTIFACTS=CONTROLLED_SOURCE_DERIVED_OUTPUTS_PLUS_NOT_APPLICABLE_HISTORICAL_SNAPSHOTS
 G0_REMOTE_REFRESH=PASS_NO_REMOTE_ADVANCE_OR_FORK
+UNPREFIXED_G1_G10_KEYS=HISTORICAL_F10_GATES_NOT_OPTION_D_GATES
 G1_STATE=DONE
 G1_BASELINE_HEAD=21105d57de7e5b4ce41365c7827ed14e64ca7ba5
 G1_IMPLEMENTATION_HEAD=98cb8c7f54d2d51ea5b59ca534aafd51544b773f
@@ -85,6 +113,12 @@ LEGACY_RETIREMENT=NOT_APPROVED
 
 Studio UI Next 已是默认入口，主体业务迁移进入后期收口，但尚未完成生产切换：
 
+- Option D 现为唯一视觉 authority。G0 的 24/24 hash/Master/宪章、route/capability/Owner/authority/fallback 台账、
+  `HerverJun / 2026-08-23` 具名批准、`option-d-g0-deterministic.v1`、本地测试、独立复核与最终 manifest/hash/whitespace/status 冻结均已完成。
+- Option D G1 的共享 Design System、Design/Canvas Labs、Master measurement、4/4 双轨视觉证据与 owner cleanup 已完成；reference/candidate hard gate 各 17/17、StudioUI 144 files / 953 tests、lint/typecheck/build/bundle 均 PASS。三路独立终审与最终 whitespace/status 已闭合，G1 为 `PASS`。
+- Option D G2 当前为 `BLOCKED_BY_CONTRACT`。全局产品导航已冻结为始终位于顶部；左侧只允许页面内部工具、分类或上下文面板，不得替代或重复全局导航。raw whole-page Master 集合因内部 Shell 冲突失去当前视觉权威，须先完成筛图、页面范围和版本化视觉基准的重新冻结。
+- Option D G3/G4 均为 `BLOCKED_BY_DEPENDENCY`。旧 D02-D04/D15/D22-D23 raw Master-to-candidate changed-pixel ratio 与历史回归证据继续保留，但不能解除当前阻断；G2 合同和视觉权威重新冻结前，禁止继续任何 Option D UI 实施。
+- run-to-node/active-node 与 Inspector recommendation 为 `DEFERRED`，subgraph 为 `NOT_APPLICABLE`；Station 保持现有 owner/admission/reconcile，这些处置不是新功能授权。
 - Next 已建立 Router、Auth/Session、Leave Guard、唯一 API transport、Host adapter、query owner、
   workspace owner、canonical FlowCanvas/ImageCanvas 和 capability-local lifecycle owner。
 - Project import/export、NPoint authorization、planar calibration、Results bulk export、Line Sequence
@@ -127,8 +161,9 @@ Studio UI Next 已是默认入口，主体业务迁移进入后期收口，但�
 
 ## 2. 状态与勾选规则
 
-- 状态只使用：`LOCKED`、`READY`、`IN_PROGRESS`、`BLOCKED_BY_CONTRACT`、
-  `BLOCKED_BY_ENVIRONMENT`、`DONE`、`DEFERRED`。
+- 历史 F10 Gate 状态使用：`LOCKED`、`READY`、`IN_PROGRESS`、`BLOCKED_BY_CONTRACT`、
+  `BLOCKED_BY_ENVIRONMENT`、`DONE`、`DEFERRED`。Option D Gate 另使用主计划冻结的 `PASS`、
+  `REVIEW_PENDING`、`BLOCKED_BY_DEPENDENCY`、`NOT_RUN` 与 `NOT_PERFORMED`，两套命名空间不得混读。
 - `[x]` 表示当前代码和绑定 SHA 的证据已确认；`[ ]` 表示尚未执行或当前 SHA 尚无证据。
 - 历史 PASS、历史截图、旧测试数量和旧 SHA 不得外推到新的候选 SHA。
 - Browser/Chromium fixture 不得替代真实 WebView2、Windows DPI、no-Node 或现场硬件。
@@ -136,7 +171,7 @@ Studio UI Next 已是默认入口，主体业务迁移进入后期收口，但�
 - 每个 Gate 完成后先更新 F10、复审并冻结新 SHA，再解锁下一 Gate。
 - Gate 表允许的只读审计可以并行；任何代码或共享文档实施仍服从前置 Gate 和唯一 Owner。
 
-## 3. Gate 总览
+## 3. 历史 F10 Gate 总览（非 Option D）
 
 | Gate | 优先级 | 工作包 | 当前状态 | 唯一 Owner | 解锁条件 |
 | --- | --- | --- | --- | --- | --- |
@@ -254,7 +289,7 @@ G2.1-G2.5、G2.7/G2.9、G2.10 AI follow-up 等延期边界；延期能力未来�
 - [x] 每个旧版用户任务都有明确 disposition、入口、测试和中文状态语义。
 - [x] 延期能力保持不可用且没有前端私有替代实现；重新进入不作为本轮 G2 退出条件。
 
-## 7. G3：产品体验、视觉与 Vue 工程收口
+## 7. 历史 F10 G3：产品体验、视觉与 Vue 工程收口
 
 **目标**：在不减少能力、不改变 authority 的前提下完成 Quiet Precision、工业高信息密度和简体中文体验。
 
@@ -424,13 +459,17 @@ G6 不因 G5 完成而自动通过。当前必须保持：`PRODUCTION_ACCEPTANCE
 
 ## 14. 下一步唯一动作
 
+- [x] 完成 Option D G1 的 code/Owner、visual/gate、documentation/status 三路独立终审与最终 whitespace/status 冻结；G1 已 `PASS`，G2 仅转为 `READY`。
+- [ ] Option D G2：`BLOCKED_BY_CONTRACT`；按顶部唯一全局导航规则筛选图片，重新冻结页面范围和版本化视觉权威。完成前禁止继续 G2 UI。
+- [ ] Option D G3/G4：均为 `BLOCKED_BY_DEPENDENCY`；旧实现与证据保留，等待 G2 合同和视觉权威重新冻结，不得恢复 G3 或实施 G4。
+- [x] 完成 Option D G0 的三路独立复核、补充 disposition 复核、machine-readable manifest、最终 hash/whitespace/status 冻结；在 G0 Goal 关闭时 G1 仅标记为 `READY`。当前状态以文件顶部的 `OPTION_D_G1_STATE=PASS` 为准。
 - [x] **G0.1-G0.4** 已完成：远端刷新、候选冻结和 stable-only commit 语义矩阵见 F10。
 - [x] **G1.1-G1.10** 已完成：请求/写入生命周期、跨工程状态安全、handoff 恢复和 diagnostics 账本已在 `98cb8c7f5` 提交。
 - [x] 开始 G2 合同解阻与功能差距决策；GlobalVariables 与 Line Sequence 可实施投影已落地，合同缺口与
   旧版能力处置见 G2 ADR。
-- [x] 完成 G2.1-G2.5 处置冻结、延期项重新进入条件和 `98cb8c7f5` 验证；G3 已解锁。
-- [x] 完成 G3 产品体验、视觉、中文与 Vue 工程收口；实现与浏览器方向性证据冻结在 `1c6e61e5a`。
-- [x] 完成 G4 Legacy profile 隔离、rollback 与退役准备；Legacy 源码保留，退役未获批准。
+- [x] 完成历史 F10 G2.1-G2.5 处置冻结、延期项重新进入条件和 `98cb8c7f5` 验证；历史 F10 G3 已解锁。
+- [x] 完成历史 F10 G3 产品体验、视觉、中文与 Vue 工程收口；实现与浏览器方向性证据冻结在 `1c6e61e5a`。该历史结论不代表 Option D G3 通过。
+- [x] 完成历史 F10 G4 Legacy profile 隔离、rollback 与退役准备；Legacy 源码保留，退役未获批准。Option D G4 仍为 `BLOCKED_BY_DEPENDENCY`。
 - [x] 在 `1c8ad67f3` 之后完成 G5；全部最终本地软件证据绑定
   `93cc880619b51d68828bcbc3336b77c83ad60dcc`。
 - [ ] 在可用的内置浏览器会话补齐 `TODOView.md` V6.4 的 S00-S13 × B0-B4 L1 最终矩阵；当前只完成登录到工程页的代表交互，不外推为全矩阵。

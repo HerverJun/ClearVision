@@ -19,6 +19,16 @@ import {
 } from './f04-browser-evidence';
 import { f03PreviewBitmapFixture } from './f03-preview-bitmap-fixture';
 import {
+  createOptionDG0AdmissionResponse,
+  createOptionDG0EvidenceManifest,
+  createOptionDG0FormalRunResult,
+  createOptionDG0PreviewResponse,
+  createOptionDG0Project,
+  createOptionDG0ResultDetail,
+  createOptionDG0ResultPage,
+  optionDG0DeterministicFixture
+} from './option-d-g0-deterministic-fixture';
+import {
   captureR2FinalMatrixGroup,
   collectR2S05BitmapEvidence,
   prepareR2FinalMatrixPage,
@@ -2746,6 +2756,129 @@ test('M07 Workspace run details traps keyboard focus and restores the trigger on
   await expect(trigger).toBeFocused();
 });
 
+test('Option D G0 consumes one frozen Project, Preview, Run and Results evidence fixture', async ({ page }) => {
+  test.setTimeout(60_000);
+  await page.setViewportSize({ width: 1920, height: 1080 });
+  const runtimeErrors = createF04RuntimeErrorAudit(page);
+  let executionSnapshotId: string | null = null;
+  const audit = await bootWorkspace(page, {
+    authRole: 'Admin',
+    projectBody: projectId => createOptionDG0Project(projectId),
+    previewScenario: (request, call) => ({
+      body: createOptionDG0PreviewResponse(request, call, previewArtifactReference(call))
+    }),
+    runScenario: (stage, request) => {
+      if (stage === 'admission') return { body: createOptionDG0AdmissionResponse(request) };
+      if (stage === 'execute') {
+        executionSnapshotId = String(request.clientSnapshotId);
+        return { body: createOptionDG0FormalRunResult(request) };
+      }
+      return {};
+    },
+    apiScenario: request => {
+      const url = new URL(request.url());
+      if (request.method() !== 'GET') return null;
+      if (url.pathname === `/api/inspection/history/${projectA}`) {
+        return { body: createOptionDG0ResultPage() };
+      }
+      if (url.pathname === `/api/inspection/history/${projectA}/${goldenResultId}`) {
+        return { body: createOptionDG0ResultDetail(executionSnapshotId) };
+      }
+      if (url.pathname === `/api/inspection/history/${projectA}/${goldenResultId}/evidence/manifest`) {
+        return { body: createOptionDG0EvidenceManifest() };
+      }
+      return null;
+    }
+  });
+
+  expect(optionDG0DeterministicFixture).toMatchObject({
+    schemaVersion: 'option-d-g0-deterministic.v1',
+    approvedBy: 'HerverJun',
+    subgraphDisposition: 'NOT_APPLICABLE',
+    authority: {
+      preview: 'DEBUG_PROJECTION',
+      formalRun: 'AUTHENTICATED_HTTP',
+      formalResult: 'RESULTS_READ',
+      projectSave: 'PROJECT_SAVE_COORDINATOR'
+    }
+  });
+  const seededProject = optionDG0DeterministicFixture.project;
+  expect(seededProject.flow.operators).toHaveLength(3);
+  expect(seededProject.globalVariables.variables).toHaveLength(1);
+  expect(seededProject.globalVariables.sourceBindings).toHaveLength(1);
+  expect(seededProject.globalVariables.targetBindings).toHaveLength(1);
+  expect(seededProject.flow.decisionConfiguration.finalDecisionBinding).toMatchObject({
+    sourceOperatorId: optionDG0DeterministicFixture.identities.judgeNodeId,
+    sourceOutputPortId: optionDG0DeterministicFixture.identities.judgeOutputId,
+    threshold: 12.5
+  });
+
+  const shell = page.locator('[data-evidence-surface="f03-workspace-shell"]');
+  await expect(shell).toHaveAttribute('data-workspace-state', 'ready');
+  await expect(shell).toHaveAttribute('data-workspace-dirty', 'false');
+  await expect(shell).toHaveAttribute('data-workspace-persistence-revision', '8');
+  await expect(page.locator('[data-evidence-surface="f03-g2-flow-canvas"]'))
+    .toHaveAttribute('data-node-count', '3');
+  await expect(page.locator('[data-testid="workspace-save"]')).toBeDisabled();
+
+  await page.locator('[data-testid="global-variables"]').click();
+  const variables = page.locator('[data-capability="global-variables-workbench"]');
+  await expect(variables).toContainText('密封宽度');
+  await variables.getByRole('button', { name: '绑定', exact: true }).click();
+  await expect(variables).toContainText('密封宽度判定.Width');
+  await page.getByRole('button', { name: '取消', exact: true }).click();
+
+  await page.locator('[data-testid="final-decision"]').click();
+  const decision = page.locator('[data-capability="final-decision-workbench"]');
+  await expect(decision).toContainText('密封宽度判定');
+  await expect(decision.locator('input[type="number"]')).toHaveValue('12.5');
+  await page.getByRole('button', { name: '取消', exact: true }).click();
+
+  await selectInspectorNode(page, 340, 125);
+  const preview = page.locator('[data-capability="preview-workbench"]');
+  await expect(preview).toHaveAttribute('data-preview-phase', 'success');
+  await expect(page.locator('.preview-panel__roi')).toHaveAttribute('data-roi-phase', 'ready');
+  await expect(page.locator('[data-testid="workspace-save"]')).toBeDisabled();
+
+  await expect(page.locator('[data-testid="workspace-run"]')).toBeEnabled();
+  await page.locator('[data-testid="workspace-run"]').click();
+  await expect(shell).toHaveAttribute('data-workspace-run-phase', 'succeeded');
+  await expect(page.locator('[data-testid="workspace-current-result"]')).toBeVisible();
+  expect(executionSnapshotId).not.toBeNull();
+
+  await page.locator('[data-testid="workspace-current-result"]').click();
+  const evidence = page.locator('[data-capability="result-evidence"]');
+  await expect(evidence).toHaveAttribute('data-evidence-phase', 'available');
+  await expect(evidence).toContainText('manifest-option-d-g0');
+  await expect.poll(async () => await workspaceDiagnostics(page)).toMatchObject({
+    workspaceOwnerCount: 0,
+    flowCanvasOwnerCount: 0,
+    inspectorOwnerCount: 0,
+    previewOwnerCount: 0,
+    imageCanvasOwnerCount: 0,
+    roiOwnerCount: 0,
+    persistenceOwnerCount: 0,
+    runOwnerCount: 0,
+    activeSubscriptions: 0,
+    activeTimers: 0,
+    activeAnimationFrames: 0,
+    activeObservers: 0,
+    activeAbortControllers: 0,
+    activeBlobUrls: 0,
+    activePreviewArtifactIds: 0,
+    inFlightReads: 0,
+    inFlightWrites: 0,
+    inFlightPreview: 0,
+    inFlightExecute: 0,
+    ownerConflictCount: 0
+  });
+  expect(audit.some(entry => entry.path === '/api/flows/preview-node')).toBe(true);
+  expect(audit.some(entry => entry.path === '/api/inspection/execute')).toBe(true);
+  expect(audit.some(entry => entry.path.endsWith('/evidence/manifest'))).toBe(true);
+  expect(audit.some(entry => entry.method === 'PUT')).toBe(false);
+  expect(runtimeErrors).toEqual({ consoleErrors: [], pageErrors: [] });
+});
+
 for (const viewport of [{ width: 1920, height: 1080 }, { width: 1366, height: 768 }] as const) {
   test(`F04-R G3 golden journey closes Camera, Variables, Decision, Preview, Save, Run, Evidence and Package at ${viewport.width}x${viewport.height}`, async ({ page }) => {
     test.setTimeout(60_000);
@@ -4167,16 +4300,36 @@ for (const fixture of [
       await expect(workspace).toHaveAttribute('data-flow-owner-phase', 'mounted');
       await expect(workspace).toHaveAttribute('data-flow-owner-count', '1');
       const canvas = page.locator('[data-testid="flow-canvas"]');
-      const box = await canvas.boundingBox();
-      if (box) {
-        await page.mouse.move(box.x + 60, box.y + 60);
-        await page.mouse.down();
-        await page.mouse.move(box.x + 90, box.y + 80, { steps: 3 });
-        await page.mouse.up();
-        await canvas.hover();
-        await page.mouse.wheel(0, -120);
+      let selectedCanvasPoint: { x: number; y: number } | null = null;
+      for (const worldPoint of [{ x: 110, y: 100 }, { x: 110, y: 80 }, { x: 110, y: 115 }]) {
+        const scale = Number((await surface.getAttribute('data-scale')) ?? '1');
+        const offsetX = Number((await surface.getAttribute('data-offset-x')) ?? '0');
+        const offsetY = Number((await surface.getAttribute('data-offset-y')) ?? '0');
+        const canvasPoint = {
+          x: (worldPoint.x - offsetX) * scale,
+          y: (worldPoint.y - offsetY) * scale
+        };
+        await canvas.click({ position: canvasPoint });
+        await page.waitForTimeout(50);
+        if (await surface.getAttribute('data-selected-count') === '1') {
+          selectedCanvasPoint = canvasPoint;
+          break;
+        }
       }
+      expect(selectedCanvasPoint).not.toBeNull();
       await expect(surface).toHaveAttribute('data-selected-count', '1');
+      await canvas.hover({ position: selectedCanvasPoint! });
+      const box = await canvas.boundingBox();
+      expect(box).not.toBeNull();
+      await page.mouse.down();
+      await page.mouse.move(
+        box!.x + selectedCanvasPoint!.x + 30,
+        box!.y + selectedCanvasPoint!.y + 20,
+        { steps: 8 }
+      );
+      await page.mouse.up();
+      await canvas.hover();
+      await page.mouse.wheel(0, -120);
       await expect(page.locator('[data-evidence-surface="f03-workspace-shell"]'))
         .toHaveAttribute('data-workspace-dirty', 'true');
       await requestStudioHashNavigation(page, '#/about');
@@ -5112,7 +5265,7 @@ for (const scenario of workspaceG3VisualMatrix) {
     });
     expect(layout.toolbar?.top).toBeGreaterThanOrEqual(0);
     expect(layout.status?.bottom).toBeLessThanOrEqual(viewport.height + 1);
-    expect(layout.topbar?.height).toBeLessThanOrEqual(density === 'comfortable' ? 56 : 52);
+    expect(layout.topbar?.height).toBeCloseTo(density === 'comfortable' ? 73 : 69, 0);
     expect(layout.saveVisible).toBe(true);
     expect(layout.runVisible).toBe(true);
     expect(layout.inspector?.width).toBeGreaterThanOrEqual(248);

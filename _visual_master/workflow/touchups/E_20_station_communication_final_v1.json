@@ -1,0 +1,45 @@
+{
+  "schema_version": "clearvision-controlled-picture-layer-touchup.v1",
+  "entry_id": "E_20_station_communication",
+  "source_iteration": "option_E/iterations/20_station_communication_v5.png",
+  "source_sha256": "b8e05954a25312a8d594e16b5d0ce8b25048c2ca5c7987256bb7057565463b0c",
+  "purpose": "Preserve closed-select v5 and add only the omitted real page refresh action plus exact CURRENT token-boundary copy.",
+  "operations": [
+    {
+      "type": "replace_text",
+      "box": [1695, 198, 1990, 250],
+      "fill": [17, 24, 31],
+      "position": [1722, 214],
+      "text": "刷新工作站配置",
+      "font_path": "C:\\Windows\\Fonts\\msyh.ttc",
+      "font_sha256": "e4b3b9d058750fb80899c24f68e35beda606ca92694eff0e9f7f91eec7a846aa",
+      "font_size": 15,
+      "text_fill": [214, 221, 228],
+      "purpose": "Restore the verified page-level action without introducing any new communication control."
+    },
+    {
+      "type": "replace_text",
+      "box": [374, 493, 900, 550],
+      "fill": [17, 24, 31],
+      "position": [378, 504],
+      "text": "完整令牌不会回显，也不会保存在浏览器或写入日志。",
+      "font_path": "C:\\Windows\\Fonts\\msyh.ttc",
+      "font_sha256": "e4b3b9d058750fb80899c24f68e35beda606ca92694eff0e9f7f91eec7a846aa",
+      "font_size": 13,
+      "text_fill": [188, 197, 206],
+      "purpose": "Restore the exact masked-token non-disclosure boundary."
+    },
+    {
+      "type": "replace_text",
+      "box": [374, 484, 475, 503],
+      "fill": [17, 24, 31],
+      "position": [378, 484],
+      "text": "******",
+      "font_path": "C:\\Windows\\Fonts\\msyh.ttc",
+      "font_sha256": "e4b3b9d058750fb80899c24f68e35beda606ca92694eff0e9f7f91eec7a846aa",
+      "font_size": 14,
+      "text_fill": [214, 221, 228],
+      "purpose": "Restore the real masked-token projection without exposing or inventing a token value."
+    }
+  ]
+}

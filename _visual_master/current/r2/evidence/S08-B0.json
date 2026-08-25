@@ -1,0 +1,167 @@
+{
+  "schemaVersion": "r2-final-matrix-capture.v1",
+  "scene": "S08",
+  "variant": "B0",
+  "route": "#/stations",
+  "state": "online-offline-stale",
+  "role": "Engineer",
+  "flags": {
+    "Studio2.StationsRead": true
+  },
+  "owner": {
+    "capability": "F02-stations",
+    "mounted": 1,
+    "subscriptions": 0,
+    "writes": 0
+  },
+  "requests": [
+    "GET /api/auth/setup-status",
+    "GET /api/auth/me",
+    "GET /health",
+    "GET /api/stations",
+    "GET /api/stations/summary",
+    "GET /api/stations/statistics",
+    "GET /api/stations/events",
+    "GET /api/stations",
+    "GET /api/stations/summary",
+    "GET /api/stations/statistics"
+  ],
+  "runtimeRequests": [
+    {
+      "method": "GET",
+      "path": "/api/auth/setup-status",
+      "url": "http://127.0.0.1:5421/api/auth/setup-status"
+    },
+    {
+      "method": "GET",
+      "path": "/api/auth/me",
+      "url": "http://127.0.0.1:5421/api/auth/me"
+    },
+    {
+      "method": "GET",
+      "path": "/health",
+      "url": "http://127.0.0.1:5421/health"
+    },
+    {
+      "method": "GET",
+      "path": "/api/stations",
+      "url": "http://127.0.0.1:5421/api/stations"
+    },
+    {
+      "method": "GET",
+      "path": "/api/stations/summary",
+      "url": "http://127.0.0.1:5421/api/stations/summary"
+    },
+    {
+      "method": "GET",
+      "path": "/api/stations/statistics",
+      "url": "http://127.0.0.1:5421/api/stations/statistics?range=today"
+    },
+    {
+      "method": "GET",
+      "path": "/api/stations/events",
+      "url": "http://127.0.0.1:5421/api/stations/events"
+    },
+    {
+      "method": "GET",
+      "path": "/api/stations",
+      "url": "http://127.0.0.1:5421/api/stations"
+    },
+    {
+      "method": "GET",
+      "path": "/api/stations/summary",
+      "url": "http://127.0.0.1:5421/api/stations/summary"
+    },
+    {
+      "method": "GET",
+      "path": "/api/stations/statistics",
+      "url": "http://127.0.0.1:5421/api/stations/statistics?range=today"
+    }
+  ],
+  "allowedWrites": [],
+  "runtime": {
+    "consoleErrors": [],
+    "pageErrors": [],
+    "failedRequests": [],
+    "httpErrors": [],
+    "expectedHttpErrors": [],
+    "observedExpectedHttpErrors": [],
+    "unexpectedWrites": []
+  },
+  "requiredCriticalActions": [
+    ".stations-page__station-name a"
+  ],
+  "motion": {
+    "layoutShifts": [
+      {
+        "value": 0.00025831434461805555,
+        "hadRecentInput": false
+      },
+      {
+        "value": 0.04311597387682754,
+        "hadRecentInput": false
+      },
+      {
+        "value": 0.0017122395833333336,
+        "hadRecentInput": false
+      }
+    ],
+    "longTasks": [
+      {
+        "startTime": 79.19999998807907,
+        "duration": 80
+      }
+    ]
+  },
+  "notes": [],
+  "dom": {
+    "url": "http://127.0.0.1:5421/studio/index.html#/stations",
+    "viewport": {
+      "width": 1920,
+      "height": 1080,
+      "dpr": 1
+    },
+    "theme": "light",
+    "density": "compact",
+    "reducedMotion": "false",
+    "focus": {
+      "tagName": "BUTTON",
+      "id": "stations-investigation-tab",
+      "testId": null
+    },
+    "landmarks": {
+      "main": 1,
+      "nav": 1,
+      "dialogs": 0
+    },
+    "mainBox": {
+      "x": 0,
+      "y": 52,
+      "width": 1920,
+      "height": 1028
+    },
+    "horizontalOverflow": 0,
+    "pageScroll": {
+      "x": 0,
+      "y": 0
+    },
+    "criticalActions": [
+      {
+        "selector": ".stations-page__station-name a",
+        "testId": null,
+        "text": "一号检测站",
+        "box": {
+          "x": 112,
+          "y": 529.171875,
+          "width": 268.390625,
+          "height": 19.5
+        },
+        "truncated": false,
+        "inViewport": true,
+        "reachable": true,
+        "enabled": true,
+        "unobscured": true
+      }
+    ]
+  }
+}

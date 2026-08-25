@@ -1,0 +1,41 @@
+{
+  "schema_version": "clearvision-controlled-picture-layer-touchup.v1",
+  "entry_id": "D_19_tcp_settings",
+  "source_iteration": "option_D/iterations/19_tcp_settings_v_final_consistency_source_4k.png",
+  "source_sha256": "cee4fc290c1766c6287e399ad5596f1457b2f91571732aa6359d7760bb518f26",
+  "purpose": "Place the generated TCP task inside the validated D20 dark Settings shell with canonical dual navigation rails.",
+  "operations": [
+    {
+      "type": "paste_option_candidate_reference",
+      "reference_path": "option_D/screens/20_station_communication.png",
+      "reference_sha256": "e1a660e9e64ff17184cda8ff7341fcfaa2660934164bbf93f73bf67ad0e65cd1",
+      "source_box": [0, 0, 3839, 2159],
+      "box": [0, 0, 3839, 2159],
+      "purpose": "Reuse the validated dark top bar, global rail, Settings rail, and canonical panel boundaries."
+    },
+    {
+      "type": "copy_resize",
+      "source_box": [420, 121, 2176, 2159],
+      "box": [833, 145, 3076, 2159],
+      "purpose": "Fit the generated TCP profile list and editor into the canonical Settings main workarea."
+    },
+    {
+      "type": "copy_resize",
+      "source_box": [2177, 121, 3839, 2159],
+      "box": [3077, 145, 3839, 2159],
+      "purpose": "Fit the generated runtime communication log into the canonical right status region."
+    },
+    {
+      "type": "copy_resize",
+      "source_box": [11, 1235, 405, 1369],
+      "box": [245, 1376, 795, 1495],
+      "purpose": "Restore Workstation Communication as an unselected Settings destination."
+    },
+    {
+      "type": "copy_resize",
+      "source_box": [11, 1001, 405, 1103],
+      "box": [245, 1108, 795, 1227],
+      "purpose": "Mark TCP as the single selected Settings destination."
+    }
+  ]
+}

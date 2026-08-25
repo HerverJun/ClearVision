@@ -1,0 +1,21 @@
+{
+  "schema_version": "clearvision-controlled-picture-layer-touchup.v1",
+  "entry_id": "E_08_run_ng_modal",
+  "source_iteration": "option_E/iterations/08_run_ng_modal_v1.png",
+  "source_sha256": "3d2f8e67a3c681552d9dc5f7cc0f6fd326e2a3e86731c8eed28a61087bffa895",
+  "purpose": "Preserve the functionally accurate first E08 gpt-image-2 iteration and restore only the confirmed current result-navigation link that the model omitted from the recent-result column.",
+  "operations": [
+    {
+      "type": "replace_text",
+      "box": [1228, 604, 1512, 658],
+      "fill": [253, 253, 253],
+      "position": [1236, 620],
+      "text": "查看本次结果",
+      "font_path": "C:\\Windows\\Fonts\\msyhbd.ttc",
+      "font_sha256": "06e1a30f687ab7d39f533447b21e84d51e0cecdaa6bfa060c87136b168811bdc",
+      "font_size": 15,
+      "text_fill": [22, 111, 159],
+      "purpose": "Restore the confirmed WorkspaceShell result link without adding any new action, identifier, metric, or device fact."
+    }
+  ]
+}

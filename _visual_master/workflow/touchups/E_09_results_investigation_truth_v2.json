@@ -1,0 +1,21 @@
+{
+  "schema_version": "clearvision-controlled-picture-layer-touchup.v1",
+  "entry_id": "E_09_results_investigation",
+  "source_iteration": "option_E/iterations/09_results_investigation_v1.png",
+  "source_sha256": "7b89697849387dc9e0f523139fe7dee34cc411361679359b3e80f0580a32868c",
+  "purpose": "Restore the verified defect wording using a small surface-matched patch.",
+  "operations": [
+    {
+      "type": "replace_text",
+      "box": [1508, 1018, 1606, 1056],
+      "fill": [247, 248, 249],
+      "position": [1515, 1028],
+      "text": "轻微划痕",
+      "font_path": "C:\\Windows\\Fonts\\msyh.ttc",
+      "font_sha256": "e4b3b9d058750fb80899c24f68e35beda606ca92694eff0e9f7f91eec7a846aa",
+      "font_size": 14,
+      "text_fill": [76, 85, 95],
+      "purpose": "Restore CURRENT defect wording without changing the result record."
+    }
+  ]
+}

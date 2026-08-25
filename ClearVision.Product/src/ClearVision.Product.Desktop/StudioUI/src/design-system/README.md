@@ -1,6 +1,6 @@
 # ClearVision Design System 2.0
 
-Design System V1 服务正式 Studio 产品页面与隔离 Labs。它不导入 legacy CSS，不创建第二产品 Shell，
+Design System 2.0 服务正式 Studio 产品页面与隔离 Labs。它不导入 legacy CSS，不创建第二产品 Shell，
 也不承载 Project、Flow、Session、Inspection 或 Station authority。
 
 ## Quiet Precision / 静谧精密

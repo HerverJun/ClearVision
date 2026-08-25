@@ -1,0 +1,93 @@
+{
+  "schema_version": "clearvision-controlled-picture-layer-touchup.v1",
+  "entry_id": "D_09_results_investigation",
+  "source_iteration": "option_D/iterations/09_results_investigation_v7.png",
+  "source_sha256": "81c19f56eb2cf0eb47c4abd0d41865c6265178d4c7fe0f1c4fdaf79a136eafe6",
+  "purpose": "Freeze the complete investigation list/detail composition and correct only Shell identity plus exact CURRENT defect evidence.",
+  "operations": [
+    {
+      "type": "replace_text",
+      "box": [573, 10, 674, 61],
+      "fill": [254, 254, 254],
+      "position": [590, 23],
+      "text": "算子库",
+      "font_path": "C:\\Windows\\Fonts\\msyh.ttc",
+      "font_sha256": "e4b3b9d058750fb80899c24f68e35beda606ca92694eff0e9f7f91eec7a846aa",
+      "font_size": 16,
+      "text_fill": [45, 57, 70],
+      "purpose": "Restore the verified Product Shell navigation label."
+    },
+    {
+      "type": "replace_text",
+      "box": [1375, 10, 1525, 61],
+      "fill": [254, 254, 254],
+      "position": [1382, 24],
+      "text": "● 本地服务在线",
+      "font_path": "C:\\Windows\\Fonts\\msyh.ttc",
+      "font_sha256": "e4b3b9d058750fb80899c24f68e35beda606ca92694eff0e9f7f91eec7a846aa",
+      "font_size": 13,
+      "text_fill": [22, 134, 111],
+      "purpose": "Restore the CURRENT local-service projection."
+    },
+    {
+      "type": "replace_text",
+      "box": [1530, 10, 1688, 61],
+      "fill": [254, 254, 254],
+      "position": [1538, 24],
+      "text": "外观 浅色·紧凑",
+      "font_path": "C:\\Windows\\Fonts\\msyh.ttc",
+      "font_sha256": "e4b3b9d058750fb80899c24f68e35beda606ca92694eff0e9f7f91eec7a846aa",
+      "font_size": 13,
+      "text_fill": [45, 57, 70],
+      "purpose": "Restore the CURRENT appearance projection."
+    },
+    {
+      "type": "replace_text",
+      "box": [1692, 10, 1804, 61],
+      "fill": [254, 254, 254],
+      "position": [1702, 24],
+      "text": "更多 ···",
+      "font_path": "C:\\Windows\\Fonts\\msyh.ttc",
+      "font_sha256": "e4b3b9d058750fb80899c24f68e35beda606ca92694eff0e9f7f91eec7a846aa",
+      "font_size": 13,
+      "text_fill": [45, 57, 70],
+      "purpose": "Restore the verified Shell overflow entry."
+    },
+    {
+      "type": "replace_text",
+      "box": [1548, 835, 1660, 872],
+      "fill": [255, 255, 255],
+      "position": [1552, 844],
+      "text": "Scratch",
+      "font_path": "C:\\Windows\\Fonts\\msyh.ttc",
+      "font_sha256": "e4b3b9d058750fb80899c24f68e35beda606ca92694eff0e9f7f91eec7a846aa",
+      "font_size": 13,
+      "text_fill": [45, 57, 70],
+      "purpose": "Restore the exact CURRENT defect name."
+    },
+    {
+      "type": "replace_text",
+      "box": [1700, 835, 1845, 872],
+      "fill": [255, 255, 255],
+      "position": [1708, 844],
+      "text": "置信度 0.910",
+      "font_path": "C:\\Windows\\Fonts\\msyh.ttc",
+      "font_sha256": "e4b3b9d058750fb80899c24f68e35beda606ca92694eff0e9f7f91eec7a846aa",
+      "font_size": 13,
+      "text_fill": [45, 57, 70],
+      "purpose": "Restore the exact CURRENT confidence."
+    },
+    {
+      "type": "replace_text",
+      "box": [1870, 835, 2000, 872],
+      "fill": [255, 255, 255],
+      "position": [1880, 844],
+      "text": "轻微划痕",
+      "font_path": "C:\\Windows\\Fonts\\msyh.ttc",
+      "font_sha256": "e4b3b9d058750fb80899c24f68e35beda606ca92694eff0e9f7f91eec7a846aa",
+      "font_size": 13,
+      "text_fill": [45, 57, 70],
+      "purpose": "Restore the exact CURRENT defect description."
+    }
+  ]
+}

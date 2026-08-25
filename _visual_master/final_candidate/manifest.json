@@ -1,0 +1,324 @@
+{
+  "schema_version": "clearvision-final-candidate.v1",
+  "generated_at": "2026-08-15T17:13:18.633627Z",
+  "approval_status": "awaiting-product-owner-visual-review",
+  "copy_and_data_policy": "Generated copy, data, device facts, and imagery are not product authority.",
+  "count": 19,
+  "entries": [
+    {
+      "id": "01_flow_editor",
+      "page_name": "Flow Editor + Inspector",
+      "file": "01_flow_editor.png",
+      "source_candidate": "candidates/01_flow_editor.png",
+      "sha256": "43053d1b31b2a17228456b89b6a2c6f73b97b7fec9e527c8be9a17ae031a5ac0",
+      "actual_dimensions": {
+        "width": 1672,
+        "height": 941
+      },
+      "status": "Approved-Candidate",
+      "text_policy": "preserve-semantic-no-copy",
+      "master_references": []
+    },
+    {
+      "id": "02_flow_preview_roi",
+      "page_name": "Flow Preview + ROI",
+      "file": "02_flow_preview_roi.png",
+      "source_candidate": "candidates/02_flow_preview_roi.png",
+      "sha256": "396eda29aa09522dcab17b18265eb3acc80ba39d39652ea09c497943e958314f",
+      "actual_dimensions": {
+        "width": 1672,
+        "height": 941
+      },
+      "status": "Generated",
+      "text_policy": "preserve-semantic-no-copy",
+      "master_references": [
+        "masters/01_flow_editor.png"
+      ]
+    },
+    {
+      "id": "03_ai_workspace",
+      "page_name": "AI Engineering Workbench",
+      "file": "03_ai_workspace.png",
+      "source_candidate": "candidates/03_ai_workspace.png",
+      "sha256": "5688bdd64244ba5dfcc1a67cece1ad7730f09c6d1e782979240ecee441b7caec",
+      "actual_dimensions": {
+        "width": 1672,
+        "height": 941
+      },
+      "status": "Approved-Candidate",
+      "text_policy": "preserve-semantic-no-copy",
+      "master_references": [
+        "masters/01_flow_editor.png"
+      ]
+    },
+    {
+      "id": "04_results_investigation",
+      "page_name": "Results Investigation",
+      "file": "04_results_investigation.png",
+      "source_candidate": "candidates/04_results_investigation.png",
+      "sha256": "e42b4d093d723795ecc637b9c4b241eb6e0ff5277d9328513c38965e9d3620b7",
+      "actual_dimensions": {
+        "width": 1672,
+        "height": 941
+      },
+      "status": "Approved-Candidate",
+      "text_policy": "preserve-semantic-no-copy",
+      "master_references": [
+        "masters/01_flow_editor.png",
+        "masters/03_ai_workspace.png"
+      ]
+    },
+    {
+      "id": "05_station_management",
+      "page_name": "Station Management",
+      "file": "05_station_management.png",
+      "source_candidate": "candidates/05_station_management.png",
+      "sha256": "653eb0314db27bb48563c1a1e04d66dcbedc4c171dd40f63c147fe55408cb2a9",
+      "actual_dimensions": {
+        "width": 1672,
+        "height": 941
+      },
+      "status": "Generated",
+      "text_policy": "preserve-semantic-no-copy",
+      "master_references": [
+        "masters/04_results_investigation.png",
+        "masters/01_flow_editor.png"
+      ]
+    },
+    {
+      "id": "06_camera_settings",
+      "page_name": "Camera Settings",
+      "file": "06_camera_settings.png",
+      "source_candidate": "candidates/06_camera_settings.png",
+      "sha256": "5d5a487c01f167d0d681d640792adad7820aaed2f5753fa0b2cb346bbfad2518",
+      "actual_dimensions": {
+        "width": 1672,
+        "height": 941
+      },
+      "status": "Approved-Candidate",
+      "text_policy": "preserve-semantic-no-copy",
+      "master_references": [
+        "masters/01_flow_editor.png",
+        "masters/04_results_investigation.png"
+      ]
+    },
+    {
+      "id": "07_overview",
+      "page_name": "Overview",
+      "file": "07_overview.png",
+      "source_candidate": "candidates/07_overview.png",
+      "sha256": "0e85f04fcf0b7aee603d906330810bd42a62fbaea05980092d18e6b56b31cefa",
+      "actual_dimensions": {
+        "width": 1672,
+        "height": 941
+      },
+      "status": "Generated",
+      "text_policy": "preserve-semantic-no-copy",
+      "master_references": [
+        "masters/04_results_investigation.png",
+        "masters/06_camera_settings.png"
+      ]
+    },
+    {
+      "id": "08_projects",
+      "page_name": "Project Management",
+      "file": "08_projects.png",
+      "source_candidate": "candidates/08_projects.png",
+      "sha256": "326a67031e59be67f73e2867840d2af91738782dd87955fb11769525b039a6fa",
+      "actual_dimensions": {
+        "width": 1672,
+        "height": 941
+      },
+      "status": "Generated",
+      "text_policy": "preserve-semantic-no-copy",
+      "master_references": [
+        "masters/04_results_investigation.png",
+        "masters/06_camera_settings.png"
+      ]
+    },
+    {
+      "id": "09_projects_empty",
+      "page_name": "Projects Empty State",
+      "file": "09_projects_empty.png",
+      "source_candidate": "candidates/09_projects_empty.png",
+      "sha256": "9f5df556e167375c546b7ab458a846e4d88d15eb5d34fb098495c68dde3700fa",
+      "actual_dimensions": {
+        "width": 1672,
+        "height": 941
+      },
+      "status": "Generated",
+      "text_policy": "preserve-semantic-no-copy",
+      "master_references": [
+        "masters/04_results_investigation.png",
+        "masters/06_camera_settings.png"
+      ]
+    },
+    {
+      "id": "10_operator_catalog",
+      "page_name": "Operator Catalog",
+      "file": "10_operator_catalog.png",
+      "source_candidate": "candidates/10_operator_catalog.png",
+      "sha256": "062feb251f19cb47d14b860a26702176381c824e14f6189f81984a0602eb34f3",
+      "actual_dimensions": {
+        "width": 1672,
+        "height": 941
+      },
+      "status": "Generated",
+      "text_policy": "preserve-semantic-no-copy",
+      "master_references": [
+        "masters/04_results_investigation.png",
+        "masters/06_camera_settings.png"
+      ]
+    },
+    {
+      "id": "11_inspection",
+      "page_name": "Inspection Workbench",
+      "file": "11_inspection.png",
+      "source_candidate": "candidates/11_inspection.png",
+      "sha256": "81d52f53781cefff854e397f3e4b8bde850f3a907124e5acfe92ec276641bfd5",
+      "actual_dimensions": {
+        "width": 1672,
+        "height": 941
+      },
+      "status": "Generated",
+      "text_policy": "preserve-semantic-no-copy",
+      "master_references": [
+        "masters/01_flow_editor.png",
+        "masters/04_results_investigation.png"
+      ]
+    },
+    {
+      "id": "12_plc_settings",
+      "page_name": "PLC Settings",
+      "file": "12_plc_settings.png",
+      "source_candidate": "candidates/12_plc_settings.png",
+      "sha256": "37abdcb4350f9fb3c1750ae67265c6eae65d00b3c79f41ae249a7ac172a58146",
+      "actual_dimensions": {
+        "width": 1672,
+        "height": 941
+      },
+      "status": "Generated",
+      "text_policy": "preserve-semantic-no-copy",
+      "master_references": [
+        "masters/06_camera_settings.png"
+      ]
+    },
+    {
+      "id": "13_tcp_settings",
+      "page_name": "TCP Settings",
+      "file": "13_tcp_settings.png",
+      "source_candidate": "candidates/13_tcp_settings.png",
+      "sha256": "0087083dbe4b7428141e23afa8301a0c60a17d5d1dae9f98450c93d296f4afd1",
+      "actual_dimensions": {
+        "width": 1672,
+        "height": 941
+      },
+      "status": "Generated",
+      "text_policy": "preserve-semantic-no-copy",
+      "master_references": [
+        "masters/06_camera_settings.png"
+      ]
+    },
+    {
+      "id": "14_station_communication",
+      "page_name": "Station Communication Settings",
+      "file": "14_station_communication.png",
+      "source_candidate": "candidates/14_station_communication.png",
+      "sha256": "8bcb1951e67cab4ea51b081f6859aebd446b0f90350f71b8dd00fe622e8df28d",
+      "actual_dimensions": {
+        "width": 1672,
+        "height": 941
+      },
+      "status": "Generated",
+      "text_policy": "preserve-semantic-no-copy",
+      "master_references": [
+        "masters/06_camera_settings.png",
+        "masters/04_results_investigation.png"
+      ]
+    },
+    {
+      "id": "15_ai_model_settings",
+      "page_name": "AI Model Settings",
+      "file": "15_ai_model_settings.png",
+      "source_candidate": "candidates/15_ai_model_settings.png",
+      "sha256": "561dcd20849421299bf489db527df0999d1823c137a92eee8fba19906366b699",
+      "actual_dimensions": {
+        "width": 1672,
+        "height": 941
+      },
+      "status": "Generated",
+      "text_policy": "preserve-semantic-no-copy",
+      "master_references": [
+        "masters/06_camera_settings.png",
+        "masters/03_ai_workspace.png"
+      ]
+    },
+    {
+      "id": "16_run_ng_modal",
+      "page_name": "Run Details NG Modal",
+      "file": "16_run_ng_modal.png",
+      "source_candidate": "candidates/16_run_ng_modal.png",
+      "sha256": "ad69dd6bebab13e460695544d4fddc8d21bbc743fdd3e0d8de60824977a801fa",
+      "actual_dimensions": {
+        "width": 1672,
+        "height": 941
+      },
+      "status": "Generated",
+      "text_policy": "preserve-semantic-no-copy",
+      "master_references": [
+        "masters/01_flow_editor.png",
+        "masters/04_results_investigation.png"
+      ]
+    },
+    {
+      "id": "17_ai_failure_recovery",
+      "page_name": "AI Failure Recovery",
+      "file": "17_ai_failure_recovery.png",
+      "source_candidate": "candidates/17_ai_failure_recovery.png",
+      "sha256": "776027349f972a8088e8ded85ddc314d900ac168077d9675e17961cc7a6995c6",
+      "actual_dimensions": {
+        "width": 1672,
+        "height": 941
+      },
+      "status": "Generated",
+      "text_policy": "preserve-semantic-no-copy",
+      "master_references": [
+        "masters/03_ai_workspace.png",
+        "masters/04_results_investigation.png"
+      ]
+    },
+    {
+      "id": "18_system_settings",
+      "page_name": "System Settings",
+      "file": "18_system_settings.png",
+      "source_candidate": "candidates/18_system_settings.png",
+      "sha256": "a8231f7c3cbe26acd9e80e93dc7c7d863fa1167a443fd83617d06fedf7efbf68",
+      "actual_dimensions": {
+        "width": 1672,
+        "height": 941
+      },
+      "status": "Generated",
+      "text_policy": "preserve-semantic-no-copy",
+      "master_references": [
+        "masters/06_camera_settings.png"
+      ]
+    },
+    {
+      "id": "19_flow_validation_error",
+      "page_name": "Flow Inspector Validation Error",
+      "file": "19_flow_validation_error.png",
+      "source_candidate": "candidates/19_flow_validation_error.png",
+      "sha256": "3e429b8ffa5ddc797263a511016c35f4c173bacc1b476272eef355e6fd945bd0",
+      "actual_dimensions": {
+        "width": 1672,
+        "height": 941
+      },
+      "status": "Generated",
+      "text_policy": "preserve-semantic-no-copy",
+      "master_references": [
+        "masters/01_flow_editor.png",
+        "masters/04_results_investigation.png"
+      ]
+    }
+  ]
+}

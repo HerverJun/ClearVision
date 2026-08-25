@@ -348,7 +348,7 @@ test('Settings shell reads Engineer safe projection, exposes groups, and stays G
   await expect(page.locator('[data-settings-phase="ready"]')).toBeVisible();
   await expect(page.locator('[data-capability="settings"][data-settings-safe-subset="true"]')).toBeVisible();
   await expect(page.locator('[data-capability="settings"]')).toContainText('工程师安全范围');
-  await expect(page.locator('[data-product-nav="/settings"]')).toBeVisible();
+  await expect(page.locator('[data-product-rail-nav="/settings"]')).toBeVisible();
   await expect(page.locator('[data-settings-group="camera"]')).toBeVisible();
 
   await page.locator('[data-settings-group="storage"]').click();
@@ -429,7 +429,7 @@ test('Settings keeps dirty drafts across groups and asks before route leave', as
   await page.locator('[data-settings-group="general"]').click();
   await expect(page.locator('input[name="softwareTitle"]')).toHaveValue('Draft retained in browser');
 
-  await page.locator('[data-product-nav="/projects"]').first().click();
+  await page.locator('[data-product-rail-nav="/projects"]').click();
   await expect(page.getByTestId('leave-guard-stay')).toBeVisible();
   await expect(page).toHaveURL(/#\/settings$/);
   await page.getByTestId('leave-guard-stay').click();
@@ -534,7 +534,7 @@ test('Settings blocks route leave while an AI model mutation is pending', async 
   await expect.poll(() => audit.filter(entry => entry.method === 'PUT' && entry.path === '/api/ai/models/model-1').length)
     .toBe(1);
 
-  await page.locator('[data-product-nav="/projects"]').first().click();
+  await page.locator('[data-product-rail-nav="/projects"]').click();
   await expect(page.locator('[data-product-state="leave-blocked"]')).toBeVisible();
   await expect(page).toHaveURL(/#\/settings$/);
   await expect(page.locator('[data-settings-ai-model-feedback]')).toBeVisible();
@@ -550,7 +550,7 @@ test('Settings blocks route leave while a mutation is pending and keeps the muta
   await expect.poll(() => audit.filter(entry => entry.method === 'PUT' && entry.path === '/api/settings').length)
     .toBe(1);
 
-  await page.locator('[data-product-nav="/projects"]').first().click();
+  await page.locator('[data-product-rail-nav="/projects"]').click();
   await expect(page.locator('[data-product-state="leave-blocked"]')).toBeVisible();
   await expect(page).toHaveURL(/#\/settings$/);
   await expect(page.locator('[data-settings-feedback="saved"]')).toBeVisible();

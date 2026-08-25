@@ -1,0 +1,35 @@
+{
+  "schema_version": "clearvision-controlled-picture-layer-touchup.v1",
+  "entry_id": "D_10_stations_list",
+  "source_iteration": "option_D/iterations/10_stations_list_v_final_consistency_source_4k.png",
+  "source_sha256": "40c86801b6e1c7669be56f553471be99b0a2327e2d849017196123cd7438bd82",
+  "purpose": "Preserve the final gpt-image-2 Station Monitor composition while enforcing the Option D full-set shell lock: one cinnabar navigation selection and the verified service, appearance, more, and account utility cluster without an invented language control.",
+  "operations": [
+    {
+      "type": "paste_option_candidate_reference",
+      "reference_path": "option_D/screens/15_operator_catalog.png",
+      "reference_sha256": "a01ee6cfbcd1344c2340ce18ced5eb2cfce66450dd0509f5e87ccedead3a2d1f",
+      "source_box": [2350, 0, 3839, 118],
+      "box": [2350, 0, 3839, 118],
+      "purpose": "Reuse the final same-option standard utility cluster and remove the invented language selector while preserving the Station page body."
+    },
+    {
+      "type": "replace_text",
+      "box": [1580, 42, 1780, 112],
+      "fill": [254, 254, 254],
+      "position": [1613, 42],
+      "text": "工作站",
+      "font_path": "C:\\Windows\\Fonts\\msyh.ttc",
+      "font_sha256": "e4b3b9d058750fb80899c24f68e35beda606ca92694eff0e9f7f91eec7a846aa",
+      "font_size": 44,
+      "text_fill": [250, 0, 0],
+      "purpose": "Use the single Option D cinnabar navigation selection treatment."
+    },
+    {
+      "type": "fill_rect",
+      "box": [1595, 143, 1764, 149],
+      "fill": [250, 0, 0],
+      "purpose": "Match the active navigation underline to the Option D cinnabar treatment."
+    }
+  ]
+}

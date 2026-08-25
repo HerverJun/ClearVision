@@ -1,0 +1,51 @@
+{
+  "schema_version": "clearvision-controlled-picture-layer-touchup.v1",
+  "entry_id": "E_17_camera_settings",
+  "source_iteration": "option_E/iterations/17_camera_settings_v14.png",
+  "source_sha256": "14d48d56fe63d9fa11a68f5cd0b8ad27cccf1f7df4cdf7383cad64708e9c931b",
+  "purpose": "Preserve the accepted E17 composition and correct only four bounded facts against current Camera code, including complete removal of generated checkbox text.",
+  "operations": [
+    {
+      "type": "fill_rect",
+      "box": [598, 812, 636, 838],
+      "fill": [255, 255, 255],
+      "purpose": "Blank the unprovided Enter Device ID without adding a value."
+    },
+    {
+      "type": "replace_text",
+      "box": [606, 840, 825, 882],
+      "fill": [255, 255, 255],
+      "position": [618, 850],
+      "text": "忙碌时忽略触发",
+      "font_path": "C:\\Windows\\Fonts\\msyh.ttc",
+      "font_sha256": "e4b3b9d058750fb80899c24f68e35beda606ca92694eff0e9f7f91eec7a846aa",
+      "font_size": 14,
+      "text_fill": [74, 85, 97],
+      "purpose": "Restore the real Enter trigger checkbox label and clear the full generated label."
+    },
+    {
+      "type": "replace_text",
+      "box": [900, 1034, 1115, 1078],
+      "fill": [255, 255, 255],
+      "position": [910, 1045],
+      "text": "忙碌时忽略触发",
+      "font_path": "C:\\Windows\\Fonts\\msyh.ttc",
+      "font_sha256": "e4b3b9d058750fb80899c24f68e35beda606ca92694eff0e9f7f91eec7a846aa",
+      "font_size": 14,
+      "text_fill": [74, 85, 97],
+      "purpose": "Restore the real serial trigger checkbox label and clear the full generated label."
+    },
+    {
+      "type": "replace_text",
+      "box": [1437, 758, 1740, 802],
+      "fill": [255, 255, 255],
+      "position": [1443, 768],
+      "text": "触发输入与诊断",
+      "font_path": "C:\\Windows\\Fonts\\msyhbd.ttc",
+      "font_sha256": "06e1a30f687ab7d39f533447b21e84d51e0cecdaa6bfa060c87136b168811bdc",
+      "font_size": 17,
+      "text_fill": [27, 32, 38],
+      "purpose": "Restore the exact current section heading."
+    }
+  ]
+}

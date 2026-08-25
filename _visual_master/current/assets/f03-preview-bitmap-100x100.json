@@ -1,0 +1,12 @@
+{
+  "schema_version": "clearvision-current-bitmap-picture-layer.v1",
+  "functional_authority": "current deterministic F03 preview bitmap fixture",
+  "source": "ClearVision.Product/tests/ClearVision.Product.UI.Tests/tests/e2e/studio-ui-next/f03-preview-bitmap-fixture.ts",
+  "source_sha256": "a8a4ed3dc717aff8d0d3807181b63dbc98252505bee774100459c7a340b5f6c6",
+  "contract": "ClearVision.Product/tests/ClearVision.Product.UI.Tests/tests/e2e/studio-ui-next/f03-preview-bitmap-contract.json",
+  "output": "_visual_master/current/assets/f03-preview-bitmap-100x100.png",
+  "output_sha256": "743aefc2299260923475866134e9218560b182d92bfc282660f9c0e4f18ea815",
+  "width": 100,
+  "height": 100,
+  "channels": 4
+}

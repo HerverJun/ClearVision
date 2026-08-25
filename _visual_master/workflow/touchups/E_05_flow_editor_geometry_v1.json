@@ -1,0 +1,27 @@
+{
+  "schema_version": "clearvision-controlled-picture-layer-touchup.v1",
+  "entry_id": "E_05_flow_editor",
+  "source_iteration": "option_E/iterations/05_flow_editor_v2.png",
+  "source_sha256": "6babbac9265124246bdf2afd76b0ace37b8167d15bc65fec4af85e7135c292de",
+  "purpose": "Reflow only the audited functionally faithful E05 Round 2 regions so the existing Canvas becomes dominant while all verified product content remains unchanged.",
+  "operations": [
+    {
+      "type": "copy_resize",
+      "source_box": [0, 125, 269, 1103],
+      "box": [0, 125, 219, 1103],
+      "purpose": "Compress the existing verified operator library into a compact 220px contextual rail."
+    },
+    {
+      "type": "copy_resize",
+      "source_box": [270, 125, 1456, 1103],
+      "box": [220, 125, 1577, 1103],
+      "purpose": "Expand the existing dotted FlowCanvas to 1358px so it remains the dominant E workspace."
+    },
+    {
+      "type": "copy_resize",
+      "source_box": [1457, 125, 2047, 1103],
+      "box": [1578, 125, 2047, 1103],
+      "purpose": "Fit the complete existing Inspector and Preview/Result context into a 470px adaptive dock."
+    }
+  ]
+}

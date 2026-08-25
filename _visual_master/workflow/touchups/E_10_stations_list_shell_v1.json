@@ -1,0 +1,39 @@
+{
+  "schema_version": "clearvision-controlled-picture-layer-touchup.v1",
+  "entry_id": "E_10_stations_list",
+  "source_iteration": "option_E/iterations/10_stations_list_v1.png",
+  "source_sha256": "287d819717ad392d37c8f2057de672d5be863e14a87b874da90e5346b142c19f",
+  "purpose": "Preserve the read-only Station monitor and remove the generated language control from the product shell.",
+  "operations": [
+    {
+      "type": "fill_rect",
+      "box": [1350, 0, 1794, 93],
+      "fill": [254, 254, 254],
+      "purpose": "Clear only the false language and duplicated appearance controls."
+    },
+    {
+      "type": "replace_text",
+      "box": [1390, 17, 1585, 75],
+      "fill": [254, 254, 254],
+      "position": [1400, 29],
+      "text": "外观  浅色 · 紧凑",
+      "font_path": "C:\\Windows\\Fonts\\msyh.ttc",
+      "font_sha256": "e4b3b9d058750fb80899c24f68e35beda606ca92694eff0e9f7f91eec7a846aa",
+      "font_size": 17,
+      "text_fill": [61, 70, 80],
+      "purpose": "Restore the existing CURRENT appearance projection."
+    },
+    {
+      "type": "replace_text",
+      "box": [1600, 17, 1695, 75],
+      "fill": [254, 254, 254],
+      "position": [1608, 29],
+      "text": "更多",
+      "font_path": "C:\\Windows\\Fonts\\msyh.ttc",
+      "font_sha256": "e4b3b9d058750fb80899c24f68e35beda606ca92694eff0e9f7f91eec7a846aa",
+      "font_size": 17,
+      "text_fill": [61, 70, 80],
+      "purpose": "Restore the existing More menu entry."
+    }
+  ]
+}

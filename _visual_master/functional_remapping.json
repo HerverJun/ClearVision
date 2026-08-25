@@ -1,0 +1,176 @@
+{
+  "schema_version": "clearvision-ui-functional-remapping.v1",
+  "generated_for": ["D", "E"],
+  "functional_authority": "Current ClearVision screenshots plus current ClearVision code. CURRENT is not a layout template.",
+  "layout_authority": "The D/E mapping below controls visual placement only and never adds product capability.",
+  "screens": [
+    {
+      "screen_id": "01_login",
+      "current_function": "Authenticate with username, password, remember-account, password visibility, login, and existing session or validation feedback.",
+      "D_location": "A compact access panel sits inside a quiet workstation shell with the form aligned to a strict utility grid; recovery feedback stays attached to the form and no product navigation appears.",
+      "E_location": "A calm, centered authentication sheet uses exceptional spacing and typography while keeping the same single form, feedback position, and one primary login action.",
+      "must_not": "No marketing hero, SSO, registration, recovery workflow, captcha, MFA, social login, or app navigation."
+    },
+    {
+      "screen_id": "02_overview",
+      "current_function": "Continue recent work, inspect runtime environment, and enter the currently available product functions.",
+      "D_location": "A command-oriented overview uses one continuous work surface: recent work is the dominant upper list, runtime context is a narrow technical strip, and real function entries form a compact launcher below without metric cards.",
+      "E_location": "A refined full-width overview gives recent work the primary visual weight, places environment facts in a restrained secondary band, and presents available functions as a disciplined text-and-icon index.",
+      "must_not": "No invented KPI, analytics, station telemetry, PLC dashboard, alert timeline, or decorative dashboard card grid."
+    },
+    {
+      "screen_id": "03_projects_data",
+      "current_function": "Refresh, search, sort, import, create, inspect, open, export, and delete projects through the real project table and pagination.",
+      "D_location": "A file-explorer-like project workspace places commands and search in a compact top bar and lets the dense project table occupy nearly all remaining space; row actions stay inline.",
+      "E_location": "A premium project library uses a quiet command bar, precise table typography, generous column alignment, and a stable pagination footer without converting projects into cards.",
+      "must_not": "No bulk actions, tag filters, live run state, flow/operator/asset counts, analytics, or preview detail pane."
+    },
+    {
+      "screen_id": "04_projects_empty",
+      "current_function": "Show the empty project library while preserving refresh, import, create-project, search, and sort actions.",
+      "D_location": "The same D project explorer remains visible with refresh, import, create, search, and sort in the compact command bar; the empty message and duplicate create entry remain inside the otherwise unframed table field.",
+      "E_location": "The same E project library remains structurally stable with the real refresh/import/create/search/sort toolbar; the empty message sits in the table field with the existing create command emphasized and no onboarding illustration.",
+      "must_not": "No sample projects, onboarding steps, import wizard, statistics, new navigation, or decorative illustration."
+    },
+    {
+      "screen_id": "05_flow_editor",
+      "current_function": "Navigate project context; set final decision; save; open results, checks, run details, global variables, runtime package and Flow template entries; discover/filter/recent/favorite and add real operators; undo/redo/copy/paste/duplicate/enable/delete and zoom the canonical FlowCanvas; inspect node identity, bindings, parameters and validation; access Preview/result context; and retain status context.",
+      "D_location": "The workflow canvas occupies roughly seventy percent of the viewport. Product navigation compresses to a slim rail; the real operator search/category library becomes an on-demand floating picker from the existing discovery entry; the selected-node Inspector is a contextual right dock; preview/result collapses to an on-demand edge workspace; save/run/status commands are grouped by frequency instead of spread across stacked bars.",
+      "E_location": "A unified premium workspace gives the canvas dominant area beneath one quiet command bar. The real operator library appears as a refined contextual palette, the selected-node Inspector becomes an adaptive material panel, and preview/result stays available as a restrained dock without permanently consuming canvas height.",
+      "must_not": "No second canvas, second save path, Fit, Auto Layout, new toolbar command, invented node, new run mode, new inspector field, or Roboflow business capability."
+    },
+    {
+      "screen_id": "06_flow_validation_error",
+      "current_function": "Keep the complete verified Flow Editor inventory available while showing the selected node's real invalid parameter and attached validation feedback, including save, formal run, and run-detail context.",
+      "D_location": "Reuse the D canvas-first master; open the contextual Inspector only as wide as the invalid field requires, attach the error and correction guidance directly to that field, and keep the canvas visually dominant.",
+      "E_location": "Reuse the E unified canvas master; the adaptive Inspector gains a precise inline error treatment and a quiet validation summary while all other workspace regions remain stable.",
+      "must_not": "No auto-fix, new validation rule, new error action, invented node, or additional run control."
+    },
+    {
+      "screen_id": "07_flow_preview_roi",
+      "current_function": "Keep the complete verified Flow Editor inventory available; manually preview or cancel/collapse Preview; use the existing image zoom, fit, actual-pixel, large-image and pixel-probe tools; inspect result summary/key/structured output; edit the existing ROI shape and X/Y/Width/Height draft; undo/redo, discard, and apply ROI.",
+      "D_location": "Enter an on-demand Canvas/Preview context: the canvas remains visible on the left, a large resizable image workspace opens on the right, and ROI controls attach contextually to the image; the full parameter Inspector yields space instead of remaining permanently open.",
+      "E_location": "A refined media workspace slides into the E canvas area with a large dark image surface, a compact ROI tool cluster, and a slim result/details column; cancel and apply remain a clear paired boundary.",
+      "must_not": "No new ROI shape, new image tool, camera control, preview mode, save channel, or duplicated Inspector."
+    },
+    {
+      "screen_id": "08_run_ng_modal",
+      "current_function": "Inspect formal-run NG identity and status, the six real run metrics, admission checks, recent result link, run technical information and diagnostics in a modal over the Flow workspace; recheck, rerun through the existing formal-run action, and close.",
+      "D_location": "A wide but bounded run-details overlay sits over the unchanged D canvas context, with run identity and NG status first, readiness checks next, and result/diagnostics in a dense lower split; the canvas remains legible behind the dim layer.",
+      "E_location": "A precisely proportioned elevated sheet overlays the E workspace, using controlled depth and typography to separate run identity, checks, result, and diagnostics without becoming a page or dashboard.",
+      "must_not": "No modal tabs, rerun variant, export, approval workflow, invented metric, new NG action, or desktop window control."
+    },
+    {
+      "screen_id": "09_results_investigation",
+      "current_function": "Switch between 态势总览 and 调查详情; return to the workspace; refresh/export; filter by source, local project, execution/judgment and additional real filters; paginate; select a run; inspect OK/NG evidence, diagnostics, defects and traceability; compare with baseline/current/previous success; and export evidence when present.",
+      "D_location": "A three-zone investigation workspace uses a narrow result chronology, a dominant evidence/detail field, and a contextual diagnostics rail; comparison actions stay adjacent to the selected evidence rather than in dashboard cards.",
+      "E_location": "A premium split view places the result list in a quiet source column and gives evidence, traceability, diagnostics, and existing comparison commands a spacious but dense detail canvas.",
+      "must_not": "No invented column, bulk action, analytics dashboard, new comparison mode, or defect workflow."
+    },
+    {
+      "screen_id": "10_stations_list",
+      "current_function": "Switch between 全站概览 and 异常调查; in the shown 异常调查 state, refresh and search the real station fleet, filter connection and run status, scan the station table, and follow the existing station-detail link while retaining read-only/realtime recovery context.",
+      "D_location": "A fleet operations workspace gives the existing 异常调查 filters and station table the dominant surface, with the real read-only/recovery state in a compact command strip and the existing 全站概览 entry retained without rendering its content on this viewport.",
+      "E_location": "A refined fleet list keeps the shown 异常调查 search, connection/run filters and station rows on one continuous high-scanability surface; 全站概览 remains the existing alternate view, not a same-page dashboard.",
+      "must_not": "No create, edit, delete, firmware, uncontracted setting, same-page detail inspector, same-page live-data rail, same-page results band, or analytics beyond the existing 全站概览 summary/statistics."
+    },
+    {
+      "screen_id": "11_station_detail",
+      "current_function": "In the shown Engineer/read-only state, inspect station identity badges, realtime recovery warning, status overview, recent results and result count/link, production trace chain and health snapshot; refresh and return to the station list.",
+      "D_location": "Station identity, recovery and refresh/return actions form a compact context bar; overview, recent-result trace, production trace and health snapshot occupy aligned evidence bands without introducing administrator commands or new tabs.",
+      "E_location": "A calm read-only operations detail sheet uses progressive section hierarchy and consistent evidence rows for identity, recovery, overview, recent results, traceability and health, with refresh/return kept explicit.",
+      "must_not": "No station edit form, delete/create, firmware control, administrator command panel, Ping, reload, stop-run, package deployment, new tab, or new device capability."
+    },
+    {
+      "screen_id": "12_inspection",
+      "current_function": "Recover realtime state, start/stop continuous inspection, verify readiness, inspect six real metrics, device/run summary, pre-run checks, and the single recent result with diagnostics.",
+      "D_location": "A compact runtime command strip anchors start, stop, and state reconciliation; the six existing metrics become a single horizontal evidence ribbon, with device summary, 6/7 readiness checks, and the one recent result arranged as a disciplined lower workbench.",
+      "E_location": "A quiet continuous-inspection surface uses controlled hierarchy: runtime context and actions first, the same six values as an integrated status band, then the three real lower evidence groups on a common baseline.",
+      "must_not": "No new mode selector, trigger selector, evidence canvas, expanded result table, cycle statistics, camera/PLC configuration, manual upload, desktop controls, or invented values."
+    },
+    {
+      "screen_id": "13_ai_workspace",
+      "current_function": "Review AI candidate readiness, plan/build summary, candidate difference, validation, run rehearsal, handoff gate, local draft notice, session version, and technical identity before workspace review.",
+      "D_location": "Use the same workflow-engineering shell as D Flow but no fake canvas: a compact left context column holds candidate readiness and next step; the central workspace shows plan/build and candidate difference; a right contextual rail holds validation, rehearsal, and handoff evidence. AI reads as an auxiliary engineering layer.",
+      "E_location": "A premium two-column engineering review pairs candidate intent/difference with validation/handoff evidence, using exceptional typography and quiet material transitions; status and the two real actions remain concise at the top.",
+      "must_not": "No chatbot composer, prompt gallery, application-preview canvas, session dropdown, bind-project action, model marketplace, token usage, magic action, node canvas, or second write channel."
+    },
+    {
+      "screen_id": "14_ai_failure_recovery",
+      "current_function": "Show blocked or failed AI stage, authoritative server replay/recovery state, warnings, history, diagnostics, and existing recovery actions without duplicating writes.",
+      "D_location": "Reuse the D AI three-zone workbench; the failed stage and server-authority warning take the contextual rail, while preserved history and diagnostic evidence remain visible without replacing the candidate workspace.",
+      "E_location": "Reuse the E AI review composition with a restrained failure band, clear authority explanation, and existing recovery/history actions kept adjacent to their evidence.",
+      "must_not": "No blind retry, auto-fix, new write action, new recovery mode, invented terminal result, or new AI ability."
+    },
+    {
+      "screen_id": "15_operator_catalog",
+      "current_function": "Search and filter the read-only operator catalog by real category/lifecycle/scope/ports/parameters and inspect details through the existing table and pagination.",
+      "D_location": "A search-first engineering index gives the compact filter command bar immediate priority and lets the read-only operator table occupy the full work surface; category and lifecycle remain filters, not new navigation.",
+      "E_location": "A refined catalog uses a quiet filter ribbon, high-legibility dense rows, precise port/parameter metadata, and stable detail actions without cardifying operators.",
+      "must_not": "No install, edit, delete, run, marketplace, or catalog statistics."
+    },
+    {
+      "screen_id": "16_system_settings",
+      "current_function": "Navigate the real Settings groups and edit only software title and product theme while auto-start remains read-only, then discard or save the General group.",
+      "D_location": "A slim grouped settings rail replaces the broad page chrome; one wide configuration sheet occupies the workspace with a persistent group-status/save footer and no duplicate horizontal tabs.",
+      "E_location": "A premium source-list settings shell pairs a quiet grouped navigation column with one beautifully aligned General form and a restrained bottom action boundary.",
+      "must_not": "No password field, duplicate settings tabs, new category, telemetry, desktop window control, enabled auto-start, or second save path."
+    },
+    {
+      "screen_id": "17_camera_settings",
+      "current_function": "Refresh and discover all supported vendors or Huaray/Hikvision cameras; inspect the real discovery columns; select and save an existing binding; edit its display/active/enabled, acquisition and trigger fields; learn/test Enter or serial photoelectric input; capture one frame or start/stop continuous debug preview; and inspect preview/resource diagnostics.",
+      "D_location": "A device workbench uses a narrow discovery/binding column, a large selected-camera acquisition and trigger workspace, and a contextual single-frame/continuous-preview diagnostic rail; the existing save-binding boundary remains explicit.",
+      "E_location": "A premium camera surface gives the image preview real visual weight while a refined adaptive inspector holds binding, acquisition, trigger, and diagnostics; discovery actions stay in a compact command bar.",
+      "must_not": "No new vendor, SDK status, firmware, Settings calibration control or wizard, acquisition mode, automatic binding, or hardware-connectivity claim."
+    },
+    {
+      "screen_id": "18_plc_settings",
+      "current_function": "Configure S7/MC/FINS protocol, heartbeat and protocol-specific connection fields; test connection; inspect validation; add/edit/delete variables through the exact mapping columns 变量名/地址/数据类型/说明/可写/操作; preserve protocolMismatch; save protocol settings separately from the current mapping.",
+      "D_location": "Connection identity, heartbeat, validation and test form a compact upper configuration strip, while the address mapping table becomes the dominant lower work surface with separate 保存协议设置 and 保存当前映射 boundaries and visible protocolMismatch dependency.",
+      "E_location": "A refined single-sheet PLC editor groups protocol, heartbeat, connection essentials, validation and protocol-specific fields above a spacious precise mapping table; the two distinct save actions remain anchored to their real scopes.",
+      "must_not": "No new protocol, live hardware claim, PLC program editor, new mapping column, or diagnostics module."
+    },
+    {
+      "screen_id": "19_tcp_settings",
+      "current_function": "Manage existing TCP Client/Server profiles, connect/disconnect or start/stop, send text/HEX, receive traffic, inspect the real log, and clear it.",
+      "D_location": "A three-pane communications workbench uses the real Client/Server profile source list, a central profile/connection editor, and a dominant runtime/send-response traffic console with the exact columns 时间/方向/字节/文本/HEX/端点.",
+      "E_location": "A premium split view aligns profile selection and editor on the left with a large, quiet traffic/debugging field on the right; connection and send actions remain contextually grouped.",
+      "must_not": "No new transport, packet analyzer, live-network claim, profile mode, log column, or telemetry chart."
+    },
+    {
+      "screen_id": "20_station_communication",
+      "current_function": "Refresh the authoritative Station communication projection; configure Disabled/LocalLoopback/LanController mode, Studio port, LAN host and local Station sync; explicitly preserve or replace a masked token or regenerate it under existing guards; discard or save; inspect effective-state/restart feedback, endpoints and diagnostics.",
+      "D_location": "A mode-driven configuration workspace places port/host/local-sync and the preserve/replace/regenerate token boundary in the primary column, with effective state, restart feedback and diagnostics in a contextual secondary rail and one anchored save action.",
+      "E_location": "A refined communications sheet uses controlled section spacing for mode, port/host, local sync, token operation, discard/save, effective-state/restart feedback and diagnostics while keeping security-sensitive actions visibly distinct.",
+      "must_not": "No snippets, raw token display/copy, Station monitor, generic cancel, new transport, remote control, live connectivity claim, token authority, sync mode, or topology dashboard."
+    },
+    {
+      "screen_id": "21_ai_model_settings",
+      "current_function": "Refresh the model catalog; create/select/delete model configurations; activate the selected model or assign planner/shadow roles while preserving visible statuses; edit display name, provider, model, enablement, endpoint and protected API-key operation; test connection; expand advanced connection/scheduling details; read inference support; discard or save.",
+      "D_location": "A dense model-catalog source column and provider configuration workbench place selection/activation/planner/shadow status beside identity/endpoint/security fields; test, the advanced details disclosure and inference support form a contextual rail with one save footer.",
+      "E_location": "A premium catalog-and-model sheet uses progressive disclosure and exceptional field rhythm; model role/status actions, credential boundary, test result, advanced details, inference support, discard and save remain explicit and singular.",
+      "must_not": "No quality analytics, token/cost dashboard, marketplace, prompt preset, plaintext secret, or new provider capability."
+    },
+    {
+      "screen_id": "22_diagnostics",
+      "current_function": "Read local service, session, desktop-host, version and environment status, expand technical diagnostics, refresh, and safely copy diagnostic information.",
+      "D_location": "A read-only technical console uses a compact status header, aligned service/session/host facts, and a dominant expandable technical projection; copy and refresh stay as the only commands.",
+      "E_location": "A quiet premium diagnostics sheet turns status, environment, and technical disclosure into one continuous hierarchy with precise monospace detail where needed and no control-center styling.",
+      "must_not": "No execution control, service restart, secret display, new telemetry, breadcrumb, title icon tile, desktop window control, or alternate shell action."
+    },
+    {
+      "screen_id": "23_about",
+      "current_function": "Explain product, host, backend, version, license/support identity, and the distinction between Studio configuration and Runtime/Station execution.",
+      "D_location": "A compact identity and composition sheet uses disciplined technical rows and one explanatory band inside the normal product shell.",
+      "E_location": "A calm, exceptionally typeset product identity surface presents version, host, license/support, and composition without marketing treatment or oversized branding.",
+      "must_not": "No invented version/license state, update action, runtime control, support service, or marketing hero."
+    },
+    {
+      "screen_id": "24_forbidden",
+      "current_function": "Explain the authority boundary and return the user to the project library through the single existing action.",
+      "D_location": "A restrained authority panel sits within the product access shell, with the reason, impact, and single return action aligned as a compact operational message.",
+      "E_location": "A quiet centered permission sheet uses controlled contrast and typography to explain the boundary, ending with the same single return action.",
+      "must_not": "No retry, request-access flow, role change, login control, permission editor, support chat, or new navigation."
+    }
+  ]
+}

@@ -1,0 +1,57 @@
+{
+  "schema_version": "clearvision-controlled-picture-layer-touchup.v1",
+  "entry_id": "E_17_camera_settings",
+  "source_iteration": "option_E/iterations/17_camera_settings_v2.png",
+  "source_sha256": "bb227b6e357496ee580fa29cf7712310c9850beeb0556dd4d0c47feac198f32c",
+  "purpose": "Preserve the Camera binding and preview workbench, restore the compact shell, and expose the verified Enter-input identification action.",
+  "operations": [
+    {
+      "type": "fill_rect",
+      "box": [1510, 0, 1800, 72],
+      "fill": [255, 254, 254],
+      "purpose": "Clear generated duplicate theme and density fragments."
+    },
+    {
+      "type": "replace_text",
+      "box": [1520, 10, 1690, 62],
+      "fill": [255, 254, 254],
+      "position": [1525, 21],
+      "text": "外观  浅色 · 紧凑",
+      "font_path": "C:\\Windows\\Fonts\\msyh.ttc",
+      "font_sha256": "e4b3b9d058750fb80899c24f68e35beda606ca92694eff0e9f7f91eec7a846aa",
+      "font_size": 14,
+      "text_fill": [63, 72, 82],
+      "purpose": "Restore the existing appearance projection."
+    },
+    {
+      "type": "replace_text",
+      "box": [1695, 10, 1765, 62],
+      "fill": [255, 254, 254],
+      "position": [1702, 21],
+      "text": "更多",
+      "font_path": "C:\\Windows\\Fonts\\msyh.ttc",
+      "font_sha256": "e4b3b9d058750fb80899c24f68e35beda606ca92694eff0e9f7f91eec7a846aa",
+      "font_size": 14,
+      "text_fill": [63, 72, 82],
+      "purpose": "Restore the existing More menu entry."
+    },
+    {
+      "type": "copy_rect",
+      "box": [1279, 732, 1378, 757],
+      "source_box": [1279, 904, 1378, 929],
+      "purpose": "Reuse the same-page compact serial-test action surface for the verified Enter-input action."
+    },
+    {
+      "type": "replace_text",
+      "box": [1285, 737, 1372, 754],
+      "fill": [240, 242, 244],
+      "position": [1288, 737],
+      "text": "识别输入设备",
+      "font_path": "C:\\Windows\\Fonts\\msyh.ttc",
+      "font_sha256": "e4b3b9d058750fb80899c24f68e35beda606ca92694eff0e9f7f91eec7a846aa",
+      "font_size": 12,
+      "text_fill": [83, 92, 101],
+      "purpose": "Restore the verified CURRENT action without adding any camera capability."
+    }
+  ]
+}

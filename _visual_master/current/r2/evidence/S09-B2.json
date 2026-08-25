@@ -1,0 +1,161 @@
+{
+  "schemaVersion": "r2-final-matrix-capture.v1",
+  "scene": "S09",
+  "variant": "B2",
+  "route": "#/projects/11111111-1111-4111-8111-111111111111/inspection",
+  "state": "recent-result",
+  "role": "Engineer",
+  "flags": {
+    "Studio2.InspectionRun": true
+  },
+  "owner": {
+    "capability": "F05-inspection-run",
+    "mounted": 1,
+    "subscriptions": 0,
+    "writes": 1
+  },
+  "requests": [
+    "GET /api/auth/setup-status",
+    "GET /api/auth/me",
+    "GET /health",
+    "GET /api/projects/11111111-1111-4111-8111-111111111111",
+    "GET /api/cameras/bindings",
+    "GET /api/inspection/realtime/11111111-1111-4111-8111-111111111111/state",
+    "POST /api/inspection/admission",
+    "POST /api/inspection/admission",
+    "POST /api/inspection/realtime/start",
+    "GET /api/inspection/realtime/11111111-1111-4111-8111-111111111111/events"
+  ],
+  "runtimeRequests": [
+    {
+      "method": "GET",
+      "path": "/api/auth/setup-status",
+      "url": "http://127.0.0.1:5421/api/auth/setup-status"
+    },
+    {
+      "method": "GET",
+      "path": "/api/auth/me",
+      "url": "http://127.0.0.1:5421/api/auth/me"
+    },
+    {
+      "method": "GET",
+      "path": "/health",
+      "url": "http://127.0.0.1:5421/health"
+    },
+    {
+      "method": "GET",
+      "path": "/api/projects/11111111-1111-4111-8111-111111111111",
+      "url": "http://127.0.0.1:5421/api/projects/11111111-1111-4111-8111-111111111111"
+    },
+    {
+      "method": "GET",
+      "path": "/api/cameras/bindings",
+      "url": "http://127.0.0.1:5421/api/cameras/bindings"
+    },
+    {
+      "method": "GET",
+      "path": "/api/inspection/realtime/11111111-1111-4111-8111-111111111111/state",
+      "url": "http://127.0.0.1:5421/api/inspection/realtime/11111111-1111-4111-8111-111111111111/state"
+    },
+    {
+      "method": "POST",
+      "path": "/api/inspection/admission",
+      "url": "http://127.0.0.1:5421/api/inspection/admission"
+    },
+    {
+      "method": "POST",
+      "path": "/api/inspection/admission",
+      "url": "http://127.0.0.1:5421/api/inspection/admission"
+    },
+    {
+      "method": "POST",
+      "path": "/api/inspection/realtime/start",
+      "url": "http://127.0.0.1:5421/api/inspection/realtime/start"
+    },
+    {
+      "method": "GET",
+      "path": "/api/inspection/realtime/11111111-1111-4111-8111-111111111111/events",
+      "url": "http://127.0.0.1:5421/api/inspection/realtime/11111111-1111-4111-8111-111111111111/events"
+    }
+  ],
+  "allowedWrites": [
+    "POST /api/inspection/admission",
+    "POST /api/inspection/realtime/start"
+  ],
+  "runtime": {
+    "consoleErrors": [],
+    "pageErrors": [],
+    "failedRequests": [],
+    "httpErrors": [],
+    "expectedHttpErrors": [],
+    "observedExpectedHttpErrors": [],
+    "unexpectedWrites": []
+  },
+  "requiredCriticalActions": [
+    "[data-testid=\"inspection-run-result-link\"]"
+  ],
+  "motion": {
+    "layoutShifts": [
+      {
+        "value": 0.0004430537215239802,
+        "hadRecentInput": false
+      },
+      {
+        "value": 0.0018963092192043581,
+        "hadRecentInput": true
+      }
+    ],
+    "longTasks": []
+  },
+  "notes": [],
+  "dom": {
+    "url": "http://127.0.0.1:5421/studio/index.html#/projects/11111111-1111-4111-8111-111111111111/inspection",
+    "viewport": {
+      "width": 1366,
+      "height": 768,
+      "dpr": 1
+    },
+    "theme": "light",
+    "density": "compact",
+    "reducedMotion": "false",
+    "focus": {
+      "tagName": "BODY",
+      "id": "",
+      "testId": null
+    },
+    "landmarks": {
+      "main": 1,
+      "nav": 1,
+      "dialogs": 0
+    },
+    "mainBox": {
+      "x": 0,
+      "y": 52,
+      "width": 1366,
+      "height": 716
+    },
+    "horizontalOverflow": 0,
+    "pageScroll": {
+      "x": 0,
+      "y": 0
+    },
+    "criticalActions": [
+      {
+        "selector": "[data-testid=\"inspection-run-result-link\"]",
+        "testId": "inspection-run-result-link",
+        "text": "查看结果",
+        "box": {
+          "x": 1282,
+          "y": 333.234375,
+          "width": 48,
+          "height": 16
+        },
+        "truncated": false,
+        "inViewport": true,
+        "reachable": true,
+        "enabled": true,
+        "unobscured": true
+      }
+    ]
+  }
+}

@@ -26,7 +26,7 @@ describe('Design Foundation Lab', () => {
 
     expect(wrapper.attributes('data-design-lab')).toBe('ready');
     expect(document.documentElement.dataset.theme).toBe('light');
-    expect(document.documentElement.dataset.density).toBe('comfortable');
+    expect(document.documentElement.dataset.density).toBe('compact');
     expect(document.documentElement.dataset.reducedMotion).toBe('false');
 
     await wrapper.get('[data-design-theme="dark"]').trigger('click');
@@ -47,6 +47,24 @@ describe('Design Foundation Lab', () => {
     expect(document.documentElement.dataset.reducedMotion).toBe('prior-motion');
   });
 
+  it('inherits valid current preferences instead of replacing them', () => {
+    document.documentElement.dataset.theme = 'dark';
+    document.documentElement.dataset.density = 'comfortable';
+    document.documentElement.dataset.reducedMotion = 'true';
+
+    const wrapper = mount(DesignLab, {
+      global: { stubs: { RouterLink: { template: '<a><slot /></a>' } } }
+    });
+
+    expect(document.documentElement.dataset.theme).toBe('dark');
+    expect(document.documentElement.dataset.density).toBe('comfortable');
+    expect(document.documentElement.dataset.reducedMotion).toBe('true');
+    wrapper.unmount();
+    expect(document.documentElement.dataset.theme).toBe('dark');
+    expect(document.documentElement.dataset.density).toBe('comfortable');
+    expect(document.documentElement.dataset.reducedMotion).toBe('true');
+  });
+
   it('keeps a single root projection owner across overlapping mounts', async () => {
     document.documentElement.dataset.theme = 'prior-theme';
     const mountOptions = {
@@ -56,6 +74,15 @@ describe('Design Foundation Lab', () => {
     expect(document.documentElement.dataset.theme).toBe('light');
 
     const second = mount(DesignLab, mountOptions);
+    const firstStagesTab = first.findAll('[role="tab"]')
+      .find(tab => tab.text() === '阶段明细');
+    const secondStagesTab = second.findAll('[role="tab"]')
+      .find(tab => tab.text() === '阶段明细');
+    expect(firstStagesTab).toBeDefined();
+    expect(secondStagesTab).toBeDefined();
+    expect(firstStagesTab?.attributes('id')).not.toBe(secondStagesTab?.attributes('id'));
+    expect(firstStagesTab?.attributes('aria-controls'))
+      .not.toBe(secondStagesTab?.attributes('aria-controls'));
     await second.get('[data-design-theme="dark"]').trigger('click');
     expect(document.documentElement.dataset.theme).toBe('light');
     second.unmount();
@@ -98,6 +125,9 @@ describe('Design Foundation Lab', () => {
     });
     await wrapper.get('[data-modal-trigger]').trigger('click');
     await wrapper.get('[aria-label="打开样本操作菜单"]').trigger('click');
+    expect(wrapper.get('h1').text()).toContain('Design System 2.0');
+    expect(wrapper.get('input[placeholder="例如：检测流程或已保存…"]')).toBeDefined();
+    expect(wrapper.text()).toContain('正在读取…');
     const names = new Set(
       wrapper.findAll('[data-design-primitive]').map(node => node.attributes('data-design-primitive'))
     );
@@ -106,6 +136,7 @@ describe('Design Foundation Lab', () => {
       'surface',
       'button',
       'data-table',
+      'description-list',
       'icon-button',
       'field',
       'inline-alert',
@@ -120,8 +151,25 @@ describe('Design Foundation Lab', () => {
       'modal',
       'toast',
       'splitter',
-      'tooltip'
+      'tooltip',
+      'view-tabs'
     ]));
+    expect(wrapper.find('[data-design-pattern="breadcrumbs"]').exists()).toBe(true);
+    expect(wrapper.find('[data-design-fixture="option-d-g1-design-system.v1"]').exists()).toBe(true);
+    expect(wrapper.get('[aria-label="检测流程只读摘要"]').text()).toContain('本地冻结 fixture');
+    expect(wrapper.get('[aria-label="检测流程只读摘要"]').text()).toContain('—');
+    const summaryTab = wrapper.findAll('[role="tab"]')
+      .find(tab => tab.text() === '摘要投影');
+    const stagesTab = wrapper.findAll('[role="tab"]')
+      .find(tab => tab.text() === '阶段明细');
+    expect(summaryTab).toBeDefined();
+    expect(stagesTab).toBeDefined();
+    if (!summaryTab || !stagesTab) throw new Error('Readonly fixture tabs were not rendered.');
+    await stagesTab.trigger('click');
+    expect(wrapper.get(`[id="${summaryTab.attributes('aria-controls')}"]`).attributes())
+      .toHaveProperty('hidden');
+    expect(wrapper.get(`[id="${stagesTab.attributes('aria-controls')}"]`).attributes())
+      .not.toHaveProperty('hidden');
     expect(wrapper.text()).toContain('品牌丹红只表达产品意图');
     expect(wrapper.text()).not.toContain('Brand blue');
     expect(wrapper.findAll('[data-design-composition]')).toHaveLength(6);

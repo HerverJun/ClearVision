@@ -1,0 +1,41 @@
+{
+  "schema_version": "clearvision-controlled-picture-layer-touchup.v1",
+  "entry_id": "E_04_projects_empty",
+  "source_iteration": "option_E/iterations/04_projects_empty_v2.png",
+  "source_sha256": "f758a507e3787f5f7b3d3a3f4026bc691fbd26c3bb69199c924fbe8564941aa1",
+  "purpose": "Restore the verified search hint and empty-state identity with a non-overlapping vertical rhythm.",
+  "operations": [
+    {
+      "type": "replace_text",
+      "box": [106, 406, 500, 454],
+      "fill": [254, 254, 254],
+      "position": [106, 416],
+      "text": "按名称或描述搜索...",
+      "font_path": "C:\\Windows\\Fonts\\msyh.ttc",
+      "font_sha256": "e4b3b9d058750fb80899c24f68e35beda606ca92694eff0e9f7f91eec7a846aa",
+      "font_size": 16,
+      "text_fill": [93, 104, 114],
+      "purpose": "Restore the exact CURRENT search placeholder."
+    },
+    {
+      "type": "paste_reference",
+      "box": [1006, 604, 1043, 641],
+      "source_box": [781, 340, 818, 377],
+      "reference_path": "current/r2/S02-EMPTY.png",
+      "reference_sha256": "4af62b9df4f3b1a7b75dac46a58d1e4f5695aa9607e41a7e06d90f81527de8e3",
+      "purpose": "Restore the existing CURRENT empty-project icon, not a new product feature."
+    },
+    {
+      "type": "replace_text",
+      "box": [950, 646, 1100, 679],
+      "fill": [249, 250, 251],
+      "position": [978, 649],
+      "text": "暂无工程",
+      "font_path": "C:\\Windows\\Fonts\\msyhbd.ttc",
+      "font_sha256": "06e1a30f687ab7d39f533447b21e84d51e0cecdaa6bfa060c87136b168811bdc",
+      "font_size": 19,
+      "text_fill": [31, 39, 47],
+      "purpose": "Restore the verified empty-state heading above the existing body copy."
+    }
+  ]
+}

@@ -29,6 +29,8 @@ const appearanceOpen = ref(false);
 const moreOpen = ref(false);
 const userOpen = ref(false);
 const workspaceMode = computed(() => route.meta.workspaceMode === true);
+const shellMode = computed(() => route.meta.shellMode ?? (workspaceMode.value ? 'workspace' : 'standard'));
+const productRailTone = computed(() => shellMode.value === 'product-rail' ? 'dark' : 'light');
 const routeViewKey = computed(() => route.name === 'project-workspace'
   ? 'project-workspace'
   : route.path);
@@ -50,6 +52,11 @@ interface ProductTopNavigationItem {
   readonly to?: string;
   readonly current?: boolean;
   readonly disabled?: boolean;
+}
+
+interface ProductRailNavigationItem extends ProductTopNavigationItem {
+  readonly to: string;
+  readonly icon: CvIconName;
 }
 
 const visibleNavigation = computed(() => visibleProductNavigation(
@@ -141,6 +148,28 @@ const productMoreNavigation = computed<readonly Readonly<{ to: string; label: st
     .filter(item => ['/diagnostics', '/about'].includes(item.to))
     .map(item => Object.freeze({ to: item.to, label: item.label }))
 ));
+const productRailNavigation = computed<readonly ProductRailNavigationItem[]>(() => {
+  const order = ['概览', '工程'];
+  if (shellMode.value === 'workspace') order.push('流程');
+  order.push('检测结果', '算子库');
+  if (shellMode.value === 'product-rail') {
+    if (route.path === '/ai' || route.path.endsWith('/ai')) order.push('AI 工程');
+    if (route.path === '/settings') order.push('设置');
+  }
+  const iconByLabel: Readonly<Record<string, CvIconName>> = Object.freeze({
+    '概览': 'overview',
+    '工程': 'projects',
+    '流程': 'drag',
+    '检测结果': 'results',
+    '算子库': 'operators',
+    'AI 工程': 'spark',
+    '设置': 'sliders'
+  });
+  return Object.freeze(order.flatMap(label => {
+    const item = productTopNavigation.value.find(candidate => candidate.label === label && candidate.to);
+    return item?.to ? [{ ...item, to: item.to, icon: iconByLabel[label] ?? 'overview' }] : [];
+  }));
+});
 const statusTone = computed(() => {
   if (systemStatus.phase === 'online') return 'ok';
   if (systemStatus.phase === 'stale') return 'warning';
@@ -220,11 +249,12 @@ function focusContent(): void {
   contentRoot.value?.focus({ preventScroll: true });
 }
 
-watch(() => route.path, async (current, previous) => {
+watch(() => route.fullPath, async (current, previous) => {
   if (!previous || current === previous) return;
   closeAppearance();
   closeMore();
   closeUser();
+  await nextTick();
   await nextTick();
   contentRoot.value?.focus({ preventScroll: true });
 });
@@ -237,8 +267,9 @@ onMounted(() => {
 <template>
   <div
     class="product-layout"
-    :class="{ 'product-layout--workspace': workspaceMode }"
+    :class="`product-layout--${shellMode}`"
     data-product-shell="ready"
+    :data-shell-mode="shellMode"
     :data-workspace-mode="workspaceMode"
     :data-leave-guard-phase="leaveGuard.projection.phase"
     :data-leave-guard-owner-count="leaveGuard.diagnostics.ownerCount"
@@ -250,257 +281,290 @@ onMounted(() => {
       @click.prevent="focusContent"
     >跳到主要内容</a>
 
-    <div class="product-layout__workspace">
-      <header class="product-layout__topbar">
-        <div class="product-layout__workspace-chrome">
-          <RouterLink
-            class="product-layout__workspace-brand"
-            to="/overview"
-            aria-label="ClearVision Studio 概览"
-          >
-            <CvBrand />
-          </RouterLink>
-          <span
-            class="product-layout__workspace-divider"
-            aria-hidden="true"
-          />
-          <nav
-            class="product-layout__workspace-nav"
-            aria-label="产品主导航"
-          >
-            <template
-              v-for="item in productTopNavigation"
-              :key="item.label"
-            >
-              <RouterLink
-                v-if="item.to"
-                class="product-layout__workspace-nav-item"
-                :class="{ 'is-current': item.current }"
-                :to="item.to"
-                :data-product-nav="item.to"
-                :title="item.description"
-                :aria-current="item.current ? 'page' : undefined"
-              >
-                {{ item.label }}
-              </RouterLink>
-              <button
-                v-else
-                type="button"
-                class="product-layout__workspace-nav-item"
-                disabled
-                :title="item.description"
-              >
-                {{ item.label }}
-              </button>
-            </template>
-          </nav>
-        </div>
-
-        <div class="product-layout__topbar-actions">
-          <div
-            class="product-layout__service-status"
-            role="status"
-            aria-live="polite"
-            aria-atomic="true"
-          >
-            <CvStatusBadge
-              :tone="statusTone"
-              :label="statusLabel"
-            />
-          </div>
-
-          <span
-            class="product-layout__appearance"
-            data-product-appearance
-          >
-            <CvMenu
-              v-model="appearanceOpen"
-              label="外观设置"
-              :trigger-label="`外观设置，当前${themeLabel}主题，${densityLabel}密度`"
-              align="end"
-              @open="openAppearance"
-              @select="selectAppearance"
-            >
-              <template #trigger>
-                <CvIcon
-                  name="theme"
-                  size="sm"
-                />
-                <span class="product-layout__menu-trigger-label">外观</span>
-                <small>{{ themeLabel }} · {{ densityLabel }}</small>
-              </template>
-              <span class="product-layout__menu-label">主题</span>
-              <CvMenuItem
-                value="theme-light"
-                label="浅色"
-                :checked="preferences.theme === 'light'"
-              />
-              <CvMenuItem
-                value="theme-dark"
-                label="深色"
-                :checked="preferences.theme === 'dark'"
-              />
-              <span class="product-layout__menu-label">界面密度</span>
-              <CvMenuItem
-                value="density-compact"
-                label="紧凑"
-                :checked="preferences.density === 'compact'"
-              />
-              <CvMenuItem
-                value="density-comfortable"
-                label="舒适"
-                :checked="preferences.density === 'comfortable'"
-              />
-            </CvMenu>
-          </span>
-
-          <span
-            v-if="productMoreNavigation.length"
-            class="product-layout__more"
-            data-product-more
-          >
-            <CvMenu
-              v-model="moreOpen"
-              label="更多产品入口"
-              trigger-label="更多产品入口"
-              align="end"
-              @open="openMore"
-              @select="selectMore"
-            >
-              <template #trigger>
-                <span class="product-layout__menu-trigger-label">更多</span>
-                <CvIcon
-                  name="more-horizontal"
-                  size="sm"
-                />
-              </template>
-              <CvMenuItem
-                v-for="item in productMoreNavigation"
-                :key="item.to"
-                :value="item.to"
-                :label="item.label"
-                :data-product-nav="item.to"
-              >
-                <template #leading>
-                  <CvIcon
-                    :name="navigationIcons[item.to] ?? 'overview'"
-                    size="sm"
-                  />
-                </template>
-              </CvMenuItem>
-            </CvMenu>
-          </span>
-
-          <span
-            class="product-layout__user-menu"
-            data-product-user-menu
-          >
-            <CvMenu
-              v-model="userOpen"
-              label="会话菜单"
-              :trigger-label="`会话菜单，${session.user?.username ?? '未认证'}，${roleLabel}`"
-              align="end"
-              @open="openUser"
-              @select="selectUser"
-            >
-              <template #trigger>
-                <span
-                  class="product-layout__user-avatar"
-                  aria-hidden="true"
-                >{{ userInitial }}</span>
-                <span class="product-layout__user-copy">
-                  <strong>{{ session.user?.username ?? '未认证' }}</strong>
-                  <small>{{ roleLabel }}</small>
-                </span>
-                <CvIcon
-                  name="chevron-right"
-                  size="sm"
-                />
-              </template>
-              <CvMenuItem
-                value="change-password"
-                label="修改密码"
-                data-session-command="change-password"
-              >
-                <template #leading>
-                  <CvIcon
-                    name="lock"
-                    size="sm"
-                  />
-                </template>
-              </CvMenuItem>
-              <CvMenuItem
-                value="logout"
-                label="退出"
-                tone="destructive"
-                data-auth-command="logout"
-              >
-                <template #leading>
-                  <CvIcon
-                    name="power"
-                    size="sm"
-                  />
-                </template>
-              </CvMenuItem>
-            </CvMenu>
-          </span>
-        </div>
-      </header>
-
-      <main
-        id="product-main"
-        ref="contentRoot"
-        class="product-layout__content"
-        :class="{ 'product-layout__content--workspace': workspaceMode }"
-        tabindex="-1"
+    <aside
+      v-if="shellMode !== 'standard'"
+      class="product-layout__product-rail"
+      :data-product-rail-tone="productRailTone"
+    >
+      <div
+        v-if="shellMode === 'product-rail'"
+        class="product-layout__rail-brand"
+        aria-hidden="true"
       >
-        <CvInlineAlert
-          v-if="leaveGuard.projection.phase === 'blocked'"
-          class="product-layout__session-alert"
-          tone="warning"
-          compact
-          title="离开操作已被保护"
-          data-product-state="leave-blocked"
+        <CvBrand compact />
+      </div>
+      <nav
+        class="product-layout__rail-nav"
+        aria-label="产品快捷导航"
+      >
+        <RouterLink
+          v-for="item in productRailNavigation"
+          :key="item.label"
+          class="product-layout__rail-nav-item"
+          :class="{ 'is-current': item.current }"
+          :to="item.to"
+          :title="item.description"
+          :aria-current="item.current ? 'page' : undefined"
+          :data-product-rail-nav="item.to"
         >
-          {{ leaveGuard.projection.message }}
-        </CvInlineAlert>
-        <CvInlineAlert
-          v-if="authRoot.auth.projection.errorCode === 'CHANGE_PASSWORD_BLOCKED'"
-          class="product-layout__session-alert"
-          tone="warning"
-          compact
-          title="会话操作已阻止"
-        >
-          {{ authRoot.auth.projection.message }}
-        </CvInlineAlert>
-        <CvInlineAlert
-          v-if="!workspaceMode && session.phase === 'error'"
-          class="product-layout__session-alert"
-          tone="error"
-          compact
-          title="会话读取失败"
-          data-product-state="error"
-        >
-          {{ session.message }} 后端授权继续是唯一安全边界。
-        </CvInlineAlert>
-        <CvInlineAlert
-          v-else-if="!workspaceMode && session.phase === 'stale'"
-          class="product-layout__session-alert"
-          tone="warning"
-          compact
-          title="会话投影已过期"
-          data-product-state="stale"
-        >
-          {{ session.message }}
-        </CvInlineAlert>
-        <RouterView v-slot="{ Component }">
-          <component
-            :is="Component"
-            :key="routeViewKey"
+          <CvIcon
+            :name="item.icon"
+            size="lg"
           />
-        </RouterView>
-      </main>
-    </div>
+          <span>{{ item.label }}</span>
+        </RouterLink>
+      </nav>
+    </aside>
+
+    <header class="product-layout__topbar">
+      <div class="product-layout__workspace-chrome">
+        <RouterLink
+          class="product-layout__workspace-brand"
+          to="/overview"
+          aria-label="ClearVision Studio 概览"
+        >
+          <CvBrand />
+        </RouterLink>
+        <span
+          class="product-layout__workspace-divider"
+          aria-hidden="true"
+        />
+        <nav
+          class="product-layout__workspace-nav"
+          aria-label="产品主导航"
+        >
+          <template
+            v-for="item in productTopNavigation"
+            :key="item.label"
+          >
+            <RouterLink
+              v-if="item.to"
+              class="product-layout__workspace-nav-item"
+              :class="{ 'is-current': item.current }"
+              :to="item.to"
+              :data-product-nav="item.to"
+              :title="item.description"
+              :aria-current="item.current ? 'page' : undefined"
+            >
+              {{ item.label }}
+            </RouterLink>
+            <button
+              v-else
+              type="button"
+              class="product-layout__workspace-nav-item"
+              disabled
+              :title="item.description"
+            >
+              {{ item.label }}
+            </button>
+          </template>
+        </nav>
+      </div>
+
+      <div class="product-layout__topbar-actions">
+        <div
+          class="product-layout__service-status"
+          role="status"
+          aria-live="polite"
+          aria-atomic="true"
+        >
+          <CvStatusBadge
+            :tone="statusTone"
+            :label="statusLabel"
+          />
+        </div>
+
+        <span
+          class="product-layout__appearance"
+          data-product-appearance
+        >
+          <CvMenu
+            v-model="appearanceOpen"
+            label="外观设置"
+            :trigger-label="`外观设置，当前${themeLabel}主题，${densityLabel}密度`"
+            align="end"
+            @open="openAppearance"
+            @select="selectAppearance"
+          >
+            <template #trigger>
+              <CvIcon
+                name="theme"
+                size="sm"
+              />
+              <span class="product-layout__menu-trigger-label">外观</span>
+              <small>{{ themeLabel }} · {{ densityLabel }}</small>
+            </template>
+            <span class="product-layout__menu-label">主题</span>
+            <CvMenuItem
+              value="theme-light"
+              label="浅色"
+              :checked="preferences.theme === 'light'"
+            />
+            <CvMenuItem
+              value="theme-dark"
+              label="深色"
+              :checked="preferences.theme === 'dark'"
+            />
+            <span class="product-layout__menu-label">界面密度</span>
+            <CvMenuItem
+              value="density-compact"
+              label="紧凑"
+              :checked="preferences.density === 'compact'"
+            />
+            <CvMenuItem
+              value="density-comfortable"
+              label="舒适"
+              :checked="preferences.density === 'comfortable'"
+            />
+          </CvMenu>
+        </span>
+
+        <span
+          v-if="productMoreNavigation.length"
+          class="product-layout__more"
+          data-product-more
+        >
+          <CvMenu
+            v-model="moreOpen"
+            label="更多产品入口"
+            trigger-label="更多产品入口"
+            align="end"
+            @open="openMore"
+            @select="selectMore"
+          >
+            <template #trigger>
+              <span class="product-layout__menu-trigger-label">更多</span>
+              <CvIcon
+                name="more-horizontal"
+                size="sm"
+              />
+            </template>
+            <CvMenuItem
+              v-for="item in productMoreNavigation"
+              :key="item.to"
+              :value="item.to"
+              :label="item.label"
+              :data-product-nav="item.to"
+            >
+              <template #leading>
+                <CvIcon
+                  :name="navigationIcons[item.to] ?? 'overview'"
+                  size="sm"
+                />
+              </template>
+            </CvMenuItem>
+          </CvMenu>
+        </span>
+
+        <span
+          class="product-layout__user-menu"
+          data-product-user-menu
+        >
+          <CvMenu
+            v-model="userOpen"
+            label="会话菜单"
+            :trigger-label="`会话菜单，${session.user?.username ?? '未认证'}，${roleLabel}`"
+            align="end"
+            @open="openUser"
+            @select="selectUser"
+          >
+            <template #trigger>
+              <span
+                class="product-layout__user-avatar"
+                aria-hidden="true"
+              >{{ userInitial }}</span>
+              <span class="product-layout__user-copy">
+                <strong>{{ session.user?.username ?? '未认证' }}</strong>
+                <small>{{ roleLabel }}</small>
+              </span>
+              <CvIcon
+                name="chevron-right"
+                size="sm"
+              />
+            </template>
+            <CvMenuItem
+              value="change-password"
+              label="修改密码"
+              data-session-command="change-password"
+            >
+              <template #leading>
+                <CvIcon
+                  name="lock"
+                  size="sm"
+                />
+              </template>
+            </CvMenuItem>
+            <CvMenuItem
+              value="logout"
+              label="退出"
+              tone="destructive"
+              data-auth-command="logout"
+            >
+              <template #leading>
+                <CvIcon
+                  name="power"
+                  size="sm"
+                />
+              </template>
+            </CvMenuItem>
+          </CvMenu>
+        </span>
+      </div>
+    </header>
+
+    <main
+      id="product-main"
+      ref="contentRoot"
+      class="product-layout__content"
+      :class="{ 'product-layout__content--workspace': workspaceMode }"
+      tabindex="-1"
+    >
+      <CvInlineAlert
+        v-if="leaveGuard.projection.phase === 'blocked'"
+        class="product-layout__session-alert"
+        tone="warning"
+        compact
+        title="离开操作已被保护"
+        data-product-state="leave-blocked"
+      >
+        {{ leaveGuard.projection.message }}
+      </CvInlineAlert>
+      <CvInlineAlert
+        v-if="authRoot.auth.projection.errorCode === 'CHANGE_PASSWORD_BLOCKED'"
+        class="product-layout__session-alert"
+        tone="warning"
+        compact
+        title="会话操作已阻止"
+      >
+        {{ authRoot.auth.projection.message }}
+      </CvInlineAlert>
+      <CvInlineAlert
+        v-if="!workspaceMode && session.phase === 'error'"
+        class="product-layout__session-alert"
+        tone="error"
+        compact
+        title="会话读取失败"
+        data-product-state="error"
+      >
+        {{ session.message }} 后端授权继续是唯一安全边界。
+      </CvInlineAlert>
+      <CvInlineAlert
+        v-else-if="!workspaceMode && session.phase === 'stale'"
+        class="product-layout__session-alert"
+        tone="warning"
+        compact
+        title="会话投影已过期"
+        data-product-state="stale"
+      >
+        {{ session.message }}
+      </CvInlineAlert>
+      <RouterView v-slot="{ Component }">
+        <component
+          :is="Component"
+          :key="routeViewKey"
+        />
+      </RouterView>
+    </main>
 
     <CvModal
       :open="leavePromptOpen"

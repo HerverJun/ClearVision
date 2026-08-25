@@ -1,0 +1,10 @@
+{
+  "schema_version": "clearvision-ui-iteration-instructions.v1",
+  "option": "D",
+  "round": 10,
+  "reference_mode": "current-dominant",
+  "functional_authority": "CURRENT screenshot plus current ClearVision code",
+  "instructions": {
+    "D_07_flow_preview_roi": "Rebuild one 2048x1152 screen from CURRENT S05-B2, the ClearVision-only D Flow architecture blueprint, and the D Flow Master. CURRENT is the sole authority for functions, text, state, values, and image evidence. Preserve exactly one Product Shell with 概览 / 工程 / 流程 / 检测结果 / 算子库; project context 瓶盖检测 A; 最终判定, 保存, 结果, 检查条件, 正式运行, 运行详情; ready/read/validation statuses; one ROI Rectangle node; and the ROI draft warning. The operator picker is closed and no parameter Inspector is open. The dotted FlowCanvas spans 59-61% of the full viewport and the right Preview / ROI context spans 35-37%. Use the actual CURRENT 100x100 black artifact with the same red patch/crack evidence. Preserve 手动预览, Rectangle, X 10, Y 10, Width 30, Height 20, the real image tools, result summary/key/structured/additional/diagnostic projection, undo, redo, 放弃, and 应用 ROI. Do not show 取消预览 because canCancel is false. No Windows controls, help, notification, permanent capability rail, invented image, new tab, new command, new value, new node, device ability, or save path."
+  }
+}

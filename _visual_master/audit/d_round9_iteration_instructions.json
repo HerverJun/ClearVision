@@ -1,0 +1,13 @@
+{
+  "schema_version": "clearvision-ui-iteration-instructions.v1",
+  "option": "D",
+  "round": 9,
+  "reference_mode": "iteration-board",
+  "functional_authority": "CURRENT screenshot plus current ClearVision code",
+  "instructions": {
+    "D_06_flow_validation_error": "Keep every correct Round 8 fact, node, 数量 *=11 inline error, status, real Product Shell including the real 流程 entry, commands, and D styling. Change geometry only: one FlowCanvas occupies about 70% of the full 2048px width and is the unmistakable center; the operator discovery entry is 56-68px; the selected-node Inspector is exactly 320-340px; Preview/Result is a separate collapsed 190-220px edge. Do not widen the Inspector, shrink the Canvas below 68%, add a blank column, duplicate navigation, or alter any text/value/control.",
+    "D_08_run_ng_modal": "Freeze the complete correct Round 8 modal, exact six metrics, seven CURRENT admission labels and 6/7 states, NG identity, technical facts, recent result, diagnostics, and commands. Restore one real top-level 流程 Product Shell entry because CURRENT S06-B0 is a project workspace; do not duplicate it elsewhere. Remove only the unverified 适应画布 command. Rename only the right-column heading 运行结果 to 近期结果. Keep 算子库 and no permanent capability rail. Change nothing else.",
+    "D_11_station_detail": "Use the restored Round 7 layout as an immutable composition target: no permanent left navigation rail, no reflow, exact warning 当前保留上次成功读取；恢复期间按服务端状态重新同步。, exact status overview, trace hash 5f4c36c - 78d0cedd, health 在线（恢复中）, all actions and Shell unchanged. Add only two verified evidence corrections inside the existing lower evidence area: the selected recent-result row shows 线序错误 · WIRE_SWAP together; retain visible 缺口/不一致 and 远程图像未上传 evidence without adding a command or changing the table columns. No other copy, value, column, layout, navigation, or state may change.",
+    "D_14_ai_failure_recovery": "Freeze the complete Round 8 no-sidebar/no-canvas composition, action positions, Shell, session version 8, five stages, and evidence. Restore only frozen Round 7 authority/history copy: 当前显示为服务端权威; 恢复后的构建状态; right warning 本页面为服务端视图 and 恢复后的权限状态; history copy 查看本次会话的历史诊断证据。; stage 5 ending 已完成服务端回滚 / 覆盖，当前为权限状态。 Keep 核对删除结果 exactly once in the main content. Add, remove, move, or rename nothing else."
+  }
+}

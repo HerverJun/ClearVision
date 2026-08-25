@@ -1,0 +1,49 @@
+{
+  "captured_at": "2026-08-16",
+  "authority": "Roboflow official documentation only",
+  "usage_policy": "Architecture and visual relationship reference only; never a ClearVision functional source.",
+  "sources": [
+    {
+      "file": "01_build_workflow_overview.png",
+      "page": "https://docs.roboflow.com/workflows/build/build-a-workflow",
+      "source_kind": "official GitBook screenshot",
+      "role": "compact node and topology reference"
+    },
+    {
+      "file": "02_create_workflow.jpg",
+      "page": "https://docs.roboflow.com/workflows/build/create-a-workflow",
+      "source_kind": "official GitBook screenshot",
+      "role": "broad product context only; not a layout reference"
+    },
+    {
+      "file": "03_test_button_editor.png",
+      "page": "https://docs.roboflow.com/workflows/build/test-a-workflow",
+      "source_kind": "official GitBook screenshot",
+      "role": "editor-to-test entry relationship"
+    },
+    {
+      "file": "04_test_pane.png",
+      "page": "https://docs.roboflow.com/workflows/build/test-a-workflow",
+      "source_kind": "official GitBook screenshot",
+      "role": "contextual test workspace relationship"
+    },
+    {
+      "file": "05_workflows_build_card.png",
+      "page": "https://docs.roboflow.com/workflows",
+      "source_kind": "official GitBook overview asset",
+      "role": "provenance only"
+    },
+    {
+      "file": "06_workflows_test_card.png",
+      "page": "https://docs.roboflow.com/workflows",
+      "source_kind": "official GitBook overview asset",
+      "role": "provenance only"
+    },
+    {
+      "file": "07_workflows_ai_assistant_card.png",
+      "page": "https://docs.roboflow.com/workflows",
+      "source_kind": "official GitBook overview asset",
+      "role": "provenance only"
+    }
+  ]
+}

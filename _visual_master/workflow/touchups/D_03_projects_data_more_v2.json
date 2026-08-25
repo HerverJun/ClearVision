@@ -1,0 +1,21 @@
+{
+  "schema_version": "clearvision-controlled-picture-layer-touchup.v1",
+  "entry_id": "D_03_projects_data",
+  "source_iteration": "option_D/iterations/03_projects_data_v9.png",
+  "source_sha256": "6feb58bb6f53aeb4007648d29efbef38e99e9ccf54fc33f45fc519a60651735f",
+  "purpose": "Restore the verified More product-menu entry without altering the project table or its actions.",
+  "operations": [
+    {
+      "type": "replace_text",
+      "box": [1668, 10, 1804, 74],
+      "fill": [254, 254, 254],
+      "position": [1674, 27],
+      "text": "外观 浅色·紧凑  更多",
+      "font_path": "C:\\Windows\\Fonts\\msyh.ttc",
+      "font_sha256": "e4b3b9d058750fb80899c24f68e35beda606ca92694eff0e9f7f91eec7a846aa",
+      "font_size": 11,
+      "text_fill": [45, 57, 70],
+      "purpose": "Keep the compact appearance projection and expose the existing More menu before the account control."
+    }
+  ]
+}

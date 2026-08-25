@@ -1,0 +1,39 @@
+{
+  "schema_version": "clearvision-controlled-picture-layer-touchup.v1",
+  "entry_id": "E_17_camera_settings",
+  "source_iteration": "option_E/iterations/17_camera_settings_v2.png",
+  "source_sha256": "bb227b6e357496ee580fa29cf7712310c9850beeb0556dd4d0c47feac198f32c",
+  "purpose": "Preserve the complete Camera binding and preview workbench while restoring the compact CURRENT shell projection.",
+  "operations": [
+    {
+      "type": "fill_rect",
+      "box": [1510, 0, 1800, 72],
+      "fill": [255, 254, 254],
+      "purpose": "Clear generated duplicate theme and density fragments."
+    },
+    {
+      "type": "replace_text",
+      "box": [1520, 10, 1690, 62],
+      "fill": [255, 254, 254],
+      "position": [1525, 21],
+      "text": "外观  浅色 · 紧凑",
+      "font_path": "C:\\Windows\\Fonts\\msyh.ttc",
+      "font_sha256": "e4b3b9d058750fb80899c24f68e35beda606ca92694eff0e9f7f91eec7a846aa",
+      "font_size": 14,
+      "text_fill": [63, 72, 82],
+      "purpose": "Restore the existing appearance projection."
+    },
+    {
+      "type": "replace_text",
+      "box": [1695, 10, 1765, 62],
+      "fill": [255, 254, 254],
+      "position": [1702, 21],
+      "text": "更多",
+      "font_path": "C:\\Windows\\Fonts\\msyh.ttc",
+      "font_sha256": "e4b3b9d058750fb80899c24f68e35beda606ca92694eff0e9f7f91eec7a846aa",
+      "font_size": 14,
+      "text_fill": [63, 72, 82],
+      "purpose": "Restore the existing More menu entry."
+    }
+  ]
+}

@@ -1,0 +1,15 @@
+{
+  "schema_version": "clearvision-controlled-picture-layer-touchup.v1",
+  "entry_id": "E_19_tcp_settings",
+  "source_iteration": "option_E/iterations/19_tcp_settings_v2.png",
+  "source_sha256": "86d25a8ad0bb121c6fb8f4fc7465954a875bda41eddab50211aa31ca192377e0",
+  "purpose": "Preserve the faithful TCP workbench and remove only the generated duplicate save and delete actions from the profile rail.",
+  "operations": [
+    {
+      "type": "fill_rect",
+      "box": [300, 900, 514, 1018],
+      "fill": [23, 27, 31],
+      "purpose": "Remove duplicate profile-rail 保存连接配置 and 删除 actions while retaining the authoritative editor actions."
+    }
+  ]
+}

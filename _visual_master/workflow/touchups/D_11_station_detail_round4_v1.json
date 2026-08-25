@@ -1,0 +1,81 @@
+{
+  "schema_version": "clearvision-controlled-picture-layer-touchup.v1",
+  "entry_id": "D_11_station_detail",
+  "source_iteration": "option_D/iterations/11_station_detail_v18.png",
+  "source_sha256": "aed6e03f4e6cf2197e0c7c7e1e1b4b46e5471ed234f5e781da8da6b0398a1767",
+  "purpose": "Preserve the accepted Round 4 Station detail and replace only generated trace wording with current product truth.",
+  "operations": [
+    {
+      "type": "replace_text",
+      "box": [598, 614, 1515, 654],
+      "fill": [255, 255, 255],
+      "position": [600, 624],
+      "text": "来源工程 = project-a / 正式保存 r12",
+      "font_path": "C:\\Windows\\Fonts\\msyh.ttc",
+      "font_sha256": "e4b3b9d058750fb80899c24f68e35beda606ca92694eff0e9f7f91eec7a846aa",
+      "font_size": 15,
+      "text_fill": [74, 85, 97],
+      "purpose": "Correct trace step 1."
+    },
+    {
+      "type": "replace_text",
+      "box": [598, 700, 1585, 740],
+      "fill": [255, 255, 255],
+      "position": [600, 710],
+      "text": "部署命令与审计 = 当前窗口无可关联命令 / 当前账号无权查看命令详情",
+      "font_path": "C:\\Windows\\Fonts\\msyh.ttc",
+      "font_sha256": "e4b3b9d058750fb80899c24f68e35beda606ca92694eff0e9f7f91eec7a846aa",
+      "font_size": 14,
+      "text_fill": [74, 85, 97],
+      "purpose": "Correct read-only command and audit semantics in trace step 3."
+    },
+    {
+      "type": "replace_text",
+      "box": [598, 743, 1628, 783],
+      "fill": [255, 255, 255],
+      "position": [600, 753],
+      "text": "工作站当前身份 / 运行 = 服务端状态已读取 / 11111111-1111-4111-8111-111111111111 · run-a",
+      "font_path": "C:\\Windows\\Fonts\\msyh.ttc",
+      "font_sha256": "e4b3b9d058750fb80899c24f68e35beda606ca92694eff0e9f7f91eec7a846aa",
+      "font_size": 13,
+      "text_fill": [74, 85, 97],
+      "purpose": "Correct trace step 4 identity label while preserving verified values."
+    },
+    {
+      "type": "replace_text",
+      "box": [598, 785, 1628, 828],
+      "fill": [255, 255, 255],
+      "position": [600, 795],
+      "text": "最近结果 = NG · 2026/07/15 10:00:00 / run-9 · message-9    查看结果",
+      "font_path": "C:\\Windows\\Fonts\\msyh.ttc",
+      "font_sha256": "e4b3b9d058750fb80899c24f68e35beda606ca92694eff0e9f7f91eec7a846aa",
+      "font_size": 14,
+      "text_fill": [74, 85, 97],
+      "purpose": "Correct trace step 5 identity and verified result action."
+    },
+    {
+      "type": "replace_text",
+      "box": [560, 950, 1637, 1002],
+      "fill": [255, 249, 240],
+      "position": [585, 961],
+      "text": "追溯链保留缺口    当前角色仅能查看监控摘要，命令与审计详情未扩权。",
+      "font_path": "C:\\Windows\\Fonts\\msyh.ttc",
+      "font_sha256": "e4b3b9d058750fb80899c24f68e35beda606ca92694eff0e9f7f91eec7a846aa",
+      "font_size": 14,
+      "text_fill": [106, 71, 18],
+      "purpose": "Restore the distinct trace-gap heading and exact read-only explanation."
+    },
+    {
+      "type": "replace_text",
+      "box": [560, 1010, 1637, 1062],
+      "fill": [255, 249, 240],
+      "position": [585, 1021],
+      "text": "远程图像未上传    工作站当前只同步结果摘要，现场图像不可查看。图像上传范围、留存和加密策略尚未配置。",
+      "font_path": "C:\\Windows\\Fonts\\msyh.ttc",
+      "font_sha256": "e4b3b9d058750fb80899c24f68e35beda606ca92694eff0e9f7f91eec7a846aa",
+      "font_size": 13,
+      "text_fill": [106, 71, 18],
+      "purpose": "Restore the distinct remote-image heading and exact current explanation."
+    }
+  ]
+}

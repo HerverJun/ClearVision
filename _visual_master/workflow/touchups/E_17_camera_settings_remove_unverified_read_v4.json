@@ -1,0 +1,15 @@
+{
+  "schema_version": "clearvision-controlled-picture-layer-touchup.v1",
+  "entry_id": "E_17_camera_settings",
+  "source_iteration": "option_E/iterations/17_camera_settings_v11.png",
+  "source_sha256": "d4cceb20fcb6d6c18229555b3e7dfa921c5be4bb7144afc83671b337aefaeff6",
+  "purpose": "Remove the unverified discovery-status badge while preserving the audited E17 composition and every confirmed camera control.",
+  "operations": [
+    {
+      "type": "copy_rect",
+      "source_box": [1210, 140, 1310, 190],
+      "box": [1325, 140, 1425, 190],
+      "purpose": "Replace only the unsupported status badge with adjacent neutral panel background from the same immutable source image."
+    }
+  ]
+}

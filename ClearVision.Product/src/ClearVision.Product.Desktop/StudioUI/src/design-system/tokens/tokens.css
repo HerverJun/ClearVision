@@ -113,6 +113,15 @@
   --cv-space-10: 40px;
   --cv-space-12: 48px;
 
+  /* Shared stroke and fixed-format geometry. */
+  --cv-border-width-thin: 1px;
+  --cv-focus-ring-width: 2px;
+  --cv-focus-ring-offset: 2px;
+  --cv-scrollbar-size: 8px;
+  --cv-scrollbar-thumb-inset: 2px;
+  --cv-content-measure-sm: 760px;
+  --cv-layout-label-column-min: 140px;
+
   /* Radius */
   --cv-radius-xs: 3px;
   --cv-radius-sm: 5px;
@@ -174,10 +183,21 @@
      Flow/Project authority is stored in the design system. */
   --cv-workspace-toolbar-height: 38px;
   --cv-workspace-status-height: 22px;
-  --cv-workspace-product-rail-width: 56px;
+  --cv-workspace-product-rail-width: 100px;
   --cv-workspace-operator-rail-width: 68px;
-  --cv-workspace-topbar-height: 46px;
-  --cv-product-topbar-height: 52px;
+  --cv-workspace-topbar-height: 69px;
+  --cv-product-topbar-height: 74px;
+  --cv-product-rail-topbar-height: 84px;
+  --cv-product-rail-width: var(--cv-workspace-product-rail-width);
+  --cv-product-rail-light-surface: #f9fafc;
+  --cv-product-rail-light-border: #d8dee5;
+  --cv-product-rail-dark-surface: #0a1422;
+  --cv-product-rail-dark-border: rgba(255, 255, 255, 0.09);
+  --cv-product-rail-dark-text: #f4f7fa;
+  --cv-product-rail-dark-muted: #b9c2cc;
+  --cv-product-rail-dark-hover: rgba(255, 255, 255, 0.07);
+  --cv-product-rail-dark-active: rgba(182, 69, 60, 0.18);
+  --cv-product-rail-dark-active-text: #ff8b80;
   --cv-page-max-width: 1720px;
 
   /* Light surfaces */
@@ -195,6 +215,7 @@
   --cv-surface-section: transparent;
   --cv-surface-card: var(--cv-surface-raised);
   --cv-surface-tool: #f2f4f6;
+  --cv-auth-shell-surface: #f8fafc;
   --cv-text-primary: #191c20;
   --cv-text-secondary: #4a525b;
   --cv-text-muted: #656e78;
@@ -208,7 +229,7 @@
   --cv-interactive-active: rgba(22, 111, 159, 0.13);
   --cv-backdrop: rgba(18, 23, 29, 0.54);
   --cv-focus-ring-color: #0f628e;
-  --cv-focus-ring: 0 0 0 2px var(--cv-focus-ring-color);
+  --cv-focus-ring: 0 0 0 var(--cv-focus-ring-width) var(--cv-focus-ring-color);
   --cv-selection-background: #d9eaf3;
   --cv-selection-text: #171b20;
   --cv-scrollbar-track: transparent;
@@ -332,6 +353,7 @@ html[data-theme="dark"] {
   --cv-surface-canvas: #0a1019;
   --cv-surface-image-canvas: #0a1019;
   --cv-surface-tool: #191c20;
+  --cv-auth-shell-surface: var(--cv-surface-page);
   --cv-text-primary: #f5f6f7;
   --cv-text-secondary: #c0c4ca;
   --cv-text-muted: #9ba2aa;
@@ -345,7 +367,7 @@ html[data-theme="dark"] {
   --cv-interactive-active: rgba(82, 161, 205, 0.17);
   --cv-backdrop: rgba(3, 5, 4, 0.76);
   --cv-focus-ring-color: #9fd1eb;
-  --cv-focus-ring: 0 0 0 2px var(--cv-focus-ring-color);
+  --cv-focus-ring: 0 0 0 var(--cv-focus-ring-width) var(--cv-focus-ring-color);
   --cv-selection-background: #234d66;
   --cv-selection-text: #ffffff;
   --cv-scrollbar-track: transparent;
@@ -412,10 +434,11 @@ html[data-density="comfortable"] {
   --cv-density-toolbar-height: 44px;
   --cv-workspace-toolbar-height: 44px;
   --cv-workspace-status-height: 24px;
-  --cv-workspace-product-rail-width: 60px;
+  --cv-workspace-product-rail-width: 100px;
   --cv-workspace-operator-rail-width: 72px;
-  --cv-workspace-topbar-height: 52px;
-  --cv-product-topbar-height: 56px;
+  --cv-workspace-topbar-height: 73px;
+  --cv-product-topbar-height: 78px;
+  --cv-product-rail-topbar-height: 88px;
 }
 
 html[data-reduced-motion="true"] {

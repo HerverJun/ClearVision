@@ -1,0 +1,120 @@
+{
+  "schemaVersion": "r2-final-matrix-capture.v1",
+  "scene": "S01",
+  "variant": "EXCEPTION",
+  "route": "#/overview",
+  "state": "recent-projects-forbidden",
+  "role": "Engineer",
+  "flags": {},
+  "owner": {
+    "capability": "F02-overview",
+    "mounted": 1,
+    "subscriptions": 0,
+    "writes": 0
+  },
+  "requests": [
+    "GET /api/auth/setup-status",
+    "GET /api/auth/me",
+    "GET /health",
+    "GET /api/projects/recent"
+  ],
+  "runtimeRequests": [
+    {
+      "method": "GET",
+      "path": "/api/auth/setup-status",
+      "url": "http://127.0.0.1:5421/api/auth/setup-status"
+    },
+    {
+      "method": "GET",
+      "path": "/api/auth/me",
+      "url": "http://127.0.0.1:5421/api/auth/me"
+    },
+    {
+      "method": "GET",
+      "path": "/health",
+      "url": "http://127.0.0.1:5421/health"
+    },
+    {
+      "method": "GET",
+      "path": "/api/projects/recent",
+      "url": "http://127.0.0.1:5421/api/projects/recent?count=5"
+    }
+  ],
+  "allowedWrites": [],
+  "runtime": {
+    "consoleErrors": [],
+    "pageErrors": [],
+    "failedRequests": [],
+    "httpErrors": [],
+    "expectedHttpErrors": [
+      "GET /api/projects/recent: 403"
+    ],
+    "observedExpectedHttpErrors": [
+      "GET /api/projects/recent: 403"
+    ],
+    "unexpectedWrites": []
+  },
+  "requiredCriticalActions": [
+    ".overview-page__quick-links a[href=\"#/projects\"]"
+  ],
+  "motion": {
+    "layoutShifts": [],
+    "longTasks": [
+      {
+        "startTime": 71.10000002384186,
+        "duration": 65
+      }
+    ]
+  },
+  "notes": [],
+  "dom": {
+    "url": "http://127.0.0.1:5421/studio/index.html#/overview",
+    "viewport": {
+      "width": 1366,
+      "height": 768,
+      "dpr": 1
+    },
+    "theme": "light",
+    "density": "compact",
+    "reducedMotion": "false",
+    "focus": {
+      "tagName": "BUTTON",
+      "id": "",
+      "testId": null
+    },
+    "landmarks": {
+      "main": 1,
+      "nav": 2,
+      "dialogs": 0
+    },
+    "mainBox": {
+      "x": 0,
+      "y": 52,
+      "width": 1366,
+      "height": 716
+    },
+    "horizontalOverflow": 0,
+    "pageScroll": {
+      "x": 0,
+      "y": 0
+    },
+    "criticalActions": [
+      {
+        "selector": ".overview-page__quick-links a[href=\"#/projects\"]",
+        "testId": null,
+        "text": "工程配置流程与工程资产",
+        "box": {
+          "x": 962.03125,
+          "y": 425.390625,
+          "width": 379.96875,
+          "height": 56.5
+        },
+        "truncated": false,
+        "inViewport": true,
+        "reachable": true,
+        "enabled": true,
+        "unobscured": true
+      }
+    ]
+  }
+}

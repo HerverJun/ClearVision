@@ -1,0 +1,33 @@
+{
+  "schema_version": "clearvision-controlled-picture-layer-touchup.v1",
+  "entry_id": "D_10_stations_list",
+  "source_iteration": "option_D/iterations/10_stations_list_v8.png",
+  "source_sha256": "b70b83cbc67c991c53cb56df837882dce7353761f73818eefa80288f66c2bb31",
+  "purpose": "Keep the corrected Station list and repair only the Product Shell catalog label and exact CURRENT diagnostic fact.",
+  "operations": [
+    {
+      "type": "replace_text",
+      "box": [768, 10, 869, 65],
+      "fill": [254, 254, 254],
+      "position": [781, 24],
+      "text": "算子库",
+      "font_path": "C:\\Windows\\Fonts\\msyh.ttc",
+      "font_sha256": "e4b3b9d058750fb80899c24f68e35beda606ca92694eff0e9f7f91eec7a846aa",
+      "font_size": 17,
+      "text_fill": [45, 57, 70],
+      "purpose": "Restore the exact Product Shell catalog label."
+    },
+    {
+      "type": "replace_text",
+      "box": [70, 724, 330, 765],
+      "fill": [254, 254, 254],
+      "position": [75, 733],
+      "text": "线序错误 · WIRE_SWAP",
+      "font_path": "C:\\Windows\\Fonts\\msyh.ttc",
+      "font_sha256": "e4b3b9d058750fb80899c24f68e35beda606ca92694eff0e9f7f91eec7a846aa",
+      "font_size": 14,
+      "text_fill": [184, 91, 22],
+      "purpose": "Restore the exact CURRENT diagnostic label and code."
+    }
+  ]
+}

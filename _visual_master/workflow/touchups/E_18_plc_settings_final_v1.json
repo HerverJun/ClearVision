@@ -1,0 +1,45 @@
+{
+  "schema_version": "clearvision-controlled-picture-layer-touchup.v1",
+  "entry_id": "E_18_plc_settings",
+  "source_iteration": "option_E/iterations/18_plc_settings_v3.png",
+  "source_sha256": "140c5a00014de9c73a8b42989ec9e0ed041fb2b00dcfa1c5e247196084b60a26",
+  "purpose": "Preserve the truthful PLC v3 sheet and correct only the CURRENT mapping helper plus the two visible save states.",
+  "operations": [
+    {
+      "type": "replace_text",
+      "box": [372, 870, 1510, 910],
+      "fill": [254, 254, 255],
+      "position": [378, 881],
+      "text": "映射保存只作用于当前协议；切换协议不会读取或覆盖其他协议草稿。",
+      "font_path": "C:\\Windows\\Fonts\\msyh.ttc",
+      "font_sha256": "e4b3b9d058750fb80899c24f68e35beda606ca92694eff0e9f7f91eec7a846aa",
+      "font_size": 14,
+      "text_fill": [77, 87, 97],
+      "purpose": "Restore the exact CURRENT mapping-scope copy."
+    },
+    {
+      "type": "replace_text",
+      "box": [1818, 730, 1994, 777],
+      "fill": [28, 126, 184],
+      "position": [1837, 742],
+      "text": "保存协议设置",
+      "font_path": "C:\\Windows\\Fonts\\msyhbd.ttc",
+      "font_sha256": "06e1a30f687ab7d39f533447b21e84d51e0cecdaa6bfa060c87136b168811bdc",
+      "font_size": 15,
+      "text_fill": [255, 255, 255],
+      "purpose": "Match the enabled save-protocol state visible in CURRENT without changing its save scope."
+    },
+    {
+      "type": "replace_text",
+      "box": [1818, 1067, 1994, 1114],
+      "fill": [28, 126, 184],
+      "position": [1837, 1079],
+      "text": "保存当前映射",
+      "font_path": "C:\\Windows\\Fonts\\msyhbd.ttc",
+      "font_sha256": "06e1a30f687ab7d39f533447b21e84d51e0cecdaa6bfa060c87136b168811bdc",
+      "font_size": 15,
+      "text_fill": [255, 255, 255],
+      "purpose": "Match the enabled save-mapping state visible in CURRENT without merging save boundaries."
+    }
+  ]
+}

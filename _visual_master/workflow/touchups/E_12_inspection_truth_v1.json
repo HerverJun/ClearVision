@@ -1,0 +1,81 @@
+{
+  "schema_version": "clearvision-controlled-picture-layer-touchup.v1",
+  "entry_id": "E_12_inspection",
+  "source_iteration": "option_E/iterations/12_inspection_v1.png",
+  "source_sha256": "9acbd6cc81746b867a494d994e70872e04b7175c763b3c8c33c0e9bf94632d15",
+  "purpose": "Preserve the Option E continuous-inspection composition while restoring CURRENT project and preflight facts.",
+  "operations": [
+    {
+      "type": "replace_text",
+      "box": [50, 171, 850, 218],
+      "fill": [253, 253, 253],
+      "position": [50, 180],
+      "text": "在线瓶盖检测 · 保存修订 12",
+      "font_path": "C:\\Windows\\Fonts\\msyh.ttc",
+      "font_sha256": "e4b3b9d058750fb80899c24f68e35beda606ca92694eff0e9f7f91eec7a846aa",
+      "font_size": 18,
+      "text_fill": [77, 87, 98],
+      "purpose": "Restore the exact CURRENT project subtitle."
+    },
+    {
+      "type": "replace_text",
+      "box": [720, 714, 1160, 744],
+      "fill": [253, 253, 253],
+      "position": [722, 718],
+      "text": "未返回参数阻断",
+      "font_path": "C:\\Windows\\Fonts\\msyh.ttc",
+      "font_sha256": "e4b3b9d058750fb80899c24f68e35beda606ca92694eff0e9f7f91eec7a846aa",
+      "font_size": 14,
+      "text_fill": [86, 96, 106],
+      "purpose": "Restore the verified preflight result."
+    },
+    {
+      "type": "replace_text",
+      "box": [720, 787, 1160, 818],
+      "fill": [253, 253, 253],
+      "position": [722, 791],
+      "text": "未返回资源阻断",
+      "font_path": "C:\\Windows\\Fonts\\msyh.ttc",
+      "font_sha256": "e4b3b9d058750fb80899c24f68e35beda606ca92694eff0e9f7f91eec7a846aa",
+      "font_size": 14,
+      "text_fill": [86, 96, 106],
+      "purpose": "Restore the verified resource preflight result."
+    },
+    {
+      "type": "replace_text",
+      "box": [720, 837, 1160, 869],
+      "fill": [253, 253, 253],
+      "position": [722, 841],
+      "text": "最终判定",
+      "font_path": "C:\\Windows\\Fonts\\msyhbd.ttc",
+      "font_sha256": "06e1a30f687ab7d39f533447b21e84d51e0cecdaa6bfa060c87136b168811bdc",
+      "font_size": 16,
+      "text_fill": [32, 40, 48],
+      "purpose": "Restore the existing final-judgment preflight check."
+    },
+    {
+      "type": "replace_text",
+      "box": [720, 869, 1160, 900],
+      "fill": [253, 253, 253],
+      "position": [722, 873],
+      "text": "未返回判定阻断",
+      "font_path": "C:\\Windows\\Fonts\\msyh.ttc",
+      "font_sha256": "e4b3b9d058750fb80899c24f68e35beda606ca92694eff0e9f7f91eec7a846aa",
+      "font_size": 14,
+      "text_fill": [86, 96, 106],
+      "purpose": "Restore the verified final-judgment preflight result."
+    },
+    {
+      "type": "replace_text",
+      "box": [720, 911, 1110, 944],
+      "fill": [253, 253, 253],
+      "position": [722, 916],
+      "text": "采集设备",
+      "font_path": "C:\\Windows\\Fonts\\msyhbd.ttc",
+      "font_sha256": "06e1a30f687ab7d39f533447b21e84d51e0cecdaa6bfa060c87136b168811bdc",
+      "font_size": 16,
+      "text_fill": [32, 40, 48],
+      "purpose": "Restore the verified acquisition-device check name."
+    }
+  ]
+}

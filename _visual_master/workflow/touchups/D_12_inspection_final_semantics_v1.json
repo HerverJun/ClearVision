@@ -1,0 +1,33 @@
+{
+  "schema_version": "clearvision-controlled-picture-layer-touchup.v1",
+  "entry_id": "D_12_inspection",
+  "source_iteration": "option_D/iterations/12_inspection_v_final_semantics_source_4k.png",
+  "source_sha256": "48eedeb9a4eadcf3b96b9ac3eb39099cf852141e09be31f7f1ccdf9f13ee9565",
+  "purpose": "Preserve the exact gpt-image-2 4K Inspection composition and CURRENT recovery scenario while correcting only semantic state colors: recovery is amber and active continuous inspection is action blue, never success green.",
+  "operations": [
+    {
+      "type": "replace_text",
+      "box": [170, 452, 204, 486],
+      "fill": [254, 254, 254],
+      "position": [171, 449],
+      "text": "●",
+      "font_path": "C:\\Windows\\Fonts\\msyh.ttc",
+      "font_sha256": "e4b3b9d058750fb80899c24f68e35beda606ca92694eff0e9f7f91eec7a846aa",
+      "font_size": 30,
+      "text_fill": [155, 106, 19],
+      "purpose": "Use the frozen amber recovery role for 实时恢复中."
+    },
+    {
+      "type": "replace_text",
+      "box": [155, 1468, 195, 1508],
+      "fill": [254, 254, 254],
+      "position": [157, 1465],
+      "text": "●",
+      "font_path": "C:\\Windows\\Fonts\\msyh.ttc",
+      "font_sha256": "e4b3b9d058750fb80899c24f68e35beda606ca92694eff0e9f7f91eec7a846aa",
+      "font_size": 34,
+      "text_fill": [22, 111, 159],
+      "purpose": "Use the frozen running/action role for 连续检测已启动 instead of success green."
+    }
+  ]
+}

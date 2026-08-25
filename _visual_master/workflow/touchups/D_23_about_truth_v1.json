@@ -1,0 +1,39 @@
+{
+  "schema_version": "clearvision-controlled-picture-layer-touchup.v1",
+  "entry_id": "D_23_about",
+  "source_iteration": "option_D/iterations/23_about_v3.png",
+  "source_sha256": "ad6a6d542886f9f48b18866d93f90488047bc7eb0fb87b514c690073c2879d0a",
+  "purpose": "Restore the product brand lockup and remove the invented primary About navigation entry.",
+  "operations": [
+    {
+      "type": "replace_text",
+      "box": [91, 18, 218, 76],
+      "fill": [255, 255, 255],
+      "position": [94, 29],
+      "text": "ClearVision",
+      "font_path": "C:\\Windows\\Fonts\\msyhbd.ttc",
+      "font_sha256": "06e1a30f687ab7d39f533447b21e84d51e0cecdaa6bfa060c87136b168811bdc",
+      "font_size": 22,
+      "text_fill": [24, 31, 39],
+      "purpose": "Restore the verified ClearVision brand name."
+    },
+    {
+      "type": "replace_text",
+      "box": [218, 18, 322, 76],
+      "fill": [255, 255, 255],
+      "position": [224, 34],
+      "text": "STUDIO",
+      "font_path": "C:\\Windows\\Fonts\\msyh.ttc",
+      "font_sha256": "e4b3b9d058750fb80899c24f68e35beda606ca92694eff0e9f7f91eec7a846aa",
+      "font_size": 16,
+      "text_fill": [91, 105, 120],
+      "purpose": "Restore the verified uppercase STUDIO descriptor."
+    },
+    {
+      "type": "fill_rect",
+      "box": [1683, 12, 1768, 96],
+      "fill": [255, 255, 255],
+      "purpose": "Remove the invented active About item; About remains reachable only from the existing More menu."
+    }
+  ]
+}

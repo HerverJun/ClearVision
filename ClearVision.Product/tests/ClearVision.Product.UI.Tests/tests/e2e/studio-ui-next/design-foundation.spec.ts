@@ -1,4 +1,8 @@
 import { expect, Page, test, TestInfo } from '@playwright/test';
+import {
+  installOptionDG1DeterministicFixture,
+  optionDG1DeterministicFixture
+} from './option-d-g1-deterministic-fixture';
 
 type Theme = 'light' | 'dark';
 type Density = 'compact' | 'comfortable';
@@ -10,47 +14,11 @@ async function bootDesignLab(page: Page): Promise<string[]> {
     if (message.type() === 'error') runtimeErrors.push(message.text());
   });
 
-  await page.route('**/health', route => route.fulfill({
-    status: 200,
-    contentType: 'application/json',
-    headers: { 'x-clearvision-data-source': 'BROWSER_FIXTURE' },
-    body: JSON.stringify({ status: 'Healthy', port: 5177 })
-  }));
-  await page.route('**/api/auth/me', route => route.fulfill({
-    status: 200,
-    contentType: 'application/json',
-    headers: { 'x-clearvision-data-source': 'BROWSER_FIXTURE' },
-    body: JSON.stringify({ userId: 'design-lab-user', username: 'design-lab', role: 'Engineer' })
-  }));
-  await page.route('**/api/auth/setup-status', route => route.fulfill({
-    status: 200,
-    contentType: 'application/json',
-    headers: { 'x-clearvision-data-source': 'BROWSER_FIXTURE' },
-    body: JSON.stringify({ requiresInitialAdminSetup: false, usernameMinLength: 3, passwordMinLength: 6, requiresUppercase: false, requiresLowercase: false, requiresDigit: false })
-  }));
-
-  await page.addInitScript(() => {
-    sessionStorage.setItem('cv_auth_token', 'design-lab-browser-fixture-token');
-    sessionStorage.setItem('cv_current_user', 'design-lab-user');
-    const startup = Object.freeze({
-      schemaVersion: 1,
-      uiKind: 'studio-ui',
-      hostKind: 'browser-test',
-      apiBaseUrl: `${window.location.origin}/api`,
-      studioUiBasePath: '/studio/',
-      startupProfile: 'NEXT_DEFAULT',
-      profileAllowedRoles: Object.freeze(['Admin', 'Engineer', 'Operator']),
-      featureFlags: Object.freeze({})
-    });
-    Object.defineProperty(window, '__CLEARVISION_STARTUP__', {
-      value: startup,
-      writable: false,
-      configurable: false
-    });
-  });
+  await installOptionDG1DeterministicFixture(page);
 
   await page.goto('/studio/index.html#/labs/design');
   await expect(page.locator('[data-design-lab="ready"]')).toBeVisible();
+  await expect(page.locator(`[data-design-fixture="${optionDG1DeterministicFixture.id}"]`)).toHaveCount(1);
   return runtimeErrors;
 }
 
@@ -79,7 +47,7 @@ test('Design Lab exposes themes, density and separated industrial status colors'
   const runtimeErrors = await bootDesignLab(page);
   const root = page.locator('html');
   await expect(root).toHaveAttribute('data-theme', 'light');
-  await expect(root).toHaveAttribute('data-density', 'comfortable');
+  await expect(root).toHaveAttribute('data-density', 'compact');
   await expect(root).toHaveAttribute('data-reduced-motion', 'false');
 
   await setTheme(page, 'dark');
@@ -191,7 +159,15 @@ test('Reduced-motion preference removes design motion durations', async ({ page 
   expect(['0ms', '0s']).toContain(mediaDuration);
 
   const reducedMotionToggle = page.locator('[data-design-reduced-motion]');
-  await page.locator('label:has([data-design-reduced-motion])').click();
+  await expect(reducedMotionToggle).toBeChecked();
+  await expect(page.locator('html')).toHaveAttribute('data-reduced-motion', 'true');
+  const reducedMotionLabel = page.locator(
+    'label:has([data-design-reduced-motion]) .cv-toggle__label'
+  );
+  await reducedMotionLabel.click();
+  await expect(reducedMotionToggle).not.toBeChecked();
+  await expect(page.locator('html')).toHaveAttribute('data-reduced-motion', 'false');
+  await reducedMotionLabel.click();
   await expect(reducedMotionToggle).toBeChecked();
   await expect(page.locator('html')).toHaveAttribute('data-reduced-motion', 'true');
   const explicitDuration = await page.locator('html').evaluate(element =>

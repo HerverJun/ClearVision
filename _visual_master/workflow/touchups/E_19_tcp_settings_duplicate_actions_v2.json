@@ -1,0 +1,15 @@
+{
+  "schema_version": "clearvision-controlled-picture-layer-touchup.v1",
+  "entry_id": "E_19_tcp_settings",
+  "source_iteration": "option_E/iterations/19_tcp_settings_v2.png",
+  "source_sha256": "86d25a8ad0bb121c6fb8f4fc7465954a875bda41eddab50211aa31ca192377e0",
+  "purpose": "Remove only generated duplicate profile actions while preserving the rail's original vertical surface texture.",
+  "operations": [
+    {
+      "type": "copy_resize",
+      "box": [300, 900, 514, 1018],
+      "source_box": [292, 900, 297, 1018],
+      "purpose": "Stretch a clean same-height rail-margin sample across the duplicate actions so the native vertical texture remains continuous."
+    }
+  ]
+}

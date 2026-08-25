@@ -1,0 +1,43 @@
+{
+  "schema_version": "clearvision-controlled-picture-layer-touchup.v1",
+  "entry_id": "D_11_station_detail",
+  "source_iteration": "option_D/iterations/11_station_detail_v21.png",
+  "source_sha256": "7e2464e736b5a75f14f89e4e08ed7460021e3a9c811fa7fd8ce6de589542371d",
+  "purpose": "Match the corrected D10 Station shell and utility cluster exactly, then remove only the misplaced page-header trace action while preserving the authoritative result-row trace link.",
+  "operations": [
+    {
+      "type": "paste_option_candidate_reference",
+      "reference_path": "option_D/screens/10_stations_list.png",
+      "reference_sha256": "939080aed9eaa4102702e5da3ccbe2e9f1b9f18cd8ca6184cfc6c6c228b374eb",
+      "source_box": [
+        0,
+        0,
+        3839,
+        147
+      ],
+      "box": [
+        0,
+        0,
+        3839,
+        147
+      ],
+      "purpose": "Lock the Station detail top shell, cinnabar navigation treatment, utility ordering, density, and 147-pixel header boundary to corrected D10."
+    },
+    {
+      "type": "copy_rect",
+      "source_box": [
+        2500,
+        380,
+        2769,
+        495
+      ],
+      "box": [
+        3570,
+        380,
+        3839,
+        495
+      ],
+      "purpose": "Cover the header-only trace button with the adjacent page background without touching the warning band or the row-scoped trace link."
+    }
+  ]
+}

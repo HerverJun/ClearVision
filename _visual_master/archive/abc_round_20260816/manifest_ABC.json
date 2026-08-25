@@ -1,0 +1,1248 @@
+{
+  "schema_version": "clearvision-ui-visual-options-delivery.v2",
+  "generated_at": "2026-08-15T21:31:09.881319Z",
+  "approval_status": "awaiting-product-owner-selection",
+  "model": "gpt-image-2",
+  "model_fallback_used": false,
+  "screen_count": 24,
+  "option_count": 3,
+  "entry_count": 72,
+  "identical_coverage": true,
+  "functional_audit": "passed-for-all-entries",
+  "copy_and_data_policy": "Generated copy and data are not product authority.",
+  "status_counts": {
+    "Approved-Candidate": 9,
+    "Failed": 0,
+    "Generated": 63,
+    "Needs-Manual": 0,
+    "Pending": 0
+  },
+  "masters": {
+    "A": [
+      "option_A/masters/05_flow_editor.png",
+      "option_A/masters/13_ai_workspace.png",
+      "option_A/masters/16_system_settings.png"
+    ],
+    "B": [
+      "option_B/masters/05_flow_editor.png",
+      "option_B/masters/13_ai_workspace.png",
+      "option_B/masters/16_system_settings.png"
+    ],
+    "C": [
+      "option_C/masters/05_flow_editor.png",
+      "option_C/masters/13_ai_workspace.png",
+      "option_C/masters/16_system_settings.png"
+    ]
+  },
+  "screens": [
+    {
+      "screen_id": "01_login",
+      "filename": "01_login.png",
+      "page_name": "Login",
+      "purpose": "Public authentication and session recovery",
+      "current_reference": "current/r2/S00-B0.png",
+      "current_sha256": "f996cade157d3766a1e8d32f10c1eb1e970c4b4eeade317dd5658dc0352bf89d",
+      "comparison": "audit/comparison/01_login.png",
+      "options": {
+        "A": {
+          "file": "option_A/screens/01_login.png",
+          "sha256": "1a77d4647839b15261a0414acaa93054df91a3c26d4133cd08aa2d13e25ae2ec",
+          "dimensions": {
+            "width": 1672,
+            "height": 941
+          },
+          "status": "Generated",
+          "master_references": [
+            "option_A/masters/16_system_settings.png"
+          ],
+          "functional_audit": "passed"
+        },
+        "B": {
+          "file": "option_B/screens/01_login.png",
+          "sha256": "5016a94d82a4cc70a1b5ac887885ed926907fc0db4379d4038199d1b86de2b5c",
+          "dimensions": {
+            "width": 1672,
+            "height": 941
+          },
+          "status": "Generated",
+          "master_references": [
+            "option_B/masters/16_system_settings.png"
+          ],
+          "functional_audit": "passed"
+        },
+        "C": {
+          "file": "option_C/screens/01_login.png",
+          "sha256": "a0946f298812bc0dc60c3d94ebd62d9dde1fa7ca6bf409298c99f6e19139bfd4",
+          "dimensions": {
+            "width": 1672,
+            "height": 941
+          },
+          "status": "Generated",
+          "master_references": [
+            "option_C/masters/16_system_settings.png"
+          ],
+          "functional_audit": "passed"
+        }
+      }
+    },
+    {
+      "screen_id": "02_overview",
+      "filename": "02_overview.png",
+      "page_name": "Overview",
+      "purpose": "System and recent-project operational overview",
+      "current_reference": "current/r2/S01-B0.png",
+      "current_sha256": "8e2eb2bd3cefdc82aa221b3ae1847c133470307b8b2270293e0b425b3b9d0f4c",
+      "comparison": "audit/comparison/02_overview.png",
+      "options": {
+        "A": {
+          "file": "option_A/screens/02_overview.png",
+          "sha256": "24c700c9517640e0a01947874744b2496050d717fbde0c60d55b4342476b4cde",
+          "dimensions": {
+            "width": 1672,
+            "height": 941
+          },
+          "status": "Generated",
+          "master_references": [
+            "option_A/masters/16_system_settings.png"
+          ],
+          "functional_audit": "passed"
+        },
+        "B": {
+          "file": "option_B/screens/02_overview.png",
+          "sha256": "a98045b95c4cfaf42ebe48742d253b271fdb045cd6ef0eaeb6f4606bcaab5591",
+          "dimensions": {
+            "width": 1672,
+            "height": 941
+          },
+          "status": "Generated",
+          "master_references": [
+            "option_B/masters/16_system_settings.png"
+          ],
+          "functional_audit": "passed"
+        },
+        "C": {
+          "file": "option_C/screens/02_overview.png",
+          "sha256": "42115d66e12a5cd86e1069e43278fd0bd0b8213353c34d2983e07b49dbdb390f",
+          "dimensions": {
+            "width": 1672,
+            "height": 941
+          },
+          "status": "Generated",
+          "master_references": [
+            "option_C/masters/16_system_settings.png"
+          ],
+          "functional_audit": "passed"
+        }
+      }
+    },
+    {
+      "screen_id": "03_projects_data",
+      "filename": "03_projects_data.png",
+      "page_name": "Projects - Data",
+      "purpose": "Populated project discovery and lifecycle entry",
+      "current_reference": "current/r2/S02-B0.png",
+      "current_sha256": "45f6d40a397bcf0eeb08e05787036380289b344c7d75d4a3083a7d4388dfb691",
+      "comparison": "audit/comparison/03_projects_data.png",
+      "options": {
+        "A": {
+          "file": "option_A/screens/03_projects_data.png",
+          "sha256": "53911e2739e19986af109f1d45fe217dd650542c192b82e877a22d6c23027cef",
+          "dimensions": {
+            "width": 1672,
+            "height": 941
+          },
+          "status": "Generated",
+          "master_references": [
+            "option_A/masters/16_system_settings.png"
+          ],
+          "functional_audit": "passed"
+        },
+        "B": {
+          "file": "option_B/screens/03_projects_data.png",
+          "sha256": "663736b6d49f459ca04e6d7a031836e90700a0c78d34163046681b29b669c6af",
+          "dimensions": {
+            "width": 1672,
+            "height": 941
+          },
+          "status": "Generated",
+          "master_references": [
+            "option_B/masters/16_system_settings.png"
+          ],
+          "functional_audit": "passed"
+        },
+        "C": {
+          "file": "option_C/screens/03_projects_data.png",
+          "sha256": "1b125e78404d102eef07e92adfcd5e782e27c119011b499681c30c39527579bc",
+          "dimensions": {
+            "width": 1672,
+            "height": 941
+          },
+          "status": "Generated",
+          "master_references": [
+            "option_C/masters/16_system_settings.png"
+          ],
+          "functional_audit": "passed"
+        }
+      }
+    },
+    {
+      "screen_id": "04_projects_empty",
+      "filename": "04_projects_empty.png",
+      "page_name": "Projects - Empty",
+      "purpose": "Project library empty state",
+      "current_reference": "current/r2/S02-EMPTY.png",
+      "current_sha256": "4af62b9df4f3b1a7b75dac46a58d1e4f5695aa9607e41a7e06d90f81527de8e3",
+      "comparison": "audit/comparison/04_projects_empty.png",
+      "options": {
+        "A": {
+          "file": "option_A/screens/04_projects_empty.png",
+          "sha256": "2c3a4af81c775b24f9a92d6e0115751d2d310f5e488e576fa80222c6e67a3074",
+          "dimensions": {
+            "width": 1672,
+            "height": 941
+          },
+          "status": "Generated",
+          "master_references": [
+            "option_A/masters/16_system_settings.png"
+          ],
+          "functional_audit": "passed"
+        },
+        "B": {
+          "file": "option_B/screens/04_projects_empty.png",
+          "sha256": "762a4471ceecca1dc6b23d3013fb6be41da607446f55d04ea7e9611624b910b5",
+          "dimensions": {
+            "width": 1672,
+            "height": 941
+          },
+          "status": "Generated",
+          "master_references": [
+            "option_B/masters/16_system_settings.png"
+          ],
+          "functional_audit": "passed"
+        },
+        "C": {
+          "file": "option_C/screens/04_projects_empty.png",
+          "sha256": "29cb552db3d8eca23eb23d7b20010acf3537e1aeb822c0a7805dc1ab46fc514e",
+          "dimensions": {
+            "width": 1672,
+            "height": 941
+          },
+          "status": "Generated",
+          "master_references": [
+            "option_C/masters/16_system_settings.png"
+          ],
+          "functional_audit": "passed"
+        }
+      }
+    },
+    {
+      "screen_id": "05_flow_editor",
+      "filename": "05_flow_editor.png",
+      "page_name": "Flow Editor",
+      "purpose": "Core Flow editor with selected-node Inspector",
+      "current_reference": "current/r2/S04-B0.png",
+      "current_sha256": "3a90f94f768d25e062eafcbcfeec33b7619e286173ef7514ab36c7151a3a2182",
+      "comparison": "audit/comparison/05_flow_editor.png",
+      "options": {
+        "A": {
+          "file": "option_A/screens/05_flow_editor.png",
+          "sha256": "38827bdacfc7260f23d4b442d4f999d4f3e5ad61318d6db19bceef6d40aefe1c",
+          "dimensions": {
+            "width": 1672,
+            "height": 941
+          },
+          "status": "Approved-Candidate",
+          "master_references": [],
+          "functional_audit": "passed"
+        },
+        "B": {
+          "file": "option_B/screens/05_flow_editor.png",
+          "sha256": "48e8ec1aad029bfdf8034dfe0a214c4cdb9a371fa10781472b03273326b8769d",
+          "dimensions": {
+            "width": 1672,
+            "height": 941
+          },
+          "status": "Approved-Candidate",
+          "master_references": [],
+          "functional_audit": "passed"
+        },
+        "C": {
+          "file": "option_C/screens/05_flow_editor.png",
+          "sha256": "c9d402c40ef8e89a7dd636b54b0a55ac16dfa9ee9ea6bf04bc769fd79661094c",
+          "dimensions": {
+            "width": 1672,
+            "height": 941
+          },
+          "status": "Approved-Candidate",
+          "master_references": [],
+          "functional_audit": "passed"
+        }
+      }
+    },
+    {
+      "screen_id": "06_flow_validation_error",
+      "filename": "06_flow_validation_error.png",
+      "page_name": "Flow Validation Error",
+      "purpose": "Selected-node parameter validation state",
+      "current_reference": "current/r2/S04-B2.png",
+      "current_sha256": "72600c4e6a3bab65c3965b9aa0e8885befa2e874f832cd7678f3c31d51ecf9ea",
+      "comparison": "audit/comparison/06_flow_validation_error.png",
+      "options": {
+        "A": {
+          "file": "option_A/screens/06_flow_validation_error.png",
+          "sha256": "5cab33197201c839cfb768fcdeb58f8b89e9a0ef98521e455c83755b2b8c146a",
+          "dimensions": {
+            "width": 1672,
+            "height": 941
+          },
+          "status": "Generated",
+          "master_references": [
+            "option_A/masters/05_flow_editor.png"
+          ],
+          "functional_audit": "passed"
+        },
+        "B": {
+          "file": "option_B/screens/06_flow_validation_error.png",
+          "sha256": "d2688e2621a8bc9d082f1f68d5cb43e009d729460c03dfce365a3cfdcadcb47d",
+          "dimensions": {
+            "width": 1672,
+            "height": 941
+          },
+          "status": "Generated",
+          "master_references": [
+            "option_B/masters/05_flow_editor.png"
+          ],
+          "functional_audit": "passed"
+        },
+        "C": {
+          "file": "option_C/screens/06_flow_validation_error.png",
+          "sha256": "f9966b8e40d099b015704b881bd6b44fc95c9be62d5291276981aa5c550c2469",
+          "dimensions": {
+            "width": 1672,
+            "height": 941
+          },
+          "status": "Generated",
+          "master_references": [
+            "option_C/masters/05_flow_editor.png"
+          ],
+          "functional_audit": "passed"
+        }
+      }
+    },
+    {
+      "screen_id": "07_flow_preview_roi",
+      "filename": "07_flow_preview_roi.png",
+      "page_name": "Flow Preview and ROI",
+      "purpose": "Node Preview with ROI editing draft",
+      "current_reference": "current/r2/S05-B2.png",
+      "current_sha256": "df7b56d9d40d0582d394dd7a9b7633f5c045becd12879e541baf96d134ef0468",
+      "comparison": "audit/comparison/07_flow_preview_roi.png",
+      "options": {
+        "A": {
+          "file": "option_A/screens/07_flow_preview_roi.png",
+          "sha256": "ddacc3cc0963f9ad31111002a7c588ab54c7ac8e594863057b627f73aa677cff",
+          "dimensions": {
+            "width": 1672,
+            "height": 941
+          },
+          "status": "Generated",
+          "master_references": [
+            "option_A/masters/05_flow_editor.png"
+          ],
+          "functional_audit": "passed"
+        },
+        "B": {
+          "file": "option_B/screens/07_flow_preview_roi.png",
+          "sha256": "703215ad8557b5ef229139346426d5db5c1f0503f7a606d3c3454839ec346b64",
+          "dimensions": {
+            "width": 1672,
+            "height": 941
+          },
+          "status": "Generated",
+          "master_references": [
+            "option_B/masters/05_flow_editor.png"
+          ],
+          "functional_audit": "passed"
+        },
+        "C": {
+          "file": "option_C/screens/07_flow_preview_roi.png",
+          "sha256": "057aed0808c2fe295286779ce76c3d9c12fcfcecd2315ee625f6ac862fae58e5",
+          "dimensions": {
+            "width": 1672,
+            "height": 941
+          },
+          "status": "Generated",
+          "master_references": [
+            "option_C/masters/05_flow_editor.png"
+          ],
+          "functional_audit": "passed"
+        }
+      }
+    },
+    {
+      "screen_id": "08_run_ng_modal",
+      "filename": "08_run_ng_modal.png",
+      "page_name": "Run Details NG Modal",
+      "purpose": "Formal-run NG details overlay",
+      "current_reference": "current/r2/S06-B0.png",
+      "current_sha256": "844375b8065e158eaa052c79718a94c485aff3c4e2fb6c65f9908c040a92a8fe",
+      "comparison": "audit/comparison/08_run_ng_modal.png",
+      "options": {
+        "A": {
+          "file": "option_A/screens/08_run_ng_modal.png",
+          "sha256": "4998e6b19ecf9e8226b5b670336b1cc009c34d4c0b261365e24b23a1ef94acae",
+          "dimensions": {
+            "width": 1672,
+            "height": 941
+          },
+          "status": "Generated",
+          "master_references": [
+            "option_A/masters/05_flow_editor.png"
+          ],
+          "functional_audit": "passed"
+        },
+        "B": {
+          "file": "option_B/screens/08_run_ng_modal.png",
+          "sha256": "b23579b94d5fce89aed98178e2d8d7e53536aa2fcf94f24bec47210ebec85885",
+          "dimensions": {
+            "width": 1672,
+            "height": 941
+          },
+          "status": "Generated",
+          "master_references": [
+            "option_B/masters/05_flow_editor.png"
+          ],
+          "functional_audit": "passed"
+        },
+        "C": {
+          "file": "option_C/screens/08_run_ng_modal.png",
+          "sha256": "c7d6a4dc68ad1209c0581ef84276e9194b84244c59f2ef36660e0e8efdffd2b5",
+          "dimensions": {
+            "width": 1672,
+            "height": 941
+          },
+          "status": "Generated",
+          "master_references": [
+            "option_C/masters/05_flow_editor.png"
+          ],
+          "functional_audit": "passed"
+        }
+      }
+    },
+    {
+      "screen_id": "09_results_investigation",
+      "filename": "09_results_investigation.png",
+      "page_name": "Results Investigation",
+      "purpose": "NG-first inspection evidence review",
+      "current_reference": "current/r2/S07-B0.png",
+      "current_sha256": "fab2806f9ac2fe19be5958bb57af4e7e847c4087f5342c2a01ffe584d6406c6e",
+      "comparison": "audit/comparison/09_results_investigation.png",
+      "options": {
+        "A": {
+          "file": "option_A/screens/09_results_investigation.png",
+          "sha256": "572c2b0632744c07a0c06a72611a91cc4a26f734e14e4c520046eb63a0bef92e",
+          "dimensions": {
+            "width": 1672,
+            "height": 941
+          },
+          "status": "Generated",
+          "master_references": [
+            "option_A/masters/05_flow_editor.png",
+            "option_A/masters/13_ai_workspace.png"
+          ],
+          "functional_audit": "passed"
+        },
+        "B": {
+          "file": "option_B/screens/09_results_investigation.png",
+          "sha256": "d29e0e796dc8114487a269f3c72b7be99d3c8eebee3a0de98bf8fd21e08b8355",
+          "dimensions": {
+            "width": 1672,
+            "height": 941
+          },
+          "status": "Generated",
+          "master_references": [
+            "option_B/masters/05_flow_editor.png",
+            "option_B/masters/13_ai_workspace.png"
+          ],
+          "functional_audit": "passed"
+        },
+        "C": {
+          "file": "option_C/screens/09_results_investigation.png",
+          "sha256": "bd38b66f78e9b46e5eccf8495a303dcb5ae1455bb5166ecd5fe7c304354cd2b3",
+          "dimensions": {
+            "width": 1672,
+            "height": 941
+          },
+          "status": "Generated",
+          "master_references": [
+            "option_C/masters/05_flow_editor.png",
+            "option_C/masters/13_ai_workspace.png"
+          ],
+          "functional_audit": "passed"
+        }
+      }
+    },
+    {
+      "screen_id": "10_stations_list",
+      "filename": "10_stations_list.png",
+      "page_name": "Stations List",
+      "purpose": "Station fleet monitoring and scanable status",
+      "current_reference": "current/r2/S08-B0.png",
+      "current_sha256": "f59f3c1283d5596c39d7d52632fcf92e862a5085364a74a7c72fe86537457405",
+      "comparison": "audit/comparison/10_stations_list.png",
+      "options": {
+        "A": {
+          "file": "option_A/screens/10_stations_list.png",
+          "sha256": "18ac165ad4c7a5d4e0128c3f0dd6c2a0db7c0ac69c8cfa0b44af5632bb71294a",
+          "dimensions": {
+            "width": 1672,
+            "height": 941
+          },
+          "status": "Generated",
+          "master_references": [
+            "option_A/masters/05_flow_editor.png",
+            "option_A/masters/13_ai_workspace.png"
+          ],
+          "functional_audit": "passed"
+        },
+        "B": {
+          "file": "option_B/screens/10_stations_list.png",
+          "sha256": "4925c7dfa1574881e7710f6597b784a3174bfa4437a181892b55e2c580d3f750",
+          "dimensions": {
+            "width": 1672,
+            "height": 941
+          },
+          "status": "Generated",
+          "master_references": [
+            "option_B/masters/05_flow_editor.png",
+            "option_B/masters/13_ai_workspace.png"
+          ],
+          "functional_audit": "passed"
+        },
+        "C": {
+          "file": "option_C/screens/10_stations_list.png",
+          "sha256": "c2fe163f5c2245e13a8ea9e83f4c6fb4d9791b8733b175f3c0f6ec81c398218a",
+          "dimensions": {
+            "width": 1672,
+            "height": 941
+          },
+          "status": "Generated",
+          "master_references": [
+            "option_C/masters/05_flow_editor.png",
+            "option_C/masters/13_ai_workspace.png"
+          ],
+          "functional_audit": "passed"
+        }
+      }
+    },
+    {
+      "screen_id": "11_station_detail",
+      "filename": "11_station_detail.png",
+      "page_name": "Station Detail",
+      "purpose": "Selected station operational detail",
+      "current_reference": "current/r2/S08-B2.png",
+      "current_sha256": "f30adc4f388fb9fd1a9a02ba7e6873bd06d3e620554badbe483a28d1bd525f3f",
+      "comparison": "audit/comparison/11_station_detail.png",
+      "options": {
+        "A": {
+          "file": "option_A/screens/11_station_detail.png",
+          "sha256": "3720c08fbe26748c6e4b0c260ede17135d80051ac57575f59f8efc6d89a15f4f",
+          "dimensions": {
+            "width": 1672,
+            "height": 941
+          },
+          "status": "Generated",
+          "master_references": [
+            "option_A/masters/05_flow_editor.png",
+            "option_A/masters/13_ai_workspace.png"
+          ],
+          "functional_audit": "passed"
+        },
+        "B": {
+          "file": "option_B/screens/11_station_detail.png",
+          "sha256": "fef51e5c38b9d9c32010898250d72aeb3de8085be851194ec752443237a12093",
+          "dimensions": {
+            "width": 1672,
+            "height": 941
+          },
+          "status": "Generated",
+          "master_references": [
+            "option_B/masters/05_flow_editor.png",
+            "option_B/masters/13_ai_workspace.png"
+          ],
+          "functional_audit": "passed"
+        },
+        "C": {
+          "file": "option_C/screens/11_station_detail.png",
+          "sha256": "3b95d3dd68deffad79c442be57781a4522ff2bba54ec2c4ad6ba03505b5ef64b",
+          "dimensions": {
+            "width": 1672,
+            "height": 941
+          },
+          "status": "Generated",
+          "master_references": [
+            "option_C/masters/05_flow_editor.png",
+            "option_C/masters/13_ai_workspace.png"
+          ],
+          "functional_audit": "passed"
+        }
+      }
+    },
+    {
+      "screen_id": "12_inspection",
+      "filename": "12_inspection.png",
+      "page_name": "Inspection",
+      "purpose": "Continuous inspection recovery, readiness, metrics, and latest result",
+      "current_reference": "current/r2/S09-B0.png",
+      "current_sha256": "e17b477e52fc4c0806e032bd3b4e3738226ac30abe307a27935b2d9d19eb8d37",
+      "comparison": "audit/comparison/12_inspection.png",
+      "options": {
+        "A": {
+          "file": "option_A/screens/12_inspection.png",
+          "sha256": "2c791dcfbc11a552a5aa003a30f7328860a09f9874ae0853988f6383e2f0a373",
+          "dimensions": {
+            "width": 1672,
+            "height": 941
+          },
+          "status": "Generated",
+          "master_references": [
+            "option_A/masters/05_flow_editor.png",
+            "option_A/masters/13_ai_workspace.png"
+          ],
+          "functional_audit": "passed"
+        },
+        "B": {
+          "file": "option_B/screens/12_inspection.png",
+          "sha256": "39ecac87075c85d269602e256c974e0124d2a6c75cdd6d4fb63cd7667ffa60f5",
+          "dimensions": {
+            "width": 1672,
+            "height": 941
+          },
+          "status": "Generated",
+          "master_references": [
+            "option_B/masters/05_flow_editor.png",
+            "option_B/masters/13_ai_workspace.png"
+          ],
+          "functional_audit": "passed"
+        },
+        "C": {
+          "file": "option_C/screens/12_inspection.png",
+          "sha256": "b40f8e509540b389e69f98f2919bb132cc319d03466f13aab4444c87b7794c1f",
+          "dimensions": {
+            "width": 1672,
+            "height": 941
+          },
+          "status": "Generated",
+          "master_references": [
+            "option_C/masters/05_flow_editor.png",
+            "option_C/masters/13_ai_workspace.png"
+          ],
+          "functional_audit": "passed"
+        }
+      }
+    },
+    {
+      "screen_id": "13_ai_workspace",
+      "filename": "13_ai_workspace.png",
+      "page_name": "AI Workspace",
+      "purpose": "AI clarification, build, validation, handoff, and recovery workbench",
+      "current_reference": "current/r2/S11-B0.png",
+      "current_sha256": "4b17c63067d19cf8b02c8a63699003f0a7969f577997125c68ac751afbdf1d22",
+      "comparison": "audit/comparison/13_ai_workspace.png",
+      "options": {
+        "A": {
+          "file": "option_A/screens/13_ai_workspace.png",
+          "sha256": "f0037b83f6d98f726a75b4e3fb4cf368bb41201c7b57d1087e407c6907659aa3",
+          "dimensions": {
+            "width": 1672,
+            "height": 941
+          },
+          "status": "Approved-Candidate",
+          "master_references": [
+            "option_A/masters/05_flow_editor.png"
+          ],
+          "functional_audit": "passed"
+        },
+        "B": {
+          "file": "option_B/screens/13_ai_workspace.png",
+          "sha256": "1274db3103075eb9761c4b56556c0598c9923992787f8ceed93be4510af47173",
+          "dimensions": {
+            "width": 1672,
+            "height": 941
+          },
+          "status": "Approved-Candidate",
+          "master_references": [
+            "option_B/masters/05_flow_editor.png"
+          ],
+          "functional_audit": "passed"
+        },
+        "C": {
+          "file": "option_C/screens/13_ai_workspace.png",
+          "sha256": "90891e5399015352ed2a57e5e96fde7038e0d086908632194ef99478a5664fbf",
+          "dimensions": {
+            "width": 1672,
+            "height": 941
+          },
+          "status": "Approved-Candidate",
+          "master_references": [
+            "option_C/masters/05_flow_editor.png"
+          ],
+          "functional_audit": "passed"
+        }
+      }
+    },
+    {
+      "screen_id": "14_ai_failure_recovery",
+      "filename": "14_ai_failure_recovery.png",
+      "page_name": "AI Failure Recovery",
+      "purpose": "AI blocked/failed recovery state",
+      "current_reference": "current/r2/S11-EXCEPTION.png",
+      "current_sha256": "e8c3d9683197fbf4b55ff3c94edb80dc47b226d7fbfcedfa4586b04a24117ba0",
+      "comparison": "audit/comparison/14_ai_failure_recovery.png",
+      "options": {
+        "A": {
+          "file": "option_A/screens/14_ai_failure_recovery.png",
+          "sha256": "80a263c6f5fe2f603348fb01b5dbb6deb4279d5030ad9620ed6a250b299225cc",
+          "dimensions": {
+            "width": 1672,
+            "height": 941
+          },
+          "status": "Generated",
+          "master_references": [
+            "option_A/masters/13_ai_workspace.png"
+          ],
+          "functional_audit": "passed"
+        },
+        "B": {
+          "file": "option_B/screens/14_ai_failure_recovery.png",
+          "sha256": "adf9ecb00dc060c0b248033fb9435a6be16bc5e057765cc03a81ce21c44c8bf2",
+          "dimensions": {
+            "width": 1672,
+            "height": 941
+          },
+          "status": "Generated",
+          "master_references": [
+            "option_B/masters/13_ai_workspace.png"
+          ],
+          "functional_audit": "passed"
+        },
+        "C": {
+          "file": "option_C/screens/14_ai_failure_recovery.png",
+          "sha256": "462fcea70d37b33f123f70b01e79bbb2b9406df8b80c2ace4540f4cf9c6d0e4e",
+          "dimensions": {
+            "width": 1672,
+            "height": 941
+          },
+          "status": "Generated",
+          "master_references": [
+            "option_C/masters/13_ai_workspace.png"
+          ],
+          "functional_audit": "passed"
+        }
+      }
+    },
+    {
+      "screen_id": "15_operator_catalog",
+      "filename": "15_operator_catalog.png",
+      "page_name": "Operator Catalog",
+      "purpose": "Read-only operator discovery and integrity",
+      "current_reference": "current/r2/S12-B0.png",
+      "current_sha256": "ce409a7e42d09c4951fa03fb1d1e6840e3661c863c5485755aef33af827197dd",
+      "comparison": "audit/comparison/15_operator_catalog.png",
+      "options": {
+        "A": {
+          "file": "option_A/screens/15_operator_catalog.png",
+          "sha256": "100fe82c3c452d14038a323b6d5552dfc7f0fef78cea037bb5e94254e99e4bd2",
+          "dimensions": {
+            "width": 1672,
+            "height": 941
+          },
+          "status": "Generated",
+          "master_references": [
+            "option_A/masters/16_system_settings.png"
+          ],
+          "functional_audit": "passed"
+        },
+        "B": {
+          "file": "option_B/screens/15_operator_catalog.png",
+          "sha256": "79b08f13d7a0a5f8d5aa2b542ce43514421211d6f450be0181e2afc1eb23f166",
+          "dimensions": {
+            "width": 1672,
+            "height": 941
+          },
+          "status": "Generated",
+          "master_references": [
+            "option_B/masters/16_system_settings.png"
+          ],
+          "functional_audit": "passed"
+        },
+        "C": {
+          "file": "option_C/screens/15_operator_catalog.png",
+          "sha256": "aeb55f4b08b6142e1a349aa39ec0c1db1ffb68ba21df9a87b8bc70cc8d15d708",
+          "dimensions": {
+            "width": 1672,
+            "height": 941
+          },
+          "status": "Generated",
+          "master_references": [
+            "option_C/masters/16_system_settings.png"
+          ],
+          "functional_audit": "passed"
+        }
+      }
+    },
+    {
+      "screen_id": "16_system_settings",
+      "filename": "16_system_settings.png",
+      "page_name": "System Settings",
+      "purpose": "General system configuration and Settings shell",
+      "current_reference": "current/r2/S10-B0.png",
+      "current_sha256": "42ed3152789796ef15d037a8bd290234fdc80bdf1cabd2321de88c3861f83556",
+      "comparison": "audit/comparison/16_system_settings.png",
+      "options": {
+        "A": {
+          "file": "option_A/screens/16_system_settings.png",
+          "sha256": "182e09fb97d626cd8102ab6cc356ef5b89bed3736783e0a06da60f0ad0e7ae61",
+          "dimensions": {
+            "width": 1672,
+            "height": 941
+          },
+          "status": "Approved-Candidate",
+          "master_references": [
+            "option_A/masters/05_flow_editor.png",
+            "option_A/masters/13_ai_workspace.png"
+          ],
+          "functional_audit": "passed"
+        },
+        "B": {
+          "file": "option_B/screens/16_system_settings.png",
+          "sha256": "170ccf9311a4601175419c92c2bfd2141f1c29905f756c090218108f10910bcb",
+          "dimensions": {
+            "width": 1672,
+            "height": 941
+          },
+          "status": "Approved-Candidate",
+          "master_references": [
+            "option_B/masters/05_flow_editor.png",
+            "option_B/masters/13_ai_workspace.png"
+          ],
+          "functional_audit": "passed"
+        },
+        "C": {
+          "file": "option_C/screens/16_system_settings.png",
+          "sha256": "ba42acc6793a6b028656b687d1d6630d729e239226e086da7ddd4635a489d3a9",
+          "dimensions": {
+            "width": 1672,
+            "height": 941
+          },
+          "status": "Approved-Candidate",
+          "master_references": [
+            "option_C/masters/05_flow_editor.png",
+            "option_C/masters/13_ai_workspace.png"
+          ],
+          "functional_audit": "passed"
+        }
+      }
+    },
+    {
+      "screen_id": "17_camera_settings",
+      "filename": "17_camera_settings.png",
+      "page_name": "Camera Settings",
+      "purpose": "Camera binding, acquisition, preview, and trigger input",
+      "current_reference": "current/settings/settings-camera-b0-1920x1080-light-compact.png",
+      "current_sha256": "86c93b6f4e7ac4b52480690b87d78c4839881d30d6d4e103086f91e192983c50",
+      "comparison": "audit/comparison/17_camera_settings.png",
+      "options": {
+        "A": {
+          "file": "option_A/screens/17_camera_settings.png",
+          "sha256": "a0e8a3950d1d05a4db8deafae80a8f64e3b1ec22b6cbe894433c778bb66b2f72",
+          "dimensions": {
+            "width": 1672,
+            "height": 941
+          },
+          "status": "Generated",
+          "master_references": [
+            "option_A/masters/16_system_settings.png"
+          ],
+          "functional_audit": "passed"
+        },
+        "B": {
+          "file": "option_B/screens/17_camera_settings.png",
+          "sha256": "8ac27437ff0d98af5237e08230456c04f6a8ea61d8198b2fb7507bc375db6aa8",
+          "dimensions": {
+            "width": 1672,
+            "height": 941
+          },
+          "status": "Generated",
+          "master_references": [
+            "option_B/masters/16_system_settings.png"
+          ],
+          "functional_audit": "passed"
+        },
+        "C": {
+          "file": "option_C/screens/17_camera_settings.png",
+          "sha256": "008d76a382f5862dd3bc58ce584345503e4e295ba0813f68f957d89f244392a6",
+          "dimensions": {
+            "width": 1672,
+            "height": 941
+          },
+          "status": "Generated",
+          "master_references": [
+            "option_C/masters/16_system_settings.png"
+          ],
+          "functional_audit": "passed"
+        }
+      }
+    },
+    {
+      "screen_id": "18_plc_settings",
+      "filename": "18_plc_settings.png",
+      "page_name": "PLC Settings",
+      "purpose": "PLC connection and address mapping",
+      "current_reference": "current/settings/settings-plc-b0-1920x1080-light-compact.png",
+      "current_sha256": "ef245e2bd5591e6b05628b6ad526e9faa43c453459ec5c000fbfdf4e255ece16",
+      "comparison": "audit/comparison/18_plc_settings.png",
+      "options": {
+        "A": {
+          "file": "option_A/screens/18_plc_settings.png",
+          "sha256": "f9cdf942c0d64b51d27569fc21374fa733433c6bac24bfd29b36a46e49f48694",
+          "dimensions": {
+            "width": 1672,
+            "height": 941
+          },
+          "status": "Generated",
+          "master_references": [
+            "option_A/masters/16_system_settings.png"
+          ],
+          "functional_audit": "passed"
+        },
+        "B": {
+          "file": "option_B/screens/18_plc_settings.png",
+          "sha256": "be6d51dee77493eb3b2c4450afc1e9d26a548f1fe431279c65f656938b36ec45",
+          "dimensions": {
+            "width": 1672,
+            "height": 941
+          },
+          "status": "Generated",
+          "master_references": [
+            "option_B/masters/16_system_settings.png"
+          ],
+          "functional_audit": "passed"
+        },
+        "C": {
+          "file": "option_C/screens/18_plc_settings.png",
+          "sha256": "deea6d939ff4dc0688a929675fe3183d732cf1ca41e5c143d129f4a62775ca53",
+          "dimensions": {
+            "width": 1672,
+            "height": 941
+          },
+          "status": "Generated",
+          "master_references": [
+            "option_C/masters/16_system_settings.png"
+          ],
+          "functional_audit": "passed"
+        }
+      }
+    },
+    {
+      "screen_id": "19_tcp_settings",
+      "filename": "19_tcp_settings.png",
+      "page_name": "TCP Settings",
+      "purpose": "TCP profiles, connection control, send/receive diagnostics",
+      "current_reference": "current/settings/settings-tcp-b0-dark-1920x1080-dark-compact.png",
+      "current_sha256": "3063c1f64370ae5c446811a95e149fb8079a3b513057290c4bb1db3bfc40b735",
+      "comparison": "audit/comparison/19_tcp_settings.png",
+      "options": {
+        "A": {
+          "file": "option_A/screens/19_tcp_settings.png",
+          "sha256": "7818ea112d0fba17f55909bd05761f2604a1d35d4b88c943edfb9b4792444a17",
+          "dimensions": {
+            "width": 1672,
+            "height": 941
+          },
+          "status": "Generated",
+          "master_references": [
+            "option_A/masters/16_system_settings.png"
+          ],
+          "functional_audit": "passed"
+        },
+        "B": {
+          "file": "option_B/screens/19_tcp_settings.png",
+          "sha256": "3fba86f8a0b98659a7a4fa7f60e81971ecaa7afe855ad7438848341be9bf88df",
+          "dimensions": {
+            "width": 1672,
+            "height": 941
+          },
+          "status": "Generated",
+          "master_references": [
+            "option_B/masters/16_system_settings.png"
+          ],
+          "functional_audit": "passed"
+        },
+        "C": {
+          "file": "option_C/screens/19_tcp_settings.png",
+          "sha256": "0a39fb3f55efd5be7cc46ae9a2dd059a51f0608c3ee3d5dfc47942a672867f64",
+          "dimensions": {
+            "width": 1672,
+            "height": 941
+          },
+          "status": "Generated",
+          "master_references": [
+            "option_C/masters/16_system_settings.png"
+          ],
+          "functional_audit": "passed"
+        }
+      }
+    },
+    {
+      "screen_id": "20_station_communication",
+      "filename": "20_station_communication.png",
+      "page_name": "Station Communication",
+      "purpose": "Studio-to-Station communication configuration",
+      "current_reference": "current/settings/settings-station-1920x1080-dark-compact.png",
+      "current_sha256": "8c2e8be409b27ed1d16b8a241543662147f87f1d7a424da0a7c0d061d31dd7c4",
+      "comparison": "audit/comparison/20_station_communication.png",
+      "options": {
+        "A": {
+          "file": "option_A/screens/20_station_communication.png",
+          "sha256": "e0f3e66976536f3e63f6dbae9023386d8165e3eebd170cce1ca874d1a649f962",
+          "dimensions": {
+            "width": 1672,
+            "height": 941
+          },
+          "status": "Generated",
+          "master_references": [
+            "option_A/masters/16_system_settings.png"
+          ],
+          "functional_audit": "passed"
+        },
+        "B": {
+          "file": "option_B/screens/20_station_communication.png",
+          "sha256": "8d689618898932cb73858be639107c2b93b99dc9f747b9d0a3b44a555b961141",
+          "dimensions": {
+            "width": 1672,
+            "height": 941
+          },
+          "status": "Generated",
+          "master_references": [
+            "option_B/masters/16_system_settings.png"
+          ],
+          "functional_audit": "passed"
+        },
+        "C": {
+          "file": "option_C/screens/20_station_communication.png",
+          "sha256": "043b0a4245ec2d9dce6ed1b25b3dc536052e661b365388e9d4e5d1930733785e",
+          "dimensions": {
+            "width": 1672,
+            "height": 941
+          },
+          "status": "Generated",
+          "master_references": [
+            "option_C/masters/16_system_settings.png"
+          ],
+          "functional_audit": "passed"
+        }
+      }
+    },
+    {
+      "screen_id": "21_ai_model_settings",
+      "filename": "21_ai_model_settings.png",
+      "page_name": "AI Model Settings",
+      "purpose": "Provider/model configuration and availability",
+      "current_reference": "current/settings/settings-ai-model-1920x1080-light-compact.png",
+      "current_sha256": "dda5fedf89a005a50123c17fdd2492d68deac956649fdafef2a6644a791de158",
+      "comparison": "audit/comparison/21_ai_model_settings.png",
+      "options": {
+        "A": {
+          "file": "option_A/screens/21_ai_model_settings.png",
+          "sha256": "d20c446a325312f10f8525d77c4efe6643b6147bb7b2208a9bd59a0209a5fc43",
+          "dimensions": {
+            "width": 1672,
+            "height": 941
+          },
+          "status": "Generated",
+          "master_references": [
+            "option_A/masters/16_system_settings.png"
+          ],
+          "functional_audit": "passed"
+        },
+        "B": {
+          "file": "option_B/screens/21_ai_model_settings.png",
+          "sha256": "b9e47d26e074660af9a1e620d75a2117fab331d33112d85da2e5256716c51e8e",
+          "dimensions": {
+            "width": 1672,
+            "height": 941
+          },
+          "status": "Generated",
+          "master_references": [
+            "option_B/masters/16_system_settings.png"
+          ],
+          "functional_audit": "passed"
+        },
+        "C": {
+          "file": "option_C/screens/21_ai_model_settings.png",
+          "sha256": "a191915de51222f641124330d5cd231ec3c6e048456e83a29de2680d07be8869",
+          "dimensions": {
+            "width": 1672,
+            "height": 941
+          },
+          "status": "Generated",
+          "master_references": [
+            "option_C/masters/16_system_settings.png"
+          ],
+          "functional_audit": "passed"
+        }
+      }
+    },
+    {
+      "screen_id": "22_diagnostics",
+      "filename": "22_diagnostics.png",
+      "page_name": "Diagnostics",
+      "purpose": "Local services, owner projection, and technical diagnostics",
+      "current_reference": "current/r2/S13-B0.png",
+      "current_sha256": "c53da62228f3550b38e41ec46dcc70f73938f661615e21beef93872afc449ace",
+      "comparison": "audit/comparison/22_diagnostics.png",
+      "options": {
+        "A": {
+          "file": "option_A/screens/22_diagnostics.png",
+          "sha256": "84faa4460c5f6660661700332192c2bafd0db2b8c5323e2d94717de27dda7a14",
+          "dimensions": {
+            "width": 1672,
+            "height": 941
+          },
+          "status": "Generated",
+          "master_references": [
+            "option_A/masters/16_system_settings.png"
+          ],
+          "functional_audit": "passed"
+        },
+        "B": {
+          "file": "option_B/screens/22_diagnostics.png",
+          "sha256": "7b1d0a346bf7b72e27734df1d9e810eafaaa8fdbddaed5151f0a55db09870b9b",
+          "dimensions": {
+            "width": 1672,
+            "height": 941
+          },
+          "status": "Generated",
+          "master_references": [
+            "option_B/masters/16_system_settings.png"
+          ],
+          "functional_audit": "passed"
+        },
+        "C": {
+          "file": "option_C/screens/22_diagnostics.png",
+          "sha256": "05ab37dd9ffeb767eac96232680c1d0421a5c33fc11edfe7d340fe7db8dc6525",
+          "dimensions": {
+            "width": 1672,
+            "height": 941
+          },
+          "status": "Generated",
+          "master_references": [
+            "option_C/masters/16_system_settings.png"
+          ],
+          "functional_audit": "passed"
+        }
+      }
+    },
+    {
+      "screen_id": "23_about",
+      "filename": "23_about.png",
+      "page_name": "About",
+      "purpose": "Product, host, backend, license, and support identity",
+      "current_reference": "current/r2/S13-B2.png",
+      "current_sha256": "366e24d983a0736a49c1b2fcad75fd47e051226d1ee810b9a114169bf74b1ac9",
+      "comparison": "audit/comparison/23_about.png",
+      "options": {
+        "A": {
+          "file": "option_A/screens/23_about.png",
+          "sha256": "edd3154882777c86245a06d0d04dcc6595de2d45da1354f50674d79da67c4aa4",
+          "dimensions": {
+            "width": 1672,
+            "height": 941
+          },
+          "status": "Generated",
+          "master_references": [
+            "option_A/masters/16_system_settings.png"
+          ],
+          "functional_audit": "passed"
+        },
+        "B": {
+          "file": "option_B/screens/23_about.png",
+          "sha256": "3b4c24637e71ec2f5864775beb76004d641d60ea3d7b59d7113727e065ad08a5",
+          "dimensions": {
+            "width": 1672,
+            "height": 941
+          },
+          "status": "Generated",
+          "master_references": [
+            "option_B/masters/16_system_settings.png"
+          ],
+          "functional_audit": "passed"
+        },
+        "C": {
+          "file": "option_C/screens/23_about.png",
+          "sha256": "d1cac97d56fe9298cdc563b0437091430a8663caa6dba470951c71be73d3a1e6",
+          "dimensions": {
+            "width": 1672,
+            "height": 941
+          },
+          "status": "Generated",
+          "master_references": [
+            "option_C/masters/16_system_settings.png"
+          ],
+          "functional_audit": "passed"
+        }
+      }
+    },
+    {
+      "screen_id": "24_forbidden",
+      "filename": "24_forbidden.png",
+      "page_name": "Forbidden",
+      "purpose": "Authority boundary and recovery route",
+      "current_reference": "current/r2/S10-EXCEPTION.png",
+      "current_sha256": "00876884da32947d4e8cdd3a83abb06eda2ef62bca8e1c49c4773c3251bc3797",
+      "comparison": "audit/comparison/24_forbidden.png",
+      "options": {
+        "A": {
+          "file": "option_A/screens/24_forbidden.png",
+          "sha256": "c7e0e384aaa393dd3ce22173037ed112363b5ebe41865ce66c78afc177e70ebb",
+          "dimensions": {
+            "width": 1672,
+            "height": 941
+          },
+          "status": "Generated",
+          "master_references": [
+            "option_A/masters/16_system_settings.png"
+          ],
+          "functional_audit": "passed"
+        },
+        "B": {
+          "file": "option_B/screens/24_forbidden.png",
+          "sha256": "d8f6e43c8f3db3d456368be8f92ecd145bf00d262bb744b6d52f1487612ae610",
+          "dimensions": {
+            "width": 1672,
+            "height": 941
+          },
+          "status": "Generated",
+          "master_references": [
+            "option_B/masters/16_system_settings.png"
+          ],
+          "functional_audit": "passed"
+        },
+        "C": {
+          "file": "option_C/screens/24_forbidden.png",
+          "sha256": "c2c916ba343213c87335894f4cb4f6c4c0851be877c47add16bbbb131c50be3e",
+          "dimensions": {
+            "width": 1672,
+            "height": 941
+          },
+          "status": "Generated",
+          "master_references": [
+            "option_C/masters/16_system_settings.png"
+          ],
+          "functional_audit": "passed"
+        }
+      }
+    }
+  ]
+}

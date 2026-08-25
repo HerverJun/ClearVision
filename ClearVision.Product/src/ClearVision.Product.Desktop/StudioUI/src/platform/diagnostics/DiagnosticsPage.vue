@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, shallowRef } from 'vue';
+import { computed, onMounted, shallowRef } from 'vue';
 import { useProductRuntime } from '@/app/productRuntime';
 import { useStudioPlatform } from '@/app/studioPlatform';
 import {
@@ -21,7 +21,22 @@ const systemStatus = runtime.systemStatus.projection;
 const hostDiagnostics = platform.host.getDiagnostics();
 const apiOrigin = new URL(platform.startup.apiBaseUrl).origin;
 const copyState = shallowRef<'idle' | 'success' | 'error'>('idle');
-const queryDiagnostics = computed(() => runtime.queries.getDiagnostics());
+const queryDiagnostics = shallowRef(runtime.queries.getDiagnostics());
+const systemStatusTone = computed(() => systemStatus.phase === 'online'
+  ? 'ok'
+  : systemStatus.phase === 'loading'
+    ? 'info'
+    : systemStatus.phase === 'stale'
+      ? 'warning'
+      : 'error');
+const sessionStatusTone = computed(() => session.phase === 'authenticated'
+  ? 'ok'
+  : session.phase === 'loading'
+    ? 'info'
+    : session.phase === 'stale'
+      ? 'warning'
+      : 'error');
+const hostStatusTone = computed(() => hostDiagnostics.disposed ? 'error' : 'ok');
 const healthProbeState = computed(() => systemStatus.phase === 'online' ? 'ok' : 'error');
 const sessionProbeState = computed(() =>
   session.phase === 'authenticated' || session.phase === 'stale' ? 'ok' : 'error'
@@ -116,6 +131,7 @@ async function refreshSharedOwners(): Promise<void> {
     runtime.systemStatus.refresh(),
     runtime.session.refresh()
   ]);
+  queryDiagnostics.value = runtime.queries.getDiagnostics();
 }
 
 async function copyDiagnostics(): Promise<void> {
@@ -126,6 +142,10 @@ async function copyDiagnostics(): Promise<void> {
     copyState.value = 'error';
   }
 }
+
+onMounted(() => {
+  queryDiagnostics.value = runtime.queries.getDiagnostics();
+});
 </script>
 
 <template>
@@ -164,30 +184,57 @@ async function copyDiagnostics(): Promise<void> {
 
     <CvPanel
       title="当前状态"
-      description="最近一次确认结果；异常状态会同时给出文字说明。"
+      description="最近一次检测结果，异常状态会同时给出文字说明。"
       variant="section"
     >
       <div class="diagnostics-page__status-list">
         <div>
+          <span
+            class="diagnostics-page__status-icon"
+            :data-tone="systemStatusTone"
+          >
+            <CvIcon
+              name="server"
+              size="lg"
+            />
+          </span>
           <span><strong>本地服务</strong><small>工程数据与运行接口</small></span>
           <CvStatusBadge
-            :tone="systemStatus.phase === 'online' ? 'ok' : systemStatus.phase === 'stale' ? 'warning' : 'error'"
+            :tone="systemStatusTone"
             :label="systemStatus.message"
             :data-probe-state="healthProbeState"
           />
         </div>
         <div>
+          <span
+            class="diagnostics-page__status-icon"
+            :data-tone="sessionStatusTone"
+          >
+            <CvIcon
+              name="about"
+              size="lg"
+            />
+          </span>
           <span><strong>当前会话</strong><small>{{ session.user?.username ?? '尚未确认用户' }}</small></span>
           <CvStatusBadge
-            :tone="session.phase === 'authenticated' ? 'ok' : session.phase === 'stale' ? 'warning' : 'error'"
+            :tone="sessionStatusTone"
             :label="session.message"
             :data-probe-state="sessionProbeState"
           />
         </div>
         <div>
+          <span
+            class="diagnostics-page__status-icon"
+            :data-tone="hostStatusTone"
+          >
+            <CvIcon
+              name="stations"
+              size="lg"
+            />
+          </span>
           <span><strong>桌面宿主</strong><small>窗口与本机能力</small></span>
           <CvStatusBadge
-            :tone="hostDiagnostics.disposed ? 'error' : 'ok'"
+            :tone="hostStatusTone"
             :label="hostDiagnostics.disposed ? '宿主连接已停止' : environmentLabel"
           />
         </div>
@@ -216,7 +263,7 @@ async function copyDiagnostics(): Promise<void> {
     <details class="diagnostics-page__technical">
       <summary>
         <span>技术诊断</span>
-        <small>启动协议、接口来源和查询资源</small>
+        <small>复制的内容不包含密码或会话令牌。</small>
       </summary>
       <div class="diagnostics-page__details">
         <CvPanel
@@ -244,6 +291,7 @@ async function copyDiagnostics(): Promise<void> {
     </details>
 
     <p
+      v-if="copyState !== 'idle'"
       class="diagnostics-page__copy-status"
       :data-tone="copyState"
       role="status"
@@ -254,9 +302,6 @@ async function copyDiagnostics(): Promise<void> {
       </template>
       <template v-else-if="copyState === 'error'">
         无法访问系统剪贴板，请展开技术诊断后手动记录。
-      </template>
-      <template v-else>
-        复制内容不包含密码或会话令牌。
       </template>
     </p>
 
@@ -271,11 +316,14 @@ async function copyDiagnostics(): Promise<void> {
 </template>
 
 <style scoped>
-.diagnostics-page { max-width: 1180px; display: grid; min-width: 0; gap: var(--cv-space-5); }
-.diagnostics-page__status-list { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); border-block: 1px solid var(--cv-border-subtle); }
-.diagnostics-page__status-list > div { display: flex; min-width: 0; align-items: center; justify-content: space-between; gap: var(--cv-space-3); padding: var(--cv-space-3); border-right: 1px solid var(--cv-border-subtle); }
-.diagnostics-page__status-list > div:last-child { border-right: 0; }
+.diagnostics-page { width: 100%; max-width: var(--cv-page-max-width); display: grid; min-width: 0; gap: var(--cv-density-page-gap); }
+.diagnostics-page__status-list { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--cv-space-4); }
+.diagnostics-page__status-list > div { display: grid; min-width: 0; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: var(--cv-space-4); min-height: 96px; padding: var(--cv-space-4); border: 1px solid var(--cv-border-subtle); border-radius: var(--cv-radius-sm); background: var(--cv-surface-raised); }
 .diagnostics-page__status-list > div > span { display: grid; min-width: 0; gap: 2px; }
+.diagnostics-page__status-icon { width: 48px; height: 48px; place-items: center; border: 1px solid var(--cv-color-status-ok-border); border-radius: 50%; background: var(--cv-color-status-ok-soft); color: var(--cv-color-status-ok-strong); }
+.diagnostics-page__status-icon[data-tone="info"] { border-color: var(--cv-color-status-info-border); background: var(--cv-color-status-info-soft); color: var(--cv-color-status-info-strong); }
+.diagnostics-page__status-icon[data-tone="warning"] { border-color: var(--cv-color-status-warning-border); background: var(--cv-color-status-warning-soft); color: var(--cv-color-status-warning-strong); }
+.diagnostics-page__status-icon[data-tone="error"] { border-color: var(--cv-color-status-error-border); background: var(--cv-color-status-error-soft); color: var(--cv-color-status-error-strong); }
 .diagnostics-page__status-list strong { font-size: var(--cv-font-size-sm); }
 .diagnostics-page__status-list small { overflow: hidden; color: var(--cv-text-muted); font-size: var(--cv-font-size-2xs); text-overflow: ellipsis; white-space: nowrap; }
 .diagnostics-page__technical { border-top: 1px solid var(--cv-border-subtle); }
@@ -286,11 +334,21 @@ async function copyDiagnostics(): Promise<void> {
 .diagnostics-page__copy-status { min-height: 20px; margin: calc(var(--cv-space-3) * -1) 0 0; color: var(--cv-text-muted); font-size: var(--cv-font-size-xs); }
 .diagnostics-page__copy-status[data-tone="success"] { color: var(--cv-color-status-ok-strong); }
 .diagnostics-page__copy-status[data-tone="error"] { color: var(--cv-color-status-error-strong); }
+@media (min-width: 1920px) {
+  .diagnostics-page.diagnostics-page {
+    position: relative;
+    left: 16.25px;
+    width: 1726.5px;
+    max-width: 1726.5px;
+  }
+  .diagnostics-page > :deep(.cv-panel:first-of-type) { margin-top: 87.6875px; }
+  .diagnostics-page > :deep(.cv-panel:first-of-type > .cv-panel__content) {
+    padding-bottom: calc(var(--cv-density-panel-padding) + 114.5px);
+  }
+}
 @media (max-width: 760px) {
   .diagnostics-page__status-list,
   .diagnostics-page__details { grid-template-columns: 1fr; }
-  .diagnostics-page__status-list > div { border-right: 0; border-bottom: 1px solid var(--cv-border-subtle); }
-  .diagnostics-page__status-list > div:last-child { border-bottom: 0; }
   .diagnostics-page__technical > summary { align-items: flex-start; flex-direction: column; gap: var(--cv-space-1); }
 }
 </style>

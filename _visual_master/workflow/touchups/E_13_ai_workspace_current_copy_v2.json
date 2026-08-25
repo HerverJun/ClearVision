@@ -1,0 +1,135 @@
+{
+  "schema_version": "clearvision-controlled-picture-layer-touchup.v1",
+  "entry_id": "E_13_ai_workspace",
+  "source_iteration": "option_E/iterations/13_ai_workspace_v4.png",
+  "source_sha256": "ca1186afdd59bd6c16845ccd251936fc6a22222d363ee4011c3f1120f95d0a50",
+  "purpose": "Restore the remaining CURRENT-visible AI readiness badge, stage explanation, validation summaries, candidate-difference terminology and two-line account identity without changing the accepted single-owner 63/37 layout.",
+  "operations": [
+    {
+      "type": "fill_rect",
+      "box": [1840, 20, 2007, 70],
+      "fill": [253, 253, 254],
+      "purpose": "Clear the generated one-line slash-separated account label while preserving the existing avatar, dropdown and account container."
+    },
+    {
+      "type": "replace_text",
+      "box": [1845, 22, 2005, 45],
+      "fill": [253, 253, 254],
+      "position": [1850, 23],
+      "text": "f06-engineer",
+      "font_path": "C:\\Windows\\Fonts\\msyh.ttc",
+      "font_sha256": "e4b3b9d058750fb80899c24f68e35beda606ca92694eff0e9f7f91eec7a846aa",
+      "font_size": 14,
+      "text_fill": [35, 42, 50],
+      "purpose": "Restore the CURRENT username on its own account line."
+    },
+    {
+      "type": "replace_text",
+      "box": [1845, 46, 2005, 67],
+      "fill": [253, 253, 254],
+      "position": [1850, 46],
+      "text": "工程师",
+      "font_path": "C:\\Windows\\Fonts\\msyh.ttc",
+      "font_sha256": "e4b3b9d058750fb80899c24f68e35beda606ca92694eff0e9f7f91eec7a846aa",
+      "font_size": 12,
+      "text_fill": [88, 98, 108],
+      "purpose": "Restore the CURRENT role on the second account line."
+    },
+    {
+      "type": "replace_text",
+      "box": [1110, 304, 1268, 337],
+      "fill": [226, 243, 238],
+      "position": [1123, 311],
+      "text": "可交接审核",
+      "font_path": "C:\\Windows\\Fonts\\msyh.ttc",
+      "font_sha256": "e4b3b9d058750fb80899c24f68e35beda606ca92694eff0e9f7f91eec7a846aa",
+      "font_size": 13,
+      "text_fill": [22, 134, 111],
+      "purpose": "Restore the CURRENT eligible Application Preview badge."
+    },
+    {
+      "type": "replace_text",
+      "box": [1425, 299, 1995, 329],
+      "fill": [247, 248, 250],
+      "position": [1432, 302],
+      "text": "结构校验、运行预演和当前输入条件已通过。",
+      "font_path": "C:\\Windows\\Fonts\\msyh.ttc",
+      "font_sha256": "e4b3b9d058750fb80899c24f68e35beda606ca92694eff0e9f7f91eec7a846aa",
+      "font_size": 13,
+      "text_fill": [74, 85, 97],
+      "purpose": "Restore the exact CURRENT build-ready stage description."
+    },
+    {
+      "type": "replace_text",
+      "box": [1420, 689, 1635, 711],
+      "fill": [247, 248, 250],
+      "position": [1428, 691],
+      "text": "已通过。",
+      "font_path": "C:\\Windows\\Fonts\\msyh.ttc",
+      "font_sha256": "e4b3b9d058750fb80899c24f68e35beda606ca92694eff0e9f7f91eec7a846aa",
+      "font_size": 12,
+      "text_fill": [92, 102, 112],
+      "purpose": "Restore the CURRENT structural-check summary."
+    },
+    {
+      "type": "replace_text",
+      "box": [1420, 765, 1635, 787],
+      "fill": [247, 248, 250],
+      "position": [1428, 767],
+      "text": "已通过。",
+      "font_path": "C:\\Windows\\Fonts\\msyh.ttc",
+      "font_sha256": "e4b3b9d058750fb80899c24f68e35beda606ca92694eff0e9f7f91eec7a846aa",
+      "font_size": 12,
+      "text_fill": [92, 102, 112],
+      "purpose": "Restore the CURRENT run-rehearsal summary."
+    },
+    {
+      "type": "replace_text",
+      "box": [1420, 841, 1635, 863],
+      "fill": [247, 248, 250],
+      "position": [1428, 843],
+      "text": "已通过。",
+      "font_path": "C:\\Windows\\Fonts\\msyh.ttc",
+      "font_sha256": "e4b3b9d058750fb80899c24f68e35beda606ca92694eff0e9f7f91eec7a846aa",
+      "font_size": 12,
+      "text_fill": [92, 102, 112],
+      "purpose": "Restore the CURRENT manifest-preflight summary."
+    },
+    {
+      "type": "replace_text",
+      "box": [620, 895, 810, 930],
+      "fill": [248, 249, 250],
+      "position": [628, 901],
+      "text": "参数确认",
+      "font_path": "C:\\Windows\\Fonts\\msyhbd.ttc",
+      "font_sha256": "06e1a30f687ab7d39f533447b21e84d51e0cecdaa6bfa060c87136b168811bdc",
+      "font_size": 16,
+      "text_fill": [35, 42, 50],
+      "purpose": "Restore the exact current-code candidate-difference heading."
+    },
+    {
+      "type": "replace_text",
+      "box": [620, 937, 955, 971],
+      "fill": [248, 249, 250],
+      "position": [628, 942],
+      "text": "• 阈值分割 · 分割阈值：128",
+      "font_path": "C:\\Windows\\Fonts\\msyh.ttc",
+      "font_sha256": "e4b3b9d058750fb80899c24f68e35beda606ca92694eff0e9f7f91eec7a846aa",
+      "font_size": 14,
+      "text_fill": [74, 85, 97],
+      "purpose": "Restore the exact CURRENT bullet and middle-dot parameter fact."
+    },
+    {
+      "type": "replace_text",
+      "box": [998, 937, 1282, 971],
+      "fill": [248, 249, 250],
+      "position": [1005, 942],
+      "text": "候选不包含已确认的资源绑定。",
+      "font_path": "C:\\Windows\\Fonts\\msyh.ttc",
+      "font_sha256": "e4b3b9d058750fb80899c24f68e35beda606ca92694eff0e9f7f91eec7a846aa",
+      "font_size": 14,
+      "text_fill": [74, 85, 97],
+      "purpose": "Restore the exact CURRENT resource-binding sentence and punctuation."
+    }
+  ]
+}

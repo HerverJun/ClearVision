@@ -14,19 +14,27 @@ import {
   CanvasLabOwnerConflictError,
   getCanvasLabDiagnostics,
   mountCanvasLab,
-  type CanvasLabController
+  type CanvasLabController,
+  type CanvasLabDiagnostics
 } from '@/labs/canvas/canvasLabOwner';
 import type {
   CanonicalCanvasRuntimeSnapshot,
   CanonicalFlowCanvasHost
 } from '@/platform/canvas';
 import {
+  CANVAS_FIXTURE_IDS,
   CANONICAL_OPERATOR_FLOW_FIXTURE,
   type OperatorFlowDto
 } from '@/labs/canvas/operatorFlowFixtures';
 
 interface FakeCanonicalHost extends CanonicalFlowCanvasHost {
   readonly disposalEvents: string[];
+}
+
+interface FakeHostOptions {
+  readonly subscribeError?: Error;
+  readonly interactionDisposeError?: Error;
+  readonly adapterDisposeError?: Error;
 }
 
 const mountedControllers: CanvasLabController[] = [];
@@ -36,7 +44,7 @@ function cloneFlow(flow: OperatorFlowDto): OperatorFlowDto {
   return structuredClone(flow);
 }
 
-function createFakeHost(initialFlow: unknown): FakeCanonicalHost {
+function createFakeHost(initialFlow: unknown, options: FakeHostOptions = {}): FakeCanonicalHost {
   let flow = cloneFlow(initialFlow as OperatorFlowDto);
   let interactionDisposed = false;
   let adapterDisposed = false;
@@ -102,6 +110,7 @@ function createFakeHost(initialFlow: unknown): FakeCanonicalHost {
     })),
     replaceFlow: vi.fn(nextFlow => {
       flow = cloneFlow(nextFlow as OperatorFlowDto);
+      validationIndex = 0;
       listeners.forEach(listener => listener());
     }),
     resize: vi.fn(() => {
@@ -109,6 +118,9 @@ function createFakeHost(initialFlow: unknown): FakeCanonicalHost {
     }),
     validateConnection: vi.fn(() => validationResponses[validationIndex++] ?? null),
     subscribe: vi.fn(listener => {
+      if (options.subscribeError) {
+        throw options.subscribeError;
+      }
       listeners.add(listener);
       let subscribed = true;
       return () => {
@@ -127,6 +139,9 @@ function createFakeHost(initialFlow: unknown): FakeCanonicalHost {
       }
       interactionDisposed = true;
       disposalEvents.push('interaction');
+      if (options.interactionDisposeError) {
+        throw options.interactionDisposeError;
+      }
     }),
     disposeAdapter: vi.fn(() => {
       if (adapterDisposed) {
@@ -135,6 +150,9 @@ function createFakeHost(initialFlow: unknown): FakeCanonicalHost {
       adapterDisposed = true;
       listeners.clear();
       disposalEvents.push('adapter');
+      if (options.adapterDisposeError) {
+        throw options.adapterDisposeError;
+      }
     })
   } as unknown as FakeCanonicalHost;
 }
@@ -198,7 +216,8 @@ describe('CanvasLab capability owner', () => {
       structureListenerCount: 0,
       viewListenerCount: 0,
       selectionListenerCount: 0,
-      interactionCleanupCount: 0
+      interactionCleanupCount: 0,
+      facadeListenerCount: 0
     });
   });
 
@@ -224,6 +243,20 @@ describe('CanvasLab capability owner', () => {
     expect(controller.getDiagnostics().validation.every(item => item.passed)).toBe(true);
   });
 
+  it('validates the canonical rejection matrix with the frozen node and port identities', () => {
+    mountTrackedController();
+    const host = canonicalHostFactory.mock.results[0]?.value as FakeCanonicalHost;
+    const ids = CANVAS_FIXTURE_IDS;
+
+    expect(vi.mocked(host.validateConnection).mock.calls).toEqual([
+      [ids.acquisition.operator, 0, ids.threshold.operator, 0],
+      [ids.acquisition.operator, 0, ids.blob.operator, 0],
+      [ids.acquisition.operator, 0, ids.acquisition.operator, 0],
+      [ids.threshold.operator, 0, ids.regionErosion.operator, 0],
+      [ids.blob.operator, 0, ids.acquisition.operator, 0]
+    ]);
+  });
+
   it('loads all fixture sizes through the same owner generation', () => {
     const controller = mountTrackedController();
     const generation = controller.generation;
@@ -232,6 +265,7 @@ describe('CanvasLab capability owner', () => {
     expect(controller.getDiagnostics()).toMatchObject({
       generation,
       fixtureId: 'benchmark-100',
+      validation: [],
       runtime: { nodeCount: 100, connectionCount: 150 }
     });
 
@@ -239,9 +273,93 @@ describe('CanvasLab capability owner', () => {
     expect(controller.getDiagnostics()).toMatchObject({
       generation,
       fixtureId: 'stress-300',
+      validation: [],
       runtime: { nodeCount: 300, connectionCount: 450 }
     });
     expect(canonicalHostFactory).toHaveBeenCalledTimes(1);
+  });
+
+  it('publishes one fixture-consistent diagnostic snapshot per switch', () => {
+    const snapshots: CanvasLabDiagnostics[] = [];
+    const controller = mountCanvasLab({
+      canvasId: 'transaction-canvas',
+      initialFixtureId: 'canonical',
+      onDiagnostics: diagnostics => snapshots.push(diagnostics)
+    });
+    mountedControllers.push(controller);
+    snapshots.splice(0);
+
+    controller.loadFixture('benchmark-100');
+    expect(snapshots).toHaveLength(1);
+    expect(snapshots[0]).toMatchObject({
+      fixtureId: 'benchmark-100',
+      validation: [],
+      runtime: { nodeCount: 100, connectionCount: 150 }
+    });
+
+    controller.loadFixture('canonical');
+    expect(snapshots).toHaveLength(2);
+    expect(snapshots[1]).toMatchObject({
+      fixtureId: 'canonical',
+      runtime: { nodeCount: 5, connectionCount: 3 }
+    });
+    expect(snapshots[1]?.validation).toHaveLength(5);
+    expect(snapshots[1]?.validation.every(item => item.passed)).toBe(true);
+  });
+
+  it('rejects commands from a disposed controller', () => {
+    const controller = mountTrackedController();
+    controller.dispose();
+
+    expect(() => controller.loadFixture('canonical')).toThrow('no longer active');
+    expect(() => controller.runIdentityRoundTrip()).toThrow('no longer active');
+    expect(() => controller.resize()).toThrow('no longer active');
+    expect(() => controller.getDiagnostics()).toThrow('no longer active');
+  });
+
+  it('cleans the host and owner projection when mount setup fails', () => {
+    canonicalHostFactory.mockImplementationOnce((_canvasId: string, initialFlow: unknown) =>
+      createFakeHost(initialFlow, { subscribeError: new Error('subscribe failed') }));
+
+    expect(() => mountCanvasLab({ canvasId: 'failing-canvas' })).toThrow('subscribe failed');
+    expect(disposalEvents).toEqual(['interaction', 'adapter']);
+    expect(getCanvasLabDiagnostics()).toMatchObject({ status: 'error', ownerCount: 0 });
+    expect(lifecycleOwnerCountReporter).toHaveBeenLastCalledWith(0);
+  });
+
+  it('unsubscribes when the initial diagnostics callback fails', () => {
+    let diagnosticsCalls = 0;
+
+    expect(() => mountCanvasLab({
+      canvasId: 'diagnostics-failing-canvas',
+      onDiagnostics: () => {
+        diagnosticsCalls += 1;
+        if (diagnosticsCalls === 1) throw new Error('diagnostics failed');
+      }
+    })).toThrow('diagnostics failed');
+
+    expect(diagnosticsCalls).toBe(2);
+    expect(disposalEvents).toEqual(['unsubscribe', 'interaction', 'adapter']);
+    expect(getCanvasLabDiagnostics()).toMatchObject({ status: 'error', ownerCount: 0 });
+    expect(lifecycleOwnerCountReporter).toHaveBeenLastCalledWith(0);
+  });
+
+  it('continues cleanup when host disposal methods throw', () => {
+    canonicalHostFactory.mockImplementationOnce((_canvasId: string, initialFlow: unknown) =>
+      createFakeHost(initialFlow, {
+        interactionDisposeError: new Error('interaction cleanup failed'),
+        adapterDisposeError: new Error('adapter cleanup failed')
+      }));
+    const controller = mountTrackedController();
+
+    expect(() => controller.dispose()).toThrow('interaction cleanup failed');
+    expect(disposalEvents).toEqual(['unsubscribe', 'interaction', 'adapter']);
+    expect(getCanvasLabDiagnostics()).toMatchObject({
+      status: 'error',
+      ownerCount: 0,
+      lastError: 'interaction cleanup failed'
+    });
+    expect(lifecycleOwnerCountReporter).toHaveBeenLastCalledWith(0);
   });
 
   it('survives twenty mount/unmount cycles without overlapping owners', () => {

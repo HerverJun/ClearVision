@@ -551,10 +551,12 @@ test('F04 auth controls remain scroll-reachable in an extremely short viewport',
   await expect(stage).toHaveJSProperty('scrollTop', 0);
   const overflow = await stage.evaluate(element => ({
     horizontal: element.scrollWidth - element.clientWidth,
-    vertical: element.scrollHeight - element.clientHeight
+    vertical: element.scrollHeight - element.clientHeight,
+    scrollOwner: getComputedStyle(element).overflowY
   }));
   expect(overflow.horizontal).toBe(0);
-  expect(overflow.vertical).toBeGreaterThan(0);
+  expect(overflow.vertical).toBe(0);
+  expect(overflow.scrollOwner).toBe('auto');
 
   await submit.scrollIntoViewIfNeeded();
   await expect(submit).toBeInViewport();

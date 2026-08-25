@@ -1,0 +1,11 @@
+{
+  "schema_version": "clearvision-ui-iteration-instructions.v1",
+  "option": "D",
+  "round": 10,
+  "reference_mode": "iteration-board",
+  "functional_authority": "CURRENT screenshot plus current ClearVision code",
+  "instructions": {
+    "D_06_flow_validation_error": "Use CURRENT S04-B2 as the sole functional authority and the restored same-page iteration as the visual starting point. Preserve exactly one Product Shell with 概览 / 工程 / 流程 / 检测结果 / 算子库; project 瓶盖检测 A; 最终判定, 保存, 结果, 检查条件, 正式运行, 运行详情; the frozen ready/read/validation statuses; one Binary-to-Image flow; selected Inspector Source identity, enabled state, input/output port facts, FilePath and 选择文件, Text, 数量 *= 11, 参数校验未通过, 数量不能大于 10, 无效参数字段; and the existing Preview / Result projection. Change geometry only: discovery entry 56-68 px, dotted FlowCanvas at least 68% and visually dominant, Inspector 320-340 px, separate collapsed Preview / Result edge 190-220 px. Remove Windows controls, the unverified multi-icon capability rail, and fit/fullscreen-like controls. Add, remove, rename, or alter no other text, value, command, node, state, navigation, or capability.",
+    "D_11_station_detail": "Use CURRENT S08-B2 as the sole functional authority and the restored Round 7 image as an immutable composition target. Preserve exactly the two-row layout: top row 状态概览 plus 最近结果; bottom row 生产追溯链 plus 健康快照. Preserve the exact Product Shell, title, 连接恢复中 badge, warning 当前保留上次成功读取；恢复期间按服务端状态重新同步。, all status values, trace hash 5f4c36c - 78d0cedd, health 在线（恢复中）, and all existing actions. Do not create a left navigation rail, reflow panels, or add a diagnostics table. Make only the verified lower-evidence corrections inside the existing bottom row: the selected recent-result diagnosis reads 线序错误 · WIRE_SWAP together, while 缺口/不一致 and 远程图像未上传 remain visible as evidence without adding a command or changing table columns. No other copy, value, column, layout, navigation, control, or state may change."
+  }
+}

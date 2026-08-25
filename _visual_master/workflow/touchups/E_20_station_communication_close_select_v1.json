@@ -1,0 +1,21 @@
+{
+  "schema_version": "clearvision-controlled-picture-layer-touchup.v1",
+  "entry_id": "E_20_station_communication",
+  "source_iteration": "option_E/iterations/20_station_communication_v3.png",
+  "source_sha256": "92ea5d81d9e5964d082449a06154aa3db810fe1b59a700ff028240752ee2d073",
+  "purpose": "Preserve the functionally faithful Station communication candidate and close only the generated expanded select layer.",
+  "operations": [
+    {
+      "type": "copy_rect",
+      "box": [350, 383, 2047, 1047],
+      "source_box": [350, 487, 2047, 1151],
+      "purpose": "Shift the immutable content below the expanded menu upward, leaving the verified collapsed select in place."
+    },
+    {
+      "type": "fill_rect",
+      "box": [350, 1048, 2047, 1151],
+      "fill": [19, 24, 31],
+      "purpose": "Restore the neutral page surface exposed by the bounded upward shift."
+    }
+  ]
+}

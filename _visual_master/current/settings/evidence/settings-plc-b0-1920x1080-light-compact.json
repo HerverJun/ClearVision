@@ -1,0 +1,66 @@
+{
+  "schemaVersion": "f07-visual-evidence.v1",
+  "capturedAtUtc": "2026-08-15T15:28:26.126Z",
+  "sourceSha": "cdd114082821bbe750fb7945a0c3a4e89002d67c",
+  "DATA_SOURCE": "BROWSER_FIXTURE",
+  "AUTH_SOURCE": "HARNESS_SEEDED_SESSION",
+  "scenario": "settings-plc-b0",
+  "url": "http://127.0.0.1:5422/studio/index.html#/settings",
+  "viewport": {
+    "width": 1920,
+    "height": 1080
+  },
+  "observedViewport": {
+    "width": 1920,
+    "height": 1080
+  },
+  "theme": "light",
+  "observedTheme": "light",
+  "density": "compact",
+  "observedDensity": "compact",
+  "dpr": {
+    "type": "BROWSER_EMULATED_DPR",
+    "value": 1,
+    "windowsDpi": "NOT_PERFORMED"
+  },
+  "horizontalOverflow": 0,
+  "requestMethods": [
+    {
+      "method": "GET",
+      "path": "/api/auth/setup-status",
+      "url": "http://127.0.0.1:5422/api/auth/setup-status"
+    },
+    {
+      "method": "GET",
+      "path": "/api/auth/me",
+      "url": "http://127.0.0.1:5422/api/auth/me"
+    },
+    {
+      "method": "GET",
+      "path": "/health",
+      "url": "http://127.0.0.1:5422/health"
+    },
+    {
+      "method": "GET",
+      "path": "/api/settings",
+      "url": "http://127.0.0.1:5422/api/settings"
+    },
+    {
+      "method": "GET",
+      "path": "/api/plc/settings",
+      "url": "http://127.0.0.1:5422/api/plc/settings"
+    },
+    {
+      "method": "GET",
+      "path": "/api/plc/mappings",
+      "url": "http://127.0.0.1:5422/api/plc/mappings"
+    }
+  ],
+  "consoleErrors": [],
+  "pageErrors": [],
+  "screenshot": {
+    "fileName": "settings-plc-b0-1920x1080-light-compact.png",
+    "sha256": "EF245E2BD5591E6B05628B6AD526E9FAA43C453459EC5C000FBFDF4E255ECE16",
+    "bytes": 92626
+  }
+}

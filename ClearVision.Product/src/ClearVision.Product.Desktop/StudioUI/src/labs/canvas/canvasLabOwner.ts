@@ -75,6 +75,7 @@ interface ActiveCanvasOwner {
   identity: CanvasIdentityResult;
   validation: readonly CanvasValidationCase[];
   unsubscribe: () => void;
+  diagnosticsSuppressed: boolean;
   disposed: boolean;
 }
 
@@ -132,7 +133,13 @@ function serializeWithEnvelope(owner: ActiveCanvasOwner): OperatorFlowDto {
   });
 }
 
-function buildValidationMatrix(host: CanonicalFlowCanvasHost): readonly CanvasValidationCase[] {
+function buildValidationMatrix(
+  host: CanonicalFlowCanvasHost,
+  fixtureId: CanvasFixtureId
+): readonly CanvasValidationCase[] {
+  if (fixtureId !== 'canonical') {
+    return Object.freeze([]);
+  }
   const ids = CANVAS_FIXTURE_IDS;
   const cases: readonly CanvasValidationExpectation[] = [
     {
@@ -193,6 +200,35 @@ function buildValidationMatrix(host: CanonicalFlowCanvasHost): readonly CanvasVa
   })));
 }
 
+function withoutDiagnostics<T>(owner: ActiveCanvasOwner, operation: () => T): T {
+  owner.diagnosticsSuppressed = true;
+  try {
+    return operation();
+  } finally {
+    owner.diagnosticsSuppressed = false;
+  }
+}
+
+function disposeHostResources(
+  host: CanonicalFlowCanvasHost | undefined,
+  unsubscribe?: () => void
+): unknown {
+  let firstError: unknown;
+  const attempt = (operation: (() => void) | undefined): void => {
+    if (!operation) return;
+    try {
+      operation();
+    } catch (error) {
+      firstError ??= error;
+    }
+  };
+
+  attempt(unsubscribe);
+  attempt(host ? () => host.disposeInteraction() : undefined);
+  attempt(host ? () => host.disposeAdapter() : undefined);
+  return firstError;
+}
+
 function diagnosticsFor(owner: ActiveCanvasOwner): CanvasLabDiagnostics {
   return freezeDiagnostics({
     status: 'mounted',
@@ -247,6 +283,7 @@ export function mountCanvasLab(options: MountCanvasLabOptions): CanvasLabControl
   const fixtureId = options.initialFixtureId ?? 'canonical';
   const fixture = getCanvasFixture(fixtureId);
   let host: CanonicalFlowCanvasHost | undefined;
+  let ownerForCleanup: ActiveCanvasOwner | undefined;
 
   try {
     host = createCanonicalFlowCanvasHost(options.canvasId, fixture);
@@ -261,16 +298,18 @@ export function mountCanvasLab(options: MountCanvasLabOptions): CanvasLabControl
       identity: notRunIdentity,
       validation: Object.freeze([]),
       unsubscribe: () => {},
+      diagnosticsSuppressed: false,
       disposed: false
     };
+    ownerForCleanup = owner;
 
     generation = owner.generation;
     totalMounts += 1;
     activeOwner = owner;
     reportCanvasOwnerCountForDiagnostics(1);
-    owner.validation = buildValidationMatrix(host);
+    owner.validation = buildValidationMatrix(host, fixtureId);
     owner.unsubscribe = host.subscribe(() => {
-      if (!owner.disposed && activeOwner?.token === owner.token) {
+      if (!owner.disposed && !owner.diagnosticsSuppressed && activeOwner?.token === owner.token) {
         emitDiagnostics(owner);
       }
     });
@@ -281,24 +320,29 @@ export function mountCanvasLab(options: MountCanvasLabOptions): CanvasLabControl
       loadFixture(nextFixtureId: CanvasFixtureId): void {
         assertCurrentOwner(owner);
         const nextFixture = getCanvasFixture(nextFixtureId);
-        owner.host.replaceFlow(nextFixture);
-        owner.fixtureId = nextFixtureId;
-        owner.flowId = nextFixture.id;
-        owner.flowName = nextFixture.name;
-        owner.identity = notRunIdentity;
+        withoutDiagnostics(owner, () => {
+          owner.host.replaceFlow(nextFixture);
+          owner.fixtureId = nextFixtureId;
+          owner.flowId = nextFixture.id;
+          owner.flowName = nextFixture.name;
+          owner.identity = notRunIdentity;
+          owner.validation = buildValidationMatrix(owner.host, nextFixtureId);
+        });
         emitDiagnostics(owner);
       },
       runIdentityRoundTrip(): CanvasIdentityResult {
         assertCurrentOwner(owner);
-        const before = serializeWithEnvelope(owner);
-        const beforeFingerprint = createFlowIdentityFingerprint(before);
-        owner.host.replaceFlow(before);
-        const after = serializeWithEnvelope(owner);
-        const afterFingerprint = createFlowIdentityFingerprint(after);
-        owner.identity = Object.freeze({
-          state: beforeFingerprint === afterFingerprint ? 'pass' : 'fail',
-          beforeFingerprint,
-          afterFingerprint
+        withoutDiagnostics(owner, () => {
+          const before = serializeWithEnvelope(owner);
+          const beforeFingerprint = createFlowIdentityFingerprint(before);
+          owner.host.replaceFlow(before);
+          const after = serializeWithEnvelope(owner);
+          const afterFingerprint = createFlowIdentityFingerprint(after);
+          owner.identity = Object.freeze({
+            state: beforeFingerprint === afterFingerprint ? 'pass' : 'fail',
+            beforeFingerprint,
+            afterFingerprint
+          });
         });
         emitDiagnostics(owner);
         return owner.identity;
@@ -318,24 +362,7 @@ export function mountCanvasLab(options: MountCanvasLabOptions): CanvasLabControl
         }
 
         owner.disposed = true;
-        let disposalError: unknown;
-        try {
-          owner.unsubscribe();
-        } catch (error) {
-          disposalError = error;
-        }
-
-        try {
-          owner.host.disposeInteraction();
-        } catch (error) {
-          disposalError ??= error;
-        }
-
-        try {
-          owner.host.disposeAdapter();
-        } catch (error) {
-          disposalError ??= error;
-        }
+        const disposalError = disposeHostResources(owner.host, owner.unsubscribe);
 
         activeOwner = undefined;
         reportCanvasOwnerCountForDiagnostics(0);
@@ -361,11 +388,11 @@ export function mountCanvasLab(options: MountCanvasLabOptions): CanvasLabControl
       }
     });
   } catch (error) {
-    try {
-      host?.disposeInteraction();
-    } finally {
-      host?.disposeAdapter();
+    if (ownerForCleanup) {
+      ownerForCleanup.disposed = true;
+      ownerForCleanup.diagnosticsSuppressed = true;
     }
+    const cleanupError = disposeHostResources(host, ownerForCleanup?.unsubscribe);
     if (activeOwner?.host === host) {
       activeOwner = undefined;
       reportCanvasOwnerCountForDiagnostics(0);
@@ -379,7 +406,9 @@ export function mountCanvasLab(options: MountCanvasLabOptions): CanvasLabControl
       totalDisposals,
       fixtureId,
       fixtureName: fixture.name,
-      lastError: errorMessage(error),
+      lastError: cleanupError === undefined
+        ? errorMessage(error)
+        : `${errorMessage(error)} Cleanup: ${errorMessage(cleanupError)}`,
       identity: notRunIdentity,
       validation: Object.freeze([]),
       runtime: host?.getRuntimeSnapshot() ?? null

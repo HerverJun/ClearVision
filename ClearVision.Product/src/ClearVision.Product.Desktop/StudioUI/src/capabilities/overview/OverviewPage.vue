@@ -3,13 +3,10 @@ import { computed, onBeforeUnmount, onMounted } from 'vue';
 import { RouterLink } from 'vue-router';
 import {
   CvButton,
-  CvDescriptionList,
   CvInlineAlert,
   CvPageHeader,
   CvPageState,
-  CvPanel,
-  CvStatusBadge,
-  type CvDescriptionItem
+  CvPanel
 } from '@/design-system';
 import { CvIcon } from '@/design-system/icons';
 import {
@@ -32,13 +29,31 @@ const systemStatus = computed(() => runtime.systemStatus.projection);
 const canViewDiagnostics = computed(() => session.value.user?.role === 'Admin' ||
   session.value.user?.role === 'Engineer');
 const canRunInspection = computed(() => canViewDiagnostics.value);
-const systemItems = computed<readonly CvDescriptionItem[]>(() => [
-  { key: 'message', label: '状态说明', value: systemStatus.value.message },
-  { key: 'updated', label: '最近确认', value: formatUpdatedAt(systemStatus.value.updatedAt) }
-]);
-const sessionItems = computed<readonly CvDescriptionItem[]>(() => [
-  { key: 'role', label: '角色', value: formatRole(session.value.user?.role) },
-  { key: 'message', label: '会话状态', value: session.value.message }
+const environmentFacts = computed(() => [
+  {
+    key: 'service',
+    label: '本地服务',
+    value: systemStatus.value.phase === 'online'
+      ? '在线'
+      : systemStatus.value.phase === 'loading'
+        ? '连接中'
+        : systemStatus.value.phase === 'stale'
+          ? '状态过期'
+          : '离线',
+    tone: systemStatus.value.phase === 'online'
+      ? 'ok'
+      : systemStatus.value.phase === 'loading'
+        ? 'info'
+        : systemStatus.value.phase === 'stale'
+          ? 'warning'
+          : 'error',
+    detail: formatHealthStatus(systemStatus.value.health?.status)
+  },
+  { key: 'message', label: '状态说明', value: systemStatus.value.message, tone: 'default', detail: null },
+  { key: 'updated', label: '最近确认', value: formatUpdatedAt(systemStatus.value.updatedAt), tone: 'default', detail: null },
+  { key: 'session', label: '当前会话', value: session.value.user?.username ?? '未提供会话', tone: 'default', detail: null },
+  { key: 'role', label: '角色', value: formatRole(session.value.user?.role) ?? '无', tone: 'default', detail: null },
+  { key: 'session-state', label: '会话状态', value: session.value.message, tone: 'default', detail: null }
 ]);
 
 const dateTimeFormatter = new Intl.DateTimeFormat('zh-CN', {
@@ -97,7 +112,7 @@ onBeforeUnmount(() => {
   >
     <CvPageHeader
       title="工作台"
-      description="继续最近工程，查看当前运行环境与可用功能。"
+      description="继续最近工作，查看当前运行环境与可用功能。"
     >
       <template #actions>
         <CvButton
@@ -272,37 +287,25 @@ onBeforeUnmount(() => {
         :padded="false"
       >
         <div class="overview-page__environment-grid">
-          <section aria-label="本地服务状态">
-            <div class="overview-page__context-heading">
-              <span>本地服务</span>
-              <CvStatusBadge
-                :tone="systemStatus.phase === 'online' ? 'ok' : systemStatus.phase === 'stale' ? 'warning' : systemStatus.phase === 'loading' ? 'info' : 'error'"
-                :label="systemStatus.phase === 'online' ? '在线' : systemStatus.phase === 'loading' ? '连接中' : systemStatus.phase === 'stale' ? '状态过期' : '离线'"
-              />
+          <dl
+            role="region"
+            aria-label="运行环境与当前会话"
+          >
+            <div
+              v-for="fact in environmentFacts"
+              :key="fact.key"
+              class="overview-page__environment-fact"
+            >
+              <dt>{{ fact.label }}</dt>
+              <dd
+                :data-tone="fact.tone"
+                :title="`${fact.label}：${fact.value}${fact.detail ? `；${fact.detail}` : ''}`"
+              >
+                <span>{{ fact.value }}</span>
+                <small v-if="fact.detail">{{ fact.detail }}</small>
+              </dd>
             </div>
-            <strong class="overview-page__context-value">{{ formatHealthStatus(systemStatus.health?.status) }}</strong>
-            <CvDescriptionList
-              :items="systemItems"
-              :columns="1"
-              label="本地服务状态"
-            />
-          </section>
-
-          <section aria-label="当前会话状态">
-            <div class="overview-page__context-heading">
-              <span>当前会话</span>
-              <CvStatusBadge
-                :tone="session.phase === 'authenticated' ? 'ok' : session.phase === 'stale' ? 'warning' : session.phase === 'loading' ? 'info' : 'idle'"
-                :label="session.phase === 'authenticated' ? '已认证' : session.phase === 'loading' ? '确认中' : session.phase === 'stale' ? '会话过期' : '未认证'"
-              />
-            </div>
-            <strong class="overview-page__context-value">{{ session.user?.username ?? '未提供会话' }}</strong>
-            <CvDescriptionList
-              :items="sessionItems"
-              :columns="1"
-              label="当前会话状态"
-            />
-          </section>
+          </dl>
         </div>
       </CvPanel>
 
@@ -320,7 +323,7 @@ onBeforeUnmount(() => {
         >
           <RouterLink to="/projects">
             <CvIcon name="projects" />
-            <span><strong>工程</strong><small>配置流程与工程资产</small></span>
+            <strong>工程</strong>
             <CvIcon
               name="chevron-right"
               size="sm"
@@ -331,7 +334,7 @@ onBeforeUnmount(() => {
             to="/inspection"
           >
             <CvIcon name="play" />
-            <span><strong>连续检测</strong><small>进入正式运行控制</small></span>
+            <strong>连续检测</strong>
             <CvIcon
               name="chevron-right"
               size="sm"
@@ -339,7 +342,7 @@ onBeforeUnmount(() => {
           </RouterLink>
           <RouterLink to="/results">
             <CvIcon name="results" />
-            <span><strong>检测结果</strong><small>调查本机与工作站结果</small></span>
+            <strong>检测结果</strong>
             <CvIcon
               name="chevron-right"
               size="sm"
@@ -350,7 +353,7 @@ onBeforeUnmount(() => {
             to="/diagnostics"
           >
             <CvIcon name="diagnostics" />
-            <span><strong>诊断</strong><small>核对应用、宿主与服务状态</small></span>
+            <strong>诊断</strong>
             <CvIcon
               name="chevron-right"
               size="sm"
@@ -358,7 +361,7 @@ onBeforeUnmount(() => {
           </RouterLink>
           <RouterLink to="/about">
             <CvIcon name="about" />
-            <span><strong>关于</strong><small>查看版本与支持信息</small></span>
+            <strong>关于</strong>
             <CvIcon
               name="chevron-right"
               size="sm"
@@ -498,37 +501,55 @@ onBeforeUnmount(() => {
 
 .overview-page__context-grid {
   display: grid;
-  grid-template-columns: minmax(0, 1.55fr) minmax(300px, .65fr);
+  grid-template-columns: minmax(0, 1fr);
   align-items: start;
-  gap: var(--cv-space-8);
+  gap: var(--cv-density-page-gap);
 }
 .overview-page__environment-grid {
+  border: 1px solid var(--cv-border-subtle);
+  border-radius: var(--cv-radius-sm);
+  background: var(--cv-surface-raised);
+}
+.overview-page__environment-grid dl {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  border-top: 1px solid var(--cv-border-subtle);
-  background: transparent;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  margin: 0;
 }
-.overview-page__environment-grid > section { min-width: 0; padding: var(--cv-space-4) 0; }
-.overview-page__environment-grid > section:first-child { padding-right: var(--cv-space-5); }
-.overview-page__environment-grid > section:last-child { padding-left: var(--cv-space-5); }
-.overview-page__environment-grid > section + section { border-inline-start: 1px solid var(--cv-border-subtle); }
-.overview-page__context-heading {
+.overview-page__environment-fact {
   display: flex;
+  min-width: 0;
   align-items: center;
-  justify-content: space-between;
-  gap: var(--cv-space-3);
-  margin-bottom: var(--cv-space-2);
-  color: var(--cv-text-secondary);
-  font-size: var(--cv-font-size-sm);
+  justify-content: center;
+  gap: var(--cv-space-2);
+  min-height: 56px;
+  padding: var(--cv-space-2) var(--cv-space-3);
 }
-.overview-page__context-value {
-  display: block;
-  margin-bottom: var(--cv-space-3);
+.overview-page__environment-fact + .overview-page__environment-fact {
+  border-inline-start: 1px solid var(--cv-border-subtle);
+}
+.overview-page__environment-fact dt {
+  color: var(--cv-text-secondary);
+  font-size: var(--cv-font-size-xs);
+  white-space: nowrap;
+}
+.overview-page__environment-fact dd {
+  display: flex;
+  min-width: 0;
+  align-items: baseline;
+  gap: var(--cv-space-1);
+  margin: 0;
+  overflow: hidden;
   color: var(--cv-text-primary);
-  overflow-wrap: anywhere;
   font-size: var(--cv-font-size-sm);
   font-weight: var(--cv-font-weight-medium);
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
+.overview-page__environment-fact dd[data-tone="ok"] { color: var(--cv-color-status-ok-strong); }
+.overview-page__environment-fact dd[data-tone="info"] { color: var(--cv-color-status-info-strong); }
+.overview-page__environment-fact dd[data-tone="warning"] { color: var(--cv-color-status-warning-strong); }
+.overview-page__environment-fact dd[data-tone="error"] { color: var(--cv-color-status-error-strong); }
+.overview-page__environment-fact dd small { color: var(--cv-text-muted); font-size: var(--cv-font-size-2xs); }
 
 .overview-page__quick-links {
   display: grid;
@@ -540,7 +561,7 @@ onBeforeUnmount(() => {
   grid-template-columns: 20px minmax(0, 1fr) 16px;
   align-items: center;
   gap: var(--cv-space-3);
-  min-height: 52px;
+  min-height: 48px;
   padding: var(--cv-space-2) var(--cv-space-3);
   border-bottom: 1px solid var(--cv-border-subtle);
   color: var(--cv-text-primary);
@@ -549,18 +570,31 @@ onBeforeUnmount(() => {
 }
 .overview-page__quick-links a:hover { background: var(--cv-interactive-hover); }
 .overview-page__quick-links a:focus-visible { outline: none; box-shadow: inset var(--cv-focus-ring); }
-.overview-page__quick-links a > span { display: grid; min-width: 0; gap: 2px; }
-.overview-page__quick-links strong,
-.overview-page__quick-links small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.overview-page__quick-links strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .overview-page__quick-links strong { font-size: var(--cv-font-size-sm); font-weight: var(--cv-font-weight-medium); }
-.overview-page__quick-links small { color: var(--cv-text-secondary); font-size: var(--cv-font-size-xs); }
 .overview-page__quick-links a > :last-child { color: var(--cv-text-muted); }
+
+@media (min-width: 1920px) {
+  .overview-page.overview-page {
+    position: relative;
+    left: 4.5px;
+    width: 1763px;
+    max-width: 1763px;
+  }
+  .overview-page__resume-section {
+    min-height: 274px;
+    margin-top: 46.1875px;
+  }
+}
 
 @media (max-width: 1180px) {
   .overview-page__resume { grid-template-columns: minmax(0, 1fr) auto; }
   .overview-page__resume-time { grid-column: 1; grid-row: 2; }
   .overview-page__resume-actions { grid-column: 2; grid-row: 1 / span 2; }
   .overview-page__context-grid { grid-template-columns: 1fr; }
+  .overview-page__environment-grid dl { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .overview-page__environment-fact:nth-child(4) { border-inline-start: 0; }
+  .overview-page__environment-fact:nth-child(n + 4) { border-block-start: 1px solid var(--cv-border-subtle); }
 }
 
 @media (max-width: 760px) {
@@ -569,13 +603,13 @@ onBeforeUnmount(() => {
   .overview-page__resume-actions { grid-column: 1; grid-row: auto; }
   .overview-page__resume-actions { justify-content: space-between; }
   .overview-page__project-list,
-  .overview-page__environment-grid,
   .overview-page__quick-links { grid-template-columns: 1fr; }
+  .overview-page__environment-grid dl { grid-template-columns: 1fr; }
+  .overview-page__environment-fact { justify-content: space-between; }
+  .overview-page__environment-fact + .overview-page__environment-fact,
+  .overview-page__environment-fact:nth-child(4) { border-block-start: 1px solid var(--cv-border-subtle); border-inline-start: 0; }
   .overview-page__project-list li:nth-child(odd),
   .overview-page__quick-links a:nth-child(odd) { border-inline-end: 0; }
-  .overview-page__project-list li + li,
-  .overview-page__environment-grid > section + section { border-block-start: 1px solid var(--cv-border-subtle); border-inline-start: 0; }
-  .overview-page__environment-grid > section:first-child,
-  .overview-page__environment-grid > section:last-child { padding: var(--cv-space-4) 0; }
+  .overview-page__project-list li + li { border-block-start: 1px solid var(--cv-border-subtle); border-inline-start: 0; }
 }
 </style>

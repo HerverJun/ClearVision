@@ -32,6 +32,7 @@ function earlierRecentProject(): Record<string, unknown> {
 }
 
 type GetImplementation = (path: string, options?: ApiGetOptions) => Promise<unknown>;
+type SystemStatusPhase = OverviewRuntime['systemStatus']['projection']['phase'];
 
 function apiWith(implementation: GetImplementation): ApiTransport {
   return {
@@ -42,7 +43,7 @@ function apiWith(implementation: GetImplementation): ApiTransport {
   };
 }
 
-function createRuntime(api: ApiTransport): OverviewRuntime {
+function createRuntime(api: ApiTransport, systemStatusPhase: SystemStatusPhase = 'online'): OverviewRuntime {
   return {
     queries: createReadQueryClient(api),
     session: {
@@ -57,9 +58,11 @@ function createRuntime(api: ApiTransport): OverviewRuntime {
     },
     systemStatus: {
       projection: {
-        phase: 'online',
-        health: { status: 'Healthy', port: 5000, healthy: true },
-        message: '本地服务在线',
+        phase: systemStatusPhase,
+        health: systemStatusPhase === 'loading' || systemStatusPhase === 'offline'
+          ? null
+          : { status: 'Healthy', port: 5000, healthy: true },
+        message: systemStatusPhase === 'online' ? '本地服务在线' : `本地服务状态：${systemStatusPhase}`,
         updatedAt: Date.now()
       },
       refresh: vi.fn(async () => {})
@@ -98,6 +101,15 @@ describe('Overview page', () => {
     expect(wrapper.text()).toContain('健康');
     expect(wrapper.text()).toContain('operator-a');
     expect(wrapper.text()).toContain('操作员');
+    const environmentRegion = wrapper.get('[role="region"][aria-label="运行环境与当前会话"]');
+    const environmentFacts = new Map(environmentRegion.findAll('.overview-page__environment-fact').map(fact => [
+      fact.get('dt').text(),
+      fact.get('dd')
+    ]));
+    expect(environmentFacts.get('当前会话')?.text()).toBe('operator-a');
+    expect(environmentFacts.get('角色')?.text()).toBe('操作员');
+    expect(environmentFacts.get('会话状态')?.text()).toBe('会话有效');
+    expect(environmentFacts.get('本地服务')?.attributes('title')).toBe('本地服务：在线；健康');
     expect(wrapper.get('.overview-page__resume-section .cv-panel__title').text()).toBe('继续工作');
     expect(wrapper.findAll(`a[href="/projects/${projectId}"]`).map(link => link.text())).toContain('查看详情');
     expect(wrapper.get('a[href="/projects/11111111-1111-4111-8111-111111111111/workspace"]').text()).toBe('继续配置');
@@ -107,6 +119,39 @@ describe('Overview page', () => {
     expect(requestedPaths).toEqual(['projects/recent?count=5']);
     expect(requestedPaths).not.toContain('/health');
     expect(requestedPaths).not.toContain('auth/me');
+
+    wrapper.unmount();
+    runtime.queries.dispose();
+  });
+
+  it.each([
+    ['online', 'ok'],
+    ['loading', 'info'],
+    ['stale', 'warning'],
+    ['offline', 'error']
+  ] as const)('projects the %s service phase with the %s tone', async (phase, tone) => {
+    const runtime = createRuntime(apiWith(async () => []), phase);
+    const router = createRouter({
+      history: createMemoryHistory(),
+      routes: [
+        { path: '/overview', component: { template: '<div />' } },
+        { path: '/projects', component: { template: '<div />' } },
+        { path: '/results', component: { template: '<div />' } },
+        { path: '/about', component: { template: '<div />' } }
+      ]
+    });
+    await router.push('/overview');
+    await router.isReady();
+
+    const wrapper = mount(OverviewPage, {
+      props: { runtime },
+      global: { plugins: [router] }
+    });
+    await flushPromises();
+
+    const serviceFact = wrapper.findAll('.overview-page__environment-fact')
+      .find(fact => fact.get('dt').text() === '本地服务');
+    expect(serviceFact?.get('dd').attributes('data-tone')).toBe(tone);
 
     wrapper.unmount();
     runtime.queries.dispose();

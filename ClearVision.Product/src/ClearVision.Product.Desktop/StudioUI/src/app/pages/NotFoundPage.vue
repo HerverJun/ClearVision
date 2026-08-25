@@ -1,10 +1,18 @@
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, nextTick, onMounted, shallowRef } from 'vue';
 import { useRoute } from 'vue-router';
 import { CvPageState } from '@/design-system/patterns';
 
 const route = useRoute();
 const isRouteLoadFailure = computed(() => route.query.reason === 'route-load');
+const standalone = computed(() => route.name === 'not-found');
+const pageRoot = shallowRef<HTMLElement>();
+
+onMounted(async () => {
+  if (!standalone.value) return;
+  await nextTick();
+  pageRoot.value?.focus({ preventScroll: true });
+});
 
 function reloadApplication(): void {
   window.location.reload();
@@ -12,9 +20,13 @@ function reloadApplication(): void {
 </script>
 
 <template>
-  <section
+  <component
+    :is="standalone ? 'main' : 'section'"
+    ref="pageRoot"
     class="product-page-state"
+    :class="{ 'product-page-state--standalone': standalone }"
     data-studio-page="not-found"
+    :tabindex="standalone ? -1 : undefined"
   >
     <CvPageState
       :kind="isRouteLoadFailure ? 'error' : 'not-found'"
@@ -38,15 +50,18 @@ function reloadApplication(): void {
           class="product-page-state__action"
           to="/projects"
         >
-          返回概览
+          返回工程库
         </RouterLink>
       </template>
     </CvPageState>
-  </section>
+  </component>
 </template>
 
 <style scoped>
 .product-page-state { width: min(680px, 100%); margin: 8vh auto 0; }
+.product-page-state--standalone { width: 100%; min-height: 100vh; min-height: 100svh; margin: 0; padding: var(--cv-space-6); display: grid; place-items: center; background: var(--cv-surface-page); }
+.product-page-state--standalone :deep(.cv-page-state) { width: min(680px, 100%); }
+.product-page-state--standalone:focus-visible { outline-offset: -2px; }
 .product-page-state__action { min-height: var(--cv-density-control-height); padding: 0 var(--cv-space-4); display: inline-flex; align-items: center; border: 1px solid var(--cv-control-border); border-radius: var(--cv-radius-sm); background: var(--cv-surface-raised); color: var(--cv-text-primary); font-size: var(--cv-font-size-sm); font-weight: var(--cv-font-weight-medium); text-decoration: none; }
 .product-page-state__action:hover { border-color: var(--cv-control-border-hover); background: var(--cv-interactive-hover); }
 </style>

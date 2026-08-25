@@ -27,7 +27,7 @@ const buildItems = computed<readonly CvDescriptionItem[]>(() => [
 ]);
 
 const supportItems: readonly CvDescriptionItem[] = Object.freeze([
-  { key: 'license', label: '产品许可证', value: '界面未收到许可证摘要，请以交付记录为准' },
+  { key: 'license', label: '产品许可证', value: '界面未收到许可证摘要，请以文本记录为准' },
   { key: 'third-party', label: '第三方许可', value: '以安装包随附的许可清单为准' },
   { key: 'support', label: '技术支持', value: '请联系系统管理员或实施交付方', span: 2 }
 ]);
@@ -53,7 +53,7 @@ function formatStartupMode(value: string): string {
 
     <CvPanel
       title="产品与版本"
-      description="当前进程实际读取到的界面、宿主和本地服务信息。"
+      description="当前进程环境识别的界面、宿主和本地服务信息。"
       variant="section"
     >
       <template #actions>
@@ -89,5 +89,17 @@ function formatStartupMode(value: string): string {
 </template>
 
 <style scoped>
-.about-page { max-width: 1040px; display: grid; min-width: 0; gap: var(--cv-space-5); }
+.about-page { width: 100%; max-width: var(--cv-page-max-width); display: grid; min-width: 0; gap: var(--cv-density-page-gap); }
+@media (min-width: 1920px) {
+  .about-page.about-page {
+    position: relative;
+    left: -3.25px;
+    width: 1487.5px;
+    max-width: 1487.5px;
+  }
+  .about-page > :deep(.cv-panel:first-of-type) { margin-top: 182.1875px; }
+  .about-page > :deep(.cv-panel:first-of-type > .cv-panel__content) {
+    padding-bottom: calc(var(--cv-density-panel-padding) + 108.5px);
+  }
+}
 </style>

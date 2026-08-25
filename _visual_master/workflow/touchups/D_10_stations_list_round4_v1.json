@@ -1,0 +1,41 @@
+{
+  "schema_version": "clearvision-controlled-picture-layer-touchup.v1",
+  "entry_id": "D_10_stations_list",
+  "source_iteration": "option_D/iterations/10_stations_list_v12.png",
+  "source_sha256": "ef90233a012ff8bdc7b37c62b8f267fdfb0f887415e310311ef0bbe9caebab65",
+  "purpose": "Remove only invented OS chrome, restore the verified refresh action and correct the exact recovery warning.",
+  "operations": [
+    {
+      "type": "copy_rect",
+      "source_box": [0, 52, 2047, 1151],
+      "box": [0, 0, 2047, 1099],
+      "purpose": "Shift the complete product surface upward without scaling."
+    },
+    {
+      "type": "fill_rect",
+      "box": [0, 1100, 2047, 1151],
+      "fill": [249, 250, 252],
+      "purpose": "Fill only the vacated blank page area."
+    },
+    {
+      "type": "paste_reference",
+      "reference_path": "current/r2/S08-B0.png",
+      "reference_sha256": "f59f3c1283d5596c39d7d52632fcf92e862a5085364a74a7c72fe86537457405",
+      "source_box": [1791, 79, 1821, 109],
+      "box": [1923, 111, 1965, 153],
+      "purpose": "Restore the verified page refresh icon button from CURRENT."
+    },
+    {
+      "type": "replace_text",
+      "box": [145, 416, 1080, 449],
+      "fill": [255, 249, 240],
+      "position": [148, 420],
+      "text": "当前保留上次成功读取；恢复期间按服务端状态重新同步。",
+      "font_path": "C:\\Windows\\Fonts\\msyh.ttc",
+      "font_sha256": "e4b3b9d058750fb80899c24f68e35beda606ca92694eff0e9f7f91eec7a846aa",
+      "font_size": 15,
+      "text_fill": [74, 85, 97],
+      "purpose": "Use the exact current recovery explanation."
+    }
+  ]
+}

@@ -1,0 +1,69 @@
+{
+  "schema_version": "clearvision-controlled-picture-layer-touchup.v1",
+  "entry_id": "D_13_ai_workspace",
+  "source_iteration": "option_D/iterations/13_ai_workspace_v4.png",
+  "source_sha256": "5f165c5ca9070c5fccf0edad607e7d72c005bec15e49459995b74f5895960737",
+  "purpose": "Remove the remaining duplicated or unconfirmed shell facts and restore exact CURRENT labels without changing the accepted D AI composition.",
+  "operations": [
+    {
+      "type": "fill_rect",
+      "box": [1870, 95, 2038, 146],
+      "fill": [255, 254, 255],
+      "purpose": "Remove the duplicated header 查看技术身份 label; the verified disclosure remains in the right evidence rail."
+    },
+    {
+      "type": "replace_text",
+      "box": [975, 530, 1145, 570],
+      "fill": [255, 254, 255],
+      "position": [982, 539],
+      "text": "候选规模",
+      "font_path": "C:\\Windows\\Fonts\\msyh.ttc",
+      "font_sha256": "e4b3b9d058750fb80899c24f68e35beda606ca92694eff0e9f7f91eec7a846aa",
+      "font_size": 14,
+      "text_fill": [74, 85, 97],
+      "purpose": "Restore the exact CURRENT plan/build summary label."
+    },
+    {
+      "type": "replace_text",
+      "box": [1255, 530, 1438, 570],
+      "fill": [255, 254, 255],
+      "position": [1262, 539],
+      "text": "输入版本",
+      "font_path": "C:\\Windows\\Fonts\\msyh.ttc",
+      "font_sha256": "e4b3b9d058750fb80899c24f68e35beda606ca92694eff0e9f7f91eec7a846aa",
+      "font_size": 14,
+      "text_fill": [74, 85, 97],
+      "purpose": "Restore the exact CURRENT plan/build input-version label."
+    },
+    {
+      "type": "replace_text",
+      "box": [535, 716, 720, 752],
+      "fill": [255, 254, 255],
+      "position": [540, 723],
+      "text": "算子与连线",
+      "font_path": "C:\\Windows\\Fonts\\msyhbd.ttc",
+      "font_sha256": "06e1a30f687ab7d39f533447b21e84d51e0cecdaa6bfa060c87136b168811bdc",
+      "font_size": 16,
+      "text_fill": [74, 85, 97],
+      "purpose": "Restore the exact CURRENT candidate-difference label."
+    },
+    {
+      "type": "replace_text",
+      "box": [920, 716, 1100, 752],
+      "fill": [255, 254, 255],
+      "position": [925, 723],
+      "text": "参数确认",
+      "font_path": "C:\\Windows\\Fonts\\msyhbd.ttc",
+      "font_sha256": "06e1a30f687ab7d39f533447b21e84d51e0cecdaa6bfa060c87136b168811bdc",
+      "font_size": 16,
+      "text_fill": [74, 85, 97],
+      "purpose": "Restore the exact CURRENT candidate-difference label."
+    },
+    {
+      "type": "fill_rect",
+      "box": [265, 1085, 2047, 1151],
+      "fill": [255, 255, 255],
+      "purpose": "Remove unconfirmed and duplicated passive status facts while retaining the verified 会话版本 8 projection."
+    }
+  ]
+}

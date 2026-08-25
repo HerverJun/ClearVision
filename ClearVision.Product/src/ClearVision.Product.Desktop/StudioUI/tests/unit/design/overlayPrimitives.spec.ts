@@ -1,6 +1,6 @@
 import { mount } from '@vue/test-utils';
 import { h, nextTick } from 'vue';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { CvMenu, CvMenuItem, CvTooltip } from '@/design-system/primitives';
 
 afterEach(() => {
@@ -84,5 +84,30 @@ describe('Design System overlay primitives', () => {
     expect(wrapper.emitted('select')).toEqual([['compact']]);
     expect(wrapper.emitted('update:modelValue')?.at(-1)).toEqual([false]);
     wrapper.unmount();
+  });
+
+  it('removes every document and window listener when unmounted while open', async () => {
+    const documentAdd = vi.spyOn(document, 'addEventListener');
+    const documentRemove = vi.spyOn(document, 'removeEventListener');
+    const windowAdd = vi.spyOn(window, 'addEventListener');
+    const windowRemove = vi.spyOn(window, 'removeEventListener');
+    const wrapper = mount(CvMenu, {
+      attachTo: document.body,
+      props: { modelValue: true, label: '生命周期菜单', triggerLabel: '打开生命周期菜单' },
+      slots: { default: () => h(CvMenuItem, { value: 'inspect' }, () => '检查') }
+    });
+    await nextTick();
+
+    const pointerCall = documentAdd.mock.calls.find(([type]) => type === 'pointerdown');
+    const resizeCall = windowAdd.mock.calls.find(([type]) => type === 'resize');
+    const scrollCall = windowAdd.mock.calls.find(([type]) => type === 'scroll');
+    expect(pointerCall).toBeDefined();
+    expect(resizeCall).toBeDefined();
+    expect(scrollCall).toBeDefined();
+
+    wrapper.unmount();
+    expect(documentRemove).toHaveBeenCalledWith(...pointerCall!);
+    expect(windowRemove).toHaveBeenCalledWith(...resizeCall!);
+    expect(windowRemove).toHaveBeenCalledWith(...scrollCall!);
   });
 });

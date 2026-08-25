@@ -1,0 +1,123 @@
+{
+  "schema_version": "clearvision-controlled-picture-layer-touchup.v1",
+  "entry_id": "D_08_run_ng_modal",
+  "source_iteration": "option_D/iterations/08_run_ng_modal_v8.png",
+  "source_sha256": "f7534a63ea6f5de0a984a65567c6899bd6ede6dacfcec5c71da1ccb94d58e7e8",
+  "purpose": "Restore the immutable Round 8 gpt-image-2 modal and correct only the verified Product Shell, forbidden canvas action, recent-result heading, and CURRENT admission state.",
+  "operations": [
+    {
+      "type": "fill_rect",
+      "box": [295, 0, 742, 68],
+      "fill": [243, 244, 247],
+      "purpose": "Clear the incomplete top navigation before restoring the exact verified five entries."
+    },
+    {
+      "type": "replace_text",
+      "box": [315, 12, 380, 62],
+      "fill": [243, 244, 247],
+      "position": [325, 24],
+      "text": "概览",
+      "font_path": "C:\\Windows\\Fonts\\msyh.ttc",
+      "font_sha256": "e4b3b9d058750fb80899c24f68e35beda606ca92694eff0e9f7f91eec7a846aa",
+      "font_size": 16,
+      "text_fill": [45, 57, 70],
+      "purpose": "Restore verified Overview navigation."
+    },
+    {
+      "type": "replace_text",
+      "box": [395, 12, 460, 62],
+      "fill": [243, 244, 247],
+      "position": [405, 24],
+      "text": "工程",
+      "font_path": "C:\\Windows\\Fonts\\msyh.ttc",
+      "font_sha256": "e4b3b9d058750fb80899c24f68e35beda606ca92694eff0e9f7f91eec7a846aa",
+      "font_size": 16,
+      "text_fill": [45, 57, 70],
+      "purpose": "Restore verified Project navigation."
+    },
+    {
+      "type": "replace_text",
+      "box": [475, 12, 540, 62],
+      "fill": [243, 244, 247],
+      "position": [485, 24],
+      "text": "流程",
+      "font_path": "C:\\Windows\\Fonts\\msyh.ttc",
+      "font_sha256": "e4b3b9d058750fb80899c24f68e35beda606ca92694eff0e9f7f91eec7a846aa",
+      "font_size": 16,
+      "text_fill": [22, 111, 159],
+      "purpose": "Restore the one verified active Flow navigation entry."
+    },
+    {
+      "type": "fill_rect",
+      "box": [480, 64, 538, 68],
+      "fill": [22, 111, 159],
+      "purpose": "Restore the active Flow selection indicator."
+    },
+    {
+      "type": "replace_text",
+      "box": [555, 12, 650, 62],
+      "fill": [243, 244, 247],
+      "position": [565, 24],
+      "text": "检测结果",
+      "font_path": "C:\\Windows\\Fonts\\msyh.ttc",
+      "font_sha256": "e4b3b9d058750fb80899c24f68e35beda606ca92694eff0e9f7f91eec7a846aa",
+      "font_size": 16,
+      "text_fill": [45, 57, 70],
+      "purpose": "Restore verified Results navigation."
+    },
+    {
+      "type": "replace_text",
+      "box": [660, 12, 742, 62],
+      "fill": [243, 244, 247],
+      "position": [670, 24],
+      "text": "算子库",
+      "font_path": "C:\\Windows\\Fonts\\msyh.ttc",
+      "font_sha256": "e4b3b9d058750fb80899c24f68e35beda606ca92694eff0e9f7f91eec7a846aa",
+      "font_size": 16,
+      "text_fill": [45, 57, 70],
+      "purpose": "Restore verified Operator Catalog navigation."
+    },
+    {
+      "type": "replace_text",
+      "box": [1490, 0, 2047, 68],
+      "fill": [243, 244, 247],
+      "position": [1520, 24],
+      "text": "● 本地服务在线        更多        F   f03-engineer",
+      "font_path": "C:\\Windows\\Fonts\\msyh.ttc",
+      "font_sha256": "e4b3b9d058750fb80899c24f68e35beda606ca92694eff0e9f7f91eec7a846aa",
+      "font_size": 14,
+      "text_fill": [45, 57, 70],
+      "purpose": "Remove invented Windows, help, and notification controls while retaining the verified local-service and session context."
+    },
+    {
+      "type": "fill_rect",
+      "box": [505, 124, 615, 185],
+      "fill": [244, 245, 248],
+      "purpose": "Remove only the forbidden 适应画布 command."
+    },
+    {
+      "type": "replace_text",
+      "box": [1490, 500, 1630, 548],
+      "fill": [254, 254, 254],
+      "position": [1500, 511],
+      "text": "近期结果",
+      "font_path": "C:\\Windows\\Fonts\\msyh.ttc",
+      "font_sha256": "e4b3b9d058750fb80899c24f68e35beda606ca92694eff0e9f7f91eec7a846aa",
+      "font_size": 18,
+      "text_fill": [25, 28, 32],
+      "purpose": "Restore the verified recent-result heading."
+    },
+    {
+      "type": "replace_text",
+      "box": [1005, 912, 1135, 952],
+      "fill": [254, 254, 254],
+      "position": [1016, 919],
+      "text": "● 不适用",
+      "font_path": "C:\\Windows\\Fonts\\msyh.ttc",
+      "font_sha256": "e4b3b9d058750fb80899c24f68e35beda606ca92694eff0e9f7f91eec7a846aa",
+      "font_size": 14,
+      "text_fill": [88, 102, 116],
+      "purpose": "Restore CURRENT 运行包 / 不适用 without changing the 6/7 admission result."
+    }
+  ]
+}

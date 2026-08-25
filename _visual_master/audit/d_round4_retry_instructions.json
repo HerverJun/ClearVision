@@ -1,0 +1,25 @@
+{
+  "schema_version": "clearvision-ui-iteration-instructions.v1",
+  "option": "D",
+  "round": 4,
+  "reference_mode": "current-dominant",
+  "functional_authority": "CURRENT screenshot plus current ClearVision code",
+  "instructions": {
+    "D_02_overview": "严格恢复 CURRENT Product Shell：顶栏只显示概览（当前激活）、工程、检测结果、算子库，并保留本地服务、外观 浅色·紧凑、更多和当前用户上下文。工程、连续检测、检测结果、诊断、关于五项只能位于下方现有功能 launcher，不能提升为顶栏。保留继续工作、最近工程、运行环境、刷新、查看全部工程和继续配置；不要新增 KPI、状态 tag、遥测、卡片仪表盘或新入口。",
+    "D_03_projects_data": "删除左侧图标 rail 和任何第二导航。完整恢复 CURRENT Product Shell 四项导航及本地服务、外观 浅色·紧凑、更多、用户；恢复页头说明“查找、打开并管理本机工程。”和“1个工程”。保留刷新、JSON 导入、新建、按名称或描述搜索、搜索按钮、最近修改/最近创建/名称排序、真实表头、查看详情/打开/导出/删除、分页与加载/无权/失败反馈。项目行数据必须跟随 CURRENT，描述使用“稳定工程摘要”或留空，绝不改写或填造。",
+    "D_04_projects_empty": "保持与 CURRENT 有数据工程页相同的 Product Shell 和命令区；恢复“0个工程”、搜索 placeholder“按名称或描述搜索...”及明确的“最近修改”排序值。保留刷新、JSON 导入、新建工程、搜索、排序、暂无工程说明和现有重复创建入口。空态必须位于连续、无框的列表字段中，不要用大圆角卡片、插画、示例、统计、向导、第二导航或新功能。",
+    "D_06_flow_validation_error": "以 CURRENT S04-B2 和 D Flow Master 为边界，保持唯一 FlowCanvas 约占可用区 65-75%。恢复全局变量、运行包、流程模板入口；保留真实算子搜索/分类/最近/收藏和画布编辑命令。Inspector 必须显示节点身份、端口/输出、资源绑定、FilePath/选择文件、Text，并把“数量不能大于10”校验直接贴在数量字段本体，不得另造通用错误模块。Preview/Result rail 保留结果摘要、ROI、结构化结果、附加结果和诊断空态。删除未确认工作流选择器、Fit、全屏、自动修复、新规则、新动作、新节点和第二画布。",
+    "D_07_flow_preview_roi": "只呈现一个 ROI 编辑时刻和一个 Preview 上下文，手动预览是单一操作按钮而不是第二 Tab/模式。必须复用绑定的 100x100 CURRENT artifact，不生成新图；Rectangle 草稿只能是 X=10、Y=10、Width=30、Height=20，并保留 CURRENT 的真实结果投影，禁止 ROI_X、ROI_Y、ROI_Area、算法 N/A 等自造数据。ROI 控件只含 Rectangle、X/Y/Width/Height、撤销、重做、放弃、应用；删除锁定纵横比和定位基准。保留真实图像工具、结果摘要/关键/结构化/附加/诊断，并在放弃/应用附近标明未保存草稿边界。",
+    "D_08_run_ng_modal": "保持单一运行详情 modal 覆盖原 FlowCanvas。项目名必须是 CURRENT 的“瓶盖检测 A”；顶部区分“正式运行完成/运行状态已同步”和判定 NG，正文恢复“运行与设备：正式运行完成，判定 NG”，不能把 NG 当执行阶段。保留六项真实指标、准入 6/7 及七项检查、近期结果 NG 与查看本次结果/诊断、重新检查、同一正式运行重跑和关闭。技术信息只显示保存修订、执行快照、流程 hash、判定 hash、会话等真实投影；无证据用 --。删除填造的日期、21.4秒、UUID、姓名式 identity、额外指标、Tab、导出、审批和桌面控件。",
+    "D_09_results_investigation": "严格以 CURRENT S07-B0 的本机 NG 结果为数据锚：Product Shell 保留外观 浅色·紧凑；执行/判定筛选显示 NG；保留本机工程“瓶盖检测 · 1.0.0”、诊断码输入、20条/页、当前单条结果、真实时间/16 ms/FIXTURE_NG/缺陷1、判定依据、缺陷 Scratch 及追溯。必须保留 CURRENT 的黑色本机结果图像证据，不得改成工作站未上报图像。比较入口只允许 baseline/current/previous-success 三项，删除“对比选中结果”和其他模式；分页大小只出现一次。不要改写项目、记录 ID、来源设备或填造新数据。",
+    "D_10_stations_list": "保留正常 Product Shell、外观 浅色·紧凑、只读/实时恢复、全站概览与异常调查、刷新、详情链接、连接状态和运行状态两个真实下拉。删除在线/警告/降级/严重/离线/未知 quick-filter chips，状态只能出现在既有下拉和表格行。搜索 placeholder 保持“名称、ID、产线、运行包或诊断码...”；表格严格保留工作站、连接、运行状态、当前运行包、现场健康、最近结果、最后心跳，并恢复“线序错误 · WIRE_SWAP”等 CURRENT 诊断子行。不得新增管理、统计或同页详情。",
+    "D_11_station_detail": "保持 CURRENT 正常 Product Shell 及外观 浅色·紧凑、更多、用户上下文，删除帮助问号和 Windows 最小化/最大化/关闭按钮。保留 Engineer/只读、返回工作站列表、查看结果、50条、刷新、实时恢复警告、状态概览、最近结果、五步生产追溯、运行包 SHA-256/流程与判定身份、缺口/不一致、远程图像未上传和健康快照。不得新增 Ping、重载、停机、部署、管理员命令、Tab 或设备能力。",
+    "D_12_inspection": "只纠正 Shell 漂移：删除 Windows 最小化/最大化/关闭按钮，保留 CURRENT Product Shell、外观 浅色·紧凑、更多和用户上下文。其余按 CURRENT 保持连续检测、恢复态、启动/停止/核对、六项指标、7项准入中的6/7、设备与运行、近期结果和诊断；不要新增模式、触发器、画布、配置、上传、扩展列或虚构周期值。",
+    "D_14_ai_failure_recovery": "严格复刻 CURRENT S11-EXCEPTION 的 failure-recovery 工程工作台，不得出现任何 node、edge、点阵画布、zoom/pan 工具或 application preview。保留会话版本8、失败阶段“构建未完成”、PUBLIC_BUILD_ERROR/公开错误说明、服务端权威警告、五阶段历史/诊断，以及当前条件允许的既有重新构建/协调服务端状态动作。删除新增/变更/删除算子计数、候选差异0、候选就绪/候选结构、伪 session ID、创建时间、创建者和其他未由 CURRENT 证明的构建事实。",
+    "D_15_operator_catalog": "以 CURRENT S12-B0 的只读目录原样作为数据锚，完整恢复 Product Shell：概览、工程、检测结果、算子库、本地服务、外观 浅色·紧凑、更多、用户。保留页头说明、只读目录、唯一刷新、名称/标识/关键词搜索、分类、生命周期、可见范围、端口和参数筛选、198个匹配项/目录共200项、分页。表格保留算子、分类、生命周期、端口、参数、版本、操作七列，并使用 CURRENT 可见行如颜色分析、性能算子004等；不得生成脸/OCR/模型路径/阈值或任何新算子数据。当前参考未打开详情，不要强行新增详情 rail；只保留现有“查看”入口。",
+    "D_17_camera_settings": "保持 CURRENT 设置 Shell 和真实发现/绑定/采集/触发结构。绑定身份必须补回 IP 地址 192.168.0.10 和接口 GigE，并保留序列号等真实字段；串口光电区必须有唯一“测试串口光电”动作。保留厂商筛选、保存绑定、曝光(us)、增益(dB)、Mono8、目标帧率、触发模式/Line0/软件触发、Enter、独立预览相机选择器、单帧/开始/停止连续预览和资源诊断。预览使用中性未采集态或明确可丢弃调试投影，不得显示未证实活动连接、实时帧、温度、带宽、丢帧、SDK或固件。",
+    "D_18_plc_settings": "恢复 CURRENT Product Shell 四项导航、本地服务、外观 浅色·紧凑、更多和用户，删除语言/帮助及 Windows 窗口按钮。心跳标签必须为“心跳间隔（毫秒）”并保持 CURRENT 1000，不得写秒。保留 S7/MC/FINS、协议专用字段、测试连接、字段校验/protocolMismatch、分别保存协议设置与当前映射、变量名/地址/数据类型/说明/可写/操作六列表。删除未证实的已启用、参数验证通过、在线硬件状态、新协议、新列和诊断模块。",
+    "D_20_station_communication": "严格跟随 CURRENT dark 设置状态和正常 Product Shell，删除 Windows 标题栏控件。保留 Disabled/LocalLoopback/LanController、Studio端口、LAN主机、本机Station同步、掩码Token、保留/替换/输入新Token、受guard约束的重新生成、放弃和保存。右侧当前投影必须表达已保存/运行配置一致、Studio无需重启、本机工作站无需重启，并仅显示 CURRENT 端点与诊断；不要标“未保存”或固定“需要重启”，不要在 Disabled 下暗示活动 TCP 连接。删除第三种Token操作、原始Token、复制、监控和连接断言。",
+    "D_21_ai_model_settings": "只保留一个模型目录、一个配置 workbench 和一个 contextual rail。测试连接与最近连接测试只能出现一套；高级连接与调度只有一个展开入口；读取推理支持、推理模式和推理强度只出现一次，不得在中央与右栏重复。模型目录恢复 CURRENT“已启用 · API 密钥已配置”状态，保留刷新、新建、选择、激活、规划器/影子、删除、显示名称、服务商、模型、启用、服务地址、受保护 API key、放弃和保存。删除重复摘要/按钮、搜索分页、假目录、质量成本、市场、预设、明文密钥和新 provider 能力。"
+  }
+}

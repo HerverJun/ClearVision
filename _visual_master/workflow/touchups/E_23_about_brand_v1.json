@@ -1,0 +1,21 @@
+{
+  "schema_version": "clearvision-controlled-picture-layer-touchup.v1",
+  "entry_id": "E_23_about",
+  "source_iteration": "option_E/iterations/23_about_v4.png",
+  "source_sha256": "afac5536d59bcb06106d3a24664aeada83c129a11d24df19e12cb4e375e48df9",
+  "purpose": "Preserve the accepted E23 gpt-image-2 correction and restore the exact product brand suffix only.",
+  "operations": [
+    {
+      "type": "replace_text",
+      "box": [90, 0, 304, 99],
+      "fill": [249, 249, 250],
+      "position": [90, 24],
+      "text": "ClearVision STUDIO",
+      "font_path": "C:\\Windows\\Fonts\\msyhbd.ttc",
+      "font_sha256": "06e1a30f687ab7d39f533447b21e84d51e0cecdaa6bfa060c87136b168811bdc",
+      "font_size": 25,
+      "text_fill": [26, 34, 42],
+      "purpose": "Restore the exact CURRENT brand casing without altering the About page."
+    }
+  ]
+}

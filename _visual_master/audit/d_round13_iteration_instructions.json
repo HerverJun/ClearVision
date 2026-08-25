@@ -1,0 +1,11 @@
+{
+  "schema_version": "clearvision-ui-iteration-instructions.v1",
+  "option": "D",
+  "round": 13,
+  "reference_mode": "iteration-board",
+  "functional_authority": "CURRENT screenshot plus current ClearVision code",
+  "instructions": {
+    "D_06_flow_validation_error": "Round 13 cleanup only. Treat the supplied same-page iteration target as an immutable geometry target: discovery right edge x=68, Inspector left edge x=1502, Preview/Result left edge x=1832, and the verified bottom status strip must not move by more than 8px. Keep every visible CURRENT function, field, value, status, validation message, command, node, and Shell item exactly as shown in the target. Improve only the horizontally compressed typography and local spacing inside the 330px Inspector and 216px Preview edge so they read as clean native UI. Do not add, delete, rename, infer, reflow, expand a panel, create a rail, or redraw the topology. No Help, Windows control, Fit/fullscreen, new command, field, node, value, or data.",
+    "D_07_flow_preview_roi": "Round 13 cleanup only. Treat the supplied same-page iteration target as an immutable geometry and evidence target: compact discovery right edge x=68, Preview/ROI divider x=1320, bottom status strip unchanged, and the exact pasted CURRENT bitmap must remain visually identical in content and position. Keep every visible CURRENT function, field, value, status, command, ROI action, result table, node, and Shell item exactly as shown in the target. Improve only the horizontally compressed typography and local spacing inside the 728px Preview/ROI/Result workspace. Do not redraw or reinterpret the bitmap, move a divider by more than 8px, add a capability rail, open an Inspector, add 编辑ROI or 取消预览, or add/delete/rename any control, field, value, image, node, result, or data."
+  }
+}

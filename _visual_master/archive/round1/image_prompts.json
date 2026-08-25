@@ -1,0 +1,526 @@
+{
+  "schema_version": "clearvision-ui-visual-master.v1",
+  "model": "gpt-image-2",
+  "default_aspect_ratio": "16:9",
+  "default_image_size": "2K",
+  "canvas": "2048x1152",
+  "status_values": [
+    "Pending",
+    "Generated",
+    "Failed",
+    "Needs-Manual",
+    "Approved-Candidate"
+  ],
+  "status_note": "Approved-Candidate means selected for the Master Reference chain, not approved by the product owner.",
+  "runtime_prompt_policy": "Every request additionally requires Simplified Chinese UI, forbids invented actions/modes/fields/telemetry, and instructs the model to return one full-screen UI rather than a reference collage.",
+  "generation_summary": {
+    "completed_at": "2026-08-16",
+    "candidate_count": 19,
+    "master_count": 4,
+    "failed_count": 0,
+    "requested_size": "2K / 16:9",
+    "actual_uniform_dimensions": "1672x941",
+    "model_discovery": "exact gpt-image-2 available"
+  },
+  "entries": [
+    {
+      "id": "01_flow_editor",
+      "filename": "01_flow_editor.png",
+      "page_name": "Flow Editor + Inspector",
+      "purpose": "Define the primary workstation shell, canvas hierarchy, node language, inspector density, command bars, and engineering state treatment.",
+      "page_role": "anchor",
+      "text_policy": "preserve-semantic-no-copy",
+      "aspect_ratio": "16:9",
+      "image_size": "2K",
+      "model": "gpt-image-2",
+      "current_reference": "current/r2/S04-B0.png",
+      "master_references": [],
+      "prompt": "DESIGN EXPRESSION: Create a premium product UI for professional industrial vision engineering software: precise, refined, compact, calm, and credible as a real Windows desktop workstation. PAGE AND SEMANTICS: This is the ClearVision Flow editor with a project/version command band, operator category rail, selected-node Inspector, central node canvas, preview/result Inspector, save/readiness/run controls, and bottom status context. Preserve product semantics and functional hierarchy; keep the existing capability regions and selected-node editing relationship, but redesign the visual presentation at a premium professional product level. SPATIAL STRUCTURE: use stable graphite application chrome, a narrow dark tool rail, a light high-contrast canvas, dense left parameter Inspector, restrained right preview/result panel, crisp splitters, and a compact command/status hierarchy. REPRODUCTION ORDER: every panel boundary, toolbar, row, field, port, node, status, and spacing interval must be clearly implementable at 1920x1080; use 3-6 px radii and 1 px borders. VISUAL SYSTEM: mix graphite #171c22/#222932 with cool neutral work surfaces; reserve cinnabar #b6453c for brand/selection, use action blue #166f9f, OK #16866f, NG #d12f3f, warning #9b6a13; system typography and familiar engineering icons. The generated image is a visual design reference, not the source of truth for product copy, workflow names, business data, node labels, or values. PROHIBITIONS: no logo or watermark contamination, no sci-fi HUD, no neon, no glassmorphism, no decorative gradient, no poster headline, no giant cards or pills, no invented capability, no fake authoritative telemetry, no collage, and no visually spectacular but impractical layout.",
+      "status": "Approved-Candidate",
+      "failed_at": "2026-08-15T15:53:14.534237Z",
+      "output": "candidates/01_flow_editor.png",
+      "reference_board": "workflow/reference_boards/01_flow_editor.png",
+      "generated_at": "2026-08-15T15:58:40.680042Z",
+      "sha256": "43053d1b31b2a17228456b89b6a2c6f73b97b7fec9e527c8be9a17ae031a5ac0",
+      "actual_dimensions": {
+        "width": 1672,
+        "height": 941
+      },
+      "master_path": "masters/01_flow_editor.png",
+      "selected_for_master_chain_at": "2026-08-15T16:00:07.339242Z",
+      "approval_scope": "selected-for-chain-not-product-owner-approved"
+    },
+    {
+      "id": "02_flow_preview_roi",
+      "filename": "02_flow_preview_roi.png",
+      "page_name": "Flow Preview + ROI",
+      "purpose": "Establish image-first preview, ROI editing, tool affordances, evidence framing, and balanced workspace splits.",
+      "page_role": "anchor",
+      "text_policy": "preserve-semantic-no-copy",
+      "aspect_ratio": "16:9",
+      "image_size": "2K",
+      "model": "gpt-image-2",
+      "current_reference": "current/r2/S05-B2.png",
+      "master_references": [
+        "masters/01_flow_editor.png"
+      ],
+      "prompt": "DESIGN EXPRESSION: Produce the same premium ClearVision industrial workstation language as the supplied Flow Master: precise, refined, dense, quiet, and suitable for hours of engineering use. PAGE AND SEMANTICS: This is the Flow workspace in image Preview and ROI edit state. Preserve product semantics and functional hierarchy: the flow/project context, operator tools, canvas relationship, image preview, zoom/fit controls, ROI edit actions, selected region overlay, result summary, stale/readiness status, and inspector context must remain recognizably real. Redesign only the visual presentation at a premium professional product level. SPATIAL STRUCTURE: make the inspection image the dominant work surface while retaining narrow, stable tool and Inspector regions; place ROI controls close to the image, keep result evidence adjacent, and preserve a compact top command band and bottom state strip. REPRODUCTION ORDER: use explicit panel geometry, crisp splitters, measurable 4/8 px rhythm, 28-34 px controls, 3-6 px radii, 1 px borders, and unambiguous tool states that can be reconstructed at 1920x1080. VISUAL SYSTEM: graphite chrome and cool neutral surfaces, restrained cinnabar selection, blue actions, green OK, red NG, amber warning, system typography, simple icons, high image contrast without cinematic effects. The generated image is a visual design reference, not the source of truth for product copy, workflow names, ROI coordinates, business data, or results. PROHIBITIONS: no logo/watermark, sci-fi HUD, neon, glass, gradient, poster typography, floating card mosaic, invented tools, fabricated readings, impossible overlay effects, collage, or usability loss for spectacle.",
+      "status": "Generated",
+      "output": "candidates/02_flow_preview_roi.png",
+      "reference_board": "workflow/reference_boards/02_flow_preview_roi.png",
+      "generated_at": "2026-08-15T16:01:21.687307Z",
+      "sha256": "396eda29aa09522dcab17b18265eb3acc80ba39d39652ea09c497943e958314f",
+      "actual_dimensions": {
+        "width": 1672,
+        "height": 941
+      }
+    },
+    {
+      "id": "03_ai_workspace",
+      "filename": "03_ai_workspace.png",
+      "page_name": "AI Engineering Workbench",
+      "purpose": "Define a modern AI-assisted engineering surface grounded in clarification, validation, candidate diff, review, and controlled handoff.",
+      "page_role": "anchor",
+      "text_policy": "preserve-semantic-no-copy",
+      "aspect_ratio": "16:9",
+      "image_size": "2K",
+      "model": "gpt-image-2",
+      "current_reference": "current/r2/S11-B0.png",
+      "master_references": [
+        "masters/01_flow_editor.png"
+      ],
+      "prompt": "DESIGN EXPRESSION: Create a premium AI-assisted engineering workstation UI that belongs to the same ClearVision product as the Flow Master: calm, technical, precise, dense, and credible rather than conversational or playful. PAGE AND SEMANTICS: This is the AI Engineering Workbench for an unbound project/session in recovery-ready state, showing session identity, binding status, candidate readiness, application preview, proposed solution/build, candidate differences, parameter/resource changes, validation gates, run rehearsal, handoff review, history and diagnostics. Preserve product semantics and functional hierarchy; do not turn it into a generic chatbot and do not imply automatic saving or execution. SPATIAL STRUCTURE: replace unused whitespace with a disciplined workbench: compact session/header context, structured proposal and diff region, validation/handoff rail, and dense status timeline while retaining the real sections in the current screen. REPRODUCTION ORDER: boundaries and rows must be explicit, with stable 1920x1080 regions, crisp dividers, 4/8 px rhythm, 3-6 px radii, and clear review actions. VISUAL SYSTEM: graphite chrome, cool light working surfaces, restrained cinnabar selection, blue reviewed actions, green pass, red failure, amber warning, system typography and precise status icons. The generated image is a visual design reference, not the source of truth for product copy, workflow names, candidate content, business data, or AgentRun facts. PROHIBITIONS: no logo/watermark, chatbot bubbles as the whole product, sci-fi AI glow, neon, glassmorphism, gradients, giant prompt box, poster headline, invented autonomous capability, fake code/data, collage, or unimplementable layout.",
+      "status": "Approved-Candidate",
+      "output": "candidates/03_ai_workspace.png",
+      "reference_board": "workflow/reference_boards/03_ai_workspace.png",
+      "generated_at": "2026-08-15T16:02:43.114399Z",
+      "sha256": "5688bdd64244ba5dfcc1a67cece1ad7730f09c6d1e782979240ecee441b7caec",
+      "actual_dimensions": {
+        "width": 1672,
+        "height": 941
+      },
+      "master_path": "masters/03_ai_workspace.png",
+      "selected_for_master_chain_at": "2026-08-15T16:05:08.637915Z",
+      "approval_scope": "selected-for-chain-not-product-owner-approved"
+    },
+    {
+      "id": "04_results_investigation",
+      "filename": "04_results_investigation.png",
+      "page_name": "Results Investigation",
+      "purpose": "Define evidence-centric list/detail hierarchy, OK/NG semantics, filtering, timing data, and inspection traceability.",
+      "page_role": "anchor",
+      "text_policy": "preserve-semantic-no-copy",
+      "aspect_ratio": "16:9",
+      "image_size": "2K",
+      "model": "gpt-image-2",
+      "current_reference": "current/r2/S07-B0.png",
+      "master_references": [
+        "masters/01_flow_editor.png",
+        "masters/03_ai_workspace.png"
+      ],
+      "prompt": "DESIGN EXPRESSION: Create a premium, sober inspection-results workstation screen in the established ClearVision Flow and AI visual language. It must feel like production traceability software, not an analytics dashboard. PAGE AND SEMANTICS: Preserve product semantics and functional hierarchy for the NG-first Results page: source/project filters, result list or table, outcome and timestamp, selected run detail, evidence image, final decision, duration, station/source identity, structured outputs, and expired-evidence handling. Redesign the visual presentation at a premium professional product level without inventing metrics or changing OK/NG meaning. SPATIAL STRUCTURE: use a compact filter/command band, high-scan-density result rows, a stable selected-result detail region, and a large evidence area with adjacent facts; keep state and source visible during investigation. REPRODUCTION ORDER: align numeric columns and timestamps, use crisp rows and dividers, stable split ratios, 4/8 px spacing, 3-6 px radii, and implementable filter/control placement at 1920x1080. VISUAL SYSTEM: graphite shell, cool neutral data surfaces, blue interaction, high-clarity green OK and red NG with icons/labels, amber stale/expired state, system typography and restrained borders. The generated image is a visual design reference, not the source of truth for product copy, workflow names, image evidence, serials, timestamps, or business data. PROHIBITIONS: no logo/watermark, oversized KPI cards, marketing chart dashboard, gradients, glass, neon, sci-fi HUD, fake telemetry, invented charts, poster headings, collage, or decorative layout that harms evidence review.",
+      "status": "Approved-Candidate",
+      "output": "candidates/04_results_investigation.png",
+      "reference_board": "workflow/reference_boards/04_results_investigation.png",
+      "generated_at": "2026-08-15T16:06:24.777201Z",
+      "sha256": "e42b4d093d723795ecc637b9c4b241eb6e0ff5277d9328513c38965e9d3620b7",
+      "actual_dimensions": {
+        "width": 1672,
+        "height": 941
+      },
+      "master_path": "masters/04_results_investigation.png",
+      "selected_for_master_chain_at": "2026-08-15T16:10:11.687954Z",
+      "approval_scope": "selected-for-chain-not-product-owner-approved"
+    },
+    {
+      "id": "05_station_management",
+      "filename": "05_station_management.png",
+      "page_name": "Station Management",
+      "purpose": "Define operational fleet/list scanning, connectivity states, stale/offline treatment, detail entry, and command restraint.",
+      "page_role": "anchor",
+      "text_policy": "preserve-semantic-no-copy",
+      "aspect_ratio": "16:9",
+      "image_size": "2K",
+      "model": "gpt-image-2",
+      "current_reference": "current/r2/S08-B0.png",
+      "master_references": [
+        "masters/04_results_investigation.png",
+        "masters/01_flow_editor.png"
+      ],
+      "prompt": "DESIGN EXPRESSION: Create a premium industrial Station fleet management screen using the same ClearVision workstation language as the supplied Results and Flow Masters: precise, restrained, compact, and operationally trustworthy. PAGE AND SEMANTICS: Preserve product semantics and functional hierarchy for Station management: fleet summary, search/filter, station identity, online/offline/stale state, active project/runtime package context, last contact, inspection/result health, detail entry, and role-scoped feedback. Do not invent remote-control authority or new Station commands. SPATIAL STRUCTURE: prioritize a dense scan-friendly table/list with persistent filters and a restrained status summary; keep row states aligned and make the selected/detail path evident without turning each station into a large card. REPRODUCTION ORDER: use stable column widths, 36-40 px rows, aligned timestamps and status tokens, crisp separators, 4/8 px rhythm, 3-6 px radii, and clear row actions implementable at 1920x1080. VISUAL SYSTEM: graphite chrome, cool neutral table surfaces, blue actions, green online/OK, red critical/NG, amber stale, muted offline, system typography and consistent icons; color is paired with label and icon. The generated image is a visual design reference, not the source of truth for product copy, station names, versions, times, packages, or business data. PROHIBITIONS: no logo/watermark, SaaS card grid, huge fleet KPIs, map invention, sci-fi network visualization, neon, gradients, glass, poster title, invented controls, fake telemetry, collage, or impractical layout.",
+      "status": "Generated",
+      "output": "candidates/05_station_management.png",
+      "reference_board": "workflow/reference_boards/05_station_management.png",
+      "generated_at": "2026-08-15T16:11:33.668960Z",
+      "sha256": "653eb0314db27bb48563c1a1e04d66dcbedc4c171dd40f63c147fe55408cb2a9",
+      "actual_dimensions": {
+        "width": 1672,
+        "height": 941
+      }
+    },
+    {
+      "id": "06_camera_settings",
+      "filename": "06_camera_settings.png",
+      "page_name": "Camera Settings",
+      "purpose": "Define the Settings/device family through camera binding, acquisition parameters, preview, trigger input, and diagnostics.",
+      "page_role": "anchor",
+      "text_policy": "preserve-semantic-no-copy",
+      "aspect_ratio": "16:9",
+      "image_size": "2K",
+      "model": "gpt-image-2",
+      "current_reference": "current/settings/settings-camera-b0-1920x1080-light-compact.png",
+      "master_references": [
+        "masters/01_flow_editor.png",
+        "masters/04_results_investigation.png"
+      ],
+      "prompt": "DESIGN EXPRESSION: Create a premium Camera configuration workbench in the established ClearVision industrial language: dense, precise, calm, credible, and suitable for technicians. PAGE AND SEMANTICS: Preserve product semantics and functional hierarchy for the Camera subsection inside Settings: settings navigation, camera binding and identity, acquisition/exposure parameters and units, trigger input/source, connection/configuration state, image preview, start/stop or refresh actions, and diagnostics. Do not invent camera features, automation authority, or device readings. SPATIAL STRUCTURE: use a stable Settings navigation rail, grouped but uncarded form sections, a dominant real preview region, compact device facts and diagnostics, and actions located next to the settings they affect. REPRODUCTION ORDER: labels, values, units, validation, and dependency order must align; use explicit split ratios, 28-34 px controls, 4/8 px rhythm, 3-6 px radii, 1 px borders, and no ambiguous floating panels at 1920x1080. VISUAL SYSTEM: graphite shell/navigation with cool light work surfaces, blue actions, restrained cinnabar selection, green connected, red fault, amber warning, system typography, familiar camera/connection icons. The generated image is a visual design reference, not the source of truth for product copy, camera names, ports, numeric values, or hardware state. PROHIBITIONS: no logo/watermark, photographic camera marketing hero, sci-fi HUD, neon, glass, gradient, giant cards, poster heading, invented settings, fake telemetry, collage, or decoration that reduces configuration accuracy.",
+      "status": "Approved-Candidate",
+      "output": "candidates/06_camera_settings.png",
+      "reference_board": "workflow/reference_boards/06_camera_settings.png",
+      "generated_at": "2026-08-15T16:12:54.499738Z",
+      "sha256": "5d5a487c01f167d0d681d640792adad7820aaed2f5753fa0b2cb346bbfad2518",
+      "actual_dimensions": {
+        "width": 1672,
+        "height": 941
+      },
+      "master_path": "masters/06_camera_settings.png",
+      "selected_for_master_chain_at": "2026-08-15T16:16:50.228790Z",
+      "approval_scope": "selected-for-chain-not-product-owner-approved"
+    },
+    {
+      "id": "07_overview",
+      "filename": "07_overview.png",
+      "page_name": "Overview",
+      "purpose": "Turn the sparse overview into a compact operational launch surface without generic dashboard styling.",
+      "page_role": "local",
+      "text_policy": "preserve-semantic-no-copy",
+      "aspect_ratio": "16:9",
+      "image_size": "2K",
+      "model": "gpt-image-2",
+      "current_reference": "current/r2/S01-B0.png",
+      "master_references": [
+        "masters/04_results_investigation.png",
+        "masters/06_camera_settings.png"
+      ],
+      "prompt": "DESIGN EXPRESSION: Create a premium ClearVision operational Overview using the supplied Results and Settings Masters: precise, restrained, compact, and immediately useful to an engineer. PAGE AND SEMANTICS: Preserve product semantics and functional hierarchy for current service health, recent/open projects, recent results or operational context, primary continuation actions, and authority-aware failures. Do not invent KPIs, charts, production counts, or monitoring capabilities absent from the current product. SPATIAL STRUCTURE: use a stable product shell, a compact health/context strip, dense recent-work table or list, and clear continuation actions; reduce dead whitespace without creating a decorative card mosaic. REPRODUCTION ORDER: all regions, rows, state labels, and actions must be bounded and align to a 4/8 px rhythm at 1920x1080, with 3-6 px radii, crisp borders, and implementation-ready spacing. VISUAL SYSTEM: graphite chrome, cool neutral work surfaces, blue actions, restrained cinnabar selection, green healthy, amber warning, red failure, system typography and simple icons. Preserve product semantics and functional hierarchy while upgrading presentation only. The generated image is a visual design reference, not the source of truth for product copy, project names, times, counts, or business data. PROHIBITIONS: no logo/watermark, generic SaaS KPI dashboard, oversized cards, giant welcome hero, fake graphs, gradients, glass, neon, sci-fi visuals, invented actions, collage, or poster layout.",
+      "status": "Generated",
+      "output": "candidates/07_overview.png",
+      "reference_board": "workflow/reference_boards/07_overview.png",
+      "generated_at": "2026-08-15T16:18:12.524687Z",
+      "sha256": "0e85f04fcf0b7aee603d906330810bd42a62fbaea05980092d18e6b56b31cefa",
+      "actual_dimensions": {
+        "width": 1672,
+        "height": 941
+      }
+    },
+    {
+      "id": "08_projects",
+      "filename": "08_projects.png",
+      "page_name": "Project Management",
+      "purpose": "Define dense project discovery, search/sort, recent projects, lifecycle entry, and restrained management actions.",
+      "page_role": "local",
+      "text_policy": "preserve-semantic-no-copy",
+      "aspect_ratio": "16:9",
+      "image_size": "2K",
+      "model": "gpt-image-2",
+      "current_reference": "current/r2/S02-B0.png",
+      "master_references": [
+        "masters/04_results_investigation.png",
+        "masters/06_camera_settings.png"
+      ],
+      "prompt": "DESIGN EXPRESSION: Create a premium Project management screen in the same ClearVision Results/Settings language: professional engineering software, clean but dense, precise, and calm. PAGE AND SEMANTICS: Preserve product semantics and functional hierarchy for project search, sort, all-project list, recent projects, project identity/description/version/modified context, open/create/refresh and lifecycle entry. Do not invent cloud collaboration, ownership, tags, analytics, or new persistence actions. SPATIAL STRUCTURE: use a compact page identity and command band, scan-friendly table/list as the main region, restrained recent-project context, persistent search/sort, and low-noise row actions. REPRODUCTION ORDER: stable columns, 36-40 px rows, aligned metadata, crisp dividers, 4/8 px spacing, 3-6 px radii, and explicit empty/loading/error slots make the design accurately implementable at 1920x1080. VISUAL SYSTEM: graphite shell, cool neutral surfaces, blue primary actions, cinnabar selection only, green/amber/red for state, system typography and familiar project icons. Preserve product semantics and functional hierarchy while redesigning presentation only. The generated image is a visual design reference, not the source of truth for product copy, names, revisions, dates, or business data. PROHIBITIONS: no logo/watermark, project card gallery, oversized create tile, SaaS template, gradients, glass, neon, poster headline, invented fields, fake data, collage, or impractical floating controls.",
+      "status": "Generated",
+      "output": "candidates/08_projects.png",
+      "reference_board": "workflow/reference_boards/08_projects.png",
+      "generated_at": "2026-08-15T16:19:21.056527Z",
+      "sha256": "326a67031e59be67f73e2867840d2af91738782dd87955fb11769525b039a6fa",
+      "actual_dimensions": {
+        "width": 1672,
+        "height": 941
+      }
+    },
+    {
+      "id": "09_projects_empty",
+      "filename": "09_projects_empty.png",
+      "page_name": "Projects Empty State",
+      "purpose": "Define a useful, context-preserving empty state that keeps search, lifecycle entry, and product shell stable.",
+      "page_role": "local",
+      "text_policy": "preserve-semantic-no-copy",
+      "aspect_ratio": "16:9",
+      "image_size": "2K",
+      "model": "gpt-image-2",
+      "current_reference": "current/r2/S02-EMPTY.png",
+      "master_references": [
+        "masters/04_results_investigation.png",
+        "masters/06_camera_settings.png"
+      ],
+      "prompt": "DESIGN EXPRESSION: Create the Project empty state for the same premium ClearVision product, with restrained engineering confidence and no onboarding-marketing tone. PAGE AND SEMANTICS: Preserve product semantics and functional hierarchy for the Projects route: page identity, search/sort context, all-project region, recent-project region, refresh, and create-new-project action. Show that no projects are returned while retaining the surrounding management layout; do not invent templates, tutorials, imports, cloud workspaces, or sample projects. SHELL INVARIANT: global navigation may use only real ClearVision destinations such as 概览、工程、检测结果、算子库、设置、帮助、关于. Never show 数据集、训练、模型库、部署、云空间 or any other invented top-level capability. SPATIAL STRUCTURE: keep the same shell and list geometry as the populated Project screen; use one compact inline empty-state message and primary lifecycle action inside the data region, with recent-project absence shown separately but quietly. REPRODUCTION ORDER: explicit table/list bounds, stable controls, 4/8 px rhythm, 3-6 px radii, 1 px borders, and a small implementable icon/message group at 1920x1080. VISUAL SYSTEM: graphite chrome, cool neutral surfaces, blue create action, restrained cinnabar selection, muted empty-state illustration limited to a familiar folder/project symbol, system typography. Preserve product semantics and functional hierarchy while upgrading only the presentation. The generated image is a visual design reference, not the source of truth for product copy, workflow names, or business data. PROHIBITIONS: no logo/watermark, giant illustration, mascot, marketing hero, celebratory confetti, huge rounded card, gradient, glass, neon, invented actions, fake projects, collage, or layout shift from the populated page.",
+      "status": "Generated",
+      "output": "candidates/09_projects_empty.png",
+      "reference_board": "workflow/reference_boards/09_projects_empty.png",
+      "generated_at": "2026-08-15T16:33:07.598889Z",
+      "sha256": "9f5df556e167375c546b7ab458a846e4d88d15eb5d34fb098495c68dde3700fa",
+      "actual_dimensions": {
+        "width": 1672,
+        "height": 941
+      }
+    },
+    {
+      "id": "10_operator_catalog",
+      "filename": "10_operator_catalog.png",
+      "page_name": "Operator Catalog",
+      "purpose": "Define a dense searchable engineering catalog with categories, compatibility, metadata, and restrained detail.",
+      "page_role": "local",
+      "text_policy": "preserve-semantic-no-copy",
+      "aspect_ratio": "16:9",
+      "image_size": "2K",
+      "model": "gpt-image-2",
+      "current_reference": "current/r2/S12-B0.png",
+      "master_references": [
+        "masters/04_results_investigation.png",
+        "masters/06_camera_settings.png"
+      ],
+      "prompt": "DESIGN EXPRESSION: Create a premium ClearVision Operator catalog for professional machine-vision engineers, consistent with the supplied Results and Settings Masters: precise, compact, quiet, and highly scannable. PAGE AND SEMANTICS: Preserve product semantics and functional hierarchy for operator categories, search/filter, operator name/type/description, compatibility or availability, metadata, and selection/detail context. Do not invent marketplace, pricing, ratings, installation, plugins, or new operator capabilities. SPATIAL STRUCTURE: use a narrow category/filter rail and a dense table/list with a restrained detail Inspector; keep search and compatibility filters persistent, make malformed/error states fit the same geometry, and avoid large repeated cards. REPRODUCTION ORDER: stable columns and row heights, explicit selected state, crisp dividers, 4/8 px rhythm, 3-6 px radii, familiar icons, and implementation-ready panel proportions at 1920x1080. VISUAL SYSTEM: graphite shell, cool neutral catalog surfaces, blue actions, cinnabar selection, muted category color, green compatible, amber limited, red unavailable/error, system typography. Preserve product semantics and functional hierarchy while refining presentation only. The generated image is a visual design reference, not the source of truth for product copy, operator names, compatibility, parameters, or business data. PROHIBITIONS: no logo/watermark, app-store tiles, huge icon cards, SaaS marketplace, gradients, glass, neon, sci-fi visuals, invented controls, fake metadata, collage, or decorative empty space.",
+      "status": "Generated",
+      "output": "candidates/10_operator_catalog.png",
+      "reference_board": "workflow/reference_boards/10_operator_catalog.png",
+      "generated_at": "2026-08-15T16:21:50.587676Z",
+      "sha256": "062feb251f19cb47d14b860a26702176381c824e14f6189f81984a0602eb34f3",
+      "actual_dimensions": {
+        "width": 1672,
+        "height": 941
+      }
+    },
+    {
+      "id": "11_inspection",
+      "filename": "11_inspection.png",
+      "page_name": "Inspection Workbench",
+      "purpose": "Define formal inspection admission, run readiness, image/evidence focus, live status, and recent result continuity.",
+      "page_role": "local",
+      "text_policy": "preserve-semantic-no-copy",
+      "aspect_ratio": "16:9",
+      "image_size": "2K",
+      "model": "gpt-image-2",
+      "current_reference": "current/r2/S09-B0.png",
+      "master_references": [
+        "masters/01_flow_editor.png",
+        "masters/04_results_investigation.png"
+      ],
+      "prompt": "DESIGN EXPRESSION: Create a premium formal Inspection workbench that clearly belongs between the ClearVision Flow and Results Masters: industrial, precise, restrained, and ready for production use. PAGE AND SEMANTICS: Preserve product semantics and functional hierarchy for project/flow selection, admission/readiness checks, formal run control, current phase/status, image or evidence region, final OK/NG decision, timing, recent result, blocked state, and navigation to investigation. Do not invent continuous production controls, counters, PLC commands, or a private execution state machine. SPATIAL STRUCTURE: use a compact readiness and run command band, a dominant inspection/evidence surface, a narrow current-state rail, and adjacent recent-result facts; maintain context before, during, and after execution. REPRODUCTION ORDER: stable 1920x1080 regions, explicit phase/status rows, crisp dividers, 4/8 px rhythm, 3-6 px radii, and a primary run action that never overwhelms safety/authority feedback. VISUAL SYSTEM: graphite chrome, cool neutral working surfaces, blue run action, green OK/ready, red NG/block, amber warning, system typography and unambiguous status icons. The generated image is a visual design reference, not the source of truth for product copy, workflow names, results, timings, or business data. PROHIBITIONS: no logo/watermark, sci-fi control room, giant gauges, fake live telemetry, dashboard tiles, gradients, glass, neon, poster headline, invented execution channels, collage, or spectacle over operator clarity.",
+      "status": "Generated",
+      "output": "candidates/11_inspection.png",
+      "reference_board": "workflow/reference_boards/11_inspection.png",
+      "generated_at": "2026-08-15T16:23:12.892457Z",
+      "sha256": "81d52f53781cefff854e397f3e4b8bde850f3a907124e5acfe92ec276641bfd5",
+      "actual_dimensions": {
+        "width": 1672,
+        "height": 941
+      }
+    },
+    {
+      "id": "12_plc_settings",
+      "filename": "12_plc_settings.png",
+      "page_name": "PLC Settings",
+      "purpose": "Extend the Settings Master to connection, register/channel mapping, validation, and diagnostics.",
+      "page_role": "local",
+      "text_policy": "preserve-semantic-no-copy",
+      "aspect_ratio": "16:9",
+      "image_size": "2K",
+      "model": "gpt-image-2",
+      "current_reference": "current/settings/settings-plc-b0-1920x1080-light-compact.png",
+      "master_references": [
+        "masters/06_camera_settings.png"
+      ],
+      "prompt": "DESIGN EXPRESSION: Create the PLC subsection as a direct extension of the premium ClearVision Settings Master: precise industrial configuration, high density, calm hierarchy, and credible field use. PAGE AND SEMANTICS: Preserve product semantics and functional hierarchy for PLC enablement, protocol/connection identity, host/port or serial context, mapping/register/channel rows, data type/direction, validation, connection/test actions, state, and diagnostics. Do not invent PLC protocols, registers, write authority, device telemetry, or automation sequences absent from the current screen. SPATIAL STRUCTURE: retain stable Settings navigation, group connection fields without decorative cards, use a dense mapping table as the main region, and keep validation/diagnostics adjacent to the affected configuration. REPRODUCTION ORDER: align labels, values, units, addresses, and row actions; use 28-34 px controls, 36-40 px table rows, 4/8 px rhythm, crisp 1 px borders, 3-6 px radii, and implementation-ready widths at 1920x1080. VISUAL SYSTEM: graphite shell/navigation, cool light form surfaces, blue actions, cinnabar selected subsection, green connected/valid, red fault/invalid, amber warning, system typography and familiar connection icons. Preserve product semantics and functional hierarchy while redesigning presentation only. The generated image is a visual design reference, not the source of truth for product copy, addresses, values, device state, or business data. PROHIBITIONS: no logo/watermark, ladder-logic invention, sci-fi network map, fake live graphs, giant cards, gradients, glass, neon, poster heading, invented controls, collage, or field-unsafe ambiguity.",
+      "status": "Generated",
+      "output": "candidates/12_plc_settings.png",
+      "reference_board": "workflow/reference_boards/12_plc_settings.png",
+      "generated_at": "2026-08-15T16:41:35.568711Z",
+      "sha256": "37abdcb4350f9fb3c1750ae67265c6eae65d00b3c79f41ae249a7ac172a58146",
+      "actual_dimensions": {
+        "width": 1672,
+        "height": 941
+      }
+    },
+    {
+      "id": "13_tcp_settings",
+      "filename": "13_tcp_settings.png",
+      "page_name": "TCP Settings",
+      "purpose": "Extend the Settings Master to TCP connection, send/receive tools, message history, and diagnostics.",
+      "page_role": "local",
+      "text_policy": "preserve-semantic-no-copy",
+      "aspect_ratio": "16:9",
+      "image_size": "2K",
+      "model": "gpt-image-2",
+      "current_reference": "current/settings/settings-tcp-b0-dark-1920x1080-dark-compact.png",
+      "master_references": [
+        "masters/06_camera_settings.png"
+      ],
+      "prompt": "DESIGN EXPRESSION: Create the TCP communication subsection in the exact premium ClearVision Settings family: technical, compact, restrained, and trustworthy, retaining the useful coherence of the current dark device screen. PAGE AND SEMANTICS: Preserve product semantics and functional hierarchy for TCP endpoint/role configuration, host/port, connect/disconnect, connection state, send payload and action, receive/history region, counters or timestamps only where already present, and diagnostics. Do not invent protocols, packet inspection, security controls, telemetry, or network authority. SPATIAL STRUCTURE: use stable Settings navigation, a compact connection command band, a deliberate send/receive split, dense chronological message rows, and adjacent diagnostic state; keep the main work surface readable in long sessions. REPRODUCTION ORDER: explicit fields and units, monospace only for payload content, stable log row height, crisp borders, 4/8 px rhythm, 3-6 px radii, and measurable 1920x1080 regions. VISUAL SYSTEM: graphite chrome with cool neutral dark/light contrast, blue actions, cinnabar subsection selection, green connected, red fault, amber warning, system typography and simple network icons. Preserve product semantics and functional hierarchy while upgrading presentation only. The generated image is a visual design reference, not the source of truth for product copy, endpoints, payloads, timestamps, or business data. PROHIBITIONS: no logo/watermark, hacker terminal aesthetic, neon, matrix code, sci-fi network map, gradients, glass, giant cards, fake packets, invented tools, poster heading, collage, or low-contrast text.",
+      "status": "Generated",
+      "output": "candidates/13_tcp_settings.png",
+      "reference_board": "workflow/reference_boards/13_tcp_settings.png",
+      "generated_at": "2026-08-15T16:42:47.763897Z",
+      "sha256": "0087083dbe4b7428141e23afa8301a0c60a17d5d1dae9f98450c93d296f4afd1",
+      "actual_dimensions": {
+        "width": 1672,
+        "height": 941
+      }
+    },
+    {
+      "id": "14_station_communication",
+      "filename": "14_station_communication.png",
+      "page_name": "Station Communication Settings",
+      "purpose": "Extend the Settings Master to Studio/Station endpoint configuration, sync state, identity, and diagnostics.",
+      "page_role": "local",
+      "text_policy": "preserve-semantic-no-copy",
+      "aspect_ratio": "16:9",
+      "image_size": "2K",
+      "model": "gpt-image-2",
+      "current_reference": "current/settings/settings-station-1920x1080-dark-compact.png",
+      "master_references": [
+        "masters/06_camera_settings.png",
+        "masters/04_results_investigation.png"
+      ],
+      "prompt": "DESIGN EXPRESSION: Create a premium Station communication settings screen consistent with the ClearVision Settings and Results Masters: precise, restrained, compact, and credible for deployment technicians. PAGE AND SEMANTICS: Preserve product semantics and functional hierarchy for Studio-to-Station communication configuration, endpoint and identity, connection/sync status, runtime-package or project context where present, test/reconnect controls, last-contact facts, and diagnostics. Do not invent remote execution, fleet commands, package formats, cloud synchronization, or new Station authority. SPATIAL STRUCTURE: retain stable Settings navigation, use a compact endpoint/configuration form, a clearly bounded connection/sync status region, and dense diagnostic/history rows; keep consequential actions near their scope. REPRODUCTION ORDER: align labels, values, timestamps, status and actions; use 28-34 px controls, 36-40 px rows, 4/8 px rhythm, crisp 1 px borders, 3-6 px radii, and implementation-ready proportions at 1920x1080. VISUAL SYSTEM: graphite shell, cool neutral surfaces, blue actions, cinnabar selected subsection, green connected/synced, red fault, amber stale, system typography and familiar link/station icons. Preserve product semantics and functional hierarchy while redesigning presentation only. The generated image is a visual design reference, not the source of truth for product copy, station ids, endpoints, versions, times, or business data. PROHIBITIONS: no logo/watermark, cloud SaaS diagram, sci-fi network, neon, gradients, glass, giant cards, fake telemetry, invented controls, poster heading, collage, or authority-confusing actions.",
+      "status": "Generated",
+      "output": "candidates/14_station_communication.png",
+      "reference_board": "workflow/reference_boards/14_station_communication.png",
+      "generated_at": "2026-08-15T16:44:03.124404Z",
+      "sha256": "8bcb1951e67cab4ea51b081f6859aebd446b0f90350f71b8dd00fe622e8df28d",
+      "actual_dimensions": {
+        "width": 1672,
+        "height": 941
+      }
+    },
+    {
+      "id": "15_ai_model_settings",
+      "filename": "15_ai_model_settings.png",
+      "page_name": "AI Model Settings",
+      "purpose": "Unify provider/model configuration with the Settings family and AI Workbench while keeping credentials and availability factual.",
+      "page_role": "local",
+      "text_policy": "preserve-semantic-no-copy",
+      "aspect_ratio": "16:9",
+      "image_size": "2K",
+      "model": "gpt-image-2",
+      "current_reference": "current/settings/settings-ai-model-1920x1080-light-compact.png",
+      "master_references": [
+        "masters/06_camera_settings.png",
+        "masters/03_ai_workspace.png"
+      ],
+      "prompt": "DESIGN EXPRESSION: Create a premium AI model configuration screen that clearly belongs to both the ClearVision Settings family and AI Workbench: technical, restrained, dense, secure-looking, and free of consumer-AI theatrics. PAGE AND SEMANTICS: Preserve product semantics and functional hierarchy for provider/model selection, endpoint or connection configuration, credential presence without revealing secrets, availability/validation status, save/test or refresh actions, and model capability context already present. Do not invent providers, models, pricing, token usage, chat features, or secret values. SPATIAL STRUCTURE: retain stable Settings navigation, group provider and model fields by dependency, keep test/validation feedback adjacent, show secure credential state compactly, and use a restrained capability/diagnostic region. REPRODUCTION ORDER: labels, inputs, select controls, secret-state treatment, validation rows, and actions must align to 4/8 px rhythm with 28-34 px controls, crisp borders, 3-6 px radii, and implementation-ready widths at 1920x1080. VISUAL SYSTEM: graphite shell/navigation, cool light work surfaces, blue actions, cinnabar selection, green available/valid, red unavailable/error, amber warning, system typography and simple AI/provider icons. Preserve product semantics and functional hierarchy while upgrading presentation only. The generated image is a visual design reference, not the source of truth for product copy, providers, models, endpoints, credentials, or business data. PROHIBITIONS: no logo/watermark, glowing AI orb, chatbot hero, neon, gradients, glass, giant model cards, fake secret strings, invented controls, poster heading, collage, or consumer marketing styling.",
+      "status": "Generated",
+      "output": "candidates/15_ai_model_settings.png",
+      "reference_board": "workflow/reference_boards/15_ai_model_settings.png",
+      "generated_at": "2026-08-15T16:45:20.367400Z",
+      "sha256": "561dcd20849421299bf489db527df0999d1823c137a92eee8fba19906366b699",
+      "actual_dimensions": {
+        "width": 1672,
+        "height": 941
+      }
+    },
+    {
+      "id": "16_run_ng_modal",
+      "filename": "16_run_ng_modal.png",
+      "page_name": "Run Details NG Modal",
+      "purpose": "Define a focused post-run investigation modal with final decision, timing, outputs, evidence, and clear return path.",
+      "page_role": "local",
+      "text_policy": "preserve-semantic-no-copy",
+      "aspect_ratio": "16:9",
+      "image_size": "2K",
+      "model": "gpt-image-2",
+      "current_reference": "current/r2/S06-B0.png",
+      "master_references": [
+        "masters/01_flow_editor.png",
+        "masters/04_results_investigation.png"
+      ],
+      "prompt": "DESIGN EXPRESSION: Create a premium ClearVision Flow workspace with an open NG Run Details modal, using the exact visual language of the supplied Flow and Results Masters: precise, restrained, evidence-centric, and operationally calm. PAGE AND SEMANTICS: Preserve product semantics and functional hierarchy for the background Flow context and focused run detail: final NG decision, completion state, duration/timestamp/source, per-node or structured results, evidence/preview, warnings, close/back path, and navigation to full results where present. Do not invent retry, override, save, or execution actions. SPATIAL STRUCTURE: keep the underlying workspace legible but clearly inactive; use one bounded modal with a compact outcome header, evidence/detail split, dense result rows, and fixed footer actions. REPRODUCTION ORDER: modal dimensions, focus overlay, close affordance, result columns, image region, scroll boundaries, 4/8 px rhythm, 3-6 px radii, and 1 px borders must be implementable at 1920x1080. VISUAL SYSTEM: graphite shell, cool neutral modal surfaces, blue navigation action, strong red NG paired with icon/label, green only for passing sub-results, amber warning, system typography and crisp dividers. The generated image is a visual design reference, not the source of truth for product copy, outputs, timing, evidence, or business data. PROHIBITIONS: no logo/watermark, full-page poster, giant red alert card, gradients, glass, neon, sci-fi HUD, fake telemetry, invented actions, nested cards, collage, or obscured close/return controls.",
+      "status": "Generated",
+      "output": "candidates/16_run_ng_modal.png",
+      "reference_board": "workflow/reference_boards/16_run_ng_modal.png",
+      "generated_at": "2026-08-15T16:51:37.259892Z",
+      "sha256": "ad69dd6bebab13e460695544d4fddc8d21bbc743fdd3e0d8de60824977a801fa",
+      "actual_dimensions": {
+        "width": 1672,
+        "height": 941
+      }
+    },
+    {
+      "id": "17_ai_failure_recovery",
+      "filename": "17_ai_failure_recovery.png",
+      "page_name": "AI Failure Recovery",
+      "purpose": "Define transparent failed AgentRun recovery, technical identity, replay/history access, and controlled next actions.",
+      "page_role": "local",
+      "text_policy": "preserve-semantic-no-copy",
+      "aspect_ratio": "16:9",
+      "image_size": "2K",
+      "model": "gpt-image-2",
+      "current_reference": "current/r2/S11-EXCEPTION.png",
+      "master_references": [
+        "masters/03_ai_workspace.png",
+        "masters/04_results_investigation.png"
+      ],
+      "prompt": "DESIGN EXPRESSION: Create the failed/recovery state of the premium ClearVision AI Workbench, consistent with the AI and Results Masters: transparent, technical, calm, and trustworthy rather than alarming or magical. PAGE AND SEMANTICS: Preserve product semantics and functional hierarchy for session/run identity, failed phase, terminal error summary, technical identity/details, completed prior steps, recovery or retry eligibility, history/diagnostics, candidate/workspace handoff state, and authority-safe next actions. Do not invent replay guarantees, autonomous repair, data recovery, or new AgentRun authority. SPATIAL STRUCTURE: keep the normal AI workbench geometry stable; use a compact failure banner or state rail, a clear phase timeline, bounded technical detail, and recovery actions close to their prerequisites while preserving the candidate context. REPRODUCTION ORDER: explicit status hierarchy, aligned phase rows, error/detail boundaries, stable action area, 4/8 px rhythm, 3-6 px radii, crisp borders, and implementation-ready 1920x1080 proportions. VISUAL SYSTEM: graphite chrome, cool neutral work surfaces, red failed state with icon/label, amber recoverable warning, green completed phases, blue reviewed action, restrained cinnabar selection, system typography. The generated image is a visual design reference, not the source of truth for product copy, error codes, run ids, recovery facts, or business data. PROHIBITIONS: no logo/watermark, dramatic red takeover, AI glow, chatbot page, neon, gradients, glass, fake stack trace, invented recovery action, poster headline, collage, or layout shift that hides context.",
+      "status": "Generated",
+      "output": "candidates/17_ai_failure_recovery.png",
+      "reference_board": "workflow/reference_boards/17_ai_failure_recovery.png",
+      "generated_at": "2026-08-15T16:52:43.747039Z",
+      "sha256": "776027349f972a8088e8ded85ddc314d900ac168077d9675e17961cc7a6995c6",
+      "actual_dimensions": {
+        "width": 1672,
+        "height": 941
+      }
+    },
+    {
+      "id": "18_system_settings",
+      "filename": "18_system_settings.png",
+      "page_name": "System Settings",
+      "purpose": "Define the general long-form Settings shell, section navigation, dependencies, save state, and diagnostics.",
+      "page_role": "local",
+      "text_policy": "preserve-semantic-no-copy",
+      "aspect_ratio": "16:9",
+      "image_size": "2K",
+      "model": "gpt-image-2",
+      "current_reference": "current/r2/S10-B0.png",
+      "master_references": [
+        "masters/06_camera_settings.png"
+      ],
+      "prompt": "DESIGN EXPRESSION: Create the general System Settings screen as the parent of the premium ClearVision Camera Settings Master: quiet, dense, precise, and comfortable for long technical configuration sessions. PAGE AND SEMANTICS: Preserve product semantics and functional hierarchy for Settings section navigation, general/local service configuration, theme or density where present, device and communication subsections, validation, save/apply scope, diagnostics, and authority awareness. Do not invent preferences, cloud accounts, licensing, telemetry, or secondary persistence paths. SPATIAL STRUCTURE: use stable Settings navigation, unframed full-width form sections grouped by engineering task, aligned labels/values/units, compact dependency/help text, and a restrained sticky save/status region where semantically valid. REPRODUCTION ORDER: 28-34 px controls, consistent label columns, clear section dividers, 4/8 px rhythm, 3-6 px radii, crisp borders, predictable scroll, and implementation-ready 1920x1080 geometry. VISUAL SYSTEM: graphite shell/navigation, cool light work surfaces, blue actions, cinnabar selected subsection, green valid/saved, red invalid, amber warning, system typography and simple settings icons. Preserve product semantics and functional hierarchy while redesigning presentation only. The generated image is a visual design reference, not the source of truth for product copy, values, paths, endpoints, or business data. PROHIBITIONS: no logo/watermark, nested card stacks, consumer settings bubbles, giant toggles, gradients, glass, neon, poster headings, invented settings, fake telemetry, collage, or a second save system.",
+      "status": "Generated",
+      "output": "candidates/18_system_settings.png",
+      "reference_board": "workflow/reference_boards/18_system_settings.png",
+      "generated_at": "2026-08-15T16:53:57.593037Z",
+      "sha256": "a8231f7c3cbe26acd9e80e93dc7c7d863fa1167a443fd83617d06fedf7efbf68",
+      "actual_dimensions": {
+        "width": 1672,
+        "height": 941
+      }
+    },
+    {
+      "id": "19_flow_validation_error",
+      "filename": "19_flow_validation_error.png",
+      "page_name": "Flow Inspector Validation Error",
+      "purpose": "Define parameter validation, node error state, field-level guidance, canvas context, and save/run consequences.",
+      "page_role": "local",
+      "text_policy": "preserve-semantic-no-copy",
+      "aspect_ratio": "16:9",
+      "image_size": "2K",
+      "model": "gpt-image-2",
+      "current_reference": "current/r2/S04-B2.png",
+      "master_references": [
+        "masters/01_flow_editor.png",
+        "masters/04_results_investigation.png"
+      ],
+      "prompt": "DESIGN EXPRESSION: Create the validation-error state of the premium ClearVision Flow Editor, exactly consistent with the Flow and Results Masters: precise, restrained, actionable, and dense without visual panic. PAGE AND SEMANTICS: Preserve product semantics and functional hierarchy for the selected node, Inspector parameters, required/range/type validation, node/canvas error indication, readiness/save consequence, preview/result context, and navigation to the affected field. Do not invent validation rules, parameters, automatic fixes, save behavior, or execution authority. SPATIAL STRUCTURE: keep the normal Flow workspace geometry stable; emphasize the affected field in the Inspector, pair node error state with a compact validation summary, and retain canvas/preview context so correction is local and understandable. REPRODUCTION ORDER: error label placement, field outline/help relation, node badge, readiness status, focus order, 4/8 px rhythm, 3-6 px radii, crisp borders, and stable 1920x1080 split geometry must be accurately implementable. VISUAL SYSTEM: graphite chrome, cool neutral work surfaces, red error paired with icon/text, amber consequence warning, blue corrective navigation, green only for valid sections, restrained cinnabar selection, system typography. The generated image is a visual design reference, not the source of truth for product copy, parameter names, rules, values, or business data. PROHIBITIONS: no logo/watermark, full-screen red alert, giant error card, gradients, glass, neon, sci-fi HUD, fake validation data, invented auto-fix, poster heading, collage, or layout shift that hides the selected node.",
+      "status": "Generated",
+      "output": "candidates/19_flow_validation_error.png",
+      "reference_board": "workflow/reference_boards/19_flow_validation_error.png",
+      "generated_at": "2026-08-15T16:55:15.192141Z",
+      "sha256": "3e429b8ffa5ddc797263a511016c35f4c173bacc1b476272eef355e6fd945bd0",
+      "actual_dimensions": {
+        "width": 1672,
+        "height": 941
+      }
+    }
+  ]
+}

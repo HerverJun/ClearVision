@@ -1,0 +1,138 @@
+{
+  "schemaVersion": "r2-final-matrix-capture.v1",
+  "scene": "S09",
+  "variant": "EXCEPTION",
+  "route": "#/projects/11111111-1111-4111-8111-111111111111/inspection",
+  "state": "blocked",
+  "role": "Engineer",
+  "flags": {
+    "Studio2.InspectionRun": true
+  },
+  "owner": {
+    "capability": "F05-inspection-run",
+    "mounted": 1,
+    "subscriptions": 0,
+    "writes": 0
+  },
+  "requests": [
+    "GET /api/auth/setup-status",
+    "GET /api/auth/me",
+    "GET /health",
+    "GET /api/projects/11111111-1111-4111-8111-111111111111",
+    "GET /api/cameras/bindings",
+    "GET /api/inspection/realtime/11111111-1111-4111-8111-111111111111/state",
+    "POST /api/inspection/admission"
+  ],
+  "runtimeRequests": [
+    {
+      "method": "GET",
+      "path": "/api/auth/setup-status",
+      "url": "http://127.0.0.1:5421/api/auth/setup-status"
+    },
+    {
+      "method": "GET",
+      "path": "/api/auth/me",
+      "url": "http://127.0.0.1:5421/api/auth/me"
+    },
+    {
+      "method": "GET",
+      "path": "/health",
+      "url": "http://127.0.0.1:5421/health"
+    },
+    {
+      "method": "GET",
+      "path": "/api/projects/11111111-1111-4111-8111-111111111111",
+      "url": "http://127.0.0.1:5421/api/projects/11111111-1111-4111-8111-111111111111"
+    },
+    {
+      "method": "GET",
+      "path": "/api/cameras/bindings",
+      "url": "http://127.0.0.1:5421/api/cameras/bindings"
+    },
+    {
+      "method": "GET",
+      "path": "/api/inspection/realtime/11111111-1111-4111-8111-111111111111/state",
+      "url": "http://127.0.0.1:5421/api/inspection/realtime/11111111-1111-4111-8111-111111111111/state"
+    },
+    {
+      "method": "POST",
+      "path": "/api/inspection/admission",
+      "url": "http://127.0.0.1:5421/api/inspection/admission"
+    }
+  ],
+  "allowedWrites": [
+    "POST /api/inspection/admission"
+  ],
+  "runtime": {
+    "consoleErrors": [],
+    "pageErrors": [],
+    "failedRequests": [],
+    "httpErrors": [],
+    "expectedHttpErrors": [],
+    "observedExpectedHttpErrors": [],
+    "unexpectedWrites": []
+  },
+  "requiredCriticalActions": [
+    "[data-testid=\"run-console-reconcile\"]"
+  ],
+  "motion": {
+    "layoutShifts": [
+      {
+        "value": 0.0004970885101716961,
+        "hadRecentInput": false
+      }
+    ],
+    "longTasks": []
+  },
+  "notes": [],
+  "dom": {
+    "url": "http://127.0.0.1:5421/studio/index.html#/projects/11111111-1111-4111-8111-111111111111/inspection",
+    "viewport": {
+      "width": 1366,
+      "height": 768,
+      "dpr": 1
+    },
+    "theme": "light",
+    "density": "compact",
+    "reducedMotion": "false",
+    "focus": {
+      "tagName": "BUTTON",
+      "id": "",
+      "testId": null
+    },
+    "landmarks": {
+      "main": 1,
+      "nav": 1,
+      "dialogs": 0
+    },
+    "mainBox": {
+      "x": 0,
+      "y": 52,
+      "width": 1366,
+      "height": 783.734375
+    },
+    "horizontalOverflow": 0,
+    "pageScroll": {
+      "x": 0,
+      "y": 0
+    },
+    "criticalActions": [
+      {
+        "selector": "[data-testid=\"run-console-reconcile\"]",
+        "testId": "run-console-reconcile",
+        "text": "核对状态",
+        "box": {
+          "x": 1228,
+          "y": 185.734375,
+          "width": 102,
+          "height": 28
+        },
+        "truncated": false,
+        "inViewport": true,
+        "reachable": true,
+        "enabled": true,
+        "unobscured": true
+      }
+    ]
+  }
+}

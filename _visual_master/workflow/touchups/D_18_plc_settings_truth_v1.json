@@ -1,0 +1,39 @@
+{
+  "schema_version": "clearvision-controlled-picture-layer-touchup.v1",
+  "entry_id": "D_18_plc_settings",
+  "source_iteration": "option_D/iterations/18_plc_settings_v5.png",
+  "source_sha256": "483757de8a99ca9ccfe4f56f3e278a1673e8684b8a0845d309896d7f02a0e5c3",
+  "purpose": "Remove the fabricated protocol-mismatch state and project both independent save actions as disabled in the verified clean state.",
+  "operations": [
+    {
+      "type": "fill_rect",
+      "box": [1492, 250, 1990, 480],
+      "fill": [255, 255, 255],
+      "purpose": "Remove the unverified validation card and protocol-mismatch warning from the healthy CURRENT state."
+    },
+    {
+      "type": "replace_text",
+      "box": [1773, 537, 1990, 586],
+      "fill": [238, 241, 244],
+      "position": [1819, 549],
+      "text": "保存协议设置",
+      "font_path": "C:\\Windows\\Fonts\\msyh.ttc",
+      "font_sha256": "e4b3b9d058750fb80899c24f68e35beda606ca92694eff0e9f7f91eec7a846aa",
+      "font_size": 16,
+      "text_fill": [126, 137, 149],
+      "purpose": "Represent the protocol save boundary as disabled because the CURRENT configuration is clean."
+    },
+    {
+      "type": "replace_text",
+      "box": [1795, 1044, 1991, 1094],
+      "fill": [238, 241, 244],
+      "position": [1826, 1056],
+      "text": "保存当前映射",
+      "font_path": "C:\\Windows\\Fonts\\msyh.ttc",
+      "font_sha256": "e4b3b9d058750fb80899c24f68e35beda606ca92694eff0e9f7f91eec7a846aa",
+      "font_size": 16,
+      "text_fill": [126, 137, 149],
+      "purpose": "Represent the separate mapping save boundary as disabled because the CURRENT mapping is clean."
+    }
+  ]
+}

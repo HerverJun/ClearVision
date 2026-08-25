@@ -1,0 +1,57 @@
+{
+  "schema_version": "clearvision-controlled-picture-layer-touchup.v1",
+  "entry_id": "E_11_station_detail",
+  "source_iteration": "option_E/iterations/11_station_detail_v5.png",
+  "source_sha256": "7b2a54ead93255694ac8b808267faf58482079bf85bbaff067d08fca7bd7dbab",
+  "purpose": "Preserve the deterministic-trace v5 body and correct only three shell labels without allowing image generation to rewrite Station facts.",
+  "operations": [
+    {
+      "type": "replace_text",
+      "box": [82, 9, 270, 67],
+      "fill": [254, 254, 255],
+      "position": [88, 18],
+      "text": "ClearVision",
+      "font_path": "C:\\Windows\\Fonts\\msyhbd.ttc",
+      "font_sha256": "06e1a30f687ab7d39f533447b21e84d51e0cecdaa6bfa060c87136b168811bdc",
+      "font_size": 21,
+      "text_fill": [27, 32, 38],
+      "purpose": "Preserve the exact product name."
+    },
+    {
+      "type": "replace_text",
+      "box": [205, 9, 270, 67],
+      "fill": [254, 254, 255],
+      "position": [211, 29],
+      "text": "STUDIO",
+      "font_path": "C:\\Windows\\Fonts\\msyh.ttc",
+      "font_sha256": "e4b3b9d058750fb80899c24f68e35beda606ca92694eff0e9f7f91eec7a846aa",
+      "font_size": 12,
+      "text_fill": [103, 113, 123],
+      "purpose": "Restore the real Studio suffix."
+    },
+    {
+      "type": "replace_text",
+      "box": [1515, 9, 1695, 67],
+      "fill": [254, 254, 255],
+      "position": [1524, 24],
+      "text": "外观  浅色 · 紧凑",
+      "font_path": "C:\\Windows\\Fonts\\msyh.ttc",
+      "font_sha256": "e4b3b9d058750fb80899c24f68e35beda606ca92694eff0e9f7f91eec7a846aa",
+      "font_size": 14,
+      "text_fill": [73, 82, 91],
+      "purpose": "Restore the exact appearance projection."
+    },
+    {
+      "type": "replace_text",
+      "box": [1696, 9, 1770, 67],
+      "fill": [254, 254, 255],
+      "position": [1704, 24],
+      "text": "更多",
+      "font_path": "C:\\Windows\\Fonts\\msyh.ttc",
+      "font_sha256": "e4b3b9d058750fb80899c24f68e35beda606ca92694eff0e9f7f91eec7a846aa",
+      "font_size": 14,
+      "text_fill": [73, 82, 91],
+      "purpose": "Restore the real More entry instead of an unlabeled ellipsis."
+    }
+  ]
+}

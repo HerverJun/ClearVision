@@ -49,11 +49,16 @@ describe('CvDataTable', () => {
     });
 
     expect(wrapper.attributes('aria-busy')).toBe('true');
-    expect(wrapper.get('[role="status"]').text()).toContain('正在加载数据');
+    expect(wrapper.get('[role="status"]').text()).toContain('正在加载数据…');
     expect(wrapper.get('table').element.tagName).toBe('TABLE');
+    const sortButton = wrapper.get('button[aria-label="按工程名称排序"]');
+    expect(sortButton.attributes()).toHaveProperty('disabled');
+    await sortButton.trigger('click');
+    expect(wrapper.emitted('sort')).toBeUndefined();
 
     await wrapper.setProps({ busy: false });
     expect(wrapper.text()).toContain('暂无数据');
     expect(wrapper.find('tbody').exists()).toBe(false);
+    expect(wrapper.get('button[aria-label="按工程名称排序"]').attributes()).not.toHaveProperty('disabled');
   });
 });

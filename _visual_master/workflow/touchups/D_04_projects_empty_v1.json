@@ -1,0 +1,27 @@
+{
+  "schema_version": "clearvision-controlled-picture-layer-touchup.v1",
+  "entry_id": "D_04_projects_empty",
+  "source_iteration": "option_D/iterations/04_projects_empty_v8.png",
+  "source_sha256": "8fa8841de018e3ed95d2d361ba4b39024337d093fccd26668bde7e78ef7cdd29",
+  "purpose": "Keep the corrected empty-state artwork and remove only the invented language control while restoring compact appearance.",
+  "operations": [
+    {
+      "type": "replace_text",
+      "box": [1505, 13, 1690, 61],
+      "fill": [254, 254, 254],
+      "position": [1518, 24],
+      "text": "外观 浅色·紧凑",
+      "font_path": "C:\\Windows\\Fonts\\msyh.ttc",
+      "font_sha256": "e4b3b9d058750fb80899c24f68e35beda606ca92694eff0e9f7f91eec7a846aa",
+      "font_size": 14,
+      "text_fill": [45, 57, 70],
+      "purpose": "Restore the exact CURRENT appearance and compact-density summary."
+    },
+    {
+      "type": "fill_rect",
+      "box": [1691, 13, 1868, 61],
+      "fill": [254, 254, 254],
+      "purpose": "Remove the invented language selector without touching the user region."
+    }
+  ]
+}

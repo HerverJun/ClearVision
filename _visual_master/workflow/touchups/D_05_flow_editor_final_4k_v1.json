@@ -1,0 +1,45 @@
+{
+  "schema_version": "clearvision-controlled-picture-layer-touchup.v1",
+  "entry_id": "D_05_flow_editor",
+  "source_iteration": "option_D/iterations/05_flow_editor_v20.png",
+  "source_sha256": "2a64aeac3f9ad7219e357a7c673c032a1d01563fe28fea029e125437054d1738",
+  "purpose": "Restore the audited 4K Flow Master geometry and correct only two factual labels required by the final D consistency contract.",
+  "operations": [
+    {
+      "type": "replace_text",
+      "box": [3438, 1136, 3750, 1182],
+      "fill": [251, 252, 253],
+      "position": [3452, 1136],
+      "text": "FilePath",
+      "font_path": "C:\\Windows\\Fonts\\segoeui.ttf",
+      "font_sha256": "ba32a222b23d727267cf1aba4e5296fe84ce99b9d910915103fc085d7931bc88",
+      "font_size": 28,
+      "text_fill": [84, 90, 106],
+      "purpose": "Replace the invented English prose technical type with the exact secondary technical label FilePath."
+    },
+    {
+      "type": "replace_text",
+      "box": [3682, 1374, 3752, 1421],
+      "fill": [251, 252, 253],
+      "position": [3692, 1375],
+      "text": "6 项",
+      "font_path": "C:\\Windows\\Fonts\\msyh.ttc",
+      "font_sha256": "e4b3b9d058750fb80899c24f68e35beda606ca92694eff0e9f7f91eec7a846aa",
+      "font_size": 28,
+      "text_fill": [52, 62, 72],
+      "purpose": "Restore the verified common-parameter count exactly as 6 items."
+    },
+    {
+      "type": "replace_text",
+      "box": [3345, 432, 3530, 494],
+      "fill": [247, 247, 249],
+      "position": [3360, 436],
+      "text": "结果摘要",
+      "font_path": "C:\\Windows\\Fonts\\msyh.ttc",
+      "font_sha256": "e4b3b9d058750fb80899c24f68e35beda606ca92694eff0e9f7f91eec7a846aa",
+      "font_size": 36,
+      "text_fill": [44, 53, 62],
+      "purpose": "Use the locked sibling terminology for the discoverable result-summary workspace entry."
+    }
+  ]
+}

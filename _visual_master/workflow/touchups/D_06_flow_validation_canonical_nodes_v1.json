@@ -1,0 +1,31 @@
+{
+  "schema_version": "clearvision-controlled-picture-layer-touchup.v1",
+  "entry_id": "D_06_flow_validation_error",
+  "source_iteration": "option_D/iterations/06_flow_validation_error_v_final_consistency_source_4k.png",
+  "source_sha256": "33ef55c20b3b4d82b52368877f6730856beb8d82efbbeb2126ace0f35880b9e7",
+  "purpose": "Bind the validation-error page to the corrected D05 canonical FlowCanvas Master while preserving the complete generated validation Inspector and every non-canvas pixel.",
+  "operations": [
+    {
+      "type": "paste_master_reference",
+      "reference_path": "option_D/masters/05_flow_editor.png",
+      "reference_sha256": "247efff95e87fdd626f36dfae2dced6d94465d0c697408dca62e69d6ccacedc3",
+      "source_box": [0, 0, 3839, 2159],
+      "box": [0, 0, 3839, 2159],
+      "purpose": "Use the corrected D05 shell, compact canonical nodes, project context, command bar, Canvas, and status geometry."
+    },
+    {
+      "type": "copy_resize",
+      "source_box": [2988, 238, 3839, 2049],
+      "box": [3014, 405, 3839, 2049],
+      "purpose": "Re-anchor the unchanged generated Inspector, including fields, -10 value, validation copy, and scroll context."
+    },
+    {
+      "type": "paste_master_reference",
+      "reference_path": "option_D/masters/05_flow_editor.png",
+      "reference_sha256": "247efff95e87fdd626f36dfae2dced6d94465d0c697408dca62e69d6ccacedc3",
+      "source_box": [3014, 405, 3839, 520],
+      "box": [3014, 405, 3839, 520],
+      "purpose": "Retain the canonical blue Preview tab label and underline shared by the Flow workspace family."
+    }
+  ]
+}

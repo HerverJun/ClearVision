@@ -1,0 +1,65 @@
+{
+  "schema_version": "clearvision-controlled-picture-layer-touchup.v1",
+  "entry_id": "E_07_flow_preview_roi",
+  "source_iteration": "option_E/iterations/07_flow_preview_roi_v15.png",
+  "source_sha256": "2d37be7cd986bc68309e65fb5326bf082ee5338c45fd6c8a8d25ab4f1c5b55d5",
+  "purpose": "Preserve the accepted current-dominant E07 composition, enforce exact geometry and restore the audited CURRENT bitmap as a Picture Layer.",
+  "operations": [
+    {
+      "type": "copy_resize",
+      "source_box": [0, 188, 103, 1110],
+      "box": [0, 188, 94, 1110],
+      "purpose": "Match the E Flow Master 95px operator rail."
+    },
+    {
+      "type": "copy_resize",
+      "source_box": [104, 188, 1292, 1110],
+      "box": [95, 188, 1319, 1110],
+      "purpose": "Set FlowCanvas to 59.8 percent of the 2048px frame."
+    },
+    {
+      "type": "copy_resize",
+      "source_box": [1293, 188, 2047, 1110],
+      "box": [1320, 188, 2047, 1110],
+      "purpose": "Keep one integrated 35.5 percent Preview, ROI and Result context."
+    },
+    {
+      "type": "fill_rect",
+      "box": [1332, 302, 2032, 606],
+      "fill": [15, 21, 29],
+      "purpose": "Clear the model-redrawn preview and generated ROI-value overlay."
+    },
+    {
+      "type": "paste_reference",
+      "reference_path": "current/r2/S05-B2.png",
+      "reference_sha256": "df7b56d9d40d0582d394dd7a9b7633f5c045becd12879e541baf96d134ef0468",
+      "source_box": [1104, 209, 1311, 416],
+      "box": [1574, 305, 1874, 605],
+      "purpose": "Restore the exact captured 100x100 bitmap projection from CURRENT."
+    },
+    {
+      "type": "replace_text",
+      "box": [1340, 313, 1570, 430],
+      "fill": [15, 21, 29],
+      "position": [1348, 322],
+      "text": "尺寸: 100 × 100\n缩放: 207.9%\n标注: 1\n移动鼠标查看像素坐标和值",
+      "font_path": "C:\\Windows\\Fonts\\msyh.ttc",
+      "font_sha256": "e4b3b9d058750fb80899c24f68e35beda606ca92694eff0e9f7f91eec7a846aa",
+      "font_size": 13,
+      "text_fill": [245, 247, 249],
+      "purpose": "Restore only verified preview metadata outside the bitmap."
+    },
+    {
+      "type": "replace_text",
+      "box": [1332, 610, 1645, 664],
+      "fill": [255, 255, 255],
+      "position": [1342, 627],
+      "text": "Rectangle · X 10 · Y 10 · W 30 · H 20",
+      "font_path": "C:\\Windows\\Fonts\\msyh.ttc",
+      "font_sha256": "e4b3b9d058750fb80899c24f68e35beda606ca92694eff0e9f7f91eec7a846aa",
+      "font_size": 13,
+      "text_fill": [45, 57, 70],
+      "purpose": "Keep verified ROI values in the functional context instead of overlaying the bitmap."
+    }
+  ]
+}
