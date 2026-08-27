@@ -159,7 +159,9 @@ class ProjectManager {
     }
 
     async createDemoProject(mode = 'full') {
-        const endpoint = mode === 'simple' ? '/demo/create-simple' : '/demo/create';
+        const endpoint = mode === 'blob'
+            ? '/demo/create-blob'
+            : (mode === 'simple' ? '/demo/create-simple' : '/demo/create');
 
         try {
             this.invalidateOpenProjectRequests();

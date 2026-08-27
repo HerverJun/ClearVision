@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using ClearVision.Product.Desktop.PreviewArtifacts;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
@@ -14,7 +15,10 @@ public static class PreviewArtifactEndpoints
             HttpContext context,
             PreviewArtifactStore artifactStore) =>
         {
-            if (!artifactStore.TryRead(artifactId, out var artifact) || artifact == null)
+            var userId = context.User.FindFirstValue(ClaimTypes.NameIdentifier);
+            if (string.IsNullOrWhiteSpace(userId) ||
+                !artifactStore.TryRead(artifactId, userId, out var artifact) ||
+                artifact == null)
             {
                 return Results.NotFound();
             }
@@ -33,14 +37,16 @@ public static class PreviewArtifactEndpoints
 
         app.MapDelete("/api/preview-artifacts/{artifactId}", (
             string artifactId,
+            HttpContext context,
             PreviewArtifactStore artifactStore) =>
         {
-            if (!PreviewArtifactStore.IsValidArtifactId(artifactId))
+            var userId = context.User.FindFirstValue(ClaimTypes.NameIdentifier);
+            if (string.IsNullOrWhiteSpace(userId) || !PreviewArtifactStore.IsValidArtifactId(artifactId))
             {
                 return Results.NotFound();
             }
 
-            return artifactStore.Delete(artifactId)
+            return artifactStore.Delete(artifactId, userId)
                 ? Results.NoContent()
                 : Results.NotFound();
         });

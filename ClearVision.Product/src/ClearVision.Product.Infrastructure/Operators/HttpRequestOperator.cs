@@ -3,9 +3,7 @@
 // 调用 REST API，触发 MES/AGV 等外部服务
 // 作者：蘅芜君
 
-using System.Net.Http.Headers;
 using System.Text;
-using System.Text.Json;
 using ClearVision.Product.Core.Attributes;
 using ClearVision.Product.Core.Entities;
 using ClearVision.Product.Core.Enums;
@@ -80,11 +78,6 @@ public class HttpRequestOperator : OperatorBase
             if (inputs.TryGetValue("Body", out var bodyObj) && bodyObj != null)
             {
                 body = bodyObj.ToString();
-            }
-            else if (inputs.Count > 0)
-            {
-                // 将所有输入序列化为 JSON
-                body = JsonSerializer.Serialize(inputs);
             }
         }
 

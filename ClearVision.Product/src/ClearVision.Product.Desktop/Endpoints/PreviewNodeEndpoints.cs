@@ -4,6 +4,7 @@
 // 作者：架构修复方案 v2
 
 using System.Collections;
+using System.Security.Claims;
 using System.Globalization;
 using System.Text.Json;
 using ClearVision.Product.Application.DTOs;
@@ -125,7 +126,9 @@ public static class PreviewNodeEndpoints
                 }
 
                 var useArtifactReferences = UsesPreviewArtifactReferences(request);
-                var artifactOwner = CreateArtifactOwner(request);
+                var artifactOwner = CreateArtifactOwner(
+                    request,
+                    context.User.FindFirstValue(ClaimTypes.NameIdentifier) ?? string.Empty);
                 var projectAdmission = await executionAdmissionService.ValidateProjectAsync(
                     request.ProjectId,
                     ExecutionAdmissionSurface.NodePreview,
@@ -605,13 +608,14 @@ public static class PreviewNodeEndpoints
     private static bool UsesPreviewArtifactReferences(PreviewNodeRequest request) =>
         string.Equals(request.ArtifactMode, "references", StringComparison.OrdinalIgnoreCase);
 
-    private static PreviewArtifactOwnerScope CreateArtifactOwner(PreviewNodeRequest request) =>
+    private static PreviewArtifactOwnerScope CreateArtifactOwner(PreviewNodeRequest request, string userId) =>
         new(
             request.ProjectId,
             request.TargetNodeId,
             request.DebugSessionId,
             request.ClientRequestSequence,
-            request.FlowRevision);
+            request.FlowRevision,
+            userId);
 
     private static async Task<IResult> BuildImageSaveSafePreviewAsync(
         PreviewNodeRequest request,

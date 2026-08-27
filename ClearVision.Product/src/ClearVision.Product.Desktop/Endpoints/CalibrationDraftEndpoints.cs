@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
@@ -32,6 +33,7 @@ public static class CalibrationDraftEndpoints
     {
         app.MapPost("/api/calibration/npoint-draft/solve", (
             NPointCalibrationDraftSolveRequest request,
+            HttpContext context,
             PreviewArtifactStore artifactStore,
             IOptions<StudioOptions> studioOptions,
             CancellationToken cancellationToken) =>
@@ -45,7 +47,11 @@ public static class CalibrationDraftEndpoints
                 });
             }
 
-            var response = SolveDraft(request, artifactStore, cancellationToken);
+            var response = SolveDraft(
+                request,
+                artifactStore,
+                cancellationToken,
+                context.User.FindFirstValue(ClaimTypes.NameIdentifier) ?? string.Empty);
             return Results.Ok(response);
         });
 
@@ -112,7 +118,8 @@ public static class CalibrationDraftEndpoints
     internal static NPointCalibrationDraftSolveResponse SolveDraft(
         NPointCalibrationDraftSolveRequest request,
         PreviewArtifactStore artifactStore,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        string artifactOwnerUserId = "")
     {
         cancellationToken.ThrowIfCancellationRequested();
         var sessionId = NormalizeIdentity(request.SessionId, "calibration-draft");
@@ -187,7 +194,15 @@ public static class CalibrationDraftEndpoints
             Diagnostics = diagnostics.Take(MaxDiagnostics).ToList()
         };
 
-        var artifacts = MaterializeDraftArtifacts(request, sessionId, draft, candidateBundleJson, artifactStore, cancellationToken, diagnostics);
+        var artifacts = MaterializeDraftArtifacts(
+            request,
+            sessionId,
+            draft,
+            candidateBundleJson,
+            artifactStore,
+            cancellationToken,
+            diagnostics,
+            artifactOwnerUserId);
         draft.Artifacts = artifacts;
 
         return new NPointCalibrationDraftSolveResponse
@@ -436,14 +451,16 @@ public static class CalibrationDraftEndpoints
         string? candidateBundleJson,
         PreviewArtifactStore artifactStore,
         CancellationToken cancellationToken,
-        List<string> diagnostics)
+        List<string> diagnostics,
+        string artifactOwnerUserId)
     {
         var owner = new PreviewArtifactOwnerScope(
             request.ProjectId,
             request.TargetNodeId,
             request.DebugSessionId ?? Guid.Empty,
             request.ClientRequestSequence,
-            request.FlowRevision);
+            request.FlowRevision,
+            artifactOwnerUserId);
         using var batch = artifactStore.CreateBatch(owner);
         var artifacts = new List<PreviewArtifactReferenceV1>();
         TryAddJsonArtifact(

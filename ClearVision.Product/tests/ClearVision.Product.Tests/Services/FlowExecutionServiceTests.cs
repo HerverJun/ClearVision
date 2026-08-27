@@ -1738,7 +1738,7 @@ public class FlowExecutionServiceTests
         inputs["ConditionResult"].Should().Be(true);
         inputs["Condition"].Should().Be("Score > 0.5");
         inputs["ActualValue"].Should().Be(0.82d);
-        inputs["Metadata"].Should().Be("meta-from-source");
+        inputs.Should().NotContainKey("Metadata", "a connection must transport only its declared source port");
         inputs.ContainsKey("False").Should().BeFalse("null branch payload should not be propagated");
 
         // Assert: indexed lookups are exercised in large graph path.
@@ -1746,6 +1746,92 @@ public class FlowExecutionServiceTests
         ReadIndexLookupCount(index!, "SourceOperatorLookupCount").Should().BeGreaterThan(0);
         ReadIndexLookupCount(index!, "SourcePortLookupCount").Should().BeGreaterThan(0);
         ReadIndexLookupCount(index!, "TargetPortLookupCount").Should().BeGreaterThan(0);
+    }
+
+    [Fact]
+    public void PrepareOperatorInputs_WhenConnectedOutputIsMissing_ShouldNotBorrowAnotherSourceField()
+    {
+        var flow = new OperatorFlow("NoOutputDictionaryBypass");
+        var source = new Operator("Measurement", OperatorType.Measurement, 0, 0);
+        source.AddOutputPort("Angle", PortDataType.Float);
+        source.AddOutputPort("Value", PortDataType.Float);
+        var target = new Operator("Branch", OperatorType.ConditionalBranch, 0, 0);
+        target.AddInputPort("Value", PortDataType.Any, true);
+        flow.AddOperator(source);
+        flow.AddOperator(target);
+        flow.AddConnection(new OperatorConnection(
+            source.Id,
+            source.OutputPorts.Single(port => port.Name == "Angle").Id,
+            target.Id,
+            target.InputPorts.Single().Id));
+        var operatorOutputs = new Dictionary<Guid, Dictionary<string, object>>
+        {
+            [source.Id] = new(StringComparer.OrdinalIgnoreCase)
+            {
+                ["Value"] = 42.0,
+                ["Distance"] = 42.0
+            }
+        };
+        var prepareMethod = typeof(FlowExecutionService)
+            .GetMethods(BindingFlags.Instance | BindingFlags.NonPublic)
+            .Single(method => method.Name == "PrepareOperatorInputs" && method.GetParameters().Length == 4);
+
+        var inputs = (Dictionary<string, object>)prepareMethod.Invoke(
+            _sut,
+            [flow, target, operatorOutputs, null])!;
+
+        inputs.Should().NotContainKey("Value");
+        inputs.Should().NotContainKey("Distance");
+    }
+
+    [Fact]
+    public async Task ExecuteFlowDebugAsync_StringFormat_ShouldIgnoreInjectedOperatorParameters()
+    {
+        var sourceExecutor = Substitute.For<IOperatorExecutor>();
+        sourceExecutor.OperatorType.Returns(OperatorType.Thresholding);
+        sourceExecutor.ExecuteAsync(
+                Arg.Any<Operator>(),
+                Arg.Any<Dictionary<string, object>?>(),
+                Arg.Any<CancellationToken>())
+            .Returns(OperatorExecutionOutput.Success(new Dictionary<string, object>
+            {
+                ["First"] = "left",
+                ["Second"] = "right"
+            }));
+        var stringFormat = new StringFormatOperator(Substitute.For<ILogger<StringFormatOperator>>());
+        using var sut = new FlowExecutionService(
+            [sourceExecutor, stringFormat],
+            Substitute.For<ILogger<FlowExecutionService>>(),
+            Substitute.For<IVariableContext>());
+        var flow = new OperatorFlow("StringFormatParameterIsolation");
+        var source = new Operator("Source", OperatorType.Thresholding, 0, 0);
+        source.AddOutputPort("First", PortDataType.String);
+        source.AddOutputPort("Second", PortDataType.String);
+        var format = new Operator("Format", OperatorType.StringFormat, 0, 0);
+        format.AddInputPort("Arg1", PortDataType.Any, false);
+        format.AddInputPort("Arg2", PortDataType.Any, false);
+        format.AddOutputPort("Result", PortDataType.String);
+        format.AddParameter(new Parameter(
+            Guid.NewGuid(),
+            "Template",
+            "Template",
+            string.Empty,
+            "string",
+            "{0}|{1}|{Template}",
+            null,
+            null,
+            true));
+        flow.AddOperator(source);
+        flow.AddOperator(format);
+        flow.AddConnection(new OperatorConnection(source.Id, source.OutputPorts[0].Id, format.Id, format.InputPorts[0].Id));
+        flow.AddConnection(new OperatorConnection(source.Id, source.OutputPorts[1].Id, format.Id, format.InputPorts[1].Id));
+
+        var result = await sut.ExecuteFlowDebugAsync(
+            flow,
+            new DebugOptions { DebugSessionId = Guid.NewGuid() });
+
+        result.IsSuccess.Should().BeTrue(result.ErrorMessage);
+        result.IntermediateResults[format.Id]["Result"].Should().Be("left|right|{Template}");
     }
 
     [Fact]

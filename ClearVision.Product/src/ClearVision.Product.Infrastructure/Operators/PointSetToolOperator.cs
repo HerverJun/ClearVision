@@ -56,10 +56,10 @@ public class PointSetToolOperator : OperatorBase
 
         var operation = GetStringParam(@operator, "Operation", "Merge");
         var sortBy = GetStringParam(@operator, "SortBy", "X");
-        var minX = GetDoubleParam(@operator, "FilterMinX", double.MinValue);
-        var minY = GetDoubleParam(@operator, "FilterMinY", double.MinValue);
-        var maxX = GetDoubleParam(@operator, "FilterMaxX", double.MaxValue);
-        var maxY = GetDoubleParam(@operator, "FilterMaxY", double.MaxValue);
+        var minX = GetDoubleParam(@operator, "FilterMinX", -1000000000.0);
+        var minY = GetDoubleParam(@operator, "FilterMinY", -1000000000.0);
+        var maxX = GetDoubleParam(@operator, "FilterMaxX", 1000000000.0);
+        var maxY = GetDoubleParam(@operator, "FilterMaxY", 1000000000.0);
 
         List<Position> resultPoints = operation.ToLowerInvariant() switch
         {

@@ -4,7 +4,9 @@ using System.Reflection;
 using System.Text;
 using ClearVision.Product.Core.Entities;
 using ClearVision.Product.Core.Enums;
+using ClearVision.Product.Core.Services;
 using ClearVision.Product.Infrastructure.Operators;
+using ClearVision.Product.Infrastructure.Services;
 using ClearVision.Product.Tests.Runtime;
 using FluentAssertions;
 using Microsoft.Extensions.Logging;
@@ -79,6 +81,49 @@ public class HttpRequestOperatorTests
         request.Path.Should().Be("/ingest");
         request.Body.Should().Be("{\"job\":\"demo\"}");
         request.Headers["X-Correlation-Id"].Should().Be("abc-123");
+    }
+
+    [Theory]
+    [InlineData("GET")]
+    [InlineData("POST")]
+    [InlineData("PUT")]
+    [InlineData("DELETE")]
+    public async Task ExecuteFlowAsync_WithoutBodyPortValue_ShouldNotSendInjectedParameters(string method)
+    {
+        using var listener = new TcpListener(IPAddress.Loopback, 0);
+        listener.Start();
+        var port = ((IPEndPoint)listener.LocalEndpoint).Port;
+        var serverTask = ServeOnceAsync(listener, "{\"ok\":true}");
+        var flow = new OperatorFlow("http-no-body");
+        var op = new Operator("request", OperatorType.HttpRequest, 0, 0);
+        op.AddInputPort("Body", PortDataType.String, false);
+        op.AddInputPort("Headers", PortDataType.Any, false);
+        op.AddOutputPort("Response", PortDataType.String);
+        op.AddParameter(TestHelpers.CreateParameter("Url", $"http://127.0.0.1:{port}/no-body", "string"));
+        op.AddParameter(TestHelpers.CreateParameter("Method", method, "string"));
+        op.AddParameter(TestHelpers.CreateParameter("TimeoutMs", 10000, "int"));
+        op.AddParameter(TestHelpers.CreateParameter("RetryCount", 0, "int"));
+        op.AddParameter(TestHelpers.CreateParameter("ContentType", "application/json", "string"));
+        op.AddParameter(TestHelpers.CreateParameter("RetryDelayMs", 1000, "int"));
+        flow.AddOperator(op);
+        using var service = new FlowExecutionService(
+            [_operator],
+            Substitute.For<ILogger<FlowExecutionService>>(),
+            Substitute.For<IVariableContext>());
+
+        var result = await service.ExecuteFlowAsync(
+            flow,
+            new Dictionary<string, object>
+            {
+                ["Headers"] = new Dictionary<string, object> { ["X-Test"] = "header-only" }
+            });
+        var request = await serverTask.WaitAsync(TimeSpan.FromSeconds(10));
+
+        result.IsSuccess.Should().BeTrue(result.ErrorMessage);
+        request.Method.Should().Be(method);
+        request.Body.Should().BeEmpty();
+        request.Headers.Should().NotContainKey("Content-Type");
+        request.Headers["X-Test"].Should().Be("header-only");
     }
 
     [Theory]

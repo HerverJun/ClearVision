@@ -479,6 +479,10 @@ export class ProjectView {
                         <input type="radio" name="new-project-mode" value="simple-demo" ${demoCreationEnabled ? '' : 'disabled'} />
                         示例工程（简化版） <span class="type-badge">${demoBadge}</span>
                     </label>
+                    <label style="display:flex; align-items:center; gap:8px;">
+                        <input type="radio" name="new-project-mode" value="blob-demo" ${demoCreationEnabled ? '' : 'disabled'} />
+                        Blob演示（晶圆缺陷检测） <span class="type-badge">${demoBadge}</span>
+                    </label>
                 </div>
                 <div style="margin-top:8px; color:var(--text-muted); font-size:12px;">${getFeatureDescription('project.demoCreation', demoFeature.description)}</div>
             </div>
@@ -507,7 +511,7 @@ export class ProjectView {
                 const name = nameInput?.value?.trim();
                 const desc = descInput?.value?.trim() || '';
                 
-                if ((mode === 'demo' || mode === 'simple-demo') && !demoCreationEnabled) {
+                if ((mode === 'demo' || mode === 'simple-demo' || mode === 'blob-demo') && !demoCreationEnabled) {
                     showToast(getFeatureDescription('project.demoCreation', '示例工程入口当前不可用'), 'warning');
                     return;
                 }
@@ -525,7 +529,9 @@ export class ProjectView {
                         ? await projectManager.createDemoProject('full')
                         : (mode === 'simple-demo'
                             ? await projectManager.createDemoProject('simple')
-                            : await projectManager.createProject(name, desc));
+                            : (mode === 'blob-demo'
+                                ? await projectManager.createDemoProject('blob')
+                                : await projectManager.createProject(name, desc)));
                     const displayName = project?.name || name || '示例工程';
                     showToast(`工程 "${displayName}" 已创建`, 'success');
                     closeModal(modalOverlay);

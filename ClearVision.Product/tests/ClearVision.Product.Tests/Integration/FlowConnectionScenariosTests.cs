@@ -118,6 +118,64 @@ public class FlowConnectionScenariosTests
     }
 
     [Fact]
+    public async Task ExecuteFlowAsync_UnavailableMeasurementOutput_ShouldFailClosedBeforeExecution()
+    {
+        var measurementExecutor = Substitute.For<IOperatorExecutor>();
+        measurementExecutor.OperatorType.Returns(OperatorType.Measurement);
+        measurementExecutor.ValidateParameters(Arg.Any<Operator>()).Returns(ValidationResult.Valid());
+        var branchExecutor = Substitute.For<IOperatorExecutor>();
+        branchExecutor.OperatorType.Returns(OperatorType.ConditionalBranch);
+        branchExecutor.ValidateParameters(Arg.Any<Operator>()).Returns(ValidationResult.Valid());
+        var service = CreateFlowService(measurementExecutor, branchExecutor);
+
+        var flow = new OperatorFlow();
+        var measurement = CreateOperator(
+            "measurement",
+            OperatorType.Measurement,
+            outputPorts: [("Angle", PortDataType.Float), ("Value", PortDataType.Float)]);
+        measurement.AddParameter(new Parameter(
+            Guid.NewGuid(),
+            "MeasureType",
+            "MeasureType",
+            string.Empty,
+            "enum",
+            "PointToPoint",
+            null,
+            null,
+            true));
+        var branch = CreateOperator(
+            "branch",
+            OperatorType.ConditionalBranch,
+            inputPorts: [("Value", PortDataType.Any)],
+            outputPorts: [("True", PortDataType.Any), ("False", PortDataType.Any)]);
+
+        flow.AddOperator(measurement);
+        flow.AddOperator(branch);
+        flow.AddConnection(CreateConnection(measurement, "Angle", branch, "Value"));
+
+        var validation = service.ValidateFlow(flow);
+        var output = await service.ExecuteFlowAsync(flow);
+        var debugOutput = await service.ExecuteFlowDebugAsync(
+            flow,
+            new DebugOptions { DebugSessionId = Guid.NewGuid() });
+
+        validation.IsValid.Should().BeFalse();
+        validation.Errors.Should().ContainSingle(error => error.Contains("STRUCT_006") && error.Contains("Angle"));
+        output.IsSuccess.Should().BeFalse();
+        output.ErrorMessage.Should().Contain("STRUCT_006").And.Contain("Angle");
+        debugOutput.IsSuccess.Should().BeFalse();
+        debugOutput.ErrorMessage.Should().Contain("STRUCT_006").And.Contain("Angle");
+        await measurementExecutor.DidNotReceive().ExecuteAsync(
+            Arg.Any<Operator>(),
+            Arg.Any<Dictionary<string, object>?>(),
+            Arg.Any<CancellationToken>());
+        await branchExecutor.DidNotReceive().ExecuteAsync(
+            Arg.Any<Operator>(),
+            Arg.Any<Dictionary<string, object>?>(),
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
     public async Task ExecuteFlowAsync_DualInputSameConsumer_ShouldNotOverRetainSourceImage()
     {
         var sourceExecutor = new TestImageSourceOperator(NullLogger<TestImageSourceOperator>.Instance);

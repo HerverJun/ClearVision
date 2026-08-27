@@ -1,15 +1,15 @@
 ---
 title: "算子工业级审计 TODO"
 doc_type: "task-list"
-status: "active"
+status: "completed"
 topic: "算子审计"
 created: "2026-04-13"
-updated: "2026-08-25"
+updated: "2026-08-27"
 ---
 
 # 算子工业级审计 TODO
 
-- 2026-08-25 已完成 158/158 个规范算子的端口、属性、运行时和预览工作台全量跨层审计；当前开放结论为严重 5 项、一般 2 项、待确认风险 4 项。报告入口：`docs/审计资料/算子审计/operator-library-quality-audit-2026-08-25.md`。
+- 2026-08-25 已完成 158/158 个规范算子的端口、属性、运行时和预览工作台全量跨层审计；当时发现严重 5 项、一般 2 项、待确认风险 4 项。11 项已于 2026-08-27 全部完成处置和定向验证。发现事实见[原始审计报告](../../../审计资料/算子审计/operator-library-quality-audit-2026-08-25.md)，修复签收见[整改记录](./operator-library-quality-remediation-2026-08-27.md)。
 - 本次结论补充并覆盖旧 Week5 在“代表性直接测试”范围内的“无新增入池问题”表述；旧记录仍作为当时实验室批次历史保留，不能再解释为当前全库端口/属性/预览合同无开放缺陷。
 - 历史执行状态：Week5 已于 2026-04-14 09:56（UTC+8）按用户指令提前启动，并于 2026-04-14 12:01（UTC+8）完成 D2、于 2026-04-14 12:20（UTC+8）启动 D3 静态首版盘点；2026-04-15（UTC+8）完成了当时 D3/D4/D5 的实验室批次收口，`test_results/week5-lab-audit-closure-20260415.trx` 为 `298/298` 通过，`test_results/week2-p0-lab-closure-20260415.trx` 为 `174/174` 通过。该段只记录 2026-04-15 的历史测试口径；当前开放缺陷以 2026-08-25 全量合同审计为准。
 - 最近一次正式启动入口：`docs/审计资料/算子审计/启动计划/Week5-长时启动计划.md`；Week5/Week6 执行结果默认回填 `Week5-审计台账.md`、`Week5-已升级证据链.md`、`Week6-修复优先级清单.md`、`Week5-审计周报.md`。
@@ -25,16 +25,21 @@ updated: "2026-08-25"
 
 | 状态 | ID | 严重度 | 结论 | 证据入口 |
 |---|---|---|---|---|
-| [ ] | F01 | 严重 | 旧端口迁移重建 GUID，但不原子更新连接 | 报告第 5 节 F01 |
-| [ ] | F02 | 严重 | 条件输出不可用时，全量输出旁路可把其他同名字段送入下游 | 报告第 5 节 F02 |
-| [ ] | F03 | 严重 | `StringFormat` 索引占位符被算子参数污染 | 报告第 5 节 F03 |
-| [ ] | F04 | 一般 | `StringFormat` 正式属性和输出合同不完整 | 报告第 5 节 F04 |
-| [ ] | F05 | 严重 | `StringFormat.Template` 缺失回退与元数据默认不一致 | 报告第 5 节 F05 |
-| [ ] | F06 | 严重 | `HttpRequest` 无 Body 连线时仍发送配置字典 | 报告第 5 节 F06 |
-| [ ] | F07 | 一般 | `blocked/auth-error` 预览同屏显示矛盾状态 | 报告第 5 节 F07 |
-| [?] | R01-R04 | 待确认 | 端口歧义恢复、两类默认值差异和 Artifact owner 策略需要补证 | 报告第 6 节 |
+| [x] | F01 | 严重 | 已修复：旧端口迁移保留/唯一映射 GUID，歧义与悬空连接 fail-closed | `operator-library-quality-remediation-2026-08-27.md` F01 |
+| [x] | F02 | 严重 | 已修复：连接仅传播声明端口，条件输出在准入与执行入口 fail-closed | `operator-library-quality-remediation-2026-08-27.md` F02 |
+| [x] | F03 | 严重 | 已修复：占位符与 Join 仅按 `Arg1/Arg2` 声明端口取值 | `operator-library-quality-remediation-2026-08-27.md` F03 |
+| [x] | F04 | 一般 | 已修复：三种模式属性、条件规则及 `Length/IsEmpty` 输出已正式声明 | `operator-library-quality-remediation-2026-08-27.md` F04 |
+| [x] | F05 | 严重 | 已修复：缺失回退与元数据一致，显式空模板保持独立语义 | `operator-library-quality-remediation-2026-08-27.md` F05 |
+| [x] | F06 | 严重 | 已修复：仅显式非 null `Body` 输入生成请求体，参数与 Headers 不再被隐式序列化 | `operator-library-quality-remediation-2026-08-27.md` F06 |
+| [x] | F07 | 一般 | 已修复：模块结果覆盖 `blocked/auth-error` 正式状态，面板不再显示冲突回退 | `operator-library-quality-remediation-2026-08-27.md` F07 |
+| [x] | R01 | 待确认 -> 已处置 | 已确认并修复：仅唯一同名/类型兼容候选可恢复，多候选明确报错 | `operator-library-quality-remediation-2026-08-27.md` R01 |
+| [x] | R02 | 待确认 -> 已处置 | 已确认并修复：执行与验证缺失回退统一为正式元数据默认 100 | `operator-library-quality-remediation-2026-08-27.md` R02 |
+| [x] | R03 | 待确认 -> 已处置 | 已确认并修复：Filter 缺失回退统一为正式元数据边界 `±1e9` | `operator-library-quality-remediation-2026-08-27.md` R03 |
+| [x] | R04 | 待确认 -> 已处置 | 已确认并修复：Artifact owner 绑定认证用户，跨用户读取/删除统一返回 404 | `operator-library-quality-remediation-2026-08-27.md` R04 |
 
-本批次验证共 484 条通过、0 失败，但 .NET 使用现有 Debug 程序集经 `dotnet vstest` 执行；NuGet `NU1301` 阻止了当前源码 clean rebuild。该限制在修复前必须持续保留，不能把本批次写成当前 HEAD 的干净重编译全绿。
+2026-08-25 发现批次曾有 484 条通过、0 失败，但当时 .NET 仅使用既有 Debug 程序集经 `dotnet vstest` 执行，NuGet `NU1301` 阻止了当前源码重编译；这是历史验证限制，不作为本次修复签收证据。
+
+2026-08-27 修复批次已恢复当前源码 restore/build，并逐项完成实现复审和定向测试。最终回归为 Product 服务 `541/546`、DesktopEndpoints `335/335`、受影响 UI `82/82`；Product 的 5 条失败均由工作区另行新增的两个 Blob 算子使运行时身份从 158 增至 160、派生目录和快照尚未同步导致。UI 全套为 `990/991`，唯一失败是仓库缺少 `docs/进行中/当前计划/VisionAgent_RuntimePreview_Pilot_Gate.md`。两组已知失败均不经过本批审计修改路径，但在其各自收口前不得宣称全仓发布门禁全绿。完整证据和发布建议见[整改记录](./operator-library-quality-remediation-2026-08-27.md)。
 
 ## 当前目标修订（2026-04-15，UTC+8）
 

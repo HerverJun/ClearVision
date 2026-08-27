@@ -3,8 +3,6 @@
 // 支持模板替换和字符串拼接
 // 作者：蘅芜君
 
-using System.Text;
-using System.Text.RegularExpressions;
 using ClearVision.Product.Core.Attributes;
 using ClearVision.Product.Core.Entities;
 using ClearVision.Product.Core.Enums;
@@ -34,9 +32,19 @@ namespace ClearVision.Product.Infrastructure.Operators;
 [InputPort("Arg1", "参数 1", PortDataType.Any, IsRequired = false)]
 [InputPort("Arg2", "参数 2", PortDataType.Any, IsRequired = false)]
 [OutputPort("Result", "结果", PortDataType.String)]
+[OutputPort("Length", "结果长度", PortDataType.Integer)]
+[OutputPort("IsEmpty", "结果为空", PortDataType.Boolean)]
+[OperatorParam("Mode", "格式模式", "enum", DefaultValue = "Template", Options = new[] { "Template|模板", "Join|拼接", "Date|日期时间" })]
 [OperatorParam("Template", "模板", "string", DefaultValue = "Result is {0} and {1}")]
+[OperatorParam("Separator", "分隔符", "string", DefaultValue = "")]
+[OperatorParam("DateFormat", "日期格式", "string", DefaultValue = "yyyy-MM-dd HH:mm:ss")]
+[OperatorParameterRule("Template", DisabledWhenAll = new[] { "Mode!=Template" }, HiddenWhenAll = new[] { "Mode!=Template" }, IgnoredWhenAll = new[] { "Mode!=Template" }, ReasonCode = "STRING_FORMAT_TEMPLATE_MODE_ONLY")]
+[OperatorParameterRule("Separator", DisabledWhenAll = new[] { "Mode!=Join" }, HiddenWhenAll = new[] { "Mode!=Join" }, IgnoredWhenAll = new[] { "Mode!=Join" }, ReasonCode = "STRING_FORMAT_JOIN_MODE_ONLY")]
+[OperatorParameterRule("DateFormat", DisabledWhenAll = new[] { "Mode!=Date" }, HiddenWhenAll = new[] { "Mode!=Date" }, IgnoredWhenAll = new[] { "Mode!=Date" }, ReasonCode = "STRING_FORMAT_DATE_MODE_ONLY")]
 public class StringFormatOperator : OperatorBase
 {
+    private static readonly string[] DeclaredInputNames = ["Arg1", "Arg2"];
+
     public override OperatorType OperatorType => OperatorType.StringFormat;
 
     public StringFormatOperator(ILogger<StringFormatOperator> logger) : base(logger) { }
@@ -52,7 +60,7 @@ public class StringFormatOperator : OperatorBase
         }
 
         // 获取参数
-        var template = GetStringParam(@operator, "Template", "");
+        var template = GetStringParam(@operator, "Template", "Result is {0} and {1}");
         var separator = GetStringParam(@operator, "Separator", "");
         var mode = GetStringParam(@operator, "Mode", "Template"); // Template, Join, Date
 
@@ -65,7 +73,7 @@ public class StringFormatOperator : OperatorBase
                 break;
 
             case "join":
-                result = string.Join(separator, inputs.Values.Select(v => v?.ToString() ?? ""));
+                result = string.Join(separator, GetDeclaredInputValues(inputs));
                 break;
 
             case "date":
@@ -91,40 +99,39 @@ public class StringFormatOperator : OperatorBase
     /// 模板替换
     /// 支持 {0}, {1}, ... 和 {KeyName}
     /// </summary>
-    private string FormatTemplate(string template, Dictionary<string, object> inputs)
+    private static string FormatTemplate(string template, IReadOnlyDictionary<string, object> inputs)
     {
         if (string.IsNullOrEmpty(template))
         {
-            return string.Join("", inputs.Values);
+            return string.Concat(GetDeclaredInputValues(inputs));
         }
 
         var result = template;
-
-        // 替换 {KeyName}
-        var keyPattern = @"\{(\w+)\}";
-        result = Regex.Replace(result, keyPattern, match =>
+        for (var index = 0; index < DeclaredInputNames.Length; index += 1)
         {
-            var key = match.Groups[1].Value;
-            if (inputs.TryGetValue(key, out var value) && value != null)
+            var inputName = DeclaredInputNames[index];
+            if (!inputs.TryGetValue(inputName, out var value))
             {
-                return value.ToString() ?? "";
+                continue;
             }
-            return match.Value; // 保留原样
-        });
 
-        // 替换 {0}, {1}, ...（按输入顺序）
-        var index = 0;
-        foreach (var value in inputs.Values)
-        {
-            var placeholder = $"{{{index}}}";
-            if (result.Contains(placeholder))
-            {
-                result = result.Replace(placeholder, value?.ToString() ?? "");
-            }
-            index++;
+            var text = value?.ToString() ?? string.Empty;
+            result = result.Replace($"{{{index}}}", text, StringComparison.Ordinal);
+            result = result.Replace($"{{{inputName}}}", text, StringComparison.Ordinal);
         }
 
         return result;
+    }
+
+    private static IEnumerable<string> GetDeclaredInputValues(IReadOnlyDictionary<string, object> inputs)
+    {
+        foreach (var inputName in DeclaredInputNames)
+        {
+            if (inputs.TryGetValue(inputName, out var value))
+            {
+                yield return value?.ToString() ?? string.Empty;
+            }
+        }
     }
 
     public override ValidationResult ValidateParameters(Operator @operator)

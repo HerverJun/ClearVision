@@ -1,6 +1,7 @@
 using System.Collections;
 using System.Diagnostics;
 using System.Net.Http.Json;
+using System.Security.Claims;
 using System.Text;
 using System.Text.Json;
 using ClearVision.Product.Application.DTOs;
@@ -36,6 +37,9 @@ namespace ClearVision.Product.Desktop.Tests;
 
 public class PreviewNodeEndpointsTests
 {
+    private const string ArtifactOwnerTestUserId = "preview-owner-user";
+    private const string OtherArtifactTestUserId = "preview-other-user";
+
     [Fact]
     public async Task PreviewNode_UsesBreakAtOperatorAndReturnsTargetOutput()
     {
@@ -217,6 +221,19 @@ public class PreviewNodeEndpointsTests
         artifactResponse.Headers.GetValues("X-Content-Type-Options").Should().Contain("nosniff");
         (await artifactResponse.Content.ReadAsByteArrayAsync()).Should().Equal(imageBytes);
 
+        using var otherUserReadRequest = new HttpRequestMessage(HttpMethod.Get, $"/api/preview-artifacts/{artifactId}");
+        otherUserReadRequest.Headers.Add("X-Test-User", OtherArtifactTestUserId);
+        using var otherUserReadResponse = await host.Client.SendAsync(otherUserReadRequest);
+        otherUserReadResponse.StatusCode.Should().Be(System.Net.HttpStatusCode.NotFound);
+
+        using var otherUserDeleteRequest = new HttpRequestMessage(HttpMethod.Delete, $"/api/preview-artifacts/{artifactId}");
+        otherUserDeleteRequest.Headers.Add("X-Test-User", OtherArtifactTestUserId);
+        using var otherUserDeleteResponse = await host.Client.SendAsync(otherUserDeleteRequest);
+        otherUserDeleteResponse.StatusCode.Should().Be(System.Net.HttpStatusCode.NotFound);
+
+        using var ownerReadAfterDeniedDelete = await host.Client.GetAsync($"/api/preview-artifacts/{artifactId}");
+        ownerReadAfterDeniedDelete.StatusCode.Should().Be(System.Net.HttpStatusCode.OK);
+
         using var pathInjection = await host.Client.GetAsync("/api/preview-artifacts/..%2Fsecret");
         pathInjection.StatusCode.Should().Be(System.Net.HttpStatusCode.NotFound);
 
@@ -239,7 +256,13 @@ public class PreviewNodeEndpointsTests
             .Select(item => item.GetProperty("artifactId").GetString()!)
             .First(item => item != artifactId);
         var store = host.Services.GetRequiredService<PreviewArtifactStore>();
-        store.RevokeOwner(new PreviewArtifactOwnerScope(projectId, targetNodeId, debugSessionId, 10, 20))
+        store.RevokeOwner(new PreviewArtifactOwnerScope(
+                projectId,
+                targetNodeId,
+                debugSessionId,
+                10,
+                20,
+                ArtifactOwnerTestUserId))
             .Should()
             .BeGreaterThan(0);
         using var afterRevoke = await host.Client.GetAsync($"/api/preview-artifacts/{remainingArtifactId}");
@@ -4184,6 +4207,7 @@ public class PreviewNodeEndpointsTests
             builder.Services.AddPreviewArtifactServices();
 
             var app = builder.Build();
+            UseTestUserIdentity(app);
             app.MapPreviewNodeEndpoints();
             app.MapPreviewArtifactEndpoints();
             await app.StartAsync();
@@ -4227,11 +4251,30 @@ public class PreviewNodeEndpointsTests
             builder.Services.AddPreviewArtifactServices();
 
             var app = builder.Build();
+            UseTestUserIdentity(app);
             app.MapPreviewNodeEndpoints();
             app.MapPreviewArtifactEndpoints();
             await app.StartAsync();
 
             return new PreviewNodeTestHost(app, app.GetTestClient());
+        }
+
+        private static void UseTestUserIdentity(WebApplication app)
+        {
+            app.Use(async (context, next) =>
+            {
+                var userId = context.Request.Headers["X-Test-User"].FirstOrDefault();
+                if (string.IsNullOrWhiteSpace(userId))
+                {
+                    userId = ArtifactOwnerTestUserId;
+                }
+
+                context.User = new ClaimsPrincipal(new ClaimsIdentity(
+                [
+                    new Claim(ClaimTypes.NameIdentifier, userId)
+                ], "PreviewNodeTest"));
+                await next();
+            });
         }
 
         public async ValueTask DisposeAsync()

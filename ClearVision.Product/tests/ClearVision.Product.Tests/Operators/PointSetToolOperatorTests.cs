@@ -39,6 +39,33 @@ public class PointSetToolOperatorTests
     }
 
     [Fact]
+    public async Task ExecuteAsync_FilterWithoutBoundaries_ShouldUseMetadataDefaults()
+    {
+        var sut = CreateSut();
+        var op = CreateOperator(new Dictionary<string, object> { { "Operation", "Filter" } });
+        var inputs = new Dictionary<string, object>
+        {
+            {
+                "Points1",
+                new List<Position>
+                {
+                    new(0, 0),
+                    new(1000000001.0, 0),
+                    new(0, -1000000001.0)
+                }
+            }
+        };
+
+        var result = await sut.ExecuteAsync(op, inputs);
+
+        Assert.True(result.IsSuccess);
+        Assert.NotNull(result.OutputData);
+        Assert.Equal(1, Convert.ToInt32(result.OutputData!["Count"]));
+        var points = Assert.IsType<List<Position>>(result.OutputData["Points"]);
+        Assert.Equal(new Position(0, 0), Assert.Single(points));
+    }
+
+    [Fact]
     public void ValidateParameters_WithInvalidOperation_ShouldReturnInvalid()
     {
         var sut = CreateSut();

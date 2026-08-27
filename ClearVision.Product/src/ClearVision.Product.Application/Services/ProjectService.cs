@@ -870,25 +870,41 @@ public class ProjectService
                 changed = true;
             }
 
-            changed |= NormalizePorts(opDto.InputPorts, metadata.InputPorts, PortDirection.Input);
+            changed |= NormalizePorts(
+                flowDto,
+                opDto.Id,
+                opDto.InputPorts,
+                metadata.InputPorts,
+                PortDirection.Input);
             changed |= opDto.Type == OperatorType.PixelStatistics
-                ? NormalizePixelStatisticsOutputPorts(opDto.OutputPorts, metadata.OutputPorts)
-                : NormalizePorts(opDto.OutputPorts, metadata.OutputPorts, PortDirection.Output);
+                ? NormalizePixelStatisticsOutputPorts(flowDto, opDto.Id, opDto.OutputPorts, metadata.OutputPorts)
+                : NormalizePorts(
+                    flowDto,
+                    opDto.Id,
+                    opDto.OutputPorts,
+                    metadata.OutputPorts,
+                    PortDirection.Output);
             changed |= CanonicalizeParameterAliases(opDto, metadata);
             changed |= NormalizeParameters(opDto.Parameters, metadata.Parameters);
         }
 
         changed |= MigratePixelStatisticsDecisionBinding(flowDto);
+        ValidateConnectionPortReferences(flowDto);
 
         return changed;
     }
 
     private static bool NormalizePixelStatisticsOutputPorts(
+        OperatorFlowDto flowDto,
+        Guid operatorId,
         List<PortDto> ports,
         List<PortDefinition> metadataPorts)
     {
+        EnsureMissingPortIdsCanBeMigrated(flowDto, operatorId, PortDirection.Output, ports);
+
         var used = new HashSet<PortDto>();
         var normalized = new List<PortDto>(Math.Max(ports.Count, metadataPorts.Count));
+        var idChanges = new List<PortIdChange>();
         var changed = false;
         foreach (var definition in metadataPorts)
         {
@@ -912,7 +928,9 @@ public class ProjectService
                 used.Add(port);
                 if (port.Id == Guid.Empty)
                 {
+                    var oldId = port.Id;
                     port.Id = Guid.NewGuid();
+                    idChanges.Add(new PortIdChange(oldId, port.Id, port.Name));
                     changed = true;
                 }
                 if (!port.Name.Equals(definition.Name, StringComparison.Ordinal))
@@ -954,6 +972,8 @@ public class ProjectService
             ports.Clear();
             ports.AddRange(normalized);
         }
+
+        RewriteConnectionPortIds(flowDto, operatorId, PortDirection.Output, idChanges);
 
         return changed;
     }
@@ -1165,7 +1185,12 @@ public class ProjectService
         return GetParameter(opDto, name)?.Value?.ToString();
     }
 
-    private static bool NormalizePorts(List<PortDto> ports, List<PortDefinition> metadataPorts, PortDirection direction)
+    private static bool NormalizePorts(
+        OperatorFlowDto flowDto,
+        Guid operatorId,
+        List<PortDto> ports,
+        List<PortDefinition> metadataPorts,
+        PortDirection direction)
     {
         if (metadataPorts.Count == 0)
         {
@@ -1173,28 +1198,54 @@ public class ProjectService
         }
 
         var changed = false;
+        var idChanges = new List<PortIdChange>();
         var shouldRebuild = ports.Count == 0 ||
             (ports.Count == metadataPorts.Count &&
              ports.All(port => LegacyPortNames.Contains(port.Name) || port.Id == Guid.Empty));
 
         if (shouldRebuild)
         {
-            ports.Clear();
-            foreach (var definition in metadataPorts)
+            if (ports.Count == 0)
             {
-                ports.Add(new PortDto
+                EnsureUnlistedConnectedPortsCanBeMigrated(flowDto, operatorId, direction);
+                foreach (var definition in metadataPorts)
                 {
-                    Id = Guid.NewGuid(),
-                    Name = definition.Name,
-                    Direction = direction,
-                    DataType = definition.DataType,
-                    IsRequired = direction == PortDirection.Input && definition.IsRequired
-                });
+                    ports.Add(new PortDto
+                    {
+                        Id = Guid.NewGuid(),
+                        Name = definition.Name,
+                        Direction = direction,
+                        DataType = definition.DataType,
+                        IsRequired = direction == PortDirection.Input && definition.IsRequired
+                    });
+                }
+
+                return true;
             }
 
+            EnsureMissingPortIdsCanBeMigrated(flowDto, operatorId, direction, ports);
+            for (var index = 0; index < metadataPorts.Count; index += 1)
+            {
+                var port = ports[index];
+                var definition = metadataPorts[index];
+                if (port.Id == Guid.Empty)
+                {
+                    var oldId = port.Id;
+                    port.Id = Guid.NewGuid();
+                    idChanges.Add(new PortIdChange(oldId, port.Id, definition.Name));
+                }
+
+                port.Name = definition.Name;
+                port.Direction = direction;
+                port.DataType = definition.DataType;
+                port.IsRequired = direction == PortDirection.Input && definition.IsRequired;
+            }
+
+            RewriteConnectionPortIds(flowDto, operatorId, direction, idChanges);
             return true;
         }
 
+        EnsureMissingPortIdsCanBeMigrated(flowDto, operatorId, direction, ports);
         var count = Math.Min(ports.Count, metadataPorts.Count);
         for (var index = 0; index < count; index += 1)
         {
@@ -1203,7 +1254,9 @@ public class ProjectService
 
             if (port.Id == Guid.Empty)
             {
+                var oldId = port.Id;
                 port.Id = Guid.NewGuid();
+                idChanges.Add(new PortIdChange(oldId, port.Id, definition.Name));
                 changed = true;
             }
 
@@ -1232,8 +1285,129 @@ public class ProjectService
             }
         }
 
+        RewriteConnectionPortIds(flowDto, operatorId, direction, idChanges);
         return changed;
     }
+
+    private static void EnsureUnlistedConnectedPortsCanBeMigrated(
+        OperatorFlowDto flowDto,
+        Guid operatorId,
+        PortDirection direction)
+    {
+        var connection = flowDto.Connections.FirstOrDefault(candidate =>
+            direction == PortDirection.Input
+                ? candidate.TargetOperatorId == operatorId
+                : candidate.SourceOperatorId == operatorId);
+        if (connection == null)
+        {
+            return;
+        }
+
+        var portId = direction == PortDirection.Input
+            ? connection.TargetPortId
+            : connection.SourcePortId;
+        throw new InvalidOperationException(
+            $"Cannot migrate {direction.ToString().ToLowerInvariant()} port ID '{portId}' " +
+            $"for operator '{operatorId}': the historical port list is empty.");
+    }
+
+    private static void EnsureMissingPortIdsCanBeMigrated(
+        OperatorFlowDto flowDto,
+        Guid operatorId,
+        PortDirection direction,
+        IReadOnlyCollection<PortDto> ports)
+    {
+        if (ports.Count(port => port.Id == Guid.Empty) <= 1)
+        {
+            return;
+        }
+
+        var hasEmptyPortConnection = flowDto.Connections.Any(connection =>
+            direction == PortDirection.Input
+                ? connection.TargetOperatorId == operatorId && connection.TargetPortId == Guid.Empty
+                : connection.SourceOperatorId == operatorId && connection.SourcePortId == Guid.Empty);
+        if (hasEmptyPortConnection)
+        {
+            throw new InvalidOperationException(
+                $"Cannot migrate empty {direction.ToString().ToLowerInvariant()} port ID for operator '{operatorId}': " +
+                "the connection has multiple candidate ports.");
+        }
+    }
+
+    private static void RewriteConnectionPortIds(
+        OperatorFlowDto flowDto,
+        Guid operatorId,
+        PortDirection direction,
+        IReadOnlyList<PortIdChange> idChanges)
+    {
+        foreach (var group in idChanges.GroupBy(change => change.OldId))
+        {
+            var matchingConnections = flowDto.Connections.Where(connection =>
+                direction == PortDirection.Input
+                    ? connection.TargetOperatorId == operatorId && connection.TargetPortId == group.Key
+                    : connection.SourceOperatorId == operatorId && connection.SourcePortId == group.Key).ToArray();
+            if (matchingConnections.Length == 0)
+            {
+                continue;
+            }
+
+            var candidates = group.ToArray();
+            if (candidates.Length != 1)
+            {
+                var names = string.Join(", ", candidates.Select(candidate => candidate.Name));
+                throw new InvalidOperationException(
+                    $"Cannot migrate {direction.ToString().ToLowerInvariant()} port ID '{group.Key}' " +
+                    $"for operator '{operatorId}': the connection is ambiguous between [{names}].");
+            }
+
+            foreach (var connection in matchingConnections)
+            {
+                if (direction == PortDirection.Input)
+                {
+                    connection.TargetPortId = candidates[0].NewId;
+                }
+                else
+                {
+                    connection.SourcePortId = candidates[0].NewId;
+                }
+            }
+        }
+    }
+
+    private static void ValidateConnectionPortReferences(OperatorFlowDto flowDto)
+    {
+        var operators = flowDto.Operators.ToDictionary(op => op.Id);
+        foreach (var connection in flowDto.Connections)
+        {
+            if (!operators.TryGetValue(connection.SourceOperatorId, out var source))
+            {
+                throw new InvalidOperationException(
+                    $"Connection '{connection.Id}' references missing source operator '{connection.SourceOperatorId}'.");
+            }
+
+            if (!source.OutputPorts.Any(port => port.Id == connection.SourcePortId))
+            {
+                throw new InvalidOperationException(
+                    $"Connection '{connection.Id}' references missing source port '{connection.SourcePortId}' " +
+                    $"on operator '{connection.SourceOperatorId}'.");
+            }
+
+            if (!operators.TryGetValue(connection.TargetOperatorId, out var target))
+            {
+                throw new InvalidOperationException(
+                    $"Connection '{connection.Id}' references missing target operator '{connection.TargetOperatorId}'.");
+            }
+
+            if (!target.InputPorts.Any(port => port.Id == connection.TargetPortId))
+            {
+                throw new InvalidOperationException(
+                    $"Connection '{connection.Id}' references missing target port '{connection.TargetPortId}' " +
+                    $"on operator '{connection.TargetOperatorId}'.");
+            }
+        }
+    }
+
+    private readonly record struct PortIdChange(Guid OldId, Guid NewId, string Name);
 
     private static bool NormalizeParameters(List<ParameterDto> parameters, List<ParameterDefinition> metadataParameters)
     {

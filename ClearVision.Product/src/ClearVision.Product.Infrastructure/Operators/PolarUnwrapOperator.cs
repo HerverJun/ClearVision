@@ -57,7 +57,7 @@ public class PolarUnwrapOperator : OperatorBase
 
         var center = ResolveCenter(@operator, inputs, src.Width, src.Height);
         var innerRadius = GetIntParam(@operator, "InnerRadius", 0, 0, Math.Max(0, Math.Min(src.Width, src.Height) / 2));
-        var outerRadius = GetIntParam(@operator, "OuterRadius", Math.Min(src.Width, src.Height) / 2, 1, Math.Min(src.Width, src.Height) / 2);
+        var outerRadius = GetIntParam(@operator, "OuterRadius", 100, 1, Math.Min(src.Width, src.Height) / 2);
         var startAngle = GetDoubleParam(@operator, "StartAngle", 0.0, -3600.0, 3600.0);
         var endAngle = GetDoubleParam(@operator, "EndAngle", 360.0, -3600.0, 3600.0);
         var outputWidth = GetIntParam(@operator, "OutputWidth", 0, 0, 20000);
@@ -110,7 +110,7 @@ public class PolarUnwrapOperator : OperatorBase
     public override ValidationResult ValidateParameters(Operator @operator)
     {
         var inner = GetIntParam(@operator, "InnerRadius", 0);
-        var outer = GetIntParam(@operator, "OuterRadius", 1);
+        var outer = GetIntParam(@operator, "OuterRadius", 100);
         if (inner < 0)
         {
             return ValidationResult.Invalid("InnerRadius must be >= 0");

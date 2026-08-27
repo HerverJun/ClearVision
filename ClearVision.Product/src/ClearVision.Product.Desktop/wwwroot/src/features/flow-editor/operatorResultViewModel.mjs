@@ -1215,6 +1215,22 @@ function getStatusInfo({
         };
     }
 
+    if (status === 'blocked') {
+        return {
+            kind: 'blocked',
+            label: '安全拦截',
+            message: state?.errorMessage || '预览已安全拦截，正式运行流程时才会执行外部动作。'
+        };
+    }
+
+    if (status === 'auth-error') {
+        return {
+            kind: 'auth-error',
+            label: '登录状态无效',
+            message: state?.errorMessage || '登录状态无效，请重新登录。'
+        };
+    }
+
     if (status === 'error') {
         return {
             kind: 'error',

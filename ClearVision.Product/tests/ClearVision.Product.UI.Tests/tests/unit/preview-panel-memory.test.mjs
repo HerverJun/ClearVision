@@ -856,7 +856,7 @@ test('PreviewPanel default owner renders and clears missing Region guidance from
   panel.destroy();
 });
 
-test('OperatorResultViewModel renders no-selection, no-preview, loading, error, stale, and disabled states', () => {
+test('OperatorResultViewModel renders all formal preview states without contradictory fallbacks', () => {
   const operator = {
     id: 'node-1',
     type: 'Thresholding',
@@ -908,6 +908,28 @@ test('OperatorResultViewModel renders no-selection, no-preview, loading, error, 
   assert.equal(stale.status, 'stale');
   assert.equal(stale.stateMessage, STALE_PREVIEW_MESSAGE);
   assert.deepEqual(stale.staleReasons.sort(), ['flowRevision', 'parameters']);
+
+  const blocked = buildOperatorResultViewModel(operator, {
+    ...successState(),
+    status: 'blocked',
+    errorMessage: '预览已安全拦截'
+  }, {
+    flowRevision: 3
+  });
+  assert.equal(blocked.status, 'blocked');
+  assert.equal(blocked.statusText, '安全拦截');
+  assert.equal(blocked.stateMessage, '预览已安全拦截');
+
+  const authError = buildOperatorResultViewModel(operator, {
+    ...successState(),
+    status: 'auth-error',
+    errorMessage: '登录状态无效，请重新登录。'
+  }, {
+    flowRevision: 3
+  });
+  assert.equal(authError.status, 'auth-error');
+  assert.equal(authError.statusText, '登录状态无效');
+  assert.equal(authError.stateMessage, '登录状态无效，请重新登录。');
 
   const disabled = buildOperatorResultViewModel(operator, successState(), {
     liveNode: { id: 'node-1', type: 'Thresholding', disabled: true, parameters: operator.parameters },
@@ -1670,7 +1692,34 @@ test('PreviewPanelCapabilityOwner renders side-effect preview block as warning s
   assert.match(harness.container.innerHTML, /安全拦截/);
   assert.match(harness.container.innerHTML, /正式运行流程时才会执行/);
   assert.match(harness.container.innerHTML, /preview-capability-empty warning/);
-  assert.doesNotMatch(harness.container.innerHTML, /预览失败/);
+  assert.doesNotMatch(harness.container.innerHTML, /未运行|预览失败/);
+
+  owner.dispose();
+});
+
+test('PreviewPanelCapabilityOwner renders authentication failure without contradictory module state', () => {
+  const harness = createPreviewCapabilityHarness();
+  const owner = new PreviewPanelCapabilityOwner(harness.container, {
+    previewAdapter: harness.adapter
+  });
+
+  harness.emitPreview({
+    ...successState(),
+    status: 'auth-error',
+    errorMessage: '登录状态无效，请重新登录。',
+    outputData: null,
+    outputImageBase64: null,
+    presenter: {
+      statusText: '登录状态无效',
+      inputImageSrc: null,
+      outputImageSrc: null
+    }
+  });
+
+  assert.match(harness.container.innerHTML, /登录状态无效/);
+  assert.match(harness.container.innerHTML, /请重新登录/);
+  assert.match(harness.container.innerHTML, /preview-capability-empty auth-error/);
+  assert.doesNotMatch(harness.container.innerHTML, /未运行|预览失败/);
 
   owner.dispose();
 });

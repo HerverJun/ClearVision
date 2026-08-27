@@ -13,7 +13,7 @@ updated: "2026-04-13"
 
 | 状态 | 结论 | 证据路径 | 复现方式 | 阻塞项 | 负责人 | 截止日期 |
 | --- | --- | --- | --- | --- | --- | --- |
-| [x] | Week1 C线引用规范冻结为“仓库真实路径 + 行号级定位 + 可执行回归入口”。若历史文档路径与仓库现状不一致，以仓库真实路径为准。 | `docs/审计资料/算子审计/审计执行标准.md:17-24`；`docs/审计资料/算子审计/审计执行标准.md:61-70`；`docs/审计资料/算子审计/TODO.md:60-72` | 任一结论至少绑定 1 条文档/源码证据和 1 条脚本/测试入口；无统一脚本时回落到 `run-dotnet-test-serial.ps1`。 | 无 | C线负责人（证据与复核） | 2026-04-13 |
+| [x] | Week1 C线引用规范冻结为“仓库真实路径 + 行号级定位 + 可执行回归入口”。若历史文档路径与仓库现状不一致，以仓库真实路径为准。 | `docs/审计资料/算子审计/审计执行标准.md:17-24`；`docs/审计资料/算子审计/审计执行标准.md:61-70`；`docs/归档/已关闭事项/2026-08-27-算子库质量审计闭环/TODO.md:67-74` | 任一结论至少绑定 1 条文档/源码证据和 1 条脚本/测试入口；无统一脚本时回落到 `run-dotnet-test-serial.ps1`。 | 无 | C线负责人（证据与复核） | 2026-04-13 |
 | [x] | Week1 内“已升级”状态不直接等于可转 `[x]`；只有当“文档证据 + 回归入口 + 结果产物”三者均绑定后，才允许在周五验收口径中转为已核验结论。 | `docs/审计资料/算子审计/审计执行标准.md`；`docs/审计资料/算子审计/启动计划/Week1-长时启动计划.md` | 检查本文件第 2-4 节是否同时具备证据源、回归入口和结果产物槽位。 | 无 | C线负责人（证据与复核） | 2026-04-13 |
 
 ## 2. 已升级类别证据源索引（Week1 本批次已绑定）
@@ -28,8 +28,8 @@ updated: "2026-04-13"
 
 | 类别 | 复核结论 | 证据路径 | 复现方式 | 阻塞项 | 负责人 | 截止日期 |
 | --- | --- | --- | --- | --- | --- | --- |
-| 匹配定位（8） | [x] 已完成当前口径复核，并绑定本周 phase42 批次结果；本轮不进入 Week2 缺陷池。 | `docs/审计资料/算子审计/TODO.md:35-36`；`算子资料/算子名片/CATALOG.md:107-117`；`test_results/phase42-regression-20260413-115751.trx` | `scripts/run-tests-phase42-regression.ps1`；`ClearVision.Product/tests/ClearVision.Product.Tests/Operators/PlanarMatchingOperatorTests.cs:1-275`；`ClearVision.Product/tests/ClearVision.Product.Tests/Operators/LocalDeformableMatchingPhase42Tests.cs:1-103` | 无 | C线负责人（证据与复核） | 2026-04-13 |
-| AI检测（6） | [-] 已绑定本周 `detection-all` 批次结果并通过，但仍缺工业验收签收与模型/阈值一致性说明，暂不转 `[x]`。 | `docs/审计资料/算子审计/TODO.md:35-36`；`算子资料/算子名片/CATALOG.md:62-70`；`test_results/detection-all-20260413-115808.trx` | `scripts/run-tests-detection-regression.ps1 -Gate all`；`ClearVision.Product/tests/ClearVision.Product.Tests/Operators/AnomalyDetectionOperatorTests.cs:1-249`；`ClearVision.Product/tests/ClearVision.Product.Tests/Operators/DeepLearningOperatorTests.cs:1-599`；`ClearVision.Product/tests/ClearVision.Product.Tests/Operators/SurfaceDefectDetectionOperatorTests.cs:1-81` | 待补工业验收签收记录、模型版本/阈值一致性说明。 | C线负责人（证据与复核） | 2026-04-17 |
+| 匹配定位（8） | [x] 已完成当前口径复核，并绑定本周 phase42 批次结果；本轮不进入 Week2 缺陷池。 | `docs/归档/已关闭事项/2026-08-27-算子库质量审计闭环/TODO.md:70`；`算子资料/算子名片/CATALOG.md:107-117`；`test_results/phase42-regression-20260413-115751.trx` | `scripts/run-tests-phase42-regression.ps1`；`ClearVision.Product/tests/ClearVision.Product.Tests/Operators/PlanarMatchingOperatorTests.cs:1-275`；`ClearVision.Product/tests/ClearVision.Product.Tests/Operators/LocalDeformableMatchingPhase42Tests.cs:1-103` | 无 | C线负责人（证据与复核） | 2026-04-13 |
+| AI检测（6） | [-] 已绑定本周 `detection-all` 批次结果并通过，但仍缺工业验收签收与模型/阈值一致性说明，暂不转 `[x]`。 | `docs/归档/已关闭事项/2026-08-27-算子库质量审计闭环/TODO.md:71`；`算子资料/算子名片/CATALOG.md:62-70`；`test_results/detection-all-20260413-115808.trx` | `scripts/run-tests-detection-regression.ps1 -Gate all`；`ClearVision.Product/tests/ClearVision.Product.Tests/Operators/AnomalyDetectionOperatorTests.cs:1-249`；`ClearVision.Product/tests/ClearVision.Product.Tests/Operators/DeepLearningOperatorTests.cs:1-599`；`ClearVision.Product/tests/ClearVision.Product.Tests/Operators/SurfaceDefectDetectionOperatorTests.cs:1-81` | 待补工业验收签收记录、模型版本/阈值一致性说明。 | C线负责人（证据与复核） | 2026-04-17 |
 
 ## 4. 回归脚本 -> 结果产物 -> 文档结论 映射表（本周已执行）
 

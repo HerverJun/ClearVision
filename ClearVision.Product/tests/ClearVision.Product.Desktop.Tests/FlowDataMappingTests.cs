@@ -266,6 +266,81 @@ public class FlowDataMappingTests
     }
 
     [Fact]
+    public void UpdateFlowRequest_ToPreviewEntity_RejectsAmbiguousCompatiblePortRecovery()
+    {
+        var sourceOperatorId = Guid.NewGuid();
+        var objectsPortId = Guid.NewGuid();
+        var defectsPortId = Guid.NewGuid();
+        var targetOperatorId = Guid.NewGuid();
+        var targetPortId = Guid.NewGuid();
+        var missingSourcePortId = Guid.NewGuid();
+        var request = new UpdateFlowRequest
+        {
+            Operators =
+            [
+                new OperatorDto
+                {
+                    Id = sourceOperatorId,
+                    Name = "Detector",
+                    Type = OperatorType.DeepLearning,
+                    OutputPorts =
+                    [
+                        new PortDto
+                        {
+                            Id = objectsPortId,
+                            Name = "Objects",
+                            Direction = PortDirection.Output,
+                            DataType = PortDataType.DetectionList
+                        },
+                        new PortDto
+                        {
+                            Id = defectsPortId,
+                            Name = "Defects",
+                            Direction = PortDirection.Output,
+                            DataType = PortDataType.DetectionList
+                        }
+                    ]
+                },
+                new OperatorDto
+                {
+                    Id = targetOperatorId,
+                    Name = "Filter",
+                    Type = OperatorType.BoxFilter,
+                    InputPorts =
+                    [
+                        new PortDto
+                        {
+                            Id = targetPortId,
+                            Name = "Detections",
+                            Direction = PortDirection.Input,
+                            DataType = PortDataType.DetectionList,
+                            IsRequired = true
+                        }
+                    ]
+                }
+            ],
+            Connections =
+            [
+                new OperatorConnectionDto
+                {
+                    Id = Guid.NewGuid(),
+                    SourceOperatorId = sourceOperatorId,
+                    SourcePortId = missingSourcePortId,
+                    TargetOperatorId = targetOperatorId,
+                    TargetPortId = targetPortId
+                }
+            ]
+        };
+
+        var act = () => FlowEntityMapper.ToPreviewEntity(request, targetOperatorId);
+
+        act.Should().Throw<InvalidOperationException>()
+            .WithMessage("*连接端口恢复存在歧义*")
+            .WithMessage("*Objects*")
+            .WithMessage("*Defects*");
+    }
+
+    [Fact]
     public void OperatorFlowDto_ToEntity_AllowsFrontendNumberCompatibilityGroups()
     {
         var sourceOperatorId = Guid.NewGuid();

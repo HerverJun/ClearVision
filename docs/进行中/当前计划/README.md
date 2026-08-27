@@ -4,6 +4,8 @@
 
 - [ClearVision-全面提升 TODO（2026-05-09）](./ClearVision-全面提升TODO-2026-05-09.md)
 - [ClearVision T01 测试与覆盖率治理总体计划（PROPOSED / AUDITED）](./测试治理/ClearVision_T01_测试与覆盖率治理总体计划_PROPOSED_AUDITED.md)
+- [T01-G01B-R3 UI 契约回归闭环计划（2026-08-28）](./测试治理/ClearVision_T01_G01B_R3_UI契约回归闭环计划_2026-08-28.md)
+- [Preview 执行安全与自动预览治理计划（2026-08-28）](./Preview-执行安全与自动预览治理计划-2026-08-28.md)
 
 旧 Vision Agent 阶段材料已在 2026-08-25 完成治理迁移：
 

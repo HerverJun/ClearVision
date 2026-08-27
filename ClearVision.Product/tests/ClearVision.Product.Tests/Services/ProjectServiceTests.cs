@@ -221,6 +221,124 @@ public class ProjectServiceTests
     }
 
     [Fact]
+    public async Task GetByIdAsync_LegacyPlaceholderPorts_ShouldPreserveIdsAndConnectionSemantics()
+    {
+        var project = new Project("legacy-placeholder-ports");
+        var sourceOperatorId = Guid.NewGuid();
+        var sourcePortId = Guid.NewGuid();
+        var targetOperatorId = Guid.NewGuid();
+        var firstTargetPortId = Guid.NewGuid();
+        var secondTargetPortId = Guid.NewGuid();
+        var connectionId = Guid.NewGuid();
+        var legacy = new OperatorFlowDto
+        {
+            Name = "legacy-placeholder-flow",
+            Operators =
+            [
+                new OperatorDto
+                {
+                    Id = sourceOperatorId,
+                    Name = "Image Acquisition",
+                    Type = OperatorType.ImageAcquisition,
+                    OutputPorts = [Port(sourcePortId, "Image", PortDirection.Output, PortDataType.Image)]
+                },
+                new OperatorDto
+                {
+                    Id = targetOperatorId,
+                    Name = "String Format",
+                    Type = OperatorType.StringFormat,
+                    InputPorts =
+                    [
+                        Port(firstTargetPortId, "input", PortDirection.Input, PortDataType.Any),
+                        Port(secondTargetPortId, "input", PortDirection.Input, PortDataType.Any)
+                    ]
+                }
+            ],
+            Connections =
+            [
+                new OperatorConnectionDto
+                {
+                    Id = connectionId,
+                    SourceOperatorId = sourceOperatorId,
+                    SourcePortId = sourcePortId,
+                    TargetOperatorId = targetOperatorId,
+                    TargetPortId = secondTargetPortId
+                }
+            ]
+        };
+        var repository = Substitute.For<IProjectRepository>();
+        var storage = Substitute.For<IProjectFlowStorage>();
+        repository.GetByIdAsync(project.Id).Returns(Task.FromResult<Project?>(project));
+        storage.LoadFlowJsonAsync(project.Id).Returns(Task.FromResult<string?>(JsonSerializer.Serialize(legacy)));
+        var service = new ProjectService(repository, storage, new OperatorFactory());
+
+        var loaded = await service.GetByIdAsync(project.Id);
+
+        var target = loaded!.Flow!.Operators.Single(op => op.Id == targetOperatorId);
+        target.InputPorts.Select(port => (port.Id, port.Name)).Should().Equal(
+            (firstTargetPortId, "Arg1"),
+            (secondTargetPortId, "Arg2"));
+        loaded.Flow.Connections.Should().ContainSingle(connection =>
+            connection.Id == connectionId && connection.TargetPortId == secondTargetPortId);
+
+        var entity = loaded.Flow.ToEntity();
+        entity.Connections.Should().ContainSingle(connection => connection.TargetPortId == secondTargetPortId);
+    }
+
+    [Fact]
+    public async Task GetByIdAsync_WhenConnectionPortCannotBeMapped_ShouldFailClosed()
+    {
+        var project = new Project("unmappable-port");
+        var sourceOperatorId = Guid.NewGuid();
+        var sourcePortId = Guid.NewGuid();
+        var targetOperatorId = Guid.NewGuid();
+        var missingTargetPortId = Guid.NewGuid();
+        var connectionId = Guid.NewGuid();
+        var legacy = new OperatorFlowDto
+        {
+            Name = "unmappable-port-flow",
+            Operators =
+            [
+                new OperatorDto
+                {
+                    Id = sourceOperatorId,
+                    Name = "Image Acquisition",
+                    Type = OperatorType.ImageAcquisition,
+                    OutputPorts = [Port(sourcePortId, "Image", PortDirection.Output, PortDataType.Image)]
+                },
+                new OperatorDto
+                {
+                    Id = targetOperatorId,
+                    Name = "String Format",
+                    Type = OperatorType.StringFormat,
+                    InputPorts = []
+                }
+            ],
+            Connections =
+            [
+                new OperatorConnectionDto
+                {
+                    Id = connectionId,
+                    SourceOperatorId = sourceOperatorId,
+                    SourcePortId = sourcePortId,
+                    TargetOperatorId = targetOperatorId,
+                    TargetPortId = missingTargetPortId
+                }
+            ]
+        };
+        var repository = Substitute.For<IProjectRepository>();
+        var storage = Substitute.For<IProjectFlowStorage>();
+        repository.GetByIdAsync(project.Id).Returns(Task.FromResult<Project?>(project));
+        storage.LoadFlowJsonAsync(project.Id).Returns(Task.FromResult<string?>(JsonSerializer.Serialize(legacy)));
+        var service = new ProjectService(repository, storage, new OperatorFactory());
+
+        var act = () => service.GetByIdAsync(project.Id);
+
+        await act.Should().ThrowAsync<InvalidOperationException>()
+            .WithMessage($"*input port ID '{missingTargetPortId}'*historical port list is empty*");
+    }
+
+    [Fact]
     public async Task GetByIdAsync_WhenProjectHasNoAssets_ShouldReturnEmptyProjectAssets()
     {
         var repository = Substitute.For<IProjectRepository>();

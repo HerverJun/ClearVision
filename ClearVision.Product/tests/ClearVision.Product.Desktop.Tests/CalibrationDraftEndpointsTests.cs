@@ -96,7 +96,7 @@ public sealed class CalibrationDraftEndpointsTests
         response.Artifacts.Should().OnlyContain(artifact => artifact.Length <= 512 * 1024);
 
         var draftArtifact = response.Artifacts.Single(artifact => artifact.Role == "calibration-draft-session.v1");
-        store.TryRead(draftArtifact.ArtifactId, out var draftRead).Should().BeTrue();
+        store.TryRead(draftArtifact.ArtifactId, string.Empty, out var draftRead).Should().BeTrue();
         Encoding.UTF8.GetString(draftRead!.Bytes).Should().Contain("\"notSavedToProjectAssets\":true");
 
         response.Observation.Should().NotBeNull();

@@ -62,6 +62,43 @@ public class PolarUnwrapOperatorTests
         Assert.False(validation.IsValid);
     }
 
+    [Fact]
+    public void ValidateParameters_WithoutOuterRadius_ShouldUseMetadataDefault()
+    {
+        var sut = CreateSut();
+        var op = CreateOperator(new Dictionary<string, object>
+        {
+            { "InnerRadius", 20 }
+        });
+
+        var validation = sut.ValidateParameters(op);
+
+        Assert.True(validation.IsValid);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_WithoutOuterRadius_ShouldUseMetadataDefault()
+    {
+        var sut = CreateSut();
+        var op = CreateOperator(new Dictionary<string, object>
+        {
+            { "InnerRadius", 20 },
+            { "OutputWidth", 180 },
+            { "UseWarpPolar", false }
+        });
+
+        using var image = CreateRingImage(300);
+        var result = await sut.ExecuteAsync(op, TestHelpers.CreateImageInputs(image));
+
+        Assert.True(result.IsSuccess);
+        Assert.NotNull(result.OutputData);
+        Assert.Equal(180, Convert.ToInt32(result.OutputData!["Width"]));
+        Assert.Equal(80, Convert.ToInt32(result.OutputData["Height"]));
+        using var outputImage = Assert.IsType<ImageWrapper>(result.OutputData["Image"]);
+        Assert.Equal(180, outputImage.GetMat().Width);
+        Assert.Equal(80, outputImage.GetMat().Height);
+    }
+
     private static PolarUnwrapOperator CreateSut()
     {
         return new PolarUnwrapOperator(Substitute.For<ILogger<PolarUnwrapOperator>>());
@@ -82,11 +119,12 @@ public class PolarUnwrapOperatorTests
         return op;
     }
 
-    private static ImageWrapper CreateRingImage()
+    private static ImageWrapper CreateRingImage(int size = 120)
     {
-        var mat = new Mat(120, 120, MatType.CV_8UC3, Scalar.Black);
-        Cv2.Circle(mat, new Point(60, 60), 40, Scalar.White, 2);
-        Cv2.Circle(mat, new Point(60, 60), 25, new Scalar(127, 127, 127), 2);
+        var center = size / 2;
+        var mat = new Mat(size, size, MatType.CV_8UC3, Scalar.Black);
+        Cv2.Circle(mat, new Point(center, center), Math.Max(2, size / 3), Scalar.White, 2);
+        Cv2.Circle(mat, new Point(center, center), Math.Max(1, size / 5), new Scalar(127, 127, 127), 2);
         return new ImageWrapper(mat);
     }
 }

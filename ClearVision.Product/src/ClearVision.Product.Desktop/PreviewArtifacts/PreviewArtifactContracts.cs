@@ -29,7 +29,8 @@ public readonly record struct PreviewArtifactOwnerScope(
     Guid TargetNodeId,
     Guid DebugSessionId,
     long? ClientRequestSequence,
-    long? FlowRevision);
+    long? FlowRevision,
+    string UserId = "");
 
 public sealed class PreviewArtifactStoreOptions
 {

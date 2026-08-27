@@ -67,7 +67,7 @@ public sealed class PreviewArtifactStore : IDisposable
         return new PreviewArtifactBatch(this, owner);
     }
 
-    public bool TryRead(string? artifactId, out PreviewArtifactReadResult? result)
+    public bool TryRead(string? artifactId, string? userId, out PreviewArtifactReadResult? result)
     {
         result = null;
         if (!IsValidArtifactId(artifactId))
@@ -87,6 +87,11 @@ public sealed class PreviewArtifactStore : IDisposable
                 return false;
             }
 
+            if (!string.Equals(entry.Owner.UserId, userId, StringComparison.Ordinal))
+            {
+                return false;
+            }
+
             if (IsExpired(entry))
             {
                 RemoveEntryUnderLock(artifactId!);
@@ -98,7 +103,7 @@ public sealed class PreviewArtifactStore : IDisposable
         }
     }
 
-    public bool Delete(string? artifactId)
+    public bool Delete(string? artifactId, string? userId)
     {
         if (!IsValidArtifactId(artifactId))
         {
@@ -108,6 +113,12 @@ public sealed class PreviewArtifactStore : IDisposable
         lock (_gate)
         {
             if (_disposed)
+            {
+                return false;
+            }
+
+            if (!_entries.TryGetValue(artifactId!, out var entry) ||
+                !string.Equals(entry.Owner.UserId, userId, StringComparison.Ordinal))
             {
                 return false;
             }

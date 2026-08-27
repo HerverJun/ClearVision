@@ -511,36 +511,24 @@ internal static class FlowEntityMapper
             ? targetOperator.InputPorts.FirstOrDefault(port => port.Id == preferredTargetPortId)
             : null;
 
-        if (sourcePort != null && targetPort != null && !IsCompatible(sourcePort.DataType, targetPort.DataType))
+        if (sourcePort != null && targetPort != null)
         {
-            sourcePort = ResolveCompatibleOutputPort(sourceOperator, sourcePort, targetPort);
-            targetPort = ResolveCompatibleInputPort(targetOperator, sourcePort, targetPort);
+            if (!IsCompatible(sourcePort.DataType, targetPort.DataType))
+            {
+                sourcePort = FindMatchingOutputPort(sourceOperator, targetPort);
+            }
         }
-
-        if (sourcePort == null && targetPort != null)
+        else if (sourcePort == null && targetPort != null)
         {
             sourcePort = FindMatchingOutputPort(sourceOperator, targetPort);
         }
-
-        if (targetPort == null && sourcePort != null)
+        else if (targetPort == null && sourcePort != null)
         {
             targetPort = FindMatchingInputPort(targetOperator, sourcePort);
         }
-
-        if (sourcePort == null || targetPort == null)
+        else
         {
-            foreach (var candidateSource in sourceOperator.OutputPorts)
-            {
-                var candidateTarget = FindMatchingInputPort(targetOperator, candidateSource);
-                if (candidateTarget == null)
-                {
-                    continue;
-                }
-
-                sourcePort = candidateSource;
-                targetPort = candidateTarget;
-                break;
-            }
+            (sourcePort, targetPort) = FindMatchingPortPair(sourceOperator, targetOperator);
         }
 
         if (sourcePort == null || targetPort == null)
@@ -557,59 +545,67 @@ internal static class FlowEntityMapper
 
     private static Port? FindMatchingOutputPort(Operator sourceOperator, Port targetPort)
     {
-        return sourceOperator.OutputPorts.FirstOrDefault(port =>
-                   string.Equals(port.Name, targetPort.Name, StringComparison.OrdinalIgnoreCase) &&
-                   IsCompatible(port.DataType, targetPort.DataType)) ??
-               sourceOperator.OutputPorts.FirstOrDefault(port => IsCompatible(port.DataType, targetPort.DataType));
+        var compatiblePorts = sourceOperator.OutputPorts
+            .Where(port => IsCompatible(port.DataType, targetPort.DataType))
+            .ToList();
+        var nameMatches = compatiblePorts
+            .Where(port => string.Equals(port.Name, targetPort.Name, StringComparison.OrdinalIgnoreCase))
+            .ToList();
+
+        return SelectUniquePort(
+            nameMatches.Count > 0 ? nameMatches : compatiblePorts,
+            $"源算子 {sourceOperator.Name} ({sourceOperator.Id}) 到目标端口 {targetPort.Name} ({targetPort.Id})");
     }
 
     private static Port? FindMatchingInputPort(Operator targetOperator, Port sourcePort)
     {
-        return targetOperator.InputPorts.FirstOrDefault(port =>
-                   string.Equals(port.Name, sourcePort.Name, StringComparison.OrdinalIgnoreCase) &&
-                   IsCompatible(sourcePort.DataType, port.DataType)) ??
-               targetOperator.InputPorts.FirstOrDefault(port => IsCompatible(sourcePort.DataType, port.DataType));
+        var compatiblePorts = targetOperator.InputPorts
+            .Where(port => IsCompatible(sourcePort.DataType, port.DataType))
+            .ToList();
+        var nameMatches = compatiblePorts
+            .Where(port => string.Equals(port.Name, sourcePort.Name, StringComparison.OrdinalIgnoreCase))
+            .ToList();
+
+        return SelectUniquePort(
+            nameMatches.Count > 0 ? nameMatches : compatiblePorts,
+            $"源端口 {sourcePort.Name} ({sourcePort.Id}) 到目标算子 {targetOperator.Name} ({targetOperator.Id})");
     }
 
-    private static Port? ResolveCompatibleOutputPort(Operator sourceOperator, Port? preferredSourcePort, Port targetPort)
+    private static (Port? Source, Port? Target) FindMatchingPortPair(
+        Operator sourceOperator,
+        Operator targetOperator)
     {
-        var targetMatched = FindMatchingOutputPort(sourceOperator, targetPort);
-        if (targetMatched != null)
+        var compatiblePairs = sourceOperator.OutputPorts
+            .SelectMany(source => targetOperator.InputPorts
+                .Where(target => IsCompatible(source.DataType, target.DataType))
+                .Select(target => (Source: source, Target: target)))
+            .ToList();
+        var nameMatchedPairs = compatiblePairs
+            .Where(pair => string.Equals(pair.Source.Name, pair.Target.Name, StringComparison.OrdinalIgnoreCase))
+            .ToList();
+        var candidates = nameMatchedPairs.Count > 0 ? nameMatchedPairs : compatiblePairs;
+
+        if (candidates.Count > 1)
         {
-            return targetMatched;
+            var candidateText = string.Join(", ", candidates.Select(pair =>
+                $"{pair.Source.Name} ({pair.Source.Id}) -> {pair.Target.Name} ({pair.Target.Id})"));
+            throw new InvalidOperationException(
+                $"连接端口恢复存在歧义: 源算子 {sourceOperator.Name} ({sourceOperator.Id}) 到目标算子 {targetOperator.Name} ({targetOperator.Id}); 候选: {candidateText}");
         }
 
-        if (preferredSourcePort == null)
-        {
-            return null;
-        }
-
-        return sourceOperator.OutputPorts.FirstOrDefault(port =>
-                   string.Equals(port.Name, preferredSourcePort.Name, StringComparison.OrdinalIgnoreCase) &&
-                   IsCompatible(port.DataType, targetPort.DataType));
+        return candidates.Count == 1 ? candidates[0] : (null, null);
     }
 
-    private static Port? ResolveCompatibleInputPort(Operator targetOperator, Port? sourcePort, Port? preferredTargetPort)
+    private static Port? SelectUniquePort(IReadOnlyList<Port> candidates, string connectionContext)
     {
-        if (sourcePort == null)
+        if (candidates.Count > 1)
         {
-            return preferredTargetPort;
+            var candidateText = string.Join(", ", candidates.Select(port => $"{port.Name} ({port.Id})"));
+            throw new InvalidOperationException(
+                $"连接端口恢复存在歧义: {connectionContext}; 候选: {candidateText}");
         }
 
-        var sourceMatched = FindMatchingInputPort(targetOperator, sourcePort);
-        if (sourceMatched != null)
-        {
-            return sourceMatched;
-        }
-
-        if (preferredTargetPort == null)
-        {
-            return null;
-        }
-
-        return targetOperator.InputPorts.FirstOrDefault(port =>
-                   string.Equals(port.Name, preferredTargetPort.Name, StringComparison.OrdinalIgnoreCase) &&
-                   IsCompatible(sourcePort.DataType, port.DataType));
+        return candidates.Count == 1 ? candidates[0] : null;
     }
 
     private static bool IsCompatible(PortDataType source, PortDataType target)

@@ -37,7 +37,7 @@ updated: "2026-04-15"
 | [-] | P0 | AI检测验收阻塞 | Week2 冻结批次 `detection-all-20260413-115808.trx` 仍有效；Week4 已补齐模型/阈值/环境可得实值，当前仅保留“工业签收实录未闭环（含生产模型唯一标识映射）”这一条外部阻塞。 | `docs/审计资料/算子审计/Week2-修复优先级清单.md`；`docs/审计资料/算子审计/Week2-已升级证据链.md` | C线负责人（证据与复核） | 已进入 Week5 入口卡片跟进。 |
 | [x] | P1 | 预处理直接单测缺口 | `Filtering`、`Thresholding`、`LaplacianSharpen`、`MorphologicalOperation`、`ImageBlend`、`ImageDiff` 同名单测已补齐并完成首批串行验证。 | `docs/审计资料/算子审计/Week2-修复优先级清单.md`；`docs/审计资料/算子审计/Week2-审计台账.md` | A线负责人（算法审计） | 本轮不进入 Week3。 |
 | [x] | P1 | `EdgeDetection` 直接单测缺口 | `EdgeDetectionOperatorTests` 已补齐，边缘主链回归已绑定 `week2-edge-mainchain-20260413-144604.trx`。 | `docs/审计资料/算子审计/Week2-修复优先级清单.md`；`docs/审计资料/算子审计/Week2-审计台账.md` | B线负责人（链路稳定性） | 本轮不进入 Week3。 |
-| [x] | P0 | 预处理 / 定位 / 特征提取 / 图像处理 / 颜色处理 实验室口径闭环 | 2026-04-15 已追加实验室补充批次 `week2-p0-lab-closure-20260415.trx`，覆盖 40 个测试类共 `174/174` 通过；上述 5 类在当前口径下均已具备可追溯收口证据。 | `docs/审计资料/算子审计/TODO.md`；`docs/审计资料/算子审计/Week2-审计台账.md`；`test_results/week2-p0-lab-closure-20260415.trx` | Week5 主执行责任位 | 当前实验室口径下不再保留类别级阻塞。 |
+| [x] | P0 | 预处理 / 定位 / 特征提取 / 图像处理 / 颜色处理 实验室口径闭环 | 2026-04-15 已追加实验室补充批次 `week2-p0-lab-closure-20260415.trx`，覆盖 40 个测试类共 `174/174` 通过；上述 5 类在当前口径下均已具备可追溯收口证据。 | `docs/归档/已关闭事项/2026-08-27-算子库质量审计闭环/TODO.md`；`docs/审计资料/算子审计/Week2-审计台账.md`；`test_results/week2-p0-lab-closure-20260415.trx` | Week5 主执行责任位 | 当前实验室口径下不再保留类别级阻塞。 |
 
 ## 4. Week3 入口条件跟踪
 

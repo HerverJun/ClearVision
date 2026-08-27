@@ -2203,15 +2203,27 @@ class FlowCanvas {
                 let sourcePortIndex = conn.sourcePort ?? 0;
                 let targetPortIndex = conn.targetPort ?? 0;
 
-                // 有 Port ID 时优先按 ID 找索引，兼容后端 DTO。
-                if (sourcePortId && sourceNode && sourceNode.outputs) {
+                // 显式 Port ID 不允许静默退回索引，否则多端口连接会恢复到错误语义。
+                if (sourcePortId) {
+                    if (!sourceNode || !Array.isArray(sourceNode.outputs)) {
+                        throw new Error(`[FlowCanvas] Cannot restore connection ${id}: source operator ${sourceId} is missing.`);
+                    }
                     const idx = sourceNode.outputs.findIndex(port => (port.id === sourcePortId) || (port.Id === sourcePortId));
-                    if (idx !== -1) sourcePortIndex = idx;
+                    if (idx === -1) {
+                        throw new Error(`[FlowCanvas] Cannot restore connection ${id}: source port ${sourcePortId} was not found on operator ${sourceId}.`);
+                    }
+                    sourcePortIndex = idx;
                 }
 
-                if (targetPortId && targetNode && targetNode.inputs) {
+                if (targetPortId) {
+                    if (!targetNode || !Array.isArray(targetNode.inputs)) {
+                        throw new Error(`[FlowCanvas] Cannot restore connection ${id}: target operator ${targetId} is missing.`);
+                    }
                     const idx = targetNode.inputs.findIndex(port => (port.id === targetPortId) || (port.Id === targetPortId));
-                    if (idx !== -1) targetPortIndex = idx;
+                    if (idx === -1) {
+                        throw new Error(`[FlowCanvas] Cannot restore connection ${id}: target port ${targetPortId} was not found on operator ${targetId}.`);
+                    }
+                    targetPortIndex = idx;
                 }
 
                 return {

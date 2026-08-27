@@ -501,6 +501,37 @@ test('FlowCanvas deserialize rebuilds connection index', async () => {
   fc.destroy();
 });
 
+test('FlowCanvas deserialize rejects explicit port ids that cannot be resolved', async () => {
+  const { FlowCanvas } = await import(
+    '../../../../src/ClearVision.Product.Desktop/wwwroot/src/core/canvas/flowCanvas.js'
+  );
+
+  const canvas = createMockCanvas();
+  global.document = createMockDocument(canvas);
+  global.window = createMockWindow(canvas);
+
+  const createFlow = connection => ({
+    operators: [
+      { id: 'op1', name: 'Src', type: 'ImageAcquisition', x: 0, y: 0, inputPorts: [], outputPorts: [{ id: 'p1', name: 'out', dataType: 'Image' }] },
+      { id: 'op2', name: 'Dst', type: 'ResultOutput', x: 200, y: 0, inputPorts: [{ id: 'p2', name: 'in', dataType: 'Image' }], outputPorts: [] }
+    ],
+    connections: [{ id: 'c1', sourceOperatorId: 'op1', targetOperatorId: 'op2', ...connection }]
+  });
+
+  const fc = new FlowCanvas('canvas');
+  assert.throws(
+    () => fc.deserialize(createFlow({ sourcePortId: 'missing-source', targetPortId: 'p2' })),
+    /connection c1: source port missing-source was not found/
+  );
+  assert.throws(
+    () => fc.deserialize(createFlow({ sourcePortId: 'p1', targetPortId: 'missing-target' })),
+    /connection c1: target port missing-target was not found/
+  );
+  assert.equal(fc.connections.length, 0, 'invalid explicit ids must not create a fallback connection');
+
+  fc.destroy();
+});
+
 test('FlowCanvas preserves agent temp id metadata through title edits', async () => {
   const { FlowCanvas } = await import(
     '../../../../src/ClearVision.Product.Desktop/wwwroot/src/core/canvas/flowCanvas.js'

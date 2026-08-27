@@ -33,6 +33,7 @@ public class FlowExecutionService : IFlowExecutionEngine, IFlowDefinitionValidat
     private static readonly TimeSpan DebugCleanupInterval = TimeSpan.FromMinutes(10);
     private static readonly TimeSpan DebugSessionTtl = TimeSpan.FromMinutes(30);
     private static readonly TimeSpan ExecutionStatusTtl = TimeSpan.FromSeconds(30);
+    private static readonly Lazy<OperatorFactory> ConstraintMetadataFactory = new(() => new OperatorFactory());
     private const string OperatorCanceledErrorMessage = "Operator execution was canceled.";
     private const int DefaultDebugCacheMaxEntries = 256;
     private static readonly JsonSerializerOptions SpatialJsonOptions = new(JsonSerializerDefaults.Web);
@@ -584,6 +585,16 @@ public class FlowExecutionService : IFlowExecutionEngine, IFlowDefinitionValidat
         bool enableParallel = false,
         CancellationToken cancellationToken = default)
     {
+        var unavailableOutputErrors = ValidateConnectedOutputAvailability(flow);
+        if (unavailableOutputErrors.Count > 0)
+        {
+            return new FlowExecutionResult
+            {
+                IsSuccess = false,
+                ErrorMessage = string.Join("; ", unavailableOutputErrors)
+            };
+        }
+
         var projectVariableContext = _projectVariableContextAccessor.Current;
         using var variableScope = _variableContext.BeginScope(new VariableContextScope(
             flow.Id,
@@ -1637,6 +1648,8 @@ public class FlowExecutionService : IFlowExecutionEngine, IFlowDefinitionValidat
             }
         }
 
+        result.Errors.AddRange(ValidateConnectedOutputAvailability(flow));
+
         if (!hasInputOperator)
         {
             result.Warnings.Add("流程缺少图像采集算子作为输入");
@@ -2203,7 +2216,7 @@ public class FlowExecutionService : IFlowExecutionEngine, IFlowDefinitionValidat
                     }
                     else
                     {
-                        // 普通算子优先使用端口元数据做精确映射；找不到端口时再走兼容合并。
+                        // 普通算子只使用端口元数据做精确映射和受控的单输出图像别名。
                         Port? sourcePort = null;
                         Port? targetPort = null;
                         if (sourceOperator != null)
@@ -2225,28 +2238,8 @@ public class FlowExecutionService : IFlowExecutionEngine, IFlowDefinitionValidat
                             }
                         }
 
-                        // 保留历史兼容的全量输出合并，用于旧算子读取非端口命名字段。
-                        // 我们依然执行全量合并，但跳过已存在的键（避免覆盖精确映射的结果）
-                        foreach (var kvp in sourceOutputs)
-                        {
-                            if (!inputs.ContainsKey(kvp.Key))
-                            {
-                                // Never implicitly propagate reference-counted image payloads across
-                                // unrelated ports. This avoids hidden ImageWrapper consumers that are
-                                // invisible to fan-out analysis and can cause premature disposal.
-                                if (ShouldSkipImplicitFallbackValue(kvp.Key, kvp.Value, sourceOperator, sourcePort))
-                                {
-                                    _logger.LogDebug(
-                                        "[FlowExecution] Skip implicit fallback key '{Key}' from {SourceOperator} to {TargetOperator} to avoid hidden ImageWrapper propagation.",
-                                        SanitizeLogValue(kvp.Key),
-                                        SanitizeLogValue(sourceOperator?.Name ?? connection.SourceOperatorId.ToString()),
-                                        SanitizeLogValue(op.Name));
-                                    continue;
-                                }
-
-                                inputs[kvp.Key] = kvp.Value;
-                            }
-                        }
+                        // A connection transports only its declared source port value. Historical
+                        // compatibility is limited to aliases handled by TryResolveConnectedSourceOutputData.
                     }
                 }
             }
@@ -2597,36 +2590,45 @@ public class FlowExecutionService : IFlowExecutionEngine, IFlowDefinitionValidat
         return false;
     }
 
-    private static bool ShouldSkipImplicitFallbackValue(
-        string key,
-        object? value,
-        Operator? sourceOperator,
-        Port? connectedSourcePort)
+    private static List<string> ValidateConnectedOutputAvailability(OperatorFlow flow)
     {
-        if (IsSpatialContextFallbackValue(key, value))
-            return true;
+        var errors = new List<string>();
+        foreach (var connection in flow.Connections)
+        {
+            var sourceOperator = flow.Operators.FirstOrDefault(op => op.Id == connection.SourceOperatorId);
+            var sourcePort = sourceOperator?.OutputPorts.FirstOrDefault(port => port.Id == connection.SourcePortId);
+            if (sourceOperator == null || sourcePort == null)
+            {
+                continue;
+            }
 
-        if (!ContainsImageWrapperReference(value))
-            return false;
+            var metadata = ConstraintMetadataFactory.Value.GetMetadata(sourceOperator.Type);
+            if (metadata == null || metadata.OutputAvailabilityRules.Count == 0)
+            {
+                continue;
+            }
 
-        if (sourceOperator == null)
-            return true;
+            var values = sourceOperator.Parameters
+                .GroupBy(parameter => parameter.Name, StringComparer.OrdinalIgnoreCase)
+                .ToDictionary(
+                    group => group.Key,
+                    group => group.First().Value,
+                    StringComparer.OrdinalIgnoreCase);
+            var explicitNames = values.Keys.ToHashSet(StringComparer.OrdinalIgnoreCase);
+            var outputState = OperatorOutputAvailabilityEvaluator
+                .ResolveStates(metadata, values, explicitNames)
+                .FirstOrDefault(state => state.Output.Equals(sourcePort.Name, StringComparison.OrdinalIgnoreCase));
+            if (outputState?.IsAvailable != false)
+            {
+                continue;
+            }
 
-        if (connectedSourcePort == null)
-            return true;
+            errors.Add(
+                $"STRUCT_006: Operator '{sourceOperator.Name}' output '{sourcePort.Name}' is unavailable " +
+                "for the current parameter mode.");
+        }
 
-        // Exact match: port name == key name (original logic)
-        if (string.Equals(connectedSourcePort.Name, key, StringComparison.OrdinalIgnoreCase))
-            return false;
-
-        // Supplemental match: if this operator has only one output port and the key is a
-        // well-known image output key produced by OperatorBase.CreateImageOutput, treat it
-        // as the port's actual output rather than an implicit propagation.
-        // This handles the common mismatch where port is named "Output" but the data key is "Image".
-        if (sourceOperator.OutputPorts.Count == 1 && IsStandardImageOutputKey(key))
-            return false;
-
-        return true;
+        return errors;
     }
 
     private static bool IsSpatialContextFallbackValue(string key, object? value) =>
@@ -2659,51 +2661,6 @@ public class FlowExecutionService : IFlowExecutionEngine, IFlowDefinitionValidat
         return string.Equals(key, "Image", StringComparison.OrdinalIgnoreCase)
             || string.Equals(key, "Edges", StringComparison.OrdinalIgnoreCase)
             || string.Equals(key, "Mask", StringComparison.OrdinalIgnoreCase);
-    }
-
-    private static bool ContainsImageWrapperReference(object? value, int depth = 0)
-    {
-        const int maxDepth = 6;
-        if (value == null || depth > maxDepth)
-            return false;
-
-        if (value is ImageWrapper)
-            return true;
-
-        if (value is string or byte[] or Mat)
-            return false;
-
-        if (value is IDictionary<string, object> typedDict)
-        {
-            foreach (var child in typedDict.Values)
-            {
-                if (ContainsImageWrapperReference(child, depth + 1))
-                    return true;
-            }
-
-            return false;
-        }
-
-        if (value is IDictionary dict)
-        {
-            foreach (DictionaryEntry entry in dict)
-            {
-                if (ContainsImageWrapperReference(entry.Value, depth + 1))
-                    return true;
-            }
-            return false;
-        }
-
-        if (value is IEnumerable enumerable)
-        {
-            foreach (var item in enumerable)
-            {
-                if (ContainsImageWrapperReference(item, depth + 1))
-                    return true;
-            }
-        }
-
-        return false;
     }
 
     #region 调试功能实现
@@ -2784,6 +2741,17 @@ public class FlowExecutionService : IFlowExecutionEngine, IFlowDefinitionValidat
                     IsSuccess = false,
                     ErrorMessage = $"{violation.Code}: {violation.Message}"
                 }).ToList()
+            };
+        }
+
+        var unavailableOutputErrors = ValidateConnectedOutputAvailability(flow);
+        if (unavailableOutputErrors.Count > 0)
+        {
+            return new FlowDebugExecutionResult
+            {
+                DebugSessionId = options.DebugSessionId,
+                IsSuccess = false,
+                ErrorMessage = string.Join("; ", unavailableOutputErrors)
             };
         }
 

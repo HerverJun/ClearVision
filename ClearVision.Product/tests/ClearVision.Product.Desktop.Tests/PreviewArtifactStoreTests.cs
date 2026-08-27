@@ -12,6 +12,8 @@ namespace ClearVision.Product.Desktop.Tests;
 [TestClassification(TestDomain.Desktop, TestPurpose.Regression, TestLane.Pr, TestEvidenceType.Contract, TestOracleType.Contract, TestResourceRequirement.None, TestExpectedDuration.Fast, TestFlakyPolicy.Blocking, "desktop")]
 public sealed class PreviewArtifactStoreTests
 {
+    private const string TestUserId = "preview-artifact-test-user";
+
     [Fact]
     public void Store_CommitsOpaqueImmutableArtifactWithChecksum()
     {
@@ -32,17 +34,30 @@ public sealed class PreviewArtifactStoreTests
 
         source[4] = 0xFF;
 
-        store.TryRead(reference.ArtifactId, out var read).Should().BeTrue();
+        store.TryRead(reference.ArtifactId, TestUserId, out var read).Should().BeTrue();
         read!.Bytes.Should().Equal(0x89, 0x50, 0x4E, 0x47, 1, 2, 3, 4);
         read.ContentType.Should().Be("image/png");
         read.Length.Should().Be(8);
         read.Sha256.Should().Be(Convert.ToHexString(SHA256.HashData(read.Bytes)).ToLowerInvariant());
 
         read.Bytes[4] = 0xEE;
-        store.TryRead(reference.ArtifactId, out var secondRead).Should().BeTrue();
+        store.TryRead(reference.ArtifactId, TestUserId, out var secondRead).Should().BeTrue();
         secondRead!.Bytes.Should().Equal(0x89, 0x50, 0x4E, 0x47, 1, 2, 3, 4);
         secondRead.Length.Should().Be(8);
         secondRead.Sha256.Should().Be(read.Sha256);
+    }
+
+    [Fact]
+    public void Store_ReadAndDeleteRequireMatchingOwnerUser()
+    {
+        using var store = new PreviewArtifactStore();
+        var reference = AddArtifact(store, CreateOwner(), [1, 2, 3]);
+
+        store.TryRead(reference.ArtifactId, "other-user", out _).Should().BeFalse();
+        store.Delete(reference.ArtifactId, "other-user").Should().BeFalse();
+        store.TryRead(reference.ArtifactId, TestUserId, out var ownerRead).Should().BeTrue();
+        ownerRead!.Bytes.Should().Equal(1, 2, 3);
+        store.Delete(reference.ArtifactId, TestUserId).Should().BeTrue();
     }
 
     [Fact]
@@ -76,23 +91,23 @@ public sealed class PreviewArtifactStoreTests
         }, clock);
         var owner = CreateOwner();
         var first = AddArtifact(store, owner, [1, 2, 3]);
-        store.TryRead(first.ArtifactId, out _).Should().BeTrue();
+        store.TryRead(first.ArtifactId, TestUserId, out _).Should().BeTrue();
 
         clock.Advance(TimeSpan.FromMinutes(11));
-        store.TryRead(first.ArtifactId, out _).Should().BeFalse();
+        store.TryRead(first.ArtifactId, TestUserId, out _).Should().BeFalse();
         store.Count.Should().Be(0);
 
         var second = AddArtifact(store, owner, [4, 5, 6]);
         store.RevokeOwner(owner).Should().Be(1);
-        store.TryRead(second.ArtifactId, out _).Should().BeFalse();
+        store.TryRead(second.ArtifactId, TestUserId, out _).Should().BeFalse();
 
         var third = AddArtifact(store, owner, [7, 8, 9]);
-        store.Delete(third.ArtifactId).Should().BeTrue();
-        store.TryRead(third.ArtifactId, out _).Should().BeFalse();
+        store.Delete(third.ArtifactId, TestUserId).Should().BeTrue();
+        store.TryRead(third.ArtifactId, TestUserId, out _).Should().BeFalse();
 
         var fourth = AddArtifact(store, owner, [10, 11, 12]);
         store.Dispose();
-        store.TryRead(fourth.ArtifactId, out _).Should().BeFalse();
+        store.TryRead(fourth.ArtifactId, TestUserId, out _).Should().BeFalse();
     }
 
     [Fact]
@@ -113,15 +128,15 @@ public sealed class PreviewArtifactStoreTests
         clock.Advance(TimeSpan.FromSeconds(1));
         var third = AddArtifact(store, owner with { ClientRequestSequence = 3 }, [3, 3, 3]);
 
-        store.TryRead(first.ArtifactId, out _).Should().BeFalse();
-        store.TryRead(second.ArtifactId, out _).Should().BeTrue();
-        store.TryRead(third.ArtifactId, out _).Should().BeTrue();
+        store.TryRead(first.ArtifactId, TestUserId, out _).Should().BeFalse();
+        store.TryRead(second.ArtifactId, TestUserId, out _).Should().BeTrue();
+        store.TryRead(third.ArtifactId, TestUserId, out _).Should().BeTrue();
 
         var replaceOwner = owner with { ClientRequestSequence = 4 };
         var oldForOwner = AddArtifact(store, replaceOwner, [4]);
         var replacement = AddArtifact(store, replaceOwner, [5]);
-        store.TryRead(oldForOwner.ArtifactId, out _).Should().BeFalse("a successful new preview replaces old artifacts for the same owner.");
-        store.TryRead(replacement.ArtifactId, out _).Should().BeTrue();
+        store.TryRead(oldForOwner.ArtifactId, TestUserId, out _).Should().BeFalse("a successful new preview replaces old artifacts for the same owner.");
+        store.TryRead(replacement.ArtifactId, TestUserId, out _).Should().BeTrue();
     }
 
     [Fact]
@@ -145,8 +160,8 @@ public sealed class PreviewArtifactStoreTests
         }
 
         store.Count.Should().Be(2);
-        store.TryRead(first.ArtifactId, out var firstRead).Should().BeTrue();
-        store.TryRead(second.ArtifactId, out var secondRead).Should().BeTrue();
+        store.TryRead(first.ArtifactId, TestUserId, out var firstRead).Should().BeTrue();
+        store.TryRead(second.ArtifactId, TestUserId, out var secondRead).Should().BeTrue();
         firstRead!.Bytes.Should().Equal(1, 2, 3);
         secondRead!.Bytes.Should().Equal(4, 5, 6);
     }
@@ -173,9 +188,9 @@ public sealed class PreviewArtifactStoreTests
         }
 
         store.Count.Should().Be(1);
-        store.TryRead(existing.ArtifactId, out var oldRead).Should().BeTrue();
+        store.TryRead(existing.ArtifactId, TestUserId, out var oldRead).Should().BeTrue();
         oldRead!.Bytes.Should().Equal(9, 9);
-        store.TryRead(pending.ArtifactId, out _).Should().BeFalse();
+        store.TryRead(pending.ArtifactId, TestUserId, out _).Should().BeFalse();
     }
 
     [Fact]
@@ -205,10 +220,10 @@ public sealed class PreviewArtifactStoreTests
         }
 
         store.Count.Should().Be(2);
-        store.TryRead(oldFirst.ArtifactId, out _).Should().BeFalse();
-        store.TryRead(oldSecond.ArtifactId, out _).Should().BeFalse();
-        store.TryRead(newFirst.ArtifactId, out _).Should().BeTrue();
-        store.TryRead(newSecond.ArtifactId, out _).Should().BeTrue();
+        store.TryRead(oldFirst.ArtifactId, TestUserId, out _).Should().BeFalse();
+        store.TryRead(oldSecond.ArtifactId, TestUserId, out _).Should().BeFalse();
+        store.TryRead(newFirst.ArtifactId, TestUserId, out _).Should().BeTrue();
+        store.TryRead(newSecond.ArtifactId, TestUserId, out _).Should().BeTrue();
     }
 
     [Fact]
@@ -226,9 +241,9 @@ public sealed class PreviewArtifactStoreTests
             .Select(index => Task.Run(() =>
             {
                 _ = index;
-                _ = store.TryRead(reference.ArtifactId, out var ignoredRead);
+                _ = store.TryRead(reference.ArtifactId, TestUserId, out var ignoredRead);
                 _ = ignoredRead;
-                _ = store.Delete(reference.ArtifactId);
+                _ = store.Delete(reference.ArtifactId, TestUserId);
             }))
             .ToArray();
 
@@ -236,7 +251,7 @@ public sealed class PreviewArtifactStoreTests
 
         PreviewArtifactStore.IsValidArtifactId("../secret").Should().BeFalse();
         PreviewArtifactStore.IsValidArtifactId("C:\\temp\\file").Should().BeFalse();
-        store.TryRead(reference.ArtifactId, out _).Should().BeFalse();
+        store.TryRead(reference.ArtifactId, TestUserId, out _).Should().BeFalse();
     }
 
     [Fact]
@@ -258,7 +273,7 @@ public sealed class PreviewArtifactStoreTests
         wrapper.Release();
 
         var imageArtifact = result.Artifacts.Should().ContainSingle().Subject;
-        store.TryRead(imageArtifact.ArtifactId, out var read).Should().BeTrue();
+        store.TryRead(imageArtifact.ArtifactId, TestUserId, out var read).Should().BeTrue();
         read!.Bytes.Should().NotBeEmpty();
         read.ContentType.Should().Be("image/png");
     }
@@ -325,7 +340,7 @@ public sealed class PreviewArtifactStoreTests
         value.Metadata.Should().Contain("count", "80");
         value.Metadata.Should().Contain("itemKind", "point");
 
-        store.TryRead(artifact.ArtifactId, out var read).Should().BeTrue();
+        store.TryRead(artifact.ArtifactId, TestUserId, out var read).Should().BeTrue();
         var json = Encoding.UTF8.GetString(read!.Bytes);
         json.Should().Contain("\"x\":10.5");
         json.Should().Contain("\"y\":20.25");
@@ -376,7 +391,7 @@ public sealed class PreviewArtifactStoreTests
         value.Metadata.Should().Contain("count", CircleCaliperFitV2Request.MaxProfileEvidenceCount.ToString());
         value.Metadata.Should().Contain("itemKind", "profile");
 
-        store.TryRead(artifact.ArtifactId, out var read).Should().BeTrue();
+        store.TryRead(artifact.ArtifactId, TestUserId, out var read).Should().BeTrue();
         var json = Encoding.UTF8.GetString(read!.Bytes);
         json.Should().Contain(CircleCaliperFitV2ProfileEvidence.ContractVersionValue);
         json.Should().Contain("\"caliperIndex\":0");
@@ -407,7 +422,7 @@ public sealed class PreviewArtifactStoreTests
 
         act.Should().Throw<OperationCanceledException>();
         store.Count.Should().Be(1);
-        store.TryRead(existing.ArtifactId, out var read).Should().BeTrue();
+        store.TryRead(existing.ArtifactId, TestUserId, out var read).Should().BeTrue();
         read!.Bytes.Should().Equal(7, 7, 7);
     }
 
@@ -428,7 +443,8 @@ public sealed class PreviewArtifactStoreTests
             Guid.Parse("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"),
             Guid.Parse("cccccccc-cccc-cccc-cccc-cccccccccccc"),
             1,
-            2);
+            2,
+            TestUserId);
 
     private sealed class FakePreviewArtifactClock : IPreviewArtifactClock
     {

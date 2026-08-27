@@ -4,6 +4,7 @@ using ClearVision.Product.Core.Enums;
 using ClearVision.Product.Core.ProjectVariables;
 using ClearVision.Product.Core.Services;
 using ClearVision.Product.Infrastructure.Operators;
+using ClearVision.Product.Infrastructure.Services;
 using ClearVision.Product.Tests.TestSupport;
 using FluentAssertions;
 using Microsoft.Extensions.Logging;
@@ -1107,17 +1108,108 @@ public class StringFormatOperatorTests
     public async Task ExecuteAsync_TemplateMode_ShouldReplaceIndexedAndNamedPlaceholders()
     {
         var op = new Operator("format", OperatorType.StringFormat, 0, 0);
-        op.AddParameter(TestHelpers.CreateParameter("Template", "Result={0}; Name={Name}", "string"));
+        op.AddParameter(TestHelpers.CreateParameter("Template", "First={0}; Second={Arg2}; Hidden={Template}", "string"));
 
         var result = await _operator.ExecuteAsync(op, new Dictionary<string, object>
         {
             ["Arg1"] = "OK",
-            ["Name"] = "StationA"
+            ["Arg2"] = "StationA",
+            ["Template"] = "polluted"
         });
 
         result.IsSuccess.Should().BeTrue();
-        result.OutputData!["Result"].Should().Be("Result=OK; Name=StationA");
+        result.OutputData!["Result"].Should().Be("First=OK; Second=StationA; Hidden={Template}");
     }
+
+    [Fact]
+    public async Task ExecuteAsync_WhenArg1IsMissing_ShouldKeepArg2AtIndexOneAndIgnoreExtraJoinKeys()
+    {
+        var templateOp = new Operator("format", OperatorType.StringFormat, 0, 0);
+        templateOp.AddParameter(TestHelpers.CreateParameter("Template", "{0}|{1}", "string"));
+        var templateResult = await _operator.ExecuteAsync(templateOp, new Dictionary<string, object>
+        {
+            ["Arg2"] = "second",
+            ["Template"] = "polluted"
+        });
+
+        var joinOp = new Operator("join", OperatorType.StringFormat, 0, 0);
+        joinOp.AddParameter(TestHelpers.CreateParameter("Mode", "Join", "string"));
+        joinOp.AddParameter(TestHelpers.CreateParameter("Separator", ",", "string"));
+        var joinResult = await _operator.ExecuteAsync(joinOp, new Dictionary<string, object>
+        {
+            ["Arg1"] = "first",
+            ["Arg2"] = "second",
+            ["Mode"] = "Join",
+            ["Separator"] = ","
+        });
+
+        templateResult.IsSuccess.Should().BeTrue();
+        templateResult.OutputData!["Result"].Should().Be("{0}|second");
+        joinResult.IsSuccess.Should().BeTrue();
+        joinResult.OutputData!["Result"].Should().Be("first,second");
+    }
+
+    [Fact]
+    public void Metadata_ShouldDeclareAllRuntimeParametersOutputsAndModeRules()
+    {
+        var metadata = new OperatorFactory().GetMetadata(OperatorType.StringFormat)!;
+
+        metadata.Parameters.Select(parameter => parameter.Name).Should().Equal(
+            "Mode",
+            "Template",
+            "Separator",
+            "DateFormat");
+        metadata.OutputPorts.Select(port => (port.Name, port.DataType)).Should().Equal(
+            ("Result", PortDataType.String),
+            ("Length", PortDataType.Integer),
+            ("IsEmpty", PortDataType.Boolean));
+
+        var templateStates = ResolveStates(metadata, "Template");
+        templateStates["Template"].EffectiveDisabled.Should().BeFalse();
+        templateStates["Separator"].EffectiveDisabled.Should().BeTrue();
+        templateStates["DateFormat"].EffectiveDisabled.Should().BeTrue();
+
+        var joinStates = ResolveStates(metadata, "Join");
+        joinStates["Template"].EffectiveDisabled.Should().BeTrue();
+        joinStates["Separator"].EffectiveDisabled.Should().BeFalse();
+        joinStates["DateFormat"].EffectiveDisabled.Should().BeTrue();
+
+        var dateStates = ResolveStates(metadata, "Date");
+        dateStates["Template"].EffectiveDisabled.Should().BeTrue();
+        dateStates["Separator"].EffectiveDisabled.Should().BeTrue();
+        dateStates["DateFormat"].EffectiveDisabled.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_TemplateMissingAndExplicitEmpty_ShouldHaveDistinctSemantics()
+    {
+        var missingTemplate = new Operator("missing-template", OperatorType.StringFormat, 0, 0);
+        var missingResult = await _operator.ExecuteAsync(missingTemplate, new Dictionary<string, object>
+        {
+            ["Arg1"] = "A",
+            ["Arg2"] = "B"
+        });
+
+        var emptyTemplate = new Operator("empty-template", OperatorType.StringFormat, 0, 0);
+        emptyTemplate.AddParameter(TestHelpers.CreateParameter("Template", string.Empty, "string"));
+        var emptyResult = await _operator.ExecuteAsync(emptyTemplate, new Dictionary<string, object>
+        {
+            ["Arg1"] = "A",
+            ["Arg2"] = "B"
+        });
+
+        missingResult.IsSuccess.Should().BeTrue();
+        missingResult.OutputData!["Result"].Should().Be("Result is A and B");
+        emptyResult.IsSuccess.Should().BeTrue();
+        emptyResult.OutputData!["Result"].Should().Be("AB");
+    }
+
+    private static Dictionary<string, OperatorParameterConstraintState> ResolveStates(
+        OperatorMetadata metadata,
+        string mode) =>
+        OperatorParameterConstraintEvaluator
+            .ResolveStates(metadata, new Dictionary<string, object?> { ["Mode"] = mode })
+            .ToDictionary(state => state.Constraint.Parameter, StringComparer.OrdinalIgnoreCase);
 }
 
 [TestClassification(TestDomain.Core, TestPurpose.Regression, TestLane.Pr, TestEvidenceType.Contract, TestOracleType.Contract, TestResourceRequirement.None, TestExpectedDuration.Fast, TestFlakyPolicy.Blocking, "product")]
