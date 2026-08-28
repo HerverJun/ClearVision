@@ -2,6 +2,7 @@
 
 本目录只保留当前仍在推进的项目级计划。当前主入口为：
 
+- [ClearVision 未尽事项统一补齐 TODO（2026-08-28）](./ClearVision-未尽事项统一补齐TODO-2026-08-28.md)：七组保留文档的唯一横向责任入口；专项计划继续作为执行规格。
 - [ClearVision-全面提升 TODO（2026-05-09）](./ClearVision-全面提升TODO-2026-05-09.md)
 - [ClearVision T01 测试与覆盖率治理总体计划（PROPOSED / AUDITED）](./测试治理/ClearVision_T01_测试与覆盖率治理总体计划_PROPOSED_AUDITED.md)
 - [T01-G01B-R3 UI 契约回归闭环计划（2026-08-28）](./测试治理/ClearVision_T01_G01B_R3_UI契约回归闭环计划_2026-08-28.md)

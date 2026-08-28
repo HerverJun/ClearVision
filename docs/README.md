@@ -16,6 +16,7 @@
 
 - [进行中总入口](./进行中/README.md)
 - [当前计划](./进行中/当前计划/README.md)
+- [ClearVision 未尽事项统一补齐 TODO](./进行中/当前计划/ClearVision-未尽事项统一补齐TODO-2026-08-28.md)
 - [Studio 2.0](./进行中/Studio2/README.md)
 - [未闭环事项](./进行中/未闭环事项/README.md)
 - [待复核索引](./进行中/待复核/索引.md)
