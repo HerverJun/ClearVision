@@ -54,6 +54,8 @@
 - 当前卡片：`docs/进行中/Studio2/goals/G16.md`
 - 当前阶段：`Release`
 - 总状态：`BLOCKED`
+- 当前阻断：`BLOCKED_OWNER_DISPOSITION_GAP`、`BLOCKED_RELEASE_EVIDENCE_GAP`
+- 2026-08-28 架构决定：本次 release 的唯一 production root 是 `wwwroot/index.html + app.js + capability owners`；FrontendV2/`/v2` 为 non-production，不再把直接切 V2 作为 G16 完成条件。未来 Vue/StudioUI 迁移另立完整 parity/migration epic。
 - 审计参考 SHA：`f4d392e2147adf175a2f8faa7d7c09b3d906ba8a`
 - G00 Initial SHA：`58c7569958f3bf8ab627f5c5b76ff0a77cc86914`
 - G00 完成 SHA：`3481d5a35f47bbf1f58c3f042cff6a679e720e0c`
@@ -130,7 +132,7 @@
 | G15.6 | Productization | Inspection capability 迁移 | DONE | G15.8 | `docs/进行中/Studio2/goals/G15_6.md` | 提交自身 SHA 不写入 tracked 文件；以 push 后核对值为准 |
 | G15.7 | Productization | Results/Review capability 迁移 | DONE | G15.6 | `docs/进行中/Studio2/goals/G15_7.md` | 提交自身 SHA 不写入 tracked 文件；以 push 后核对值为准 |
 | G15.4 | Productization | AI Panel 外壳与展示 capability 迁移 | DONE | G15.7 | `docs/进行中/Studio2/goals/G15_4.md` | 提交自身 SHA 不写入 tracked 文件；以 push 后核对值为准 |
-| G16 | Release | 性能、发布与唯一入口收口 | BLOCKED | G15.4 | `docs/进行中/Studio2/goals/G16.md` | PARTIAL；business owner 默认切换已完成，真实 `/v2` production root 与完整 release evidence 留 `RELEASE-FOLLOWUP` |
+| G16 | Release | 当前 production root、owner disposition、性能与发布收口 | BLOCKED | G15.4 | `docs/进行中/Studio2/goals/G16.md` | 2026-08-28 已取消“不完整 `/v2` 直接切生产”的旧目标；剩余 owner/flag 处置、真实 WebView2、no-Node、DPI/分辨率、同 SHA CI 和完整 release evidence |
 
 ## 6. 阶段 Gate
 

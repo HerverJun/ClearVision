@@ -1,10 +1,13 @@
 # ClearVision T01 测试与覆盖率治理总体计划（PROPOSED / AUDITED）
 
 > 审计日期：2026-07-30（Asia/Shanghai）
-> 唯一代码基线：`origin/codex初稿@bea404394ac8cf403cca719c1990c426414a06c2`
+> 原始审计基线：`origin/codex初稿@bea404394ac8cf403cca719c1990c426414a06c2`
+> 2026-08-28 当前性复核代码基线：`c504ae1919cca0ff4df993c956c45742440fc471`（其后 `78d693fb4` 仅含文档治理）
 > 文档性质：审计结论与分阶段计划；本轮没有实施正式治理改造
 > 实施状态（2026-08-28）：G01 的覆盖率与专项 Gate 主体已形成阶段证据；历史 UI E2E 契约遗留已转入独立 R3 计划。G02-G09 不声明闭环。
-> 横向责任入口（2026-08-28）：G01B-R3 与 G02-G09 已去重登记在 [ClearVision 未尽事项统一补齐 TODO](../ClearVision-未尽事项统一补齐TODO-2026-08-28.md) U05-U07；本文继续作为测试治理专项规格，不归档。
+> 横向责任入口（2026-08-28）：G01B-R3 与 G02-G09 已去重登记在 [ClearVision 未尽事项统一补齐 TODO](../ClearVision-未尽事项统一补齐TODO-2026-08-28.md) U01/U03/U05-U07；本文继续作为测试治理专项规格，不归档。
+> 当前分支架构纠偏（2026-08-28）：第 1.3 节记录的 `studio-ui-next` 是另一条缓存分支，不是 `codex初稿` 当前事实。当前分支仍使用 `wwwroot/index.html + app.js + capability owners`，存在 non-production `FrontendV2`，不存在 `Desktop/StudioUI`。第 7 节及 G03-G07 已按当前代码重写；旧分支上的删除、路径和测试命令不得作为本分支执行指令。
+> 时间面说明：第 1-6、12 节中未带“2026-08-28 当前性复核”标记的 `当前 HEAD`/`VERIFIED` 均指原始审计基线 `bea404...`；第 7-11 节的 disposition 和当前执行边界以 `c504ae...` 为准。两种证据不得交叉替代。
 
 文档采用 `docs/进行中/当前计划/测试治理/`，而非直接放在 `docs/进行中/测试治理/`，因为仓库现行文档治理规则要求项目级 active 计划统一进入“当前计划”并由其 README 建立唯一入口。
 
@@ -222,34 +225,31 @@ Desktop PR Lane 新鲜 Cobertura：
 | --- | --- | --- | --- |
 | 流程执行、取消、停止、异常终态 | 服务级取消、并行失败、stop、replacement、spool/dead-letter 较强 | 跨 Desktop/Station/设备的终态一致性、重复取消/断电恢复、全链路事件顺序未做当前现场验证 | `PARTIALLY_VERIFIED` |
 | 项目保存、恢复、一致性 | commit intent、revision、hash、fence、flow/variables/assets 有高价值测试 | 真实进程崩溃/磁盘满/杀进程后的恢复演练未执行；部分测试共享静态状态并禁并行 | `PARTIALLY_VERIFIED` |
-| Preview、ROI、副作用阻断 | 后端 side-effect admission、dry-run、不提交变量、设备读取阻断覆盖强；Legacy unit 很多 | Legacy E2E 全量未绿；StudioUI 正在重写 Preview/ROI，旧 UI 修补会快速失效 | `PARTIALLY_VERIFIED` |
+| Preview、ROI、副作用阻断 | 后端 side-effect admission、dry-run、不提交变量、设备读取阻断覆盖强；Legacy unit 很多 | 原审计基线的 Legacy E2E 全量未绿；2026-08-28 当前分支应验证当前 production root，缓存 StudioUI 分支不再作为修补取舍前提 | `PARTIALLY_VERIFIED` |
 | FinalDecision、结果统计 | resolver、canonical outcome、Station 映射和结果 UI unit 存在 | FinalDecision Playwright 当前全量状态未知；跨历史重放、统计口径、Invalid 与 execution failure 的新 UI 端到端尚待迁移接管 | `PARTIALLY_VERIFIED` |
 | Station、PLC、TCP、设备资源 | local loopback、virtual PLC、simulator、offline replay、security、spool 较多 | 真实设备 Lane 18 个 ReleaseManual 定义未执行；端口/时序/网络抖动仍可能环境敏感 | `PARTIALLY_VERIFIED` |
-| Agent Plan/Build/Validation/Apply Gate/Owner/Recovery | 762 个 Ai 域源码定义，加 UI/endpoint/benchmark | 当前 Agent Quality 4 fail；真实 LLM 是 manual；artifact 可在 assertion 跳过时上传历史内容；StudioUI AI owner 正在改动 | `PARTIALLY_VERIFIED` |
+| Agent Plan/Build/Validation/Apply Gate/Owner/Recovery | 762 个 Ai 域源码定义，加 UI/endpoint/benchmark | 原审计基线曾有 Agent Quality 4 fail；当前 SHA 状态须重跑，真实 LLM 仍是 manual，缓存 StudioUI 分支改动不计当前事实 | `PARTIALLY_VERIFIED` |
 | 算法精度、稳定性、性能、现场证据 | Golden、公开数据、contract、性能 runner 和明确 manifest | 当前 SHA 无新鲜报告；Accuracy/Stability 源码定义仅 6/3；Field Replay 是 substitute；真实 field data 20 项 blocked | `PARTIALLY_VERIFIED` |
 | 覆盖率治理 | main CI 会生成 Product/Desktop Cobertura | codex初稿不生成；无下降 Gate；Product 完整 collector 不稳定；模块集合未固定 | `PARTIALLY_VERIFIED` |
 
-## 7. 与 `studio-ui-next` 的冲突矩阵
+## 7. 当前 UI 路线与 `studio-ui-next` 边界
 
-迁移分支相对共同祖先改动约 1001 个文件，其中 StudioUI 440、Product tests 105、Legacy `wwwroot` 12、FrontendV2 34；根 CI 和 Playwright 配置也已修改。迁移分支已删除 FrontendV2，并新增约 97 个 StudioUI unit spec 文件及 22 个 StudioUI E2E/支持文件。
+`studio-ui-next` 的统计、删除 FrontendV2 决定和 StudioUI 测试路径只描述缓存的并行分支。当前分支没有合并这些事实，且缓存观察显示两条路线已经大幅分叉；在没有新鲜 fetch 和正式合并/架构决定前，不能把另一分支的未来状态写成本分支前提。
 
-| 工作 | 冲突等级 | 并行建议 | 依据/边界 | 状态 |
-| --- | --- | --- | --- | --- |
-| 覆盖率证据 schema、SHA/SDK/模块清单、Cobertura 解析器 | 低 | 立即并行 | 可放 `quality/coverage` 或新脚本，不触碰 StudioUI | `VERIFIED` |
-| Product Core/Application/Runtime 的覆盖率口径与后端资产分级 | 低 | 立即并行 | 与前端组件结构独立；避开迁移已改的具体 endpoint/test 文件 | `INFERRED` |
-| `quality/test-gates.json` 数量基线设计 | 低 | 立即并行准备 | 迁移提交未改该文件；实际基线要纳入合并后的 StudioUI 测试 | `VERIFIED` |
-| 根 `.github/workflows/ci.yml` 接线 | 中 | 可准备，合并时单点协调 | 迁移已修改同一文件，主要是文本冲突 | `VERIFIED` |
-| `playwright.config.ts`、UI package scripts | 中高 | 等迁移配置稳定或由迁移负责人接入 | 迁移已修改 scenario/server/testMatch | `VERIFIED` |
-| FrontendV2 覆盖率、阈值、补测 | 极高/无效劳动 | 不实施 | 迁移分支已删除 FrontendV2 | `VERIFIED` |
-| Legacy UI selector 大改、E2E 大规模重写 | 高 | 延期 | 新 StudioUI 将替代页面结构；只保留少量合同映射分析 | `VERIFIED` |
-| StudioUI unit/E2E 数量 Gate、Vitest coverage、WebView2 验收 | 高 | 框架与测试入口稳定后由迁移线接管 | 当前迁移工作树仍在持续改 AI owner/endpoint/E2E | `VERIFIED` |
-| 后端算法 Golden/Field/性能证据 | 低 | 立即并行 | 不依赖前端，真实设备 Lane 除外 | `INFERRED` |
-| AgentRun endpoint/owner 恢复测试 | 高 | 当前不要双写 | 迁移工作树正修改 AgentRun endpoint、Desktop test 和 StudioUI owner | `VERIFIED` |
+| 对象 | 当前分支事实 | 本计划决定 | 状态 |
+| --- | --- | --- | --- |
+| Production root | `wwwroot/index.html + app.js + capability owners` | 作为本次 release 唯一 production root 继续验收 | `VERIFIED` |
+| FrontendV2 | 目录、构建和 `/v2` flag 仍存在，但 Tool/Review 等 capability 不完整且 flag 默认 false | 明确为 non-production；不补 production coverage，也不直接切换 | `VERIFIED` |
+| StudioUI | 当前分支不存在 `Desktop/StudioUI` | 其 unit/E2E 路径和命令不得进入当前 Gate | `VERIFIED` |
+| 缓存 `studio-ui-next` | 2026-08-25 缓存 HEAD 为 `0c44df6c`，与当前分支显著分叉；本轮 fetch 失败 | 只作迁移调研。若未来采用，另立完整 parity/migration epic 并经正常合并 | `PARTIALLY_VERIFIED` |
+| 当前 UI 测试 | legacy/current `wwwroot` unit、Playwright、WebView2 与 capability owner 合同 | T01-G07 只接管这些当前可执行入口 | `VERIFIED` |
+| 后端/算法/coverage | 与最终 UI 路线弱耦合 | 可按当前分支继续，但 endpoint/owner 变更仍需文件级协调 | `INFERRED` |
 
 ## 8. 分阶段总体计划
 
 ### T01-G01：建立可信、可复现的当前 HEAD 覆盖率证据合同
 
+- **当前 disposition**：阶段主体已归档；只保留 G01B-R3 对当前 UI spec 的重基线，历史 G01 报告不得替代当前 SHA。
 - **目标**：先得到可审计的 Product/Desktop 当前 SHA 证据，固定模块范围、命令、SDK、测试计数、耗时和失败语义；不设置阻断阈值。
 - **前置条件**：干净的 `origin/codex初稿` 隔离 checkout；无同项目测试进程；保留本轮 Product collector 长尾作为复现用例。
 - **允许修改范围**：新增 `quality/coverage/**`、覆盖率 runsettings、专用只读汇总脚本、测试产物 schema、文档；如需改现有串行 runner，必须拆为独立评审。
@@ -262,97 +262,61 @@ Desktop PR Lane 新鲜 Cobertura：
 - **与迁移冲突**：低。
 - **是否立即并行**：是。
 
-### T01-G02：修复当前红色 CI，并让 codex初稿发布非阻断覆盖率证据
+### T01-G02：current-SHA necessary checks 与 artifact freshness
 
-- **目标**：先让 current-HEAD necessary checks 可重复执行，再把 G01 覆盖率作为 artifact/summary 发布；仍不做覆盖率下降阻断。
-- **前置条件**：G01 模块口径稳定；Unicode marshal 与 4 个 Agent Nightly 失败有最小复现和责任归属。
-- **允许修改范围**：失败对应的测试/必要产品修复（单独 PR）、Safe CI/Agent workflow、覆盖率上传步骤、artifact freshness assertion。
-- **禁止修改范围**：通过放宽断言、删除失败用例、增加无条件 retry、伪造 artifact freshness 获绿；不接触 StudioUI 业务架构。
-- **主要任务**：复现 CI locale；区分产品 Unicode 缺陷与测试夹具缺陷；修复 BuildFromPlan readiness 预期/实现合同；让 fail-fast 前也能上传明确标记 incomplete 的诊断；将 coverage artifact 绑定 SHA；协调 `ci.yml` 文本冲突。
-- **验证命令**：Product PR/Agent FQN 通过串行脚本单进程运行；`gh run view <run> --json jobs` 验证远端；对 artifact 执行 SHA/schema/freshness 校验。
-- **交付物**：绿色 HEAD run、失败根因记录、coverage artifact、incomplete artifact 语义。
-- **完成标准**：同 SHA Safe CI 与 Agent Quality 均绿；Desktop/UI 不再因 Product fail-fast 永久跳过；coverage artifact 不能来自 checkout 历史文件。
-- **风险与回滚**：CI 文件与迁移有文本冲突；按 step 级 commit 回滚，保留诊断 artifact，不回滚迁移代码。
-- **与迁移冲突**：中（工作流文本）；AgentRun 相关修复高，需迁移负责人协调。
-- **是否立即并行**：脚本/失败复现可以；工作流合并需协调。
+- **当前 disposition**：未闭环，远端证据为 `UNKNOWN`。旧基线中的 Unicode/Agent 失败只能作为历史线索，不能预设为当前 HEAD 仍失败；本地分支 ahead 且本环境无可用 `gh`，尚无新鲜远端结论。
+- **目标**：让同一最终 SHA 的 Safe CI、Agent Quality、UI/主 CI necessary checks 可重复执行，并让 coverage/diagnostic artifact 绑定 SHA、schema 和 freshness；覆盖率仍 report-only。
+- **主要任务**：先运行当前 Gate；只对实际 failure signature 建账并区分产品、fixture、locale、环境；fail-fast 也上传明确标 `incomplete` 的诊断；拒绝 checkout 内历史 artifact。
+- **禁止修改范围**：为复现旧失败而制造 backlog、放宽断言、删除失败用例、无条件 retry、伪造 freshness、把缓存远端或历史 run 当作 current SHA。
+- **验证**：本地按根 `AGENTS.md` 串行运行对应 Gate；远端用 run URL/job/artifact 证明 SHA 一致；artifact 执行 SHA/schema/timestamp/module 校验。
+- **完成标准**：同一最终 SHA 的 necessary checks 全绿；任何 skipped/fail-fast job 有明确状态；coverage artifact 不能来自旧 checkout 内容。
 
 ### T01-G03：测试资产分级、Owner 与数量防回退
 
-- **目标**：建立 A（关键业务保护）、B（合同/算法证据）、C（实现耦合/低价值候选）资产台账；把“至少 1 个”改为可审计基线与显式变更流程。
-- **前置条件**：G01/G02 给出稳定动态计数；确认 theory 展开计数与源码定义计数的用途差异。
-- **允许修改范围**：治理 schema/runner、`quality/test-gates.json`、Owner/资产清单、报告；不要求本阶段补测试。
-- **禁止修改范围**：用总数替代质量；为了达标复制/参数化空洞用例；直接删除 C 类测试。
-- **主要任务**：按 Domain/Lane/asset tier 记录源码定义数和动态数；Gate floor 使用批准后的 baseline+tolerance；删除/降级必须附 Owner 与原因；UI/Agent 现有下限纳入统一报告；FrontendV2 不再建立新基线。
-- **验证命令**：`run-test-governance.ps1 -FailOnWarning`；三个分类 Gate discovery；Node TAP summary；StudioUI 稳定后再接入其 Vitest/E2E count。
-- **交付物**：资产台账、Owner 映射、count baseline、批准变更模板、异常报告。
-- **完成标准**：删除任一 A 类或超过批准容差的 Gate 测试会失败；合法重命名/合并可通过显式 baseline review 更新。
-- **风险与回滚**：理论用例变化可能造成噪声；先 report-only，再启用 count blocking，可一键回退到报告模式。
-- **与迁移冲突**：后端低；StudioUI count 部分高。
-- **是否立即并行**：后端与治理框架可以；StudioUI 部分等待。
+- **当前 disposition**：`OPEN_RESCOPED`。仓库已有 `TestClassificationAttribute` 以及 Domain/Purpose/Lane/Evidence/Oracle/Resource 分类，不再建立 A/B/C 平行体系。
+- **目标**：在现有分类上增加 critical-contract 标记、Owner、批准 baseline+tolerance 和动态人口防回退，把多数 `minimumTotalTests: 1` 的占位下限升级为可审计基线。
+- **主要任务**：分别记录源码定义数和动态用例数；删除/降级 critical contract 必须附 Owner 与原因；理论用例合法重命名/合并通过显式 baseline review；仅接入当前分支可执行的 UI/Agent Gate。
+- **禁止修改范围**：用总数代替质量、复制空洞测试、引入第二套分类 schema、为 non-production FrontendV2 或不存在的 StudioUI 建 production baseline。
+- **完成标准**：删除一个受保护 contract 或超过批准 tolerance 会失败；新增/移除模块会触发显式人口差异；合法 baseline update 有可审计审批记录。
 
 ### T01-G04：关键后端业务域合同矩阵补强
 
-- **目标**：按状态机和失败矩阵审查缺口，只补能防真实业务回归的测试，不追求任意百分比。
-- **前置条件**：G03 A 类定义完成；每个域有产品 Owner 和 Oracle。
-- **允许修改范围**：Product/Desktop 测试与必要测试夹具；产品代码修改必须拆分为独立缺陷修复。
-- **禁止修改范围**：大规模产品重构、UI 架构修改、真实设备访问、把私有实现细节作为新 Oracle。
-- **主要任务**：流程 terminal/cancel/stop 矩阵；项目 crash/recovery/fence 一致性；Preview side-effect/ROI 不提交；FinalDecision 与统计口径；Station/PLC/TCP virtual/offline；Agent Plan→Build→Validation→Apply/Owner/Recovery 合同。
-- **验证命令**：按 AGENTS 规则将同项目多个 FQN 合并到一次 `run-dotnet-test-serial.ps1`；Desktop 与 Product 分开串行；不得启动真实设备脚本。
-- **交付物**：域矩阵、A 类测试、失败注入夹具、Oracle 说明、TRX。
-- **完成标准**：每个关键状态转换至少有成功、拒绝、取消/异常和恢复 Oracle；测试从公共合同观察结果；无新增非公开反射，或有批准豁免。
-- **风险与回滚**：共享静态状态可能扩大 flaky；按域小批提交，回滚新增测试/夹具，不隐藏产品缺陷。
-- **与迁移冲突**：Product core 低；Desktop endpoint/AgentRun 中高。
-- **是否立即并行**：不与迁移重叠的后端域可以；AgentRun/Preview endpoint 需文件 Owner 协调。
+- **当前 disposition**：`OPEN_RESCOPED`。不再建设脱离真实修复的无限状态矩阵。
+- **目标**：U08-U13 每个实际修复在实现提交中补公共合同、拒绝/故障和恢复 Oracle；测试范围由风险与变更边界决定。
+- **主要任务**：执行准入、authority、持久化恢复、资源上限、fail-closed 参数等修复各自产生对应回归；跨域公共合同才提升为 critical contract。
+- **禁止修改范围**：为凑“四象限”机械复制测试、用私有反射作为新 Oracle、在普通 CI 访问真实设备、把产品缺陷改成宽松断言。
+- **完成标准**：每个 U08-U13 源 ID 有独立 acceptance 与 focused test，治理台账能追溯到修复 SHA；是否需要成功/拒绝/取消/恢复由该风险模型明确说明。
 
 ### T01-G05：稳定性、隔离性与低价值测试治理
 
-- **目标**：用运行证据处理 flaky、顺序依赖、共享状态、固定等待、过度 Mock 与私有反射；先观测再清理。
-- **前置条件**：G03 资产分级；至少 5 次同环境重复结果与失败签名。
-- **允许修改范围**：测试夹具、时间/随机/端口抽象、公共测试 seam、测试并行集合、报告。
-- **禁止修改范围**：无证据批量删除；用 retry 掩盖；为了测试暴露产品私有状态；当前重写 Legacy UI selector。
-- **主要任务**：记录 p50/p95/失败率；将真实 flaky 与稳定产品缺陷分开；替换固定 sleep 为条件等待；减少静态缓存反射清理；抽样检查 Mock Oracle；建立 skip 到期 Gate；Playwright 记录 retry/flaky 而非最终绿即通过。
-- **验证命令**：计划新增串行 repeat runner；同一 csproj 逐次执行；UI 按单 worker 和 shard 隔离对比；输出 machine-readable flake report。
-- **交付物**：flaky registry、隔离修复、reflection/mock 审计清单、skip expiry report。
-- **完成标准**：A 类 Gate 连续运行无不解释失败；已知 flaky 有 Owner/到期日/非静默策略；retry 后通过仍在摘要中显式失败或警告。
-- **风险与回滚**：时序改造可能改变测试速度；按夹具回滚，保留观测报告。
-- **与迁移冲突**：后端低；Legacy/StudioUI 高。
-- **是否立即并行**：后端观测可以；UI 改造等待。
+- **当前 disposition**：`OPEN_RESCOPED`。仓库尚无 machine-readable flake registry，但不要求整个全量套件固定五次。
+- **目标**：对 blocking lane、已知 flaky、时序/资源敏感测试进行有界 repeat，记录失败签名、p50/p95、retry、skip expiry 和 Owner。
+- **主要任务**：区分稳定产品缺陷与真实 flaky；固定 sleep 改条件等待；静态状态和端口资源显式隔离；Playwright retry 后通过仍显式记账。
+- **完成标准**：受治理 lane 的重复次数由风险说明；所有不稳定结果有 Owner/到期日/非静默策略；普通全量 Gate 不因机械 repeat 放大成本和噪声。
 
 ### T01-G06：算法质量证据新鲜度、Oracle 与数据治理
 
-- **目标**：让 Golden/public benchmark/性能/Field Replay 报告可绑定 SHA、数据版本和运行环境，保持现场声明诚实。
-- **前置条件**：数据许可、manifest checksum、runner 版本和 Owner 清晰；当前历史报告只作参考。
-- **允许修改范围**：`quality/**`、算法质量 runner/test、报告 schema、CI scheduled/manual lane。
-- **禁止修改范围**：把 field-substitute 改名成真实现场；把公开非商业数据当商用签字；未校准环境下设置性能硬阈值；真实设备自动连接。
-- **主要任务**：所有报告加入 source SHA/dirty/tool/data checksum；Quick/Golden current-HEAD 重跑；公开数据按许可分层；Accuracy 使用独立/标注 Oracle；Stability 使用多 seed/扰动分布；性能记录硬件与 p50/p95；20 个 blocked field 项保持阻断状态直至真实数据到位。
-- **验证命令**：`python quality/tools/run_quality_suite.py --suite quick_contract_suite --validate-only/--run`；Golden 串行运行；dataset/field 默认 dry-run 或 manual。
-- **交付物**：新鲜证据 manifest、数据卡、Oracle 说明、环境指纹、current-HEAD 报告。
-- **完成标准**：报告能从 SHA+manifest+命令复现；历史/local 报告不能进入 current Gate；真实/替代/合成标签不可丢失。
-- **风险与回滚**：报告体积和运行时间；保留 summary、外置大原始产物，回滚 Gate 接线而非篡改数据。
-- **与迁移冲突**：低。
-- **是否立即并行**：metadata/Quick/Golden 可以；重型数据与现场必须分 Lane。
+- **当前 disposition**：治理要求保留，具体实现去重到统一计划 U01/U03/U07。
+- **目标**：只让 active/release-relevant 报告绑定 source SHA、dirty、tool/data checksum、环境和 evidence kind；历史报告保留为历史，不要求全部重生。
+- **职责边界**：DeepLearning smoke/precision、交付模型和 provider 由 U01；算子人口、Core20、场景资产由 U03；真实 field/device/profile 由 U07。
+- **完成标准**：current Gate 不能消费历史/错误类型产物；真实、公开、替代、合成标签机器可判且不可丢失；现场阻断只能由真实 profile 证据解除。
 
-### T01-G07：StudioUI 测试接管与 Legacy 退役
+### T01-G07：当前 production UI 的 capability owner 测试接管
 
-- **目标**：新前端稳定后，按业务合同接管 Legacy 测试，不按文件逐行翻译；建立 StudioUI unit、E2E、WebView2 与前端覆盖率基线。
-- **前置条件**：StudioUI 路由、host adapter、Preview/ROI/AI/FinalDecision/Station owner 接口稳定；迁移负责人声明测试入口冻结窗口。
-- **允许修改范围**：`StudioUI/tests`、StudioUI Vitest 配置、`tests/e2e/studio-ui-next`、Playwright scenario、CI 对应步骤、Legacy retirement map。
-- **禁止修改范围**：继续建设已删除的 FrontendV2；新旧页面双份无 Owner 测试长期共存；在功能未接管前删除 Legacy A 类保护。
-- **主要任务**：建立 Legacy→StudioUI 业务合同映射；补 Preview/ROI/FinalDecision/Result/Station/AI Owner E2E；设置 test count 与 Vitest coverage 报告；WebView2 与浏览器静态 E2E 分 Lane；每退役一组 Legacy 测试必须有替代证据。
-- **验证命令**：StudioUI `npm run lint/typecheck/test:unit/bundle:ci`；`CV_UI_SCENARIO=studio-ui-next` Playwright；WebView2 固定脚本；均由迁移线提供稳定入口。
-- **交付物**：接管矩阵、StudioUI baseline、Legacy retirement ledger、WebView2 evidence。
-- **完成标准**：每个 Legacy A 类合同都有新 owner 和可执行替代；Legacy 删除不会降低业务保护；StudioUI 测试数量/覆盖率/flake 报告可审计。
-- **风险与回滚**：迁移结构变化使测试快速失效；按 capability 接管，未完成 capability 保留 Legacy Gate。
-- **与迁移冲突**：高。
-- **是否立即并行**：否，等待框架与 owner 稳定。
+- **当前 disposition**：原 StudioUI 路径和命令 `SUPERSEDED`。当前分支不存在 `Desktop/StudioUI`，FrontendV2 为 non-production，本次 release 不切 `/v2`。
+- **目标**：为 `wwwroot/index.html + app.js + capability owners` 建立 owner/legacy replacement matrix，保证 Settings、AI、Project、Inspection、Results、Preview 等实际 production capability 只有一个 mounted owner 和一组权威业务合同。
+- **允许修改范围**：当前 `wwwroot` unit、现有 Playwright、WebView2 脚本、capability owner architecture guard、CI 对应步骤和 legacy retirement ledger。
+- **禁止修改范围**：调用不存在的 StudioUI 测试命令；为 non-production FrontendV2 建发布阻断覆盖率；在 owner parity 未明确前删除现有业务保护。
+- **主要任务**：逐 capability 决定晋级或删除实验 owner/flag；current root 的 unit/E2E/WebView2 接管；每退役一组 legacy 行为必须有等价公共合同证据。
+- **完成标准**：production root、mounted owner、默认 flag、构建产物和测试 Gate 一致；真实 WebView2 及 G16 release matrix 通过。未来 Vue/StudioUI 迁移另立 epic，不在本 Goal 偷渡。
 
 ### T01-G08：数据驱动的覆盖率防回退 Gate
 
 - **目标**：在可信、稳定的 current-HEAD 基线之上防止覆盖率下降；不采用预设 80%。
-- **前置条件**：G01-G05 完成；模块集合固定；至少多个绿色 HEAD 运行可估计自然波动；A 类资产台账可用。
+- **前置条件**：G01-G05 完成；模块集合固定；至少多个绿色 HEAD 运行可估计自然波动；critical-contract baseline 可用。
 - **允许修改范围**：coverage policy、CI comparison、approved baseline、changed-code policy、例外流程。
 - **禁止修改范围**：用全仓单一百分比驱动无价值测试；忽略生成代码/模块变化；在当前红 CI 上直接 blocking。
-- **主要任务**：选择按程序集/关键命名空间/changed-code 的组合策略；line 与 branch 分开；模块增删单独审批；阈值来源于实际基线、风险与波动；覆盖率下降与 A 类测试删除双 Gate。
+- **主要任务**：选择按程序集/关键命名空间/changed-code 的组合策略；line 与 branch 分开；模块增删单独审批；阈值来源于实际基线、风险与波动；覆盖率下降与 critical-contract 删除/降级形成双 Gate。
 - **验证命令**：基线/候选两次报告比较；构造下降、模块缺失、合法 baseline update 三类自测。
 - **交付物**：policy、baseline、comparison report、例外模板、blocking workflow。
 - **完成标准**：真实下降可阻断，等价重构/模块移动可审查更新，无“删除未测代码反而变绿”的漏洞。
@@ -362,62 +326,33 @@ Desktop PR Lane 新鲜 Cobertura：
 
 ### T01-G09：真实设备、现场数据与人工验收
 
-- **目标**：补齐自动模拟不能证明的设备、现场、性能和人工体验证据。
-- **前置条件**：隔离实验室、设备清单、脱敏数据、回滚 SOP、人工验收人和时间窗。
-- **允许修改范围**：ReleaseManual 配置、实验室脚本、外置证据、脱敏 manifest、验收记录。
-- **禁止修改范围**：普通 CI 自动连接真实 PLC/相机/机器人/Station/生产 DB；未授权写生产配置。
-- **主要任务**：PLC/TCP 抖动与断线恢复；相机/光学/编码路径；Station 部署/离线/重连；真实算法数据；真实 LLM shadow；StudioUI WebView2/DPI/键鼠人工验收。
-- **验证命令**：仅实验室批准 SOP；命令、设备序列、固件、数据 checksum、操作者均记录。
-- **交付物**：签字 evidence pack、field replay manifest、设备/环境指纹、失败回滚记录。
-- **完成标准**：每项声明有真实来源、Owner、时间、SHA、设备/数据版本与明确 pass/fail；替代数据不冒充现场。
-- **风险与回滚**：设备或数据副作用；使用隔离账户/配置快照/停止开关，失败立即按 SOP 恢复。
-- **与迁移冲突**：前端人工验收高，后端设备证据中。
-- **是否立即并行**：否，需要设备与人工授权。
+- **当前 disposition**：`BLOCKED_EXTERNAL`，但按 release SKU/profile 独立关闭，不要求一次验证仓库声称过的所有 PLC、相机、LLM 和 GPU provider。
+- **前置条件**：先建立 support matrix，将设备、协议、相机、模型/provider、Station/WebView2 标为 required/optional/unsupported，并准备隔离实验室、脱敏数据和回滚 SOP。
+- **主要任务**：只对目标 SKU 声明支持的 PLC/TCP、相机/光学、Station、交付模型/provider、真实 LLM shadow 和当前 production UI 的 WebView2/DPI/键鼠做真实验收。
+- **完成标准**：每个 profile 有 Owner、SHA、设备型号/序列号、固件/驱动、数据 checksum、pass/fail、异常恢复和回滚；profile 可独立关闭，未发布/实验能力不阻塞项目。
+- **禁止修改范围**：普通 CI 连接真实设备或生产 DB；用 simulator/public/field-substitute 结果冒充现场；执行不存在的 StudioUI 人工验收路径。
 
 ## 9. 推荐执行顺序
 
 | 顺序 | Goal | 时间分类 | 原因 |
 | ---: | --- | --- | --- |
-| 1 | G01 可信覆盖率证据合同 | 可立即执行 | 当前最核心缺口；与迁移低冲突 |
-| 2 | G02 当前红 CI 与 artifact freshness | 可立即准备/协调合并 | 没有绿色 current-HEAD Gate，后续阈值无意义 |
-| 3 | G03 资产分级与数量防回退 | 可立即执行后端部分 | 先知道保护资产，再谈补测/删测 |
-| 4 | G04 关键后端合同矩阵 | 可立即执行非重叠域 | 直接保护业务风险，不追数值 |
-| 5 | G06 算法证据新鲜度 | metadata/Quick 可立即；重型 manual | 现有证据大多是历史/local |
-| 6 | G05 稳定性治理 | 后端可开始，UI 等待 | 需要运行历史，不宜一次性大改 |
-| 7 | G07 StudioUI 接管 | 等前端框架稳定 | 避免 FrontendV2/Legacy 无效劳动 |
-| 8 | G08 覆盖率 blocking | 暂不建议实施 | 需稳定基线和多次分布 |
-| 9 | G09 真实设备/人工验收 | 需要实验室/人工 | 普通 CI 禁止执行 |
+| 1 | G01B-R3 当前 UI 契约重基线 | 可立即执行本地部分 | 先运行现存 7 个 spec，历史 21 个 failure point 不预设为当前 backlog |
+| 2 | G02 current-SHA CI/freshness | 本地准备；远端证据受阻 | 没有同一 SHA 绿色 necessary checks，后续阈值无意义 |
+| 3 | G03 现有分类的 critical-contract baseline | 可与风险修复并行 | 不重复建设 A/B/C，先固定 Owner 与动态人口 |
+| 4 | G04 随 U08-U13 修复落地 | 随实现执行 | 公共合同测试由真实风险产生，不另建无限矩阵 |
+| 5 | G05 风险定向 flaky 治理 | 有运行证据后执行 | 只 repeat blocking/已知敏感 lane |
+| 6 | G06/U01/U03 证据真实性 | 可分 lane 执行 | active/release evidence 优先，历史报告不重生 |
+| 7 | G07 当前 production UI 接管 | 与 G16 同步 | 验证当前 root/capability owners，不等待不存在的 StudioUI |
+| 8 | G08 coverage blocking | 暂不实施 | 需多个绿色 SHA 和稳定模块人口 |
+| 9 | G09 目标 SKU 现场验收 | 需要授权环境 | 每个 profile 独立关闭 |
 
 明确暂不建议：全仓 80% 硬阈值、批量删除低覆盖代码、批量重写 Mock/反射测试、用 retry 获绿、当前重构 Legacy UI selector、给 FrontendV2 新增治理、把历史/local/field-substitute 报告写成 current/现场完成。
 
-## 10. 首个可执行 Goal 的明确边界
+## 10. 下一可执行子 Goal 的明确边界
 
-首个执行 Goal 推荐为 **T01-G01：可信覆盖率证据合同**。
+下一项是 [T01-G01B-R3 UI 契约回归闭环计划](./ClearVision_T01_G01B_R3_UI契约回归闭环计划_2026-08-28.md)：在当前 HEAD 运行仍存在的 7 个 spec，按当前 failure signature 重建账本。已消失的历史 fixture 直接记录关闭依据，实际失败才进入产品回归、fixture 过时或环境问题分类。
 
-### 文件白名单
-
-- 新增 `quality/coverage/**`；
-- 新增专用 coverage runsettings/schema；
-- 新增一个覆盖率串行 orchestration/report 脚本；
-- 更新测试治理文档；
-- 生成文件只进入 ignored `TestResults`/`.tmp` 或 CI artifact。
-
-### 明确非目标
-
-- 不修改产品源码和业务测试断言；
-- 不修复本轮发现的 CI 测试失败；
-- 不改 StudioUI、Legacy UI、FrontendV2；
-- 不设置任何 coverage blocking threshold；
-- 不连接真实资源；
-- 不声称 Product 覆盖率，直到完整模块集合可重复生成。
-
-### 首个 Goal 验收重点
-
-1. 新鲜产物必须绑定 `HEAD`、dirty 状态、SDK、命令、TRX counters 和模块集合。
-2. Product/Desktop 同项目只允许单进程；多 FQN 合并一次调用。
-3. collector 中断后必须清理/重建，不得消费残留 instrumented 输出。
-4. 模块缺失、SHA 不符、旧时间戳、无 TRX、测试失败均使证据无效。
-5. 两个干净 checkout 的 valid line/branch 总量和模块集合一致后，才登记 baseline。
+本子 Goal 不修改不存在的 StudioUI，不为 non-production FrontendV2 建发布阻断覆盖率，不预创建 21 个永久 backlog，也不以本地结果替代 G02 的同 SHA 远端 necessary checks。所有 .NET targeted tests 继续通过仓库串行 runner 合并同项目 FQN。
 
 ## 11. 尚不能验证的事项
 
@@ -428,7 +363,7 @@ Desktop PR Lane 新鲜 Cobertura：
 - `UNKNOWN`：Product Nightly 1043 源码定义和 ReleaseManual 18 定义的完整动态计数/状态。
 - `UNKNOWN`：Quick/Golden/public dataset/性能 suite 在当前 HEAD 的新鲜结果。
 - `UNKNOWN`：真实 LLM、真实相机/PLC/机器人/Station/生产数据库与真实现场数据的当前 HEAD 结果。
-- `UNKNOWN`：`studio-ui-next` 当前脏工作树的完整 unit/E2E 状态；本轮严格只读且未干扰其他 Agent。
+- `UNKNOWN`：`studio-ui-next` 的新鲜远端状态和完整 unit/E2E 结果；2026-08-28 fetch 因 TLS EOF 失败，缓存分支事实不得用于当前 Gate。
 - `UNKNOWN`：覆盖率自然波动分布和合理阻断阈值；当前无足够多可信基线运行。
 
 ## 12. 本轮主要验证命令与结果摘要

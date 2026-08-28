@@ -1,7 +1,7 @@
 # Studio 2.0
 
 > 状态：Release 阶段
-> 已完成：G00-G15.4
+> 已完成：G00-G15 全部前置 Goal 卡（含 G15.1-G15.8）
 > 当前执行项：G16（`BLOCKED`）
 > 状态权威：仓库根 [`TODO.md`](../../../TODO.md)
 > 入口更新：2026-08-28
@@ -12,7 +12,7 @@
 ## 当前入口
 
 - 当前 Goal：[`G16`](goals/G16.md)
-- 根账本记录的阻断边界：生产唯一入口切换与完整 release evidence 尚未闭环。
+- 根账本记录的阻断边界：当前 production root 的 owner/flag disposition 与完整 release evidence 尚未闭环；2026-08-28 已取消“不完整 `/v2` 直接切生产”的旧目标。
 - 基线报告：[`baseline/G00-基线冻结报告-2026-07-01.md`](baseline/G00-基线冻结报告-2026-07-01.md)
 - 状态权威与恢复边界：[`状态权威与恢复边界.md`](状态权威与恢复边界.md)
 - Studio 2.0 架构边界 ADR：[`architecture/Studio2-架构边界-ADR.md`](architecture/Studio2-架构边界-ADR.md)
@@ -26,7 +26,7 @@
 | Observation | G05A-G08 | DONE |
 | Geometry / Spatial | G09A-G10C 及 follow-up | DONE |
 | Vertical Product | G11A-G13C 及 follow-up | DONE |
-| Productization | G14A-G15.4 | DONE |
+| Productization | G14A-G15 全部卡片（含 G15.1-G15.8） | DONE |
 | Release | G16 | BLOCKED |
 
 已完成卡片继续保留在 [`goals/`](goals/) 中，作为当前 G16 的前置执行记录。G16 关闭后，再将整套 Studio 2.0 Goal 卡和闭环说明作为一个批次归档，避免在项目仍 active 时拆散依赖链。
