@@ -47,20 +47,6 @@ public sealed class DesktopWebRootResolverTests : IDisposable
         resolved.Should().Be(Path.GetFullPath(Path.Combine(baseDirectory, "wwwroot")));
     }
 
-    [Fact]
-    public void ResolveFrontendV2_ShouldAlwaysUseOutputWwwRootV2()
-    {
-        var projectRoot = CreateDesktopProject();
-        var baseDirectory = Path.Combine(projectRoot, "bin", "Debug", "net8.0-windows", "win-x64");
-        CreateOutputWwwRoot(baseDirectory);
-        Directory.CreateDirectory(Path.Combine(baseDirectory, "wwwroot", "v2"));
-        Directory.CreateDirectory(Path.Combine(projectRoot, "wwwroot", "v2"));
-
-        var resolved = DesktopWebRootResolver.ResolveFrontendV2(baseDirectory);
-
-        resolved.Should().Be(Path.GetFullPath(Path.Combine(baseDirectory, "wwwroot", "v2")));
-    }
-
     public void Dispose()
     {
         if (Directory.Exists(_tempRoot))

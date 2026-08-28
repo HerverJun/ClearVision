@@ -29,7 +29,6 @@ async function stubOperatorLibrary(page: Page) {
 async function installStartupFlag(page: Page, enabled: boolean) {
   await page.addInitScript(flagEnabled => {
     const startup = {
-      workspaceV2Enabled: false,
       featureFlags: Object.freeze({
         'Studio:NPointCalibrationWorkbenchEnabled': flagEnabled,
       }),

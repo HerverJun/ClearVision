@@ -41,7 +41,6 @@ async function setCurrentProject(page: Page) {
 async function installCircleSearchV2StartupFlag(page: Page, enabled: boolean) {
   await page.addInitScript((flagEnabled) => {
     const startup = {
-      workspaceV2Enabled: false,
       featureFlags: Object.freeze({
         'Studio:CircleSearchV2ToolEnabled': flagEnabled,
       }),

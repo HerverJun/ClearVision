@@ -262,14 +262,17 @@ test('default startup uses legacy AiPanel and idle examples only fill the compos
 
   const pathEvidence = await page.evaluate(() => ({
     constructorName: (window as any).aiPanel?.constructor?.name,
-    capabilityEnabled: (window as any).__CLEARVISION_STARTUP__?.featureFlags?.['Studio2.AiPanel'] === true,
+    hasRetiredCapabilityFlag: Object.hasOwn(
+      (window as any).__CLEARVISION_STARTUP__?.featureFlags ?? {},
+      'Studio2.AiPanel',
+    ),
     shellHookCount: document.querySelectorAll('[data-ai-hook="shell"]').length,
     workbenchPaneCount: document.querySelectorAll('[data-ai-hook="workbench-pane"]').length,
     conversationPaneCount: document.querySelectorAll('[data-ai-hook="conversation-pane"]').length,
   }));
   expect(pathEvidence).toEqual({
     constructorName: 'AiPanel',
-    capabilityEnabled: false,
+    hasRetiredCapabilityFlag: false,
     shellHookCount: 1,
     workbenchPaneCount: 1,
     conversationPaneCount: 1,

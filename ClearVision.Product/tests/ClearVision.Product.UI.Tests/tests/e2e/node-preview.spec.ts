@@ -144,8 +144,6 @@ function buildLargeDetail() {
 async function installStartup(page, inspectorEnabled: boolean) {
   await page.addInitScript((enabled) => {
     const startup = {
-      workspaceV2Enabled: false,
-      nodePreviewInspectorEnabled: enabled,
       featureFlags: {
         'Studio:NodePreviewInspectorEnabled': enabled,
       },

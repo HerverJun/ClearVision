@@ -56,6 +56,10 @@ jobs:
         with:
           global-json-file: global.json
 
+      - name: Validate Resolved .NET SDK Policy
+        shell: pwsh
+        run: '& "./scripts/validate-dotnet-sdk-policy.ps1"'
+
       - name: Cache NuGet packages
         uses: actions/cache@v4
         with:

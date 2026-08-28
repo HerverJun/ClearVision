@@ -14,9 +14,19 @@ $ErrorActionPreference = "Stop"
 $scriptRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
 $repoRoot = Split-Path -Parent $scriptRoot
 $globalJsonPath = Join-Path $repoRoot "global.json"
+$sdkPolicyValidatorPath = Join-Path $scriptRoot "validate-dotnet-sdk-policy.ps1"
 
 if (-not (Test-Path -LiteralPath $globalJsonPath)) {
     throw "Cannot find repository global.json: $globalJsonPath"
+}
+
+if (-not (Test-Path -LiteralPath $sdkPolicyValidatorPath -PathType Leaf)) {
+    throw "Cannot find SDK policy validator: $sdkPolicyValidatorPath"
+}
+
+& $sdkPolicyValidatorPath -ValidateGlobalJsonOnly
+if ($LASTEXITCODE -ne 0) {
+    throw "Repository SDK policy validation failed."
 }
 
 $globalJson = Get-Content -LiteralPath $globalJsonPath -Raw | ConvertFrom-Json
@@ -81,14 +91,8 @@ function Test-DotnetHasRequiredSdk {
         [string]$DotnetPath
     )
 
-    Push-Location -LiteralPath $repoRoot
-    try {
-        $null = & $DotnetPath --version 2>$null
-        return $LASTEXITCODE -eq 0
-    }
-    finally {
-        Pop-Location
-    }
+    & $sdkPolicyValidatorPath -DotnetPath $DotnetPath -Quiet 2>$null | Out-Null
+    return $LASTEXITCODE -eq 0
 }
 
 function Get-DotnetInstallScript {
@@ -148,12 +152,13 @@ function Install-RequiredSdk {
     if (-not $InstallIfMissing) {
         $candidateList = (Get-DotnetCandidates) -join [Environment]::NewLine
         throw @"
-A .NET SDK compatible with global.json baseline $requiredSdk was not found by any usable dotnet host.
+A .NET SDK in the allowed 9.0.3xx feature band was not found by any usable dotnet host.
+The repository baseline is $requiredSdk with rollForward=latestPatch.
 
 Candidates checked:
 $candidateList
 
-Run this once to install/use the pinned SDK:
+Run this once to install the baseline SDK and resolve the latest available 9.0.3xx patch:
   & ".\scripts\dotnet.ps1" -InstallIfMissing --version
 "@
     }
@@ -245,7 +250,7 @@ foreach ($candidate in (Get-DotnetCandidates)) {
 if ([string]::IsNullOrWhiteSpace($dotnetPath)) {
     $dotnetPath = Install-RequiredSdk
     if (-not (Test-DotnetHasRequiredSdk -DotnetPath $dotnetPath)) {
-        throw "Installed dotnet host cannot resolve a compatible SDK for ${requiredSdk}: $dotnetPath"
+        throw "Installed dotnet host cannot resolve an SDK in the allowed 9.0.3xx feature band from baseline ${requiredSdk}: $dotnetPath"
     }
 }
 

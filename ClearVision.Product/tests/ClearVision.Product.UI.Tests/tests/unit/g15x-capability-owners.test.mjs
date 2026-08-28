@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 
 function readRepoText(relativeUrl) {
   return readFileSync(new URL(relativeUrl, import.meta.url), 'utf8');
@@ -9,50 +9,59 @@ function readRepoText(relativeUrl) {
 const appSource = () => readRepoText('../../../../src/ClearVision.Product.Desktop/wwwroot/src/app.js');
 const appSettingsSource = () => readRepoText('../../../../src/ClearVision.Product.Desktop/appsettings.json');
 
-test('G15X app composition reads all remaining capability flags once and defaults to legacy paths', () => {
+function countOccurrences(source, fragment) {
+  return source.split(fragment).length - 1;
+}
+
+test('Wave 0 app composition retains the five promoted capability owners behind one startup flag read each', () => {
   const source = appSource();
 
-  for (const flag of [
-    'Studio2.GlobalVariables',
-    'Studio2.Settings',
-    'Studio2.ProjectPage',
-    'Studio2.Inspection',
-    'Studio2.ResultsReview',
-    'Studio2.AiPanel'
-  ]) {
-    assert.match(source, new RegExp(flag.replace('.', '\\.')));
+  const retained = [
+    ['Studio2.PropertyPanel', 'PROPERTY_PANEL_CAPABILITY_ENABLED', 'readPropertyPanelCapabilityFlagOnce', 'PropertyPanelCapabilityOwner'],
+    ['Studio2.PreviewPanel', 'PREVIEW_PANEL_CAPABILITY_ENABLED', 'readPreviewPanelCapabilityFlagOnce', 'PreviewPanelCapabilityOwner'],
+    ['Studio2.GlobalVariables', 'GLOBAL_VARIABLES_CAPABILITY_ENABLED', 'readGlobalVariablesCapabilityFlagOnce', 'GlobalVariablesCapabilityOwner'],
+    ['Studio2.ProjectPage', 'PROJECT_PAGE_CAPABILITY_ENABLED', 'readProjectPageCapabilityFlagOnce', 'ProjectPageCapabilityOwner'],
+    ['Studio2.ResultsReview', 'RESULTS_REVIEW_CAPABILITY_ENABLED', 'readResultsReviewCapabilityFlagOnce', 'ResultsReviewCapabilityOwner']
+  ];
+
+  for (const [flag, constant, reader, owner] of retained) {
+    assert.equal(countOccurrences(source, `'${flag}'`), 1, `${flag} has one client-side flag authority`);
+    assert.equal(
+      countOccurrences(source, `const ${constant} = ${reader}();`),
+      1,
+      `${constant} is snapshotted once`
+    );
+    assert.equal(countOccurrences(source, `new ${owner}`), 1, `${owner} has one composition path`);
   }
-
-  assert.match(source, /const GLOBAL_VARIABLES_CAPABILITY_ENABLED = readGlobalVariablesCapabilityFlagOnce\(\);/);
-  assert.match(source, /const SETTINGS_CAPABILITY_ENABLED = readSettingsCapabilityFlagOnce\(\);/);
-  assert.match(source, /const PROJECT_PAGE_CAPABILITY_ENABLED = readProjectPageCapabilityFlagOnce\(\);/);
-  assert.match(source, /const INSPECTION_CAPABILITY_ENABLED = readInspectionCapabilityFlagOnce\(\);/);
-  assert.match(source, /const RESULTS_REVIEW_CAPABILITY_ENABLED = readResultsReviewCapabilityFlagOnce\(\);/);
-  assert.match(source, /const AI_PANEL_CAPABILITY_ENABLED = readAiPanelCapabilityFlagOnce\(\);/);
-
-  assert.match(source, /if \(isGlobalVariablesCapabilityEnabled\(\)\) \{[\s\S]*new GlobalVariablesCapabilityOwner/);
-  assert.match(source, /if \(isSettingsCapabilityEnabled\(\)\) \{[\s\S]*new SettingsCapabilityOwner/);
-  assert.match(source, /if \(isProjectPageCapabilityEnabled\(\)\) \{[\s\S]*new ProjectPageCapabilityOwner/);
-  assert.match(source, /if \(isInspectionCapabilityEnabled\(\)\) \{[\s\S]*new InspectionCapabilityOwner/);
-  assert.match(source, /if \(isResultsReviewCapabilityEnabled\(\)\) \{[\s\S]*new ResultsReviewCapabilityOwner/);
-  assert.match(source, /if \(isAiPanelCapabilityEnabled\(\)\) \{[\s\S]*new AiPanelCapabilityOwner/);
-
-  assert.match(source, /loadGlobalVariablePanelModule\(\)[\s\S]*new module\.default\('global-variable-panel'\)/);
-  assert.match(source, /loadSettingsViewModule\(\)[\s\S]*createLegacySettingsView\('settings-view'\)/);
-  assert.match(source, /loadProjectViewModule\(\)[\s\S]*new ProjectView\('project-view'\)/);
-  assert.match(source, /loadInspectionPanelModule\(\)[\s\S]*new InspectionPanel\('inspection-control-panel'\)/);
-  assert.match(source, /loadResultPanelModule\(\)[\s\S]*new ResultPanel\('results-list-container'\)/);
-  assert.match(source, /loadAiPanelModule\(\)[\s\S]*new AiPanel\('ai-view'/);
 });
 
-test('G15X owner source files define adapters, dispose paths, and do not use CSS-only hide as the migration mechanism', () => {
+test('Wave 0 retires incomplete Settings, Inspection, and AI owners and composes each legacy owner exactly once', () => {
+  const source = appSource();
+  const appSettings = JSON.parse(appSettingsSource());
+  const retired = [
+    ['SettingsCapabilityEnabled', 'SettingsCapabilityOwner', '../../../../src/ClearVision.Product.Desktop/wwwroot/src/features/settings/settingsCapabilityOwner.mjs'],
+    ['InspectionCapabilityEnabled', 'InspectionCapabilityOwner', '../../../../src/ClearVision.Product.Desktop/wwwroot/src/features/inspection/inspectionCapabilityOwner.mjs'],
+    ['AiPanelCapabilityEnabled', 'AiPanelCapabilityOwner', '../../../../src/ClearVision.Product.Desktop/wwwroot/src/features/ai/aiPanelCapabilityOwner.mjs']
+  ];
+
+  for (const [option, owner, path] of retired) {
+    assert.equal(appSettings.Studio[option], undefined, `${option} is not a runtime product switch`);
+    assert.doesNotMatch(source, new RegExp(option));
+    assert.doesNotMatch(source, new RegExp(owner));
+    assert.equal(existsSync(new URL(path, import.meta.url)), false, `${owner} source is retired`);
+  }
+
+  assert.doesNotMatch(source, /__CLEARVISION_ENABLE_EXPERIMENTAL_(SETTINGS|INSPECTION|AI_PANEL)_CAPABILITY/);
+  assert.equal(countOccurrences(source, "createLegacySettingsView('settings-view')"), 1);
+  assert.equal(countOccurrences(source, "new InspectionPanel('inspection-control-panel')"), 1);
+  assert.equal(countOccurrences(source, "new AiPanel('ai-view'"), 1);
+});
+
+test('retained owner source files define adapters, dispose paths, and do not use CSS-only hiding as migration', () => {
   const owners = [
     ['GlobalVariables', '../../../../src/ClearVision.Product.Desktop/wwwroot/src/features/global-variables/globalVariablesCapabilityOwner.mjs'],
-    ['Settings', '../../../../src/ClearVision.Product.Desktop/wwwroot/src/features/settings/settingsCapabilityOwner.mjs'],
     ['ProjectPage', '../../../../src/ClearVision.Product.Desktop/wwwroot/src/features/project/projectPageCapabilityOwner.mjs'],
-    ['Inspection', '../../../../src/ClearVision.Product.Desktop/wwwroot/src/features/inspection/inspectionCapabilityOwner.mjs'],
-    ['ResultsReview', '../../../../src/ClearVision.Product.Desktop/wwwroot/src/features/results/resultsReviewCapabilityOwner.mjs'],
-    ['AiPanel', '../../../../src/ClearVision.Product.Desktop/wwwroot/src/features/ai/aiPanelCapabilityOwner.mjs']
+    ['ResultsReview', '../../../../src/ClearVision.Product.Desktop/wwwroot/src/features/results/resultsReviewCapabilityOwner.mjs']
   ];
 
   for (const [name, path] of owners) {
@@ -76,17 +85,6 @@ test('Global Variables capability keeps preview/property binding compatibility t
   assert.doesNotMatch(source, /localStorage|indexedDB|new\s+ProjectManager/);
 });
 
-test('Settings capability saves only the active tab through the existing settings API', () => {
-  const source = readRepoText('../../../../src/ClearVision.Product.Desktop/wwwroot/src/features/settings/settingsCapabilityOwner.mjs');
-
-  assert.match(source, /SETTINGS_TABS/);
-  assert.match(source, /saveCurrentTab/);
-  assert.match(source, /saveScope:\s*tab\.configKey/);
-  assert.match(source, /\[tab\.configKey\]:\s*parsed/);
-  assert.match(source, /settingsApiRef = settingsApi/);
-  assert.doesNotMatch(source, /localStorage\.setItem|indexedDB/);
-});
-
 test('Legacy settings system tab saves scoped payloads and excludes retired no-op fields', () => {
   const source = readRepoText('../../../../src/ClearVision.Product.Desktop/wwwroot/src/features/settings/tabs/systemTabs.js');
 
@@ -100,23 +98,6 @@ test('Legacy settings system tab saves scoped payloads and excludes retired no-o
   assert.match(source, /cfg-minFreeSpaceGb[\s\S]*暂未启用，仅保留兼容/);
   assert.match(source, /id="cfg-sessionTimeoutMinutes"[\s\S]*disabled/);
   assert.match(source, /桌面端不适用/);
-});
-
-test('Settings and AI capability gates fail closed behind explicit experimental window switches', () => {
-  const source = appSource();
-  const appSettings = JSON.parse(appSettingsSource());
-
-  assert.equal(appSettings.Studio.SettingsCapabilityEnabled, false);
-  assert.equal(appSettings.Studio.AiPanelCapabilityEnabled, false);
-
-  assert.match(
-    source,
-    /function isSettingsCapabilityEnabled\(\) \{[\s\S]*return SETTINGS_CAPABILITY_ENABLED\s*&&\s*window\.__CLEARVISION_ENABLE_EXPERIMENTAL_SETTINGS_CAPABILITY === true;[\s\S]*\}/
-  );
-  assert.match(
-    source,
-    /function isAiPanelCapabilityEnabled\(\) \{[\s\S]*return AI_PANEL_CAPABILITY_ENABLED\s*&&\s*window\.__CLEARVISION_ENABLE_EXPERIMENTAL_AI_PANEL_CAPABILITY === true;[\s\S]*\}/
-  );
 });
 
 test('Project Page capability routes list, search, create, open, save, import and export through project manager or existing globals', () => {
@@ -138,16 +119,19 @@ test('Project Page capability routes list, search, create, open, save, import an
   assert.doesNotMatch(source, /fetch\(|localStorage\.setItem|indexedDB|ProjectSaveCoordinator/);
 });
 
-test('Inspection capability sends commands through inspectionController and cleans result subscriptions', () => {
-  const source = readRepoText('../../../../src/ClearVision.Product.Desktop/wwwroot/src/features/inspection/inspectionCapabilityOwner.mjs');
+test('legacy Settings, Inspection, and AI owners clean their timers, subscriptions, and transports', () => {
+  const settings = readRepoText('../../../../src/ClearVision.Product.Desktop/wwwroot/src/features/settings/settingsView.js');
+  const inspection = readRepoText('../../../../src/ClearVision.Product.Desktop/wwwroot/src/features/inspection/inspectionPanel.js');
+  const aiLifecycle = readRepoText('../../../../src/ClearVision.Product.Desktop/wwwroot/src/features/ai/aiPanelLifecycle.js');
 
-  assert.match(source, /executeSingle/);
-  assert.match(source, /startRealtime/);
-  assert.match(source, /stopRealtime/);
-  assert.match(source, /onInspectionCompleted|onCompleted/);
-  assert.match(source, /onInspectionError|onError/);
-  assert.match(source, /unsubscribes/);
-  assert.doesNotMatch(source, /EvidenceManifest|retention|PreviewArtifact/);
+  assert.match(settings, /destroy\(\)\s*\{[\s\S]*this\.deactivate\(\)/);
+  assert.match(settings, /clearTransientResources\(\)\s*\{[\s\S]*_trackedTimeouts\.forEach[\s\S]*_trackedTimeouts\.clear\(\)/);
+  assert.match(inspection, /this\.unsubscribeCompleted = inspectionController\.onInspectionCompleted/);
+  assert.match(inspection, /this\.unsubscribeError = inspectionController\.onInspectionError/);
+  assert.match(inspection, /dispose\(\)\s*\{[\s\S]*this\.unsubscribeCompleted\(\)[\s\S]*this\.unsubscribeError\(\)/);
+  assert.match(aiLifecycle, /dispose\(\)\s*\{[\s\S]*_ownedTimeouts[\s\S]*_messageUnsubscribes[\s\S]*_closeAllAgentTransports/);
+  assert.match(aiLifecycle, /window\.clearTimeout/);
+  assert.match(aiLifecycle, /window\.cancelAnimationFrame/);
 });
 
 test('Results Review capability uses formal history loaders and avoids preview artifact/cache authority', () => {
@@ -162,18 +146,7 @@ test('Results Review capability uses formal history loaders and avoids preview a
   assert.doesNotMatch(source, /PreviewArtifact|preview cache|previewCache|direct artifact client/i);
 });
 
-test('AI Panel capability is backend AgentRun projection with cancel and stream cleanup only', () => {
-  const source = readRepoText('../../../../src/ClearVision.Product.Desktop/wwwroot/src/features/ai/aiPanelCapabilityOwner.mjs');
-
-  assert.match(source, /agent-runs\/latest/);
-  assert.match(source, /agent-runs\/\$?\{?encodeURIComponent\(runId\)\}?\/cancel|cancelRun/);
-  assert.match(source, /EventSource/);
-  assert.match(source, /closeEventStream/);
-  assert.match(source, /dispose\(\)/);
-  assert.doesNotMatch(source, /class\s+AgentRunEventStore|EventStore|terminal recovery|Workspace Snapshot authority/i);
-});
-
-test('view manager uses injected settings owner and no longer mounts settings through globals', () => {
+test('view manager uses the injected legacy settings owner and does not mount settings through globals', () => {
   const source = readRepoText('../../../../src/ClearVision.Product.Desktop/wwwroot/src/core/app/viewManager.js');
 
   assert.match(source, /ensureSettingsView/);

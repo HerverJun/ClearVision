@@ -42771,9 +42771,38 @@
         "DataType": "String",
         "IsRequired": false,
         "Description": ""
+      },
+      {
+        "Name": "Length",
+        "DisplayName": "\u7ED3\u679C\u957F\u5EA6",
+        "DataType": "Integer",
+        "IsRequired": false,
+        "Description": ""
+      },
+      {
+        "Name": "IsEmpty",
+        "DisplayName": "\u7ED3\u679C\u4E3A\u7A7A",
+        "DataType": "Boolean",
+        "IsRequired": false,
+        "Description": ""
       }
     ],
     "Parameters": [
+      {
+        "Name": "Mode",
+        "DisplayName": "\u683C\u5F0F\u6A21\u5F0F",
+        "DataType": "enum",
+        "Description": "",
+        "DefaultValue": "Template",
+        "MinValue": null,
+        "MaxValue": null,
+        "IsRequired": true,
+        "AllowedValues": [
+          "\u6A21\u677F",
+          "\u62FC\u63A5",
+          "\u65E5\u671F\u65F6\u95F4"
+        ]
+      },
       {
         "Name": "Template",
         "DisplayName": "\u6A21\u677F",
@@ -42784,9 +42813,164 @@
         "MaxValue": null,
         "IsRequired": true,
         "AllowedValues": []
+      },
+      {
+        "Name": "Separator",
+        "DisplayName": "\u5206\u9694\u7B26",
+        "DataType": "string",
+        "Description": "",
+        "DefaultValue": "",
+        "MinValue": null,
+        "MaxValue": null,
+        "IsRequired": true,
+        "AllowedValues": []
+      },
+      {
+        "Name": "DateFormat",
+        "DisplayName": "\u65E5\u671F\u683C\u5F0F",
+        "DataType": "string",
+        "Description": "",
+        "DefaultValue": "yyyy-MM-dd HH:mm:ss",
+        "MinValue": null,
+        "MaxValue": null,
+        "IsRequired": true,
+        "AllowedValues": []
       }
     ],
-    "ParameterConditions": [],
+    "ParameterConditions": [
+      {
+        "Parameter": "Template",
+        "RequiredPolicy": "metadata",
+        "RequiredWhen": null,
+        "EnabledWhen": null,
+        "DisabledWhen": {
+          "All": [
+            {
+              "Parameter": "Mode",
+              "Comparison": "not-equals",
+              "Value": "Template"
+            }
+          ],
+          "Any": null
+        },
+        "AtLeastOneGroup": null,
+        "MutuallyExclusiveGroup": null,
+        "AliasFor": null,
+        "Deprecated": false,
+        "ResourceKind": null,
+        "ReasonCode": "STRING_FORMAT_TEMPLATE_MODE_ONLY",
+        "VisibleWhen": null,
+        "HiddenWhen": {
+          "All": [
+            {
+              "Parameter": "Mode",
+              "Comparison": "not-equals",
+              "Value": "Template"
+            }
+          ],
+          "Any": null
+        },
+        "IgnoredWhen": {
+          "All": [
+            {
+              "Parameter": "Mode",
+              "Comparison": "not-equals",
+              "Value": "Template"
+            }
+          ],
+          "Any": null
+        },
+        "SatisfiedByInputPorts": null
+      },
+      {
+        "Parameter": "Separator",
+        "RequiredPolicy": "metadata",
+        "RequiredWhen": null,
+        "EnabledWhen": null,
+        "DisabledWhen": {
+          "All": [
+            {
+              "Parameter": "Mode",
+              "Comparison": "not-equals",
+              "Value": "Join"
+            }
+          ],
+          "Any": null
+        },
+        "AtLeastOneGroup": null,
+        "MutuallyExclusiveGroup": null,
+        "AliasFor": null,
+        "Deprecated": false,
+        "ResourceKind": null,
+        "ReasonCode": "STRING_FORMAT_JOIN_MODE_ONLY",
+        "VisibleWhen": null,
+        "HiddenWhen": {
+          "All": [
+            {
+              "Parameter": "Mode",
+              "Comparison": "not-equals",
+              "Value": "Join"
+            }
+          ],
+          "Any": null
+        },
+        "IgnoredWhen": {
+          "All": [
+            {
+              "Parameter": "Mode",
+              "Comparison": "not-equals",
+              "Value": "Join"
+            }
+          ],
+          "Any": null
+        },
+        "SatisfiedByInputPorts": null
+      },
+      {
+        "Parameter": "DateFormat",
+        "RequiredPolicy": "metadata",
+        "RequiredWhen": null,
+        "EnabledWhen": null,
+        "DisabledWhen": {
+          "All": [
+            {
+              "Parameter": "Mode",
+              "Comparison": "not-equals",
+              "Value": "Date"
+            }
+          ],
+          "Any": null
+        },
+        "AtLeastOneGroup": null,
+        "MutuallyExclusiveGroup": null,
+        "AliasFor": null,
+        "Deprecated": false,
+        "ResourceKind": null,
+        "ReasonCode": "STRING_FORMAT_DATE_MODE_ONLY",
+        "VisibleWhen": null,
+        "HiddenWhen": {
+          "All": [
+            {
+              "Parameter": "Mode",
+              "Comparison": "not-equals",
+              "Value": "Date"
+            }
+          ],
+          "Any": null
+        },
+        "IgnoredWhen": {
+          "All": [
+            {
+              "Parameter": "Mode",
+              "Comparison": "not-equals",
+              "Value": "Date"
+            }
+          ],
+          "Any": null
+        },
+        "SatisfiedByInputPorts": null
+      }
+    ],
     "OutputConditions": [],
     "ImageInputContracts": [],
     "ResourceRequirements": [],

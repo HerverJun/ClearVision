@@ -27,6 +27,10 @@ jobs:
         with:
           global-json-file: global.json
 
+      - name: Validate Resolved .NET SDK Policy
+        shell: pwsh
+        run: '& "./scripts/validate-dotnet-sdk-policy.ps1"'
+
       - name: Initialize CodeQL
         uses: github/codeql-action/init@v3
         with:

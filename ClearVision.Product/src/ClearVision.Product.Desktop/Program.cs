@@ -334,6 +334,7 @@ static class Program
                 .RunStartupRecoveryAsync()
                 .GetAwaiter()
                 .GetResult();
+            RunFlowTemplateStartupMigration(services);
 
             var cameraManager = services.GetRequiredService<ClearVision.Product.Core.Cameras.ICameraManager>();
             var configService = services.GetRequiredService<ClearVision.Product.Core.Interfaces.IConfigurationService>();
@@ -354,6 +355,7 @@ static class Program
         app.MapUserEndpoints();
         app.MapVisionApiEndpoints();
         app.MapSettingsEndpoints();
+        app.MapTemplateMaintenanceEndpoints();
         app.MapAgentRunEndpoints();
         app.MapPlcEndpoints();
         app.MapTcpEndpoints();
@@ -374,20 +376,22 @@ static class Program
 
     internal static void UseDesktopStaticAssets(
         IApplicationBuilder app,
-        string? legacyWebRootPath = null,
-        string? frontendV2WebRootPath = null)
+        string? legacyWebRootPath = null)
     {
         ArgumentNullException.ThrowIfNull(app);
 
-        var resolvedFrontendV2WebRootPath = frontendV2WebRootPath ?? DesktopWebRootResolver.ResolveFrontendV2();
-        if (Directory.Exists(resolvedFrontendV2WebRootPath))
+        app.Use(async (context, next) =>
         {
-            var frontendV2Provider = new PhysicalFileProvider(resolvedFrontendV2WebRootPath);
-            var frontendV2Options = CreateDesktopStaticFileOptions(frontendV2Provider);
-            frontendV2Options.RequestPath = StudioStartupPageResolver.FrontendV2BasePath;
-            app.UseStaticFiles(frontendV2Options);
-            Debug.WriteLine($"Studio 2.0 V2 静态资源目录: {resolvedFrontendV2WebRootPath}");
-        }
+            if (context.Request.Path.StartsWithSegments(
+                    new PathString("/v2"),
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                context.Response.StatusCode = StatusCodes.Status404NotFound;
+                return;
+            }
+
+            await next();
+        });
 
         var resolvedLegacyWebRootPath = legacyWebRootPath ?? DesktopWebRootResolver.Resolve();
         if (!Directory.Exists(resolvedLegacyWebRootPath))
@@ -445,6 +449,25 @@ static class Program
         };
 
         VisionDatabaseInitializer.InitializeAsync(dbContext, options).GetAwaiter().GetResult();
+    }
+
+    private static void RunFlowTemplateStartupMigration(IServiceProvider services)
+    {
+        try
+        {
+            var result = services.GetRequiredService<IFlowTemplateService>()
+                .RunStartupMigrationAsync()
+                .GetAwaiter()
+                .GetResult();
+            Debug.WriteLine(
+                $"Flow template startup migration: action={result.Action}, templates={result.TemplateCount}, changed={result.Changed}");
+        }
+        catch (FlowTemplateStoreException ex)
+        {
+            // Keep the authoritative bytes untouched. Read endpoints expose a stable degraded response,
+            // and replacement is available only through the explicit Admin maintenance operation.
+            Debug.WriteLine($"Flow template store degraded: code={ex.Code}");
+        }
     }
 
     private static Task<OutdatedVisionDatabaseDecision> PromptForOutdatedDatabaseDecisionAsync(

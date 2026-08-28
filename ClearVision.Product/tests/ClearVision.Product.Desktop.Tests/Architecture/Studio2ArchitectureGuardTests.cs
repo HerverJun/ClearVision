@@ -498,7 +498,7 @@ public sealed class Studio2ArchitectureGuardTests
         webViewHostText.Should().Contain("[\"Studio2.PropertyPanel\"] = propertyPanelCapabilityEnabled");
         appSettingsText.Should().Contain("\"PropertyPanelCapabilityEnabled\": true");
         ledgerText.Should().Contain("`Studio2.PropertyPanel`");
-        ledgerText.Should().Contain("RUNTIME_IMPLEMENTED_G15_1");
+        ledgerText.Should().Contain("RETAINED_PRODUCTION_OWNER_WAVE0");
 
         sidebarControllerText.Should().Contain("class PropertyPanelCapabilityAdapter");
         sidebarControllerText.Should().Contain("writeParameters");
@@ -574,7 +574,7 @@ public sealed class Studio2ArchitectureGuardTests
         webViewHostText.Should().Contain("[\"Studio2.PreviewPanel\"] = previewPanelCapabilityEnabled");
         appSettingsText.Should().Contain("\"PreviewPanelCapabilityEnabled\": true");
         ledgerText.Should().Contain("`Studio2.PreviewPanel`");
-        ledgerText.Should().Contain("RUNTIME_IMPLEMENTED_G15_2");
+        ledgerText.Should().Contain("RETAINED_PRODUCTION_OWNER_WAVE0");
         indexText.Should().Contain("id=\"preview-panel\"");
         indexText.Should().Contain("data-preview-panel-host");
 
@@ -994,7 +994,7 @@ public sealed class Studio2ArchitectureGuardTests
     }
 
     [Fact]
-    public void G15X_RemainingCapabilities_ShouldUseFlaggedOwnersAndKeepAuthorities()
+    public void CurrentCapabilities_ShouldKeepPromotedOwnersAndRetireIncompleteExperimentalOwners()
     {
         var appText = ReadRepoText("ClearVision.Product/src/ClearVision.Product.Desktop/wwwroot/src/app.js");
         var indexText = ReadRepoText("ClearVision.Product/src/ClearVision.Product.Desktop/wwwroot/index.html");
@@ -1014,14 +1014,6 @@ public sealed class Studio2ArchitectureGuardTests
                 LegacyConstructor: @"new\s+module\.default\(\s*'global-variable-panel'\s*\)"
             ),
             (
-                Flag: "Studio2.Settings",
-                Option: "SettingsCapabilityEnabled",
-                Owner: "SettingsCapabilityOwner",
-                Adapter: "SettingsCapabilityAdapter",
-                Path: "ClearVision.Product/src/ClearVision.Product.Desktop/wwwroot/src/features/settings/settingsCapabilityOwner.mjs",
-                LegacyConstructor: @"createLegacySettingsView\(\s*'settings-view'\s*\)"
-            ),
-            (
                 Flag: "Studio2.ProjectPage",
                 Option: "ProjectPageCapabilityEnabled",
                 Owner: "ProjectPageCapabilityOwner",
@@ -1030,28 +1022,12 @@ public sealed class Studio2ArchitectureGuardTests
                 LegacyConstructor: @"new\s+ProjectView\(\s*'project-view'\s*\)"
             ),
             (
-                Flag: "Studio2.Inspection",
-                Option: "InspectionCapabilityEnabled",
-                Owner: "InspectionCapabilityOwner",
-                Adapter: "InspectionCapabilityAdapter",
-                Path: "ClearVision.Product/src/ClearVision.Product.Desktop/wwwroot/src/features/inspection/inspectionCapabilityOwner.mjs",
-                LegacyConstructor: @"new\s+InspectionPanel\(\s*'inspection-control-panel'\s*\)"
-            ),
-            (
                 Flag: "Studio2.ResultsReview",
                 Option: "ResultsReviewCapabilityEnabled",
                 Owner: "ResultsReviewCapabilityOwner",
                 Adapter: "ResultsReviewCapabilityAdapter",
                 Path: "ClearVision.Product/src/ClearVision.Product.Desktop/wwwroot/src/features/results/resultsReviewCapabilityOwner.mjs",
                 LegacyConstructor: @"new\s+ResultPanel\(\s*'results-list-container'\s*\)"
-            ),
-            (
-                Flag: "Studio2.AiPanel",
-                Option: "AiPanelCapabilityEnabled",
-                Owner: "AiPanelCapabilityOwner",
-                Adapter: "AiPanelCapabilityAdapter",
-                Path: "ClearVision.Product/src/ClearVision.Product.Desktop/wwwroot/src/features/ai/aiPanelCapabilityOwner.mjs",
-                LegacyConstructor: @"new\s+AiPanel\(\s*'ai-view'"
             )
         };
 
@@ -1060,10 +1036,7 @@ public sealed class Studio2ArchitectureGuardTests
             studioOptionsText.Should().Contain(capability.Option);
             webViewHostText.Should().Contain(capability.Option);
             webViewHostText.Should().Contain($"[\"{capability.Flag}\"]");
-            var expectedDefault = capability.Option is "SettingsCapabilityEnabled" or "AiPanelCapabilityEnabled"
-                ? "false"
-                : "true";
-            appSettingsText.Should().Contain($"\"{capability.Option}\": {expectedDefault}");
+            appSettingsText.Should().Contain($"\"{capability.Option}\": true");
             appText.Should().Contain(capability.Flag);
             appText.Should().Contain(capability.Owner);
             appText.Should().Contain(capability.Adapter);
@@ -1080,6 +1053,53 @@ public sealed class Studio2ArchitectureGuardTests
             Regex.Matches(appText, capability.LegacyConstructor)
                 .Should().ContainSingle($"{capability.Flag} must keep exactly one legacy flag-off path.");
         }
+
+        var retiredCapabilities = new[]
+        {
+            (
+                Flag: "Studio2.Settings",
+                Option: "SettingsCapabilityEnabled",
+                Owner: "SettingsCapabilityOwner",
+                Adapter: "SettingsCapabilityAdapter",
+                Path: "ClearVision.Product/src/ClearVision.Product.Desktop/wwwroot/src/features/settings/settingsCapabilityOwner.mjs",
+                LegacyConstructor: @"createLegacySettingsView\(\s*'settings-view'\s*\)"
+            ),
+            (
+                Flag: "Studio2.Inspection",
+                Option: "InspectionCapabilityEnabled",
+                Owner: "InspectionCapabilityOwner",
+                Adapter: "InspectionCapabilityAdapter",
+                Path: "ClearVision.Product/src/ClearVision.Product.Desktop/wwwroot/src/features/inspection/inspectionCapabilityOwner.mjs",
+                LegacyConstructor: @"new\s+InspectionPanel\(\s*'inspection-control-panel'\s*\)"
+            ),
+            (
+                Flag: "Studio2.AiPanel",
+                Option: "AiPanelCapabilityEnabled",
+                Owner: "AiPanelCapabilityOwner",
+                Adapter: "AiPanelCapabilityAdapter",
+                Path: "ClearVision.Product/src/ClearVision.Product.Desktop/wwwroot/src/features/ai/aiPanelCapabilityOwner.mjs",
+                LegacyConstructor: @"new\s+AiPanel\(\s*'ai-view'"
+            )
+        };
+
+        foreach (var capability in retiredCapabilities)
+        {
+            studioOptionsText.Should().NotContain(capability.Option);
+            webViewHostText.Should().NotContain(capability.Option);
+            webViewHostText.Should().NotContain(capability.Flag);
+            appSettingsText.Should().NotContain(capability.Option);
+            appText.Should().NotContain(capability.Flag);
+            appText.Should().NotContain(capability.Owner);
+            appText.Should().NotContain(capability.Adapter);
+            File.Exists(Path.Combine(Root, capability.Path.Replace('/', Path.DirectorySeparatorChar)))
+                .Should().BeFalse($"{capability.Owner} was an incomplete experimental owner and must be retired.");
+            Regex.Matches(appText, capability.LegacyConstructor)
+                .Should().ContainSingle($"{capability.Flag} must have exactly one legacy production owner.");
+        }
+
+        appText.Should().NotContain("__CLEARVISION_ENABLE_EXPERIMENTAL_SETTINGS_CAPABILITY");
+        appText.Should().NotContain("__CLEARVISION_ENABLE_EXPERIMENTAL_INSPECTION_CAPABILITY");
+        appText.Should().NotContain("__CLEARVISION_ENABLE_EXPERIMENTAL_AI_PANEL_CAPABILITY");
 
         appText.Should().Contain("const PROPERTY_PANEL_CAPABILITY_FLAG_KEY = 'Studio2.PropertyPanel'");
         appText.Should().Contain("const PREVIEW_PANEL_CAPABILITY_FLAG_KEY = 'Studio2.PreviewPanel'");
@@ -1101,20 +1121,10 @@ public sealed class Studio2ArchitectureGuardTests
         globalVariablesOwner.Should().NotContain("localStorage");
         globalVariablesOwner.Should().NotContain("indexedDB");
 
-        var settingsOwner = ReadRepoText("ClearVision.Product/src/ClearVision.Product.Desktop/wwwroot/src/features/settings/settingsCapabilityOwner.mjs");
-        settingsOwner.Should().Contain("saveCurrentTab");
-        settingsOwner.Should().Contain("settingsApiRef = settingsApi");
-        settingsOwner.Should().NotContain("settings schema");
-
         var projectOwner = ReadRepoText("ClearVision.Product/src/ClearVision.Product.Desktop/wwwroot/src/features/project/projectPageCapabilityOwner.mjs");
         projectOwner.Should().Contain("projectManagerRef");
         projectOwner.Should().NotContain("fetch(");
         projectOwner.Should().NotContain("localStorage.setItem");
-
-        var inspectionOwner = ReadRepoText("ClearVision.Product/src/ClearVision.Product.Desktop/wwwroot/src/features/inspection/inspectionCapabilityOwner.mjs");
-        inspectionOwner.Should().Contain("inspectionControllerRef");
-        inspectionOwner.Should().NotContain("EvidenceManifest");
-        inspectionOwner.Should().NotContain("retention");
 
         var resultsOwner = ReadRepoText("ClearVision.Product/src/ClearVision.Product.Desktop/wwwroot/src/features/results/resultsReviewCapabilityOwner.mjs");
         resultsOwner.Should().Contain("loadHistory");
@@ -1123,13 +1133,6 @@ public sealed class Studio2ArchitectureGuardTests
         resultsOwner.Should().Contain("exportEvidence");
         resultsOwner.Should().NotContain("PreviewArtifact");
         resultsOwner.Should().NotContain("previewCache");
-
-        var aiOwner = ReadRepoText("ClearVision.Product/src/ClearVision.Product.Desktop/wwwroot/src/features/ai/aiPanelCapabilityOwner.mjs");
-        aiOwner.Should().Contain("/ai/agent-runs/latest");
-        aiOwner.Should().Contain("cancelRun");
-        aiOwner.Should().Contain("closeEventStream");
-        aiOwner.Should().NotContain("AgentRunEventStore");
-        aiOwner.Should().NotContain("resolveAgentRunTerminal");
 
         var forbiddenAuthorityRoots = new[]
         {
@@ -1161,13 +1164,21 @@ public sealed class Studio2ArchitectureGuardTests
     }
 
     [Fact]
-    public void G16_ReleaseCutover_ShouldDefaultBusinessCapabilitiesOnAndKeepLegacyLibrariesFlagOffOnly()
+    public void G16_ProductionRootAndOwnerDisposition_ShouldMatchCurrentReleaseArchitecture()
     {
         var appText = ReadRepoText("ClearVision.Product/src/ClearVision.Product.Desktop/wwwroot/src/app.js");
         var indexText = ReadRepoText("ClearVision.Product/src/ClearVision.Product.Desktop/wwwroot/index.html");
         var appSettingsText = ReadRepoText("ClearVision.Product/src/ClearVision.Product.Desktop/appsettings.json");
+        var studioOptionsText = ReadRepoText("ClearVision.Product/src/ClearVision.Product.Desktop/Configuration/StudioOptions.cs");
+        var webViewHostText = ReadRepoText("ClearVision.Product/src/ClearVision.Product.Desktop/WebView2Host.cs");
+        var startupResolverText = ReadRepoText("ClearVision.Product/src/ClearVision.Product.Desktop/StudioStartupPageResolver.cs");
+        var programText = ReadRepoText("ClearVision.Product/src/ClearVision.Product.Desktop/Program.cs");
+        var desktopProjectText = ReadRepoText("ClearVision.Product/src/ClearVision.Product.Desktop/ClearVision.Product.Desktop.csproj");
+        var workflowText = string.Join(
+            "\n",
+            Directory.EnumerateFiles(Path.Combine(Root, ".github/workflows"), "*.yml", SearchOption.TopDirectoryOnly)
+                .Select(File.ReadAllText));
         var resultsOwnerText = ReadRepoText("ClearVision.Product/src/ClearVision.Product.Desktop/wwwroot/src/features/results/resultsReviewCapabilityOwner.mjs");
-        var aiOwnerText = ReadRepoText("ClearVision.Product/src/ClearVision.Product.Desktop/wwwroot/src/features/ai/aiPanelCapabilityOwner.mjs");
         var previewOwnerText = ReadRepoText("ClearVision.Product/src/ClearVision.Product.Desktop/wwwroot/src/features/flow-editor/previewPanelCapabilityOwner.mjs");
         var globalVariablesOwnerText = ReadRepoText("ClearVision.Product/src/ClearVision.Product.Desktop/wwwroot/src/features/global-variables/globalVariablesCapabilityOwner.mjs");
 
@@ -1177,27 +1188,44 @@ public sealed class Studio2ArchitectureGuardTests
                      "PreviewPanelCapabilityEnabled",
                      "GlobalVariablesCapabilityEnabled",
                      "ProjectPageCapabilityEnabled",
-                     "InspectionCapabilityEnabled",
                      "ResultsReviewCapabilityEnabled"
                  })
         {
             appSettingsText.Should().Contain($"\"{option}\": true");
         }
 
-        foreach (var option in new[]
+        foreach (var retiredOption in new[]
                  {
+                     "WorkspaceV2Enabled",
                      "SettingsCapabilityEnabled",
+                     "InspectionCapabilityEnabled",
                      "AiPanelCapabilityEnabled"
                  })
         {
-            appSettingsText.Should().Contain($"\"{option}\": false");
+            appSettingsText.Should().NotContain(retiredOption);
+            studioOptionsText.Should().NotContain(retiredOption);
+            webViewHostText.Should().NotContain(retiredOption);
         }
 
-        appText.Should().Contain("window.__CLEARVISION_ENABLE_EXPERIMENTAL_SETTINGS_CAPABILITY === true");
-        appText.Should().Contain("window.__CLEARVISION_ENABLE_EXPERIMENTAL_AI_PANEL_CAPABILITY === true");
-
-        appSettingsText.Should().Contain("\"WorkspaceV2Enabled\": false");
+        appText.Should().NotContain("__CLEARVISION_ENABLE_EXPERIMENTAL_SETTINGS_CAPABILITY");
+        appText.Should().NotContain("__CLEARVISION_ENABLE_EXPERIMENTAL_INSPECTION_CAPABILITY");
+        appText.Should().NotContain("__CLEARVISION_ENABLE_EXPERIMENTAL_AI_PANEL_CAPABILITY");
         appSettingsText.Should().Contain("\"NodePreviewInspectorEnabled\": false");
+
+        startupResolverText.Should().Contain("LegacyPagePath = \"/index.html\"");
+        startupResolverText.Should().NotContain("FrontendV2");
+        startupResolverText.Should().NotContain("/v2");
+        webViewHostText.Should().NotContain("frontendV2BasePath");
+        programText.Should().Contain("new PathString(\"/v2\")");
+        programText.Should().Contain("StatusCodes.Status404NotFound");
+        programText.Should().NotContain("ResolveFrontendV2");
+        desktopProjectText.Should().Contain("<Content Remove=\"FrontendV2\\**\\*\" />");
+        desktopProjectText.Should().NotContain("BuildFrontendV2");
+        desktopProjectText.Should().NotContain("CopyFrontendV2AssetsToPublish");
+        desktopProjectText.Should().NotContain("npm ci");
+        workflowText.Should().NotContain("SkipFrontendV2");
+        workflowText.Should().NotContain("FRONTEND_V2_DIR");
+        workflowText.Should().NotContain("Install FrontendV2 Dependencies");
 
         foreach (var legacyModule in new[]
                  {
@@ -1228,18 +1256,19 @@ public sealed class Studio2ArchitectureGuardTests
         Regex.Matches(appText, @"new\s+PropertyPanelCapabilityOwner\s*\(").Should().ContainSingle();
         Regex.Matches(appText, @"new\s+PreviewPanelCapabilityOwner\s*\(").Should().ContainSingle();
         Regex.Matches(appText, @"new\s+GlobalVariablesCapabilityOwner\s*\(").Should().ContainSingle();
-        Regex.Matches(appText, @"new\s+SettingsCapabilityOwner\s*\(").Should().ContainSingle();
         Regex.Matches(appText, @"new\s+ProjectPageCapabilityOwner\s*\(").Should().ContainSingle();
-        Regex.Matches(appText, @"new\s+InspectionCapabilityOwner\s*\(").Should().ContainSingle();
         Regex.Matches(appText, @"new\s+ResultsReviewCapabilityOwner\s*\(").Should().ContainSingle();
-        Regex.Matches(appText, @"new\s+AiPanelCapabilityOwner\s*\(").Should().ContainSingle();
+        appText.Should().NotContain("SettingsCapabilityOwner");
+        appText.Should().NotContain("InspectionCapabilityOwner");
+        appText.Should().NotContain("AiPanelCapabilityOwner");
+        Regex.Matches(appText, @"createLegacySettingsView\(\s*'settings-view'\s*\)").Should().ContainSingle();
+        Regex.Matches(appText, @"new\s+InspectionPanel\(\s*'inspection-control-panel'\s*\)").Should().ContainSingle();
+        Regex.Matches(appText, @"new\s+AiPanel\(\s*'ai-view'").Should().ContainSingle();
 
         appText.Should().Contain("disposeLegacyNodePreviewSurfaces();");
         appText.Should().Contain("previewResourcesEnabled: !isPreviewPanelCapabilityEnabled()");
         appText.Should().Contain("if (!resultPanel.serverPaged)");
         resultsOwnerText.Should().Contain("this.serverPaged = true");
-        aiOwnerText.Should().Contain("closeEventStream()");
-        aiOwnerText.Should().Contain("window.clearTimeout");
         previewOwnerText.Should().Contain("this.previewAdapter.subscribePreviewState");
         previewOwnerText.Should().Contain("this.unsubscribes.forEach");
         globalVariablesOwnerText.Should().Contain("this.unsubscribes.forEach");

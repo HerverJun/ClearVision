@@ -216,6 +216,7 @@ public class Sprint7_AiEvolutionTests
         try
         {
             var service = new FlowTemplateService(tempRoot);
+            await service.RunStartupMigrationAsync();
 
             // Act
             var templates = await service.GetTemplatesAsync();
@@ -259,6 +260,7 @@ public class Sprint7_AiEvolutionTests
         try
         {
             var service = new FlowTemplateService(tempRoot);
+            await service.RunStartupMigrationAsync();
 
             var template = (await service.GetTemplatesAsync())
                 .Single(item => item.ScenarioKey == "classic-template-matching-inspection");
@@ -308,8 +310,8 @@ public class Sprint7_AiEvolutionTests
         }
     }
 
-    [Fact(DisplayName = "FlowTemplateService - 已有模板库缺失新增内置模板时应自动补齐")]
-    public async Task FlowTemplateService_GetTemplatesAsync_ShouldMergeMissingBuiltInTemplatesIntoExistingStore()
+    [Fact(DisplayName = "FlowTemplateService - 显式启动迁移应补齐新增内置模板")]
+    public async Task FlowTemplateService_RunStartupMigrationAsync_ShouldMergeMissingBuiltInTemplatesIntoExistingStore()
     {
         var tempRoot = Path.Combine(Path.GetTempPath(), "clearvision-template-test-" + Guid.NewGuid().ToString("N"));
         try
@@ -347,6 +349,7 @@ public class Sprint7_AiEvolutionTests
                 JsonSerializer.Serialize(existingTemplates, new JsonSerializerOptions { WriteIndented = true }));
 
             var service = new FlowTemplateService(tempRoot);
+            await service.RunStartupMigrationAsync();
 
             var templates = await service.GetTemplatesAsync();
 
@@ -405,8 +408,8 @@ public class Sprint7_AiEvolutionTests
         }
     }
 
-    [Fact(DisplayName = "FlowTemplateService - 已有旧版线序模板时应自动升级到最新骨架")]
-    public async Task FlowTemplateService_GetTemplatesAsync_ShouldUpgradeOutdatedWireSequenceTemplate()
+    [Fact(DisplayName = "FlowTemplateService - 显式启动迁移应升级旧版线序模板")]
+    public async Task FlowTemplateService_RunStartupMigrationAsync_ShouldUpgradeOutdatedWireSequenceTemplate()
     {
         var tempRoot = Path.Combine(Path.GetTempPath(), "clearvision-template-test-" + Guid.NewGuid().ToString("N"));
         try
@@ -440,6 +443,7 @@ public class Sprint7_AiEvolutionTests
                 JsonSerializer.Serialize(new[] { oldWireTemplate }, new JsonSerializerOptions { WriteIndented = true }));
 
             var service = new FlowTemplateService(tempRoot);
+            await service.RunStartupMigrationAsync();
             var templates = await service.GetTemplatesAsync();
             var upgraded = templates.Single(item => item.ScenarioKey == "wire-sequence-terminal");
 
@@ -501,6 +505,7 @@ public class Sprint7_AiEvolutionTests
         try
         {
             var service = new FlowTemplateService(tempRoot);
+            await service.RunStartupMigrationAsync();
             var templates = (await service.GetTemplatesAsync("空调制造"))
                 .ToDictionary(item => item.Name, StringComparer.OrdinalIgnoreCase);
 
@@ -701,6 +706,7 @@ public class Sprint7_AiEvolutionTests
         try
         {
             var service = new FlowTemplateService(tempRoot);
+            await service.RunStartupMigrationAsync();
 
             var template = (await service.GetTemplatesAsync())
                 .Single(item => item.Name == "端子线序检测");
@@ -791,6 +797,7 @@ public class Sprint7_AiEvolutionTests
         try
         {
             var service = new FlowTemplateService(tempRoot);
+            await service.RunStartupMigrationAsync();
 
             var template = (await service.GetTemplatesAsync())
                 .Single(item => item.Name == "端子线序检测-视频流版");
@@ -850,6 +857,7 @@ public class Sprint7_AiEvolutionTests
         try
         {
             var service = new FlowTemplateService(tempRoot);
+            await service.RunStartupMigrationAsync();
             var templates = await service.GetTemplatesAsync();
             var validator = new AiFlowValidator(new OperatorFactory());
             var jsonOptions = new JsonSerializerOptions
@@ -921,8 +929,73 @@ public class Sprint7_AiEvolutionTests
         }
     }
 
-    [Fact(DisplayName = "FlowTemplateService - 读取损坏模板文件时应保留损坏副本并恢复默认模板")]
-    public async Task FlowTemplateService_LoadCorruptedFile_ShouldBackupAndRecover()
+    [Fact(DisplayName = "FlowTemplateService - 未初始化读取应返回稳定错误且不得创建模板目录")]
+    public async Task FlowTemplateService_GetTemplatesAsync_MissingStore_ShouldFailWithoutInitialization()
+    {
+        var tempRoot = Path.Combine(Path.GetTempPath(), "clearvision-template-test-" + Guid.NewGuid().ToString("N"));
+        var templateDir = Path.Combine(tempRoot, "templates");
+
+        try
+        {
+            var service = new FlowTemplateService(tempRoot);
+            var read = () => service.GetTemplatesAsync();
+
+            var exception = await read.Should().ThrowAsync<FlowTemplateStoreException>();
+
+            exception.Which.Code.Should().Be(FlowTemplateStoreErrorCodes.NotInitialized);
+            exception.Which.Degraded.Should().BeTrue();
+            Directory.Exists(templateDir).Should().BeFalse();
+        }
+        finally
+        {
+            if (Directory.Exists(tempRoot))
+                Directory.Delete(tempRoot, recursive: true);
+        }
+    }
+
+    [Fact(DisplayName = "FlowTemplateService - 有效读取应保持权威文件 bytes 和 mtime 不变并保留自定义模板")]
+    public async Task FlowTemplateService_GetTemplatesAsync_ShouldNotMutateValidAuthoritativeStore()
+    {
+        var tempRoot = Path.Combine(Path.GetTempPath(), "clearvision-template-test-" + Guid.NewGuid().ToString("N"));
+        var templateDir = Path.Combine(tempRoot, "templates");
+        var templateFile = Path.Combine(templateDir, "flow_templates.json");
+
+        try
+        {
+            var service = new FlowTemplateService(tempRoot);
+            await service.RunStartupMigrationAsync();
+            var custom = await service.CreateTemplateAsync(new FlowTemplate
+            {
+                Name = "权威自定义模板",
+                Description = "普通读取不得删除",
+                Industry = "通用制造",
+                Tags = new List<string> { "自定义" },
+                FlowJson = """{"operators":[],"connections":[]}"""
+            });
+
+            var fixedMtime = new DateTime(2026, 8, 28, 1, 2, 3, DateTimeKind.Utc);
+            File.SetLastWriteTimeUtc(templateFile, fixedMtime);
+            var bytesBefore = await File.ReadAllBytesAsync(templateFile);
+            var mtimeBefore = File.GetLastWriteTimeUtc(templateFile);
+
+            var templates = await service.GetTemplatesAsync();
+            var detail = await service.GetTemplateAsync(custom.Id);
+
+            templates.Should().Contain(item => item.Id == custom.Id && item.Name == "权威自定义模板");
+            detail.Should().NotBeNull();
+            (await File.ReadAllBytesAsync(templateFile)).Should().Equal(bytesBefore);
+            File.GetLastWriteTimeUtc(templateFile).Should().Be(mtimeBefore);
+            Directory.GetFiles(templateDir, "flow_templates.corrupted.*.json").Should().BeEmpty();
+        }
+        finally
+        {
+            if (Directory.Exists(tempRoot))
+                Directory.Delete(tempRoot, recursive: true);
+        }
+    }
+
+    [Fact(DisplayName = "FlowTemplateService - 损坏读取应返回稳定错误且不得修改或备份 active 文件")]
+    public async Task FlowTemplateService_GetTemplatesAsync_CorruptedStore_ShouldFailWithoutMutation()
     {
         var tempRoot = Path.Combine(Path.GetTempPath(), "clearvision-template-test-" + Guid.NewGuid().ToString("N"));
         var templateDir = Path.Combine(tempRoot, "templates");
@@ -933,18 +1006,82 @@ public class Sprint7_AiEvolutionTests
         {
             Directory.CreateDirectory(templateDir);
             File.WriteAllText(templateFile, corruptedContent);
+            var fixedMtime = new DateTime(2026, 8, 28, 2, 3, 4, DateTimeKind.Utc);
+            File.SetLastWriteTimeUtc(templateFile, fixedMtime);
+            var bytesBefore = await File.ReadAllBytesAsync(templateFile);
+            var mtimeBefore = File.GetLastWriteTimeUtc(templateFile);
 
             var service = new FlowTemplateService(tempRoot);
-            var templates = await service.GetTemplatesAsync();
+            var read = () => service.GetTemplatesAsync();
 
-            templates.Should().NotBeEmpty();
-            var corruptedCopies = Directory.GetFiles(templateDir, "flow_templates.corrupted.*.json");
-            corruptedCopies.Should().ContainSingle();
-            File.ReadAllText(corruptedCopies[0]).Should().Be(corruptedContent);
+            var exception = await read.Should().ThrowAsync<FlowTemplateStoreException>();
 
-            var repairedJson = File.ReadAllText(templateFile);
-            Action parse = () => JsonDocument.Parse(repairedJson);
-            parse.Should().NotThrow();
+            exception.Which.Code.Should().Be(FlowTemplateStoreErrorCodes.Corrupted);
+            exception.Which.Degraded.Should().BeTrue();
+            (await File.ReadAllBytesAsync(templateFile)).Should().Equal(bytesBefore);
+            File.GetLastWriteTimeUtc(templateFile).Should().Be(mtimeBefore);
+            Directory.GetFiles(templateDir, "flow_templates.corrupted.*.json").Should().BeEmpty();
+        }
+        finally
+        {
+            if (Directory.Exists(tempRoot))
+                Directory.Delete(tempRoot, recursive: true);
+        }
+    }
+
+    [Fact(DisplayName = "FlowTemplateService - 空库读取应返回稳定错误且不得初始化默认模板")]
+    public async Task FlowTemplateService_GetTemplatesAsync_EmptyStore_ShouldFailWithoutMutation()
+    {
+        var tempRoot = Path.Combine(Path.GetTempPath(), "clearvision-template-test-" + Guid.NewGuid().ToString("N"));
+        var templateDir = Path.Combine(tempRoot, "templates");
+        var templateFile = Path.Combine(templateDir, "flow_templates.json");
+
+        try
+        {
+            Directory.CreateDirectory(templateDir);
+            await File.WriteAllTextAsync(templateFile, "[]");
+            var bytesBefore = await File.ReadAllBytesAsync(templateFile);
+            var service = new FlowTemplateService(tempRoot);
+
+            var read = () => service.GetTemplatesAsync();
+
+            var exception = await read.Should().ThrowAsync<FlowTemplateStoreException>();
+            exception.Which.Code.Should().Be(FlowTemplateStoreErrorCodes.Empty);
+            (await File.ReadAllBytesAsync(templateFile)).Should().Equal(bytesBefore);
+            Directory.GetFiles(templateDir, "flow_templates.corrupted.*.json").Should().BeEmpty();
+        }
+        finally
+        {
+            if (Directory.Exists(tempRoot))
+                Directory.Delete(tempRoot, recursive: true);
+        }
+    }
+
+    [Fact(DisplayName = "FlowTemplateService - 只有显式 repair 才应备份损坏 bytes 并恢复 active 文件")]
+    public async Task FlowTemplateService_RepairAsync_CorruptedStore_ShouldBackupAndRecover()
+    {
+        var tempRoot = Path.Combine(Path.GetTempPath(), "clearvision-template-test-" + Guid.NewGuid().ToString("N"));
+        var templateDir = Path.Combine(tempRoot, "templates");
+        var templateFile = Path.Combine(templateDir, "flow_templates.json");
+        var corruptedBytes = System.Text.Encoding.UTF8.GetBytes("{not-valid-json");
+
+        try
+        {
+            Directory.CreateDirectory(templateDir);
+            await File.WriteAllBytesAsync(templateFile, corruptedBytes);
+            var service = new FlowTemplateService(tempRoot);
+
+            var repair = await service.RepairAsync();
+
+            repair.Action.Should().Be("repaired");
+            repair.Changed.Should().BeTrue();
+            repair.TemplateCount.Should().Be(17);
+            repair.BackupFileName.Should().NotBeNullOrWhiteSpace();
+            var backupPath = Path.Combine(templateDir, repair.BackupFileName!);
+            File.Exists(backupPath).Should().BeTrue();
+            (await File.ReadAllBytesAsync(backupPath)).Should().Equal(corruptedBytes);
+            (await File.ReadAllBytesAsync(templateFile)).Should().NotEqual(corruptedBytes);
+            (await service.GetTemplatesAsync()).Should().HaveCount(17);
         }
         finally
         {

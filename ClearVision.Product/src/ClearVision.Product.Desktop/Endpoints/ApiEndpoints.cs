@@ -1056,8 +1056,15 @@ public static class ApiEndpoints
             string? industry,
             CancellationToken cancellationToken) =>
         {
-            var templates = await templateService.GetTemplatesAsync(industry, cancellationToken);
-            return Results.Ok(templates);
+            try
+            {
+                var templates = await templateService.GetTemplatesAsync(industry, cancellationToken);
+                return Results.Ok(templates);
+            }
+            catch (FlowTemplateStoreException ex)
+            {
+                return BuildFlowTemplateStoreError(ex);
+            }
         });
 
         // 获取单个流程模板详情
@@ -1066,8 +1073,15 @@ public static class ApiEndpoints
             IFlowTemplateService templateService,
             CancellationToken cancellationToken) =>
         {
-            var template = await templateService.GetTemplateAsync(id, cancellationToken);
-            return template != null ? Results.Ok(template) : Results.NotFound();
+            try
+            {
+                var template = await templateService.GetTemplateAsync(id, cancellationToken);
+                return template != null ? Results.Ok(template) : Results.NotFound();
+            }
+            catch (FlowTemplateStoreException ex)
+            {
+                return BuildFlowTemplateStoreError(ex);
+            }
         });
 
         // 创建流程模板
@@ -1096,8 +1110,15 @@ public static class ApiEndpoints
                 FlowJson = flowJson
             };
 
-            var created = await templateService.CreateTemplateAsync(template, cancellationToken);
-            return Results.Created($"/api/templates/{created.Id}", created);
+            try
+            {
+                var created = await templateService.CreateTemplateAsync(template, cancellationToken);
+                return Results.Created($"/api/templates/{created.Id}", created);
+            }
+            catch (FlowTemplateStoreException ex)
+            {
+                return BuildFlowTemplateStoreError(ex);
+            }
         })
         .RequireClearVisionPermission(ClearVisionPermissionPolicies.RequireEngineerOrAdmin);
 
@@ -1128,8 +1149,15 @@ public static class ApiEndpoints
                 FlowJson = flowJson
             };
 
-            var updated = await templateService.UpdateTemplateAsync(id, template, cancellationToken);
-            return updated != null ? Results.Ok(updated) : Results.NotFound();
+            try
+            {
+                var updated = await templateService.UpdateTemplateAsync(id, template, cancellationToken);
+                return updated != null ? Results.Ok(updated) : Results.NotFound();
+            }
+            catch (FlowTemplateStoreException ex)
+            {
+                return BuildFlowTemplateStoreError(ex);
+            }
         })
         .RequireClearVisionPermission(ClearVisionPermissionPolicies.RequireEngineerOrAdmin);
 
@@ -1178,6 +1206,19 @@ public static class ApiEndpoints
     private static bool TryDecodeImage(string? imageBase64, out Mat image, out string errorMessage, out int statusCode)
     {
         return ImagePayloadDecoder.TryDecodeImage(imageBase64, out image, out errorMessage, out statusCode);
+    }
+
+    internal static IResult BuildFlowTemplateStoreError(FlowTemplateStoreException exception)
+    {
+        return Results.Json(
+            new
+            {
+                error = "TemplateStoreUnavailable",
+                code = exception.Code,
+                degraded = exception.Degraded,
+                repairAuthority = "Admin"
+            },
+            statusCode: StatusCodes.Status503ServiceUnavailable);
     }
 
     private static string? ResolveFlowJson(TemplateUpsertRequest request)

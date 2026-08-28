@@ -12,19 +12,16 @@ public sealed class StudioStartupPageResolverTests : IDisposable
         Guid.NewGuid().ToString("N"));
 
     [Fact]
-    public void Resolve_WhenFlagOff_ShouldUseLegacyIndexAndIgnoreMissingV2()
+    public void Resolve_WhenProductionIndexExists_ShouldAlwaysUseProductionRoot()
     {
-        var legacyRoot = CreateLegacyRoot();
-        var missingV2Root = Path.Combine(_tempRoot, "missing-v2");
+        var legacyRoot = CreateProductionRoot();
 
         var decision = StudioStartupPageResolver.Resolve(
-            new StudioOptions { WorkspaceV2Enabled = false },
-            legacyWebRoot: legacyRoot,
-            frontendV2WebRoot: missingV2Root);
+            new StudioOptions(),
+            legacyWebRoot: legacyRoot);
 
         decision.Kind.Should().Be(StudioStartupPageKind.Legacy);
         decision.PagePath.Should().Be(StudioStartupPageResolver.LegacyPagePath);
-        decision.WorkspaceV2Enabled.Should().BeFalse();
         decision.RequiredFilePath.Should().Be(Path.Combine(legacyRoot, "index.html"));
         StudioStartupPageResolver.CreateInitialPageUri(5000, decision)
             .ToString()
@@ -33,46 +30,25 @@ public sealed class StudioStartupPageResolverTests : IDisposable
     }
 
     [Fact]
-    public void Resolve_WhenFlagOnAndAssetsExist_ShouldUseV2Index()
+    public void Resolve_WhenProductionIndexIsMissing_ShouldReturnNonNavigableWelcomeDecision()
     {
-        var legacyRoot = CreateLegacyRoot();
-        var v2Root = CreateV2Root(withAssets: true);
+        var missingRoot = Path.Combine(_tempRoot, "missing-wwwroot");
+        Directory.CreateDirectory(missingRoot);
 
         var decision = StudioStartupPageResolver.Resolve(
-            new StudioOptions { WorkspaceV2Enabled = true },
-            legacyWebRoot: legacyRoot,
-            frontendV2WebRoot: v2Root);
+            new StudioOptions(),
+            legacyWebRoot: missingRoot);
 
-        decision.Kind.Should().Be(StudioStartupPageKind.FrontendV2);
-        decision.PagePath.Should().Be(StudioStartupPageResolver.FrontendV2PagePath);
-        decision.WorkspaceV2Enabled.Should().BeTrue();
-        StudioStartupPageResolver.CreateInitialPageUri(5000, decision)
-            .ToString()
-            .Should()
-            .Be("http://localhost:5000/v2/index.html");
-    }
-
-    [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public void Resolve_WhenFlagOnAndV2AssetsMissing_ShouldFailClosedWithoutLegacyFallback(bool includeIndex)
-    {
-        var legacyRoot = CreateLegacyRoot();
-        var v2Root = includeIndex
-            ? CreateV2Root(withAssets: false)
-            : Path.Combine(_tempRoot, "v2-missing-index");
-        Directory.CreateDirectory(v2Root);
-
-        var decision = StudioStartupPageResolver.Resolve(
-            new StudioOptions { WorkspaceV2Enabled = true },
-            legacyWebRoot: legacyRoot,
-            frontendV2WebRoot: v2Root);
-
-        decision.Kind.Should().Be(StudioStartupPageKind.Diagnostic);
+        decision.Kind.Should().Be(StudioStartupPageKind.Welcome);
         decision.IsNavigable.Should().BeFalse();
         decision.PagePath.Should().BeNull();
-        decision.DiagnosticMessage.Should().Contain("禁止回退旧页面");
-        decision.DiagnosticMessage.Should().Contain("wwwroot/v2");
+        decision.DiagnosticMessage.Should().Contain("index.html");
+    }
+
+    [Fact]
+    public void StudioOptions_ShouldNotExposeWorkspaceV2RuntimeSwitch()
+    {
+        typeof(StudioOptions).GetProperty("WorkspaceV2Enabled").Should().BeNull();
     }
 
     public void Dispose()
@@ -83,26 +59,11 @@ public sealed class StudioStartupPageResolverTests : IDisposable
         }
     }
 
-    private string CreateLegacyRoot()
+    private string CreateProductionRoot()
     {
-        var root = Path.Combine(_tempRoot, "legacy-wwwroot");
+        var root = Path.Combine(_tempRoot, "wwwroot");
         Directory.CreateDirectory(root);
-        File.WriteAllText(Path.Combine(root, "index.html"), "<!doctype html>legacy");
-        return root;
-    }
-
-    private string CreateV2Root(bool withAssets)
-    {
-        var root = Path.Combine(_tempRoot, withAssets ? "v2-ready" : "v2-no-assets");
-        Directory.CreateDirectory(root);
-        File.WriteAllText(Path.Combine(root, "index.html"), "<!doctype html>v2");
-        if (withAssets)
-        {
-            var assets = Path.Combine(root, "assets");
-            Directory.CreateDirectory(assets);
-            File.WriteAllText(Path.Combine(assets, "index.js"), "console.log('v2');");
-        }
-
+        File.WriteAllText(Path.Combine(root, "index.html"), "<!doctype html>production");
         return root;
     }
 }

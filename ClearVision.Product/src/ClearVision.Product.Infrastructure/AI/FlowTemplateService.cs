@@ -2,6 +2,7 @@
 // 流程模板服务
 // 负责流程模板加载、查询与模板化生成支持
 // 作者：蘅芜君
+using System.Text;
 using System.Text.Json;
 using ClearVision.Product.Core.Entities;
 using ClearVision.Product.Infrastructure.Services;
@@ -10,6 +11,9 @@ namespace ClearVision.Product.Infrastructure.AI;
 
 public interface IFlowTemplateService
 {
+    Task<FlowTemplateMigrationResult> RunStartupMigrationAsync(
+        CancellationToken cancellationToken = default);
+
     Task<IReadOnlyList<FlowTemplate>> GetTemplatesAsync(
         string? industry = null,
         CancellationToken cancellationToken = default);
@@ -30,7 +34,42 @@ public interface IFlowTemplateService
         Guid id,
         FlowTemplate template,
         CancellationToken cancellationToken = default);
+
+    Task<FlowTemplateRepairResult> RepairAsync(
+        CancellationToken cancellationToken = default);
 }
+
+public static class FlowTemplateStoreErrorCodes
+{
+    public const string NotInitialized = "TEMPLATE_STORE_NOT_INITIALIZED";
+    public const string Corrupted = "TEMPLATE_STORE_CORRUPTED";
+    public const string Empty = "TEMPLATE_STORE_EMPTY";
+    public const string Unavailable = "TEMPLATE_STORE_UNAVAILABLE";
+}
+
+public sealed class FlowTemplateStoreException : IOException
+{
+    public FlowTemplateStoreException(string code, string message, Exception? innerException = null)
+        : base(message, innerException)
+    {
+        Code = code;
+    }
+
+    public string Code { get; }
+
+    public bool Degraded => true;
+}
+
+public sealed record FlowTemplateMigrationResult(
+    string Action,
+    int TemplateCount,
+    bool Changed);
+
+public sealed record FlowTemplateRepairResult(
+    string Action,
+    int TemplateCount,
+    bool Changed,
+    string? BackupFileName);
 
 public class FlowTemplateService : IFlowTemplateService
 {
@@ -61,6 +100,9 @@ public class FlowTemplateService : IFlowTemplateService
 
     private readonly string _templateFilePath;
     private readonly object _syncRoot = new();
+    private static readonly UTF8Encoding _strictUtf8 = new(
+        encoderShouldEmitUTF8Identifier: false,
+        throwOnInvalidBytes: true);
 
     public FlowTemplateService(string? storageRootPath = null)
     {
@@ -70,7 +112,41 @@ public class FlowTemplateService : IFlowTemplateService
 
         var templateDirectory = Path.Combine(rootPath, "templates");
         _templateFilePath = Path.Combine(templateDirectory, "flow_templates.json");
-        EnsureTemplateStore();
+    }
+
+    public Task<FlowTemplateMigrationResult> RunStartupMigrationAsync(
+        CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+
+        var result = ExecuteStoreMutation(() =>
+        {
+            if (!File.Exists(_templateFilePath))
+            {
+                var defaults = CreateBuiltInTemplates();
+                SaveTemplates(defaults);
+                return new FlowTemplateMigrationResult("initialized", defaults.Count, Changed: true);
+            }
+
+            var templates = ReadTemplates();
+            var changed = RemoveDeprecatedBuiltInTemplates(templates);
+            if (MergeBuiltInTemplates(templates))
+            {
+                changed = true;
+            }
+
+            if (changed)
+            {
+                SaveTemplates(templates);
+            }
+
+            return new FlowTemplateMigrationResult(
+                changed ? "migrated" : "current",
+                templates.Count,
+                changed);
+        });
+
+        return Task.FromResult(result);
     }
 
     public Task<IReadOnlyList<FlowTemplate>> GetTemplatesAsync(
@@ -79,7 +155,7 @@ public class FlowTemplateService : IFlowTemplateService
     {
         cancellationToken.ThrowIfCancellationRequested();
 
-        var templates = LoadTemplates();
+        var templates = ReadTemplates();
         if (string.IsNullOrWhiteSpace(industry))
             return Task.FromResult<IReadOnlyList<FlowTemplate>>(templates);
 
@@ -93,7 +169,7 @@ public class FlowTemplateService : IFlowTemplateService
     public Task<FlowTemplate?> GetTemplateAsync(Guid id, CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        var template = LoadTemplates().FirstOrDefault(item => item.Id == id);
+        var template = ReadTemplates().FirstOrDefault(item => item.Id == id);
         return Task.FromResult(template);
     }
 
@@ -103,9 +179,9 @@ public class FlowTemplateService : IFlowTemplateService
         if (template == null)
             throw new ArgumentNullException(nameof(template));
 
-        lock (_syncRoot)
+        ExecuteStoreMutation(() =>
         {
-            var templates = LoadTemplates();
+            var templates = ReadTemplatesForMutation();
             var existing = templates.FirstOrDefault(item => item.Id == template.Id);
             if (existing == null)
             {
@@ -125,7 +201,8 @@ public class FlowTemplateService : IFlowTemplateService
             }
 
             SaveTemplates(templates);
-        }
+            return true;
+        });
 
         return Task.FromResult(template);
     }
@@ -136,14 +213,15 @@ public class FlowTemplateService : IFlowTemplateService
         if (template == null)
             throw new ArgumentNullException(nameof(template));
 
-        lock (_syncRoot)
+        ExecuteStoreMutation(() =>
         {
-            var templates = LoadTemplates();
+            var templates = ReadTemplatesForMutation();
             template.Id = template.Id == Guid.Empty ? Guid.NewGuid() : template.Id;
             template.CreatedAt = template.CreatedAt == default ? DateTime.UtcNow : template.CreatedAt;
             templates.Add(template);
             SaveTemplates(templates);
-        }
+            return true;
+        });
 
         return Task.FromResult(template);
     }
@@ -154,12 +232,12 @@ public class FlowTemplateService : IFlowTemplateService
         if (template == null)
             throw new ArgumentNullException(nameof(template));
 
-        lock (_syncRoot)
+        var updated = ExecuteStoreMutation(() =>
         {
-            var templates = LoadTemplates();
+            var templates = ReadTemplatesForMutation();
             var existing = templates.FirstOrDefault(item => item.Id == id);
             if (existing == null)
-                return Task.FromResult<FlowTemplate?>(null);
+                return null;
 
             existing.Name = template.Name;
             existing.Description = template.Description;
@@ -168,62 +246,111 @@ public class FlowTemplateService : IFlowTemplateService
             existing.FlowJson = template.FlowJson;
 
             SaveTemplates(templates);
-            return Task.FromResult<FlowTemplate?>(existing);
-        }
+            return existing;
+        });
+
+        return Task.FromResult<FlowTemplate?>(updated);
     }
 
-    private void EnsureTemplateStore()
+    public Task<FlowTemplateRepairResult> RepairAsync(
+        CancellationToken cancellationToken = default)
     {
-        var directory = Path.GetDirectoryName(_templateFilePath)
-                        ?? throw new InvalidOperationException("Template directory path is invalid.");
-        Directory.CreateDirectory(directory);
+        cancellationToken.ThrowIfCancellationRequested();
 
-        if (File.Exists(_templateFilePath))
-            return;
-
-        var defaults = CreateBuiltInTemplates();
-        SaveTemplates(defaults);
-    }
-
-    private List<FlowTemplate> LoadTemplates()
-    {
-        lock (_syncRoot)
+        var result = ExecuteStoreMutation(() =>
         {
-            EnsureTemplateStore();
-
-            try
+            if (File.Exists(_templateFilePath))
             {
-                var json = File.ReadAllText(_templateFilePath);
-                var templates = JsonSerializer.Deserialize<List<FlowTemplate>>(json, _jsonOptions);
-
-                if (templates == null || templates.Count == 0)
+                try
                 {
-                    BackupCorruptedTemplateFile();
-                    templates = CreateBuiltInTemplates();
-                    SaveTemplates(templates);
+                    var healthyTemplates = ReadTemplates();
+                    return new FlowTemplateRepairResult(
+                        "not-required",
+                        healthyTemplates.Count,
+                        Changed: false,
+                        BackupFileName: null);
                 }
-
-                var changed = RemoveDeprecatedBuiltInTemplates(templates);
-                if (MergeBuiltInTemplates(templates))
+                catch (FlowTemplateStoreException ex) when (
+                    ex.Code is FlowTemplateStoreErrorCodes.Corrupted or FlowTemplateStoreErrorCodes.Empty)
                 {
-                    changed = true;
+                    // Explicit Admin repair below is the only path allowed to replace a degraded store.
                 }
-
-                if (changed)
-                {
-                    SaveTemplates(templates);
-                }
-
-                return templates;
             }
-            catch
-            {
-                BackupCorruptedTemplateFile();
-                var templates = CreateBuiltInTemplates();
-                SaveTemplates(templates);
-                return templates;
-            }
+
+            var defaults = CreateBuiltInTemplates();
+            var candidateJson = SerializeAndValidateTemplates(defaults);
+            var backupPath = BackupTemplateFileForRepair();
+            SaveTemplates(defaults, candidateJson);
+
+            return new FlowTemplateRepairResult(
+                "repaired",
+                defaults.Count,
+                Changed: true,
+                BackupFileName: backupPath == null ? null : Path.GetFileName(backupPath));
+        });
+
+        return Task.FromResult(result);
+    }
+
+    private List<FlowTemplate> ReadTemplatesForMutation()
+    {
+        if (!File.Exists(_templateFilePath))
+        {
+            var defaults = CreateBuiltInTemplates();
+            SaveTemplates(defaults);
         }
+
+        return ReadTemplates();
+    }
+
+    private List<FlowTemplate> ReadTemplates()
+    {
+        if (!File.Exists(_templateFilePath))
+        {
+            throw new FlowTemplateStoreException(
+                FlowTemplateStoreErrorCodes.NotInitialized,
+                "The flow template store has not been initialized.");
+        }
+
+        byte[] bytes;
+        try
+        {
+            bytes = File.ReadAllBytes(_templateFilePath);
+        }
+        catch (Exception ex) when (IsStoreAccessException(ex))
+        {
+            throw CreateUnavailableException(ex);
+        }
+
+        List<FlowTemplate>? templates;
+        try
+        {
+            var json = _strictUtf8.GetString(bytes);
+            templates = JsonSerializer.Deserialize<List<FlowTemplate>>(json, _jsonOptions);
+        }
+        catch (Exception ex) when (ex is JsonException or DecoderFallbackException or NotSupportedException)
+        {
+            throw new FlowTemplateStoreException(
+                FlowTemplateStoreErrorCodes.Corrupted,
+                "The flow template store is corrupted. Explicit Admin repair is required.",
+                ex);
+        }
+
+        if (templates == null)
+        {
+            throw new FlowTemplateStoreException(
+                FlowTemplateStoreErrorCodes.Corrupted,
+                "The flow template store is corrupted. Explicit Admin repair is required.");
+        }
+
+        if (templates.Count == 0)
+        {
+            throw new FlowTemplateStoreException(
+                FlowTemplateStoreErrorCodes.Empty,
+                "The flow template store is empty. Explicit Admin repair is required.");
+        }
+
+        return templates;
     }
 
     private static bool RemoveDeprecatedBuiltInTemplates(List<FlowTemplate> templates)
@@ -338,10 +465,9 @@ public class FlowTemplateService : IFlowTemplateService
             };
     }
 
-    private void SaveTemplates(List<FlowTemplate> templates)
+    private void SaveTemplates(List<FlowTemplate> templates, string? candidateJson = null)
     {
-        var json = JsonSerializer.Serialize(templates, _jsonOptions);
-        ValidateTemplatePayload(json);
+        var json = candidateJson ?? SerializeAndValidateTemplates(templates);
 
         var directory = Path.GetDirectoryName(_templateFilePath)
                         ?? throw new InvalidOperationException("Template directory path is invalid.");
@@ -352,7 +478,7 @@ public class FlowTemplateService : IFlowTemplateService
 
         try
         {
-            File.WriteAllText(tempFilePath, json);
+            File.WriteAllText(tempFilePath, json, _strictUtf8);
             ValidateTemplatePayload(File.ReadAllText(tempFilePath));
 
             if (File.Exists(_templateFilePath))
@@ -371,17 +497,24 @@ public class FlowTemplateService : IFlowTemplateService
         }
     }
 
+    private static string SerializeAndValidateTemplates(List<FlowTemplate> templates)
+    {
+        var json = JsonSerializer.Serialize(templates, _jsonOptions);
+        ValidateTemplatePayload(json);
+        return json;
+    }
+
     private static void ValidateTemplatePayload(string json)
     {
         var parsed = JsonSerializer.Deserialize<List<FlowTemplate>>(json, _jsonOptions);
-        if (parsed == null)
+        if (parsed == null || parsed.Count == 0)
             throw new InvalidDataException("Serialized template payload is invalid.");
     }
 
-    private void BackupCorruptedTemplateFile()
+    private string? BackupTemplateFileForRepair()
     {
         if (!File.Exists(_templateFilePath))
-            return;
+            return null;
 
         var directory = Path.GetDirectoryName(_templateFilePath)
                         ?? throw new InvalidOperationException("Template directory path is invalid.");
@@ -389,7 +522,36 @@ public class FlowTemplateService : IFlowTemplateService
 
         var backupPath = Path.Combine(directory, $"flow_templates.corrupted.{DateTime.UtcNow:yyyyMMddHHmmssfff}.{Guid.NewGuid():N}.json");
         File.Copy(_templateFilePath, backupPath, overwrite: false);
+        return backupPath;
     }
+
+    private T ExecuteStoreMutation<T>(Func<T> mutation)
+    {
+        lock (_syncRoot)
+        {
+            try
+            {
+                return mutation();
+            }
+            catch (FlowTemplateStoreException)
+            {
+                throw;
+            }
+            catch (Exception ex) when (IsStoreAccessException(ex))
+            {
+                throw CreateUnavailableException(ex);
+            }
+        }
+    }
+
+    private static bool IsStoreAccessException(Exception exception) =>
+        exception is IOException or UnauthorizedAccessException;
+
+    private static FlowTemplateStoreException CreateUnavailableException(Exception exception) =>
+        new(
+            FlowTemplateStoreErrorCodes.Unavailable,
+            "The flow template store is unavailable. The active file was not replaced.",
+            exception);
 
     private static void TryDeleteFile(string filePath)
     {

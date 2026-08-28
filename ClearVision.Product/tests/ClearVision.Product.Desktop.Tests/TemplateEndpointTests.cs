@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http.Json;
 using System.Reflection;
+using System.Text.Json;
 using ClearVision.Product.Core.Entities;
 using ClearVision.Product.Core.Enums;
 using ClearVision.Product.Core.Services;
@@ -43,6 +44,31 @@ public sealed class TemplateEndpointTests
         detailResponse.StatusCode.Should().Be(HttpStatusCode.OK, await detailResponse.Content.ReadAsStringAsync());
     }
 
+    [Theory]
+    [InlineData(FlowTemplateStoreErrorCodes.NotInitialized)]
+    [InlineData(FlowTemplateStoreErrorCodes.Corrupted)]
+    [InlineData(FlowTemplateStoreErrorCodes.Empty)]
+    [InlineData(FlowTemplateStoreErrorCodes.Unavailable)]
+    public async Task TemplateReadEndpoints_WhenStoreIsDegraded_ShouldReturnStableError(string errorCode)
+    {
+        await using var host = await TemplateEndpointTestHost.CreateAsync(UserRole.Operator);
+        host.TemplateService
+            .GetTemplatesAsync(null, Arg.Any<CancellationToken>())
+            .Returns(_ => Task.FromException<IReadOnlyList<FlowTemplate>>(
+                new FlowTemplateStoreException(
+                    errorCode,
+                    "degraded")));
+
+        using var response = await host.Client.GetAsync("/api/templates");
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+
+        response.StatusCode.Should().Be(HttpStatusCode.ServiceUnavailable);
+        body.GetProperty("error").GetString().Should().Be("TemplateStoreUnavailable");
+        body.GetProperty("code").GetString().Should().Be(errorCode);
+        body.GetProperty("degraded").GetBoolean().Should().BeTrue();
+        body.GetProperty("repairAuthority").GetString().Should().Be("Admin");
+    }
+
     [Fact]
     public async Task TemplateWriteEndpoints_ShouldRejectOperator()
     {
@@ -82,6 +108,42 @@ public sealed class TemplateEndpointTests
         updateResponse.StatusCode.Should().Be(HttpStatusCode.OK, await updateResponse.Content.ReadAsStringAsync());
         await host.TemplateService.Received(1).CreateTemplateAsync(Arg.Any<FlowTemplate>(), Arg.Any<CancellationToken>());
         await host.TemplateService.Received(1).UpdateTemplateAsync(templateId, Arg.Any<FlowTemplate>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task TemplateRepairEndpoint_ShouldRejectNonAdmin()
+    {
+        await using var host = await TemplateEndpointTestHost.CreateAsync(UserRole.Engineer);
+
+        using var response = await host.Client.PostAsync(
+            "/api/settings/maintenance/templates/repair",
+            content: null);
+
+        response.StatusCode.Should().Be(HttpStatusCode.Forbidden, await response.Content.ReadAsStringAsync());
+        await host.TemplateService.DidNotReceive().RepairAsync(Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task TemplateRepairEndpoint_ShouldAllowAdmin()
+    {
+        await using var host = await TemplateEndpointTestHost.CreateAsync(UserRole.Admin);
+        host.TemplateService
+            .RepairAsync(Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(new FlowTemplateRepairResult(
+                "repaired",
+                TemplateCount: 17,
+                Changed: true,
+                BackupFileName: "flow_templates.corrupted.test.json")));
+
+        using var response = await host.Client.PostAsync(
+            "/api/settings/maintenance/templates/repair",
+            content: null);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK, await response.Content.ReadAsStringAsync());
+        body.GetProperty("action").GetString().Should().Be("repaired");
+        body.GetProperty("changed").GetBoolean().Should().BeTrue();
+        await host.TemplateService.Received(1).RepairAsync(Arg.Any<CancellationToken>());
     }
 
     private static ApiEndpoints.TemplateUpsertRequest CreatePayload() => new()
@@ -150,6 +212,7 @@ public sealed class TemplateEndpointTests
                 await next();
             });
             MapOperatorEndpoints(app);
+            app.MapTemplateMaintenanceEndpoints();
             await app.StartAsync();
             return new TemplateEndpointTestHost(app, templateService);
         }

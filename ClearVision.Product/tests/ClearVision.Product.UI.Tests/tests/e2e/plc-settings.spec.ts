@@ -84,8 +84,6 @@ async function installStartupFlags(page: Page) {
     Object.defineProperty(window, '__CLEARVISION_STARTUP__', {
       value: Object.freeze({
         featureFlags: Object.freeze({
-          'Studio2.Settings': true,
-          'Studio2.AiPanel': true,
           'Studio2.PropertyPanel': true,
           'Studio2.PreviewPanel': true,
         }),
@@ -423,7 +421,7 @@ test('PLC communication settings payloads, errors, connection test states, and r
   await page.locator('tr.plc-mapping-row').nth(0).locator('[data-field="address"]').fill('DM100');
   await page.locator('#btn-save-plc').click();
   await expect.poll(() => state.plcPuts.length).toBeGreaterThanOrEqual(2);
-  await expect.poll(() => state.settingsPuts.length).toBeGreaterThanOrEqual(1);
+  expect(state.settingsPuts).toHaveLength(0);
   await expect(page.locator('.cv-toast', { hasText: 'PLC 配置已保存' }).last()).toBeVisible();
   await capture(page, 'i-save-success.png', { requireActionBarVisible: true });
 

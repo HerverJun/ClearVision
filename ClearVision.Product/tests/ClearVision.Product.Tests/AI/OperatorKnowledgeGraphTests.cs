@@ -18,6 +18,7 @@ public class OperatorKnowledgeGraphTests
         {
             var factory = new OperatorFactory();
             var templateService = new FlowTemplateService(tempRoot);
+            await templateService.RunStartupMigrationAsync();
             var graphService = new OperatorKnowledgeGraphService(factory, templateService);
 
             var graph = await graphService.BuildAsync();
@@ -63,6 +64,7 @@ public class OperatorKnowledgeGraphTests
         {
             var factory = new OperatorFactory();
             var templateService = new FlowTemplateService(tempRoot);
+            await templateService.RunStartupMigrationAsync();
             var graphService = new OperatorKnowledgeGraphService(factory, templateService);
 
             var graph = await graphService.BuildAsync();
@@ -97,6 +99,7 @@ public class OperatorKnowledgeGraphTests
         {
             var factory = new OperatorFactory();
             var templateService = new FlowTemplateService(tempRoot);
+            await templateService.RunStartupMigrationAsync();
             var scenarioMatcher = new ScenarioMatcher(templateService);
             var graphService = new OperatorKnowledgeGraphService(factory, templateService);
             var retriever = new OperatorKnowledgeRetriever(factory, scenarioMatcher, graphService);

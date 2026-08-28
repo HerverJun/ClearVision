@@ -99,21 +99,12 @@ import PreviewPanelCapabilityOwner, {
 import GlobalVariablesCapabilityOwner, {
     createGlobalVariablesCapabilityAdapter
 } from './features/global-variables/globalVariablesCapabilityOwner.mjs';
-import SettingsCapabilityOwner, {
-    createSettingsCapabilityAdapter
-} from './features/settings/settingsCapabilityOwner.mjs';
 import ProjectPageCapabilityOwner, {
     createProjectPageCapabilityAdapter
 } from './features/project/projectPageCapabilityOwner.mjs';
-import InspectionCapabilityOwner, {
-    createInspectionCapabilityAdapter
-} from './features/inspection/inspectionCapabilityOwner.mjs';
 import ResultsReviewCapabilityOwner, {
     createResultsReviewCapabilityAdapter
 } from './features/results/resultsReviewCapabilityOwner.mjs';
-import AiPanelCapabilityOwner, {
-    createAiPanelCapabilityAdapter
-} from './features/ai/aiPanelCapabilityOwner.mjs';
 import projectManager, {
     getCurrentProject,
     subscribeProject
@@ -123,11 +114,8 @@ const NODE_PREVIEW_INSPECTOR_FLAG_KEY = 'Studio:NodePreviewInspectorEnabled';
 const PROPERTY_PANEL_CAPABILITY_FLAG_KEY = 'Studio2.PropertyPanel';
 const PREVIEW_PANEL_CAPABILITY_FLAG_KEY = 'Studio2.PreviewPanel';
 const GLOBAL_VARIABLES_CAPABILITY_FLAG_KEY = 'Studio2.GlobalVariables';
-const SETTINGS_CAPABILITY_FLAG_KEY = 'Studio2.Settings';
 const PROJECT_PAGE_CAPABILITY_FLAG_KEY = 'Studio2.ProjectPage';
-const INSPECTION_CAPABILITY_FLAG_KEY = 'Studio2.Inspection';
 const RESULTS_REVIEW_CAPABILITY_FLAG_KEY = 'Studio2.ResultsReview';
-const AI_PANEL_CAPABILITY_FLAG_KEY = 'Studio2.AiPanel';
 
 function readStartupFeatureFlagOnce(flagKey) {
     const startup = window.__CLEARVISION_STARTUP__;
@@ -161,35 +149,20 @@ function readGlobalVariablesCapabilityFlagOnce() {
     return readStartupFeatureFlagOnce(GLOBAL_VARIABLES_CAPABILITY_FLAG_KEY);
 }
 
-function readSettingsCapabilityFlagOnce() {
-    return readStartupFeatureFlagOnce(SETTINGS_CAPABILITY_FLAG_KEY);
-}
-
 function readProjectPageCapabilityFlagOnce() {
     return readStartupFeatureFlagOnce(PROJECT_PAGE_CAPABILITY_FLAG_KEY);
-}
-
-function readInspectionCapabilityFlagOnce() {
-    return readStartupFeatureFlagOnce(INSPECTION_CAPABILITY_FLAG_KEY);
 }
 
 function readResultsReviewCapabilityFlagOnce() {
     return readStartupFeatureFlagOnce(RESULTS_REVIEW_CAPABILITY_FLAG_KEY);
 }
 
-function readAiPanelCapabilityFlagOnce() {
-    return readStartupFeatureFlagOnce(AI_PANEL_CAPABILITY_FLAG_KEY);
-}
-
 const NODE_PREVIEW_INSPECTOR_ENABLED = readNodePreviewInspectorFlagOnce();
 const PROPERTY_PANEL_CAPABILITY_ENABLED = readPropertyPanelCapabilityFlagOnce();
 const PREVIEW_PANEL_CAPABILITY_ENABLED = readPreviewPanelCapabilityFlagOnce();
 const GLOBAL_VARIABLES_CAPABILITY_ENABLED = readGlobalVariablesCapabilityFlagOnce();
-const SETTINGS_CAPABILITY_ENABLED = readSettingsCapabilityFlagOnce();
 const PROJECT_PAGE_CAPABILITY_ENABLED = readProjectPageCapabilityFlagOnce();
-const INSPECTION_CAPABILITY_ENABLED = readInspectionCapabilityFlagOnce();
 const RESULTS_REVIEW_CAPABILITY_ENABLED = readResultsReviewCapabilityFlagOnce();
-const AI_PANEL_CAPABILITY_ENABLED = readAiPanelCapabilityFlagOnce();
 
 // 全局状态
 const [getCurrentView, setCurrentView, subscribeView] = createSignal('flow');
@@ -219,11 +192,8 @@ let propertyPanelCapabilityAdapter = null;
 let previewPanelCapabilityOwner = null;
 let previewPanelCapabilityAdapter = null;
 let globalVariablesCapabilityAdapter = null;
-let settingsCapabilityAdapter = null;
 let projectPageCapabilityAdapter = null;
-let inspectionCapabilityAdapter = null;
 let resultsReviewCapabilityAdapter = null;
-let aiPanelCapabilityAdapter = null;
 let propertySidebarController = null;
 let nodePreviewCoordinator = null;
 let nodePreviewOverlay = null;
@@ -1568,27 +1538,12 @@ function isGlobalVariablesCapabilityEnabled() {
     return GLOBAL_VARIABLES_CAPABILITY_ENABLED;
 }
 
-function isSettingsCapabilityEnabled() {
-    return SETTINGS_CAPABILITY_ENABLED
-        && window.__CLEARVISION_ENABLE_EXPERIMENTAL_SETTINGS_CAPABILITY === true;
-}
-
 function isProjectPageCapabilityEnabled() {
     return PROJECT_PAGE_CAPABILITY_ENABLED;
 }
 
-function isInspectionCapabilityEnabled() {
-    return INSPECTION_CAPABILITY_ENABLED
-        && window.__CLEARVISION_ENABLE_EXPERIMENTAL_INSPECTION_CAPABILITY === true;
-}
-
 function isResultsReviewCapabilityEnabled() {
     return RESULTS_REVIEW_CAPABILITY_ENABLED;
-}
-
-function isAiPanelCapabilityEnabled() {
-    return AI_PANEL_CAPABILITY_ENABLED
-        && window.__CLEARVISION_ENABLE_EXPERIMENTAL_AI_PANEL_CAPABILITY === true;
 }
 
 function disposePreviewPanelCapabilityOwner() {
@@ -2392,11 +2347,8 @@ function disposeSettingsViewOwner() {
         }
     }
 
-    serviceRegistry.unregister('settingsCapabilityOwner', settingsView);
-    serviceRegistry.unregister('settingsCapabilityAdapter', settingsCapabilityAdapter);
     serviceRegistry.unregister('settingsView', settingsView);
     settingsView = null;
-    settingsCapabilityAdapter = null;
 }
 
 async function ensureSettingsView() {
@@ -2411,19 +2363,6 @@ async function ensureSettingsView() {
     }
 
     disposeSettingsViewOwner();
-
-    if (isSettingsCapabilityEnabled()) {
-        settingsCapabilityAdapter = createSettingsCapabilityAdapter();
-        settingsView = new SettingsCapabilityOwner(container, {
-            adapter: settingsCapabilityAdapter,
-            showToast
-        });
-        serviceRegistry.register('settingsCapabilityAdapter', settingsCapabilityAdapter);
-        serviceRegistry.register('settingsCapabilityOwner', settingsView);
-        serviceRegistry.register('settingsView', settingsView);
-        debugLogger.debug('[App] Settings capability owner 初始化完成');
-        return settingsView;
-    }
 
     const { createLegacySettingsView } = await loadSettingsViewModule();
     settingsView = createLegacySettingsView('settings-view');
@@ -2516,36 +2455,6 @@ async function ensureInspectionPanelReady() {
         return inspectionPanel;
     }
 
-    if (isInspectionCapabilityEnabled()) {
-        const existingInspectionPanel = serviceRegistry.get('inspectionPanel');
-        existingInspectionPanel?.dispose?.();
-        inspectionCapabilityAdapter = createInspectionCapabilityAdapter({
-            inspectionControllerRef: inspectionController
-        });
-        inspectionPanel = new InspectionCapabilityOwner(container, {
-            adapter: inspectionCapabilityAdapter,
-            showToast,
-            imageSink: result => {
-                const outputImage = getInlineResultImageBase64(result);
-                if (outputImage) {
-                    serviceRegistry.register('lastInspectionImageBase64', outputImage);
-                }
-            }
-        });
-        serviceRegistry.register('inspectionCapabilityAdapter', inspectionCapabilityAdapter);
-        serviceRegistry.register('inspectionCapabilityOwner', inspectionPanel);
-        serviceRegistry.register('inspectionPanel', inspectionPanel);
-        inspectionPanel.setProjectContext(getCurrentProject()?.id || null);
-
-        const lastResult = inspectionController.getLastResult?.();
-        if (lastResult) {
-            inspectionPanel.handleInspectionResult(lastResult);
-        }
-
-        debugLogger.debug('[App] Inspection capability owner 初始化完成');
-        return inspectionPanel;
-    }
-
     const { InspectionPanel } = await loadInspectionPanelModule();
 
     const existingInspectionPanel = serviceRegistry.get('inspectionPanel');
@@ -2587,29 +2496,6 @@ async function ensureStationMonitorView() {
 
 async function ensureAiPanel() {
     if (aiPanel) {
-        return aiPanel;
-    }
-
-    if (isAiPanelCapabilityEnabled()) {
-        const container = document.getElementById('ai-view');
-        if (!container) {
-            debugLogger.warn('[App] AI 视图容器未找到');
-            return null;
-        }
-
-        const existingAiPanel = serviceRegistry.get('aiPanel');
-        existingAiPanel?.dispose?.();
-        aiPanelCapabilityAdapter = createAiPanelCapabilityAdapter({
-            httpClientRef: httpClient
-        });
-        aiPanel = new AiPanelCapabilityOwner(container, {
-            adapter: aiPanelCapabilityAdapter,
-            showToast
-        });
-        serviceRegistry.register('aiPanelCapabilityAdapter', aiPanelCapabilityAdapter);
-        serviceRegistry.register('aiPanelCapabilityOwner', aiPanel);
-        serviceRegistry.register('aiPanel', aiPanel);
-        debugLogger.debug('[App] AI Panel capability owner 初始化完成');
         return aiPanel;
     }
 

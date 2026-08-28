@@ -77,7 +77,7 @@ flowchart LR
 前置条件：
 
 - Windows 10/11
-- .NET SDK `9.0.300`，仓库根目录 `global.json` 精确固定 SDK 版本，不做 roll-forward
+- .NET SDK `9.0.3xx`；仓库根目录 `global.json` 以 `9.0.300` 为基线并使用 `latestPatch`，只允许同一 feature band 的安全 patch
 - .NET 8 Desktop Runtime（调试/运行 WinForms + WebView2 桌面端需要）
 - Microsoft Edge WebView2 Runtime
 - PowerShell
@@ -94,7 +94,7 @@ cd ClearVision
 & ".\ClearVision.Product\src\ClearVision.Product.Desktop\bin\Debug\net8.0-windows\win-x64\ClearVision.Product.Desktop.exe"
 ```
 
-如果本机同时存在 `C:\Program Files\dotnet` 和 `%LOCALAPPDATA%\Microsoft\dotnet`，不要直接依赖 PATH 中的裸 `dotnet`。仓库脚本会读取 `global.json`，优先选择包含 SDK `9.0.300` 的 dotnet host；`-InstallIfMissing` 会补齐 SDK `9.0.300` 和 .NET 8 Core / ASP.NET / WindowsDesktop runtime，避免两台机器因为 PATH 顺序不同而使用不同 SDK 或运行时。
+如果本机同时存在 `C:\Program Files\dotnet` 和 `%LOCALAPPDATA%\Microsoft\dotnet`，不要直接依赖 PATH 中的裸 `dotnet`。仓库脚本会读取 `global.json`，并通过 `scripts/validate-dotnet-sdk-policy.ps1` 选择实际解析结果位于 `9.0.300`–`9.0.399` 的 dotnet host；`-InstallIfMissing` 会补齐基线 SDK `9.0.300` 和 .NET 8 Core / ASP.NET / WindowsDesktop runtime。CI 在每次 `setup-dotnet` 后也会记录 resolved SDK，并拒绝跨 feature band 的结果。
 
 AI 流程生成相关密钥默认不写入仓库。需要联调时，请在本地配置文件或运行环境中配置自己的 provider、base URL 和 API key，避免提交任何密钥。
 

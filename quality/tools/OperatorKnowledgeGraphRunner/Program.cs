@@ -27,6 +27,7 @@ Directory.CreateDirectory(storageRoot);
 
 var operatorFactory = new OperatorFactory();
 var templateService = new FlowTemplateService(storageRoot);
+await templateService.RunStartupMigrationAsync();
 var graphService = new OperatorKnowledgeGraphService(operatorFactory, templateService);
 
 var graph = await graphService.BuildAsync();

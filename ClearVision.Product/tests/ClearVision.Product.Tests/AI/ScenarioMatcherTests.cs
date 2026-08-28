@@ -32,7 +32,9 @@ public sealed class ScenarioMatcherTests
         var tempRoot = CreateTempRoot();
         try
         {
-            var matcher = new ScenarioMatcher(new FlowTemplateService(tempRoot));
+            var service = new FlowTemplateService(tempRoot);
+            await service.RunStartupMigrationAsync();
+            var matcher = new ScenarioMatcher(service);
 
             var matches = await matcher.MatchAsync(prompt);
 
@@ -57,7 +59,9 @@ public sealed class ScenarioMatcherTests
         var tempRoot = CreateTempRoot();
         try
         {
-            var matcher = new ScenarioMatcher(new FlowTemplateService(tempRoot));
+            var service = new FlowTemplateService(tempRoot);
+            await service.RunStartupMigrationAsync();
+            var matcher = new ScenarioMatcher(service);
 
             var matches = await matcher.MatchAsync("check terminal order and wire sequence for black blue pins");
 
@@ -77,7 +81,9 @@ public sealed class ScenarioMatcherTests
         var tempRoot = CreateTempRoot();
         try
         {
-            var matcher = new ScenarioMatcher(new FlowTemplateService(tempRoot));
+            var service = new FlowTemplateService(tempRoot);
+            await service.RunStartupMigrationAsync();
+            var matcher = new ScenarioMatcher(service);
 
             var matches = await matcher.MatchAsync(
                 "传统视觉模板匹配，上传标准模板图，后续产品图片与参考图对比判断OK/NG；场景类型：外观缺陷，检测对象：产品。");
@@ -102,7 +108,9 @@ public sealed class ScenarioMatcherTests
         var tempRoot = CreateTempRoot();
         try
         {
-            var matcher = new ScenarioMatcher(new FlowTemplateService(tempRoot));
+            var service = new FlowTemplateService(tempRoot);
+            await service.RunStartupMigrationAsync();
+            var matcher = new ScenarioMatcher(service);
 
             var matches = await matcher.MatchAsync("帮我做一个视觉检测流程");
 
@@ -120,7 +128,9 @@ public sealed class ScenarioMatcherTests
         var tempRoot = CreateTempRoot();
         try
         {
-            var matcher = new ScenarioMatcher(new FlowTemplateService(tempRoot));
+            var service = new FlowTemplateService(tempRoot);
+            await service.RunStartupMigrationAsync();
+            var matcher = new ScenarioMatcher(service);
 
             var matches = await matcher.MatchAsync("空调内机外机外观都要检测一下");
 

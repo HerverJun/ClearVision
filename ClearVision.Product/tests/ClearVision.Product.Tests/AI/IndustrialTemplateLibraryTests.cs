@@ -33,6 +33,7 @@ public sealed class IndustrialTemplateLibraryTests
         try
         {
             var service = new FlowTemplateService(tempRoot);
+            await service.RunStartupMigrationAsync();
             var templates = await service.GetTemplatesAsync();
             var byName = templates.ToDictionary(item => item.Name, StringComparer.OrdinalIgnoreCase);
 
@@ -74,6 +75,7 @@ public sealed class IndustrialTemplateLibraryTests
         try
         {
             var service = new FlowTemplateService(tempRoot);
+            await service.RunStartupMigrationAsync();
             var templates = (await service.GetTemplatesAsync())
                 .Where(item => NewTraditionalTemplateNames.Contains(item.Name, StringComparer.OrdinalIgnoreCase))
                 .ToList();
@@ -105,6 +107,7 @@ public sealed class IndustrialTemplateLibraryTests
         try
         {
             var service = new FlowTemplateService(tempRoot);
+            await service.RunStartupMigrationAsync();
             var templates = await service.GetTemplatesAsync();
 
             templates.Should().NotBeEmpty();

@@ -2173,36 +2173,6 @@ test('Generate user message redacts unsafe attachment display names', async () =
   assert.doesNotMatch(captured.userMessage, unsafePattern);
 });
 
-test('AI capability owner redacts unsafe AgentRun public projection text', async () => {
-  const { AiPanelCapabilityOwner } = await import('../../../../src/ClearVision.Product.Desktop/wwwroot/src/features/ai/aiPanelCapabilityOwner.mjs');
-  const container = createFakeElement();
-  const unsafe = 'rawPrompt=secret systemPrompt=hidden token=super-secret-value baseUrl=http://192.168.1.8/v1 C:\\factory\\secret.onnx DB1.DBX0.0 data:image/png;base64,QUJD sk-secret-token apiKey=raw-key';
-  const unsafePattern = /rawPrompt=|systemPrompt=|super-secret-value|raw-key|192\.168\.1\.8|C:\\factory|secret\.onnx|DB1\.DBX0\.0|data:image|QUJD|sk-secret-token/i;
-  const owner = new AiPanelCapabilityOwner(container, {
-    adapter: {
-      loadLatestRun: async () => null,
-      loadRun: async () => null,
-      cancelRun: async () => null,
-      buildEventStreamUrl: () => ''
-    }
-  });
-
-  owner.errorMessage = `load failed ${unsafe}`;
-  owner.activeRunId = `run ${unsafe}`;
-  owner.replay = { summary: { status: `failed ${unsafe}` } };
-  owner.events = [{
-    sequence: 1,
-    eventType: `tool.failed ${unsafe}`,
-    title: `Validate flow ${unsafe}`,
-    summary: `Tool failed ${unsafe}`
-  }];
-  owner.render();
-
-  assert.match(container.innerHTML, /redacted/);
-  assertNoSensitiveLeak(container.innerHTML);
-  assert.doesNotMatch(container.innerHTML, unsafePattern);
-});
-
 test('developer mode payload includes useVisionAgentGenerateFlow=true', async () => {
   const { AiPanel } = await loadAiPanel();
   const panel = createPanel(AiPanel, { developer: true, enabled: true });
@@ -9991,16 +9961,20 @@ test('quality suite tracks raised UI contract minimum', () => {
     .some(entry => String(entry.id || '').includes('planner_shadow')), false);
 });
 
-test('RuntimePreview pilot gate document keeps real adapter gated and offline-fallback safe', () => {
-  const gatePath = path.resolve(
+test('archived superseded RuntimePreview pilot gate preserves historical safety constraints', () => {
+  const archiveDirectory = path.resolve(
     getRepoRoot(),
     'docs',
-    '\u8fdb\u884c\u4e2d',
-    '\u5f53\u524d\u8ba1\u5212',
-    'VisionAgent_RuntimePreview_Pilot_Gate.md'
+    '\u5f52\u6863',
+    '\u8fc7\u671f\u8ba1\u5212',
+    'VisionAgent-\u65e7\u9636\u6bb5\u8ba1\u5212'
   );
+  const gatePath = path.join(archiveDirectory, 'VisionAgent_RuntimePreview_Pilot_Gate.md');
+  const archiveIndex = fs.readFileSync(path.join(archiveDirectory, 'README.md'), 'utf8');
   const doc = fs.readFileSync(gatePath, 'utf8');
 
+  assert.match(archiveIndex, /RuntimePreview Pilot Gate/);
+  assert.match(archiveIndex, /\u65e7 Pilot \u95e8\u7981\u5feb\u7167\uff0c\u4e0d\u518d\u662f\u5f53\u524d release gate/);
   assert.match(doc, /fixed shadow/i);
   assert.match(doc, /holdout shadow/i);
   assert.match(doc, /permission negative/i);

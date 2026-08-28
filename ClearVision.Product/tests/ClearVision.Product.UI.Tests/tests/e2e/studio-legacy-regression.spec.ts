@@ -38,14 +38,12 @@ function screenshotPath(name: string) {
   return resolve(screenshotDir, name);
 }
 
-async function installFailClosedStartupFlags(page: Page) {
+async function installRetainedStartupFlags(page: Page) {
   await page.addInitScript(() => {
     const startup = Object.freeze({
       featureFlags: Object.freeze({
         'Studio2.PropertyPanel': true,
         'Studio2.PreviewPanel': true,
-        'Studio2.Settings': true,
-        'Studio2.AiPanel': true,
       }),
     });
 
@@ -150,7 +148,7 @@ async function installApiRoutes(page: Page) {
 
 async function bootStudio(page: Page) {
   await page.setViewportSize({ width: 1440, height: 900 });
-  await installFailClosedStartupFlags(page);
+  await installRetainedStartupFlags(page);
   await installApiRoutes(page);
   await bootAuthenticatedApp(page);
 }
@@ -199,12 +197,12 @@ async function expectFlowOnlySurfacesCollapsed(page: Page) {
   }
 }
 
-test.describe('Studio legacy AI/Settings fail-closed regression', () => {
+test.describe('Studio legacy AI/Settings sole-owner regression', () => {
   test.beforeEach(async ({ page }) => {
     await bootStudio(page);
   });
 
-  test('AI page uses legacy AiPanel by default even when backend flag is true', async ({ page }) => {
+  test('AI page uses the sole legacy AiPanel production owner', async ({ page }) => {
     await openView(page, 'ai');
 
     await expect(page.locator('#ai-view')).toBeVisible();

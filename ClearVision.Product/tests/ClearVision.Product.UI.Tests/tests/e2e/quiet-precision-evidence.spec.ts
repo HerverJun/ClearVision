@@ -275,16 +275,12 @@ async function boot(page: Page, theme: Theme): Promise<void> {
     localStorage.setItem('cv_theme', currentTheme);
     Object.defineProperty(window, '__CLEARVISION_STARTUP__', {
       value: Object.freeze({
-        workspaceV2Enabled: false,
         featureFlags: Object.freeze({
           'Studio2.PropertyPanel': true,
           'Studio2.PreviewPanel': true,
           'Studio2.GlobalVariables': true,
-          'Studio2.Settings': false,
           'Studio2.ProjectPage': true,
-          'Studio2.Inspection': true,
           'Studio2.ResultsReview': true,
-          'Studio2.AiPanel': false,
           'Studio:NodePreviewInspectorEnabled': false,
           'Studio:CircleSearchV2ToolEnabled': true,
           'Studio:NPointCalibrationWorkbenchEnabled': true,

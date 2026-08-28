@@ -85,95 +85,12 @@
     </Content>
   </ItemGroup>
 
-  <PropertyGroup>
-    <FrontendV2Root>$(MSBuildThisFileDirectory)FrontendV2\</FrontendV2Root>
-    <FrontendV2IntermediateDist>$(MSBuildThisFileDirectory)$(BaseIntermediateOutputPath)$(Configuration)\$(TargetFramework)\FrontendV2\dist</FrontendV2IntermediateDist>
-    <FrontendV2NodeModulesLock>$(FrontendV2Root)node_modules\.package-lock.json</FrontendV2NodeModulesLock>
-    <SkipFrontendV2Build Condition="'$(SkipFrontendV2Build)' == ''">false</SkipFrontendV2Build>
-    <SkipFrontendV2Install Condition="'$(SkipFrontendV2Install)' == ''">false</SkipFrontendV2Install>
-  </PropertyGroup>
-
+  <!-- FrontendV2 is a non-production development asset and is deliberately
+       excluded from Desktop build, output, and publish. -->
   <ItemGroup>
     <Content Remove="FrontendV2\**\*" />
     <None Remove="FrontendV2\**\*" />
-    <FrontendV2PackageInput Include="$(FrontendV2Root)package.json" />
-    <FrontendV2PackageInput Include="$(FrontendV2Root)package-lock.json" />
-    <FrontendV2BuildInput Include="$(FrontendV2Root)index.html" />
-    <FrontendV2BuildInput Include="$(FrontendV2Root)package.json" />
-    <FrontendV2BuildInput Include="$(FrontendV2Root)package-lock.json" />
-    <FrontendV2BuildInput Include="$(FrontendV2Root)tsconfig*.json" />
-    <FrontendV2BuildInput Include="$(FrontendV2Root)vite.config.ts" />
-    <FrontendV2BuildInput Include="$(FrontendV2Root)vitest.config.ts" />
-    <FrontendV2BuildInput Include="$(FrontendV2Root)eslint.config.js" />
-    <FrontendV2BuildInput Include="$(FrontendV2Root)scripts\**\*" />
-    <FrontendV2BuildInput Include="$(FrontendV2Root)src\**\*" />
   </ItemGroup>
-
-  <Target Name="InstallFrontendV2Dependencies"
-          Condition="Exists('$(FrontendV2Root)package.json') and '$(SkipFrontendV2Build)' != 'true'"
-          Inputs="@(FrontendV2PackageInput)"
-          Outputs="$(FrontendV2NodeModulesLock)">
-    <Error Condition="'$(SkipFrontendV2Install)' == 'true'"
-           Text="SkipFrontendV2Install=true requires up-to-date FrontendV2 node_modules and $(FrontendV2NodeModulesLock). Run npm ci before invoking MSBuild with this property." />
-    <Message Importance="high"
-             Text="Installing FrontendV2 dependencies from $(FrontendV2Root)" />
-    <Exec WorkingDirectory="$(FrontendV2Root)"
-          Command="npm ci" />
-  </Target>
-
-  <Target Name="BuildFrontendV2"
-          BeforeTargets="BeforeBuild"
-          DependsOnTargets="InstallFrontendV2Dependencies"
-          Condition="Exists('$(FrontendV2Root)package.json')"
-          Inputs="@(FrontendV2BuildInput);$(FrontendV2NodeModulesLock)"
-          Outputs="$(FrontendV2IntermediateDist)\index.html;$(FrontendV2IntermediateDist)\.vite\manifest.json">
-    <Error Condition="'$(SkipFrontendV2Build)' == 'true'"
-           Text="SkipFrontendV2Build=true requires current FrontendV2 assets at $(FrontendV2IntermediateDist). Rebuild assets before using this property." />
-    <Message Importance="high"
-             Text="Building FrontendV2 assets into $(FrontendV2IntermediateDist)" />
-    <RemoveDir Directories="$(FrontendV2IntermediateDist)" />
-    <Exec WorkingDirectory="$(FrontendV2Root)"
-          Command="npm run build"
-          EnvironmentVariables="VITE_OUT_DIR=$(FrontendV2IntermediateDist)" />
-  </Target>
-
-  <Target Name="CollectFrontendV2DistAssets"
-          DependsOnTargets="BuildFrontendV2"
-          Condition="Exists('$(FrontendV2IntermediateDist)')">
-    <ItemGroup>
-      <FrontendV2DistAsset Include="$(FrontendV2IntermediateDist)\**\*" />
-    </ItemGroup>
-    <Error Condition="'@(FrontendV2DistAsset)' == ''"
-           Text="FrontendV2 build produced no assets in $(FrontendV2IntermediateDist)." />
-  </Target>
-
-  <Target Name="CopyFrontendV2AssetsToOutput"
-          AfterTargets="AfterBuild"
-          DependsOnTargets="CollectFrontendV2DistAssets">
-    <RemoveDir Directories="$(OutDir)wwwroot\v2" />
-    <Copy SourceFiles="@(FrontendV2DistAsset)"
-          DestinationFiles="@(FrontendV2DistAsset->'$(OutDir)wwwroot\v2\%(RecursiveDir)%(Filename)%(Extension)')"
-          SkipUnchangedFiles="true" />
-  </Target>
-
-  <Target Name="CopyFrontendV2AssetsToPublish"
-          AfterTargets="Publish"
-          DependsOnTargets="CollectFrontendV2DistAssets"
-          Condition="'$(PublishDir)' != ''">
-    <RemoveDir Directories="$(PublishDir)wwwroot\v2" />
-    <Copy SourceFiles="@(FrontendV2DistAsset)"
-          DestinationFiles="@(FrontendV2DistAsset->'$(PublishDir)wwwroot\v2\%(RecursiveDir)%(Filename)%(Extension)')"
-          SkipUnchangedFiles="true" />
-  </Target>
-
-  <Target Name="CleanFrontendV2Assets"
-          AfterTargets="Clean">
-    <RemoveDir Directories="$(FrontendV2IntermediateDist)" />
-    <RemoveDir Directories="$(OutDir)wwwroot\v2"
-               Condition="'$(OutDir)' != ''" />
-    <RemoveDir Directories="$(PublishDir)wwwroot\v2"
-               Condition="'$(PublishDir)' != ''" />
-  </Target>
 
   <PropertyGroup>
     <HuaraySdkPath>$(MSBuildThisFileDirectory)..\..\lib\HuaraySDK\x64\</HuaraySdkPath>

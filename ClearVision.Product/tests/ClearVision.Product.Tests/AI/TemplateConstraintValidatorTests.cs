@@ -133,6 +133,7 @@ public sealed class TemplateConstraintValidatorTests
     private static async Task<FlowTemplate> LoadTemplateAsync(string tempRoot, string templateName)
     {
         var service = new FlowTemplateService(tempRoot);
+        await service.RunStartupMigrationAsync();
         var templates = await service.GetTemplatesAsync();
         return templates.Single(template => template.Name == templateName);
     }

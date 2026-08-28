@@ -41,31 +41,15 @@ public sealed class WebView2Host : IAsyncDisposable
         return new Uri($"http://localhost:{webPort}/index.html");
     }
 
-    internal static Uri CreateInitialPageUri(int webPort, bool workspaceV2Enabled)
-    {
-        var decision = new StudioStartupPageDecision(
-            workspaceV2Enabled ? StudioStartupPageKind.FrontendV2 : StudioStartupPageKind.Legacy,
-            workspaceV2Enabled,
-            workspaceV2Enabled ? StudioStartupPageResolver.FrontendV2PagePath : StudioStartupPageResolver.LegacyPagePath,
-            RequiredFilePath: null,
-            DiagnosticMessage: null);
-
-        return StudioStartupPageResolver.CreateInitialPageUri(webPort, decision);
-    }
-
     internal static string BuildStartupInjectionScript(
-        bool workspaceV2Enabled,
         string apiBaseUrl,
         string cssVersion,
         bool nodePreviewInspectorEnabled = false,
         bool propertyPanelCapabilityEnabled = false,
         bool previewPanelCapabilityEnabled = false,
         bool globalVariablesCapabilityEnabled = false,
-        bool settingsCapabilityEnabled = false,
         bool projectPageCapabilityEnabled = false,
-        bool inspectionCapabilityEnabled = false,
         bool resultsReviewCapabilityEnabled = false,
-        bool aiPanelCapabilityEnabled = false,
         bool circleSearchV2ToolEnabled = true,
         bool nPointCalibrationWorkbenchEnabled = true)
     {
@@ -74,22 +58,17 @@ public sealed class WebView2Host : IAsyncDisposable
 
         var startup = new
         {
-            workspaceV2Enabled,
             nodePreviewInspectorEnabled,
             apiBaseUrl,
             hostKind = "desktop-webview2",
-            frontendV2BasePath = StudioStartupPageResolver.FrontendV2BasePath,
             featureFlags = new Dictionary<string, bool>
             {
                 ["Studio:NodePreviewInspectorEnabled"] = nodePreviewInspectorEnabled,
                 ["Studio2.PropertyPanel"] = propertyPanelCapabilityEnabled,
                 ["Studio2.PreviewPanel"] = previewPanelCapabilityEnabled,
                 ["Studio2.GlobalVariables"] = globalVariablesCapabilityEnabled,
-                ["Studio2.Settings"] = settingsCapabilityEnabled,
                 ["Studio2.ProjectPage"] = projectPageCapabilityEnabled,
-                ["Studio2.Inspection"] = inspectionCapabilityEnabled,
                 ["Studio2.ResultsReview"] = resultsReviewCapabilityEnabled,
-                ["Studio2.AiPanel"] = aiPanelCapabilityEnabled,
                 ["Studio:CircleSearchV2ToolEnabled"] = circleSearchV2ToolEnabled,
                 ["Studio:NPointCalibrationWorkbenchEnabled"] = nPointCalibrationWorkbenchEnabled
             }
@@ -263,18 +242,14 @@ public sealed class WebView2Host : IAsyncDisposable
         var apiBaseUrl = $"http://localhost:{apiPort}/api";
         var cssVersion = GenerateCssVersion();
         var initScript = BuildStartupInjectionScript(
-            _studioOptions.WorkspaceV2Enabled,
             apiBaseUrl,
             cssVersion,
             _studioOptions.NodePreviewInspectorEnabled,
             _studioOptions.PropertyPanelCapabilityEnabled,
             _studioOptions.PreviewPanelCapabilityEnabled,
             _studioOptions.GlobalVariablesCapabilityEnabled,
-            _studioOptions.SettingsCapabilityEnabled,
             _studioOptions.ProjectPageCapabilityEnabled,
-            _studioOptions.InspectionCapabilityEnabled,
             _studioOptions.ResultsReviewCapabilityEnabled,
-            _studioOptions.AiPanelCapabilityEnabled,
             _studioOptions.CircleSearchV2ToolEnabled,
             _studioOptions.NPointCalibrationWorkbenchEnabled);
         await core.AddScriptToExecuteOnDocumentCreatedAsync(initScript);
@@ -442,9 +417,7 @@ public sealed class WebView2Host : IAsyncDisposable
 
     private static string BuildStartupDiagnosticHtml(StudioStartupPageDecision decision)
     {
-        var title = decision.WorkspaceV2Enabled
-            ? "Studio 2.0 V2 启动失败"
-            : "ClearVision Product";
+        const string title = "ClearVision Product";
         var message = decision.DiagnosticMessage ?? "WebView2 已成功初始化，但未找到前端入口文件。";
 
         return $$"""

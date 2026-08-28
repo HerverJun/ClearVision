@@ -145,14 +145,9 @@ if (-not (Stop-AfterFailure $governance)) {
         }
 
         if (-not $SkipUi -and -not ($FailFast -and @($results | Where-Object exitCode -ne 0).Count -gt 0)) {
-            [void](Invoke-LaneStep -Name "frontend-v2-unit" -Action {
-                Invoke-NpmUnit -WorkingDirectory (Join-Path $repoRoot "ClearVision.Product\src\ClearVision.Product.Desktop\FrontendV2") -ScriptName "test:unit"
+            [void](Invoke-LaneStep -Name "ui-contract-unit" -Action {
+                Invoke-NpmUnit -WorkingDirectory (Join-Path $repoRoot "ClearVision.Product\tests\ClearVision.Product.UI.Tests") -ScriptName "test:unit"
             })
-            if (-not ($FailFast -and @($results | Where-Object exitCode -ne 0).Count -gt 0)) {
-                [void](Invoke-LaneStep -Name "ui-contract-unit" -Action {
-                    Invoke-NpmUnit -WorkingDirectory (Join-Path $repoRoot "ClearVision.Product\tests\ClearVision.Product.UI.Tests") -ScriptName "test:unit"
-                })
-            }
         }
 
         if (-not ($FailFast -and @($results | Where-Object exitCode -ne 0).Count -gt 0)) {
