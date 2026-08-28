@@ -5,7 +5,8 @@
 > Initial SHA：`789e9ec643390f5a79c68cfa6c4b401c1a679be3`
 > 历史维护规则：本文件记录 Studio 2.0 capability 迁移白名单；2026-08-28 起不再以表内“默认 on/当前状态”作为运行时事实，新的迁移或挂载必须先更新 G16/current plan 和单一 flag authority。
 > 2026-08-28 当前 release 决定：本表保留为历史迁移与 owner 证据，不再授权直接切换 `/v2`。当前唯一 production root 是 `wwwroot/index.html + app.js + capability owners`，FrontendV2 为 non-production；未来 Vue/StudioUI 迁移须另立完整 parity/migration epic。当前执行权威见 [G16](../goals/G16.md) 与 [统一补齐 TODO](../../当前计划/ClearVision-未尽事项统一补齐TODO-2026-08-28.md) U05。
-> 术语纠偏：G15 `*CapabilityOwner` 模块位于当前 `wwwroot/src`/`app.js` root，不等于 `Desktop/FrontendV2`。退役 FrontendV2 不得误删这些 production owner。
+> 术语纠偏：G15 `*CapabilityOwner` 模块位于当前 `wwwroot/src`/`app.js` root，不等于 `Desktop/FrontendV2`。Property、Preview、GlobalVariables、Project、ResultsReview owner 继续生产挂载；Settings、Inspection、AI 的不完整实验 owner 已按本次 disposition 删除，不能再按 2026-07 历史目标启用。
+> Wave 0 implementation/evidence SHA：`1e2342c3909cb1f157d902aef1338e92f1ac44a3`。
 
 ## 总规则
 
@@ -17,9 +18,9 @@
 - Project、Flow、GlobalVariables 的正式保存仍经 `ProjectService + ProjectSaveCoordinator`。
 - Pinia、DOM、localStorage 只能作为投影或编辑草稿，不得作为正式业务权威。
 - G02A 的 V2 源码目录为 `ClearVision.Product/src/ClearVision.Product.Desktop/FrontendV2/`；发布资产目录为 `wwwroot/v2/`；不得把 Vue/TypeScript/package/node_modules 放入旧 `wwwroot/src`。
-- FrontendV2 的历史构建入口是 Desktop `.csproj`；在当前 release 决定下它是 non-production，后续应退役其 production flag/build/publish 路径，除非另行批准完整迁移 epic。
-- G02B 的 `Studio:WorkspaceV2Enabled` 是宿主启动页面切换，不是业务 capability Feature Flag。默认 `false`；关闭时旧 `app.js` 是唯一 root，打开时 WebView2 只加载 `/v2/index.html`。
-- G03 将 `/v2/index.html` 承载内容从无业务测试岛升级为 Workspace Shell MVP；它只挂载 Shell、dock、模式切换和 hosted FlowCanvas，不迁移 Flow Editor、Project 保存、Property、Preview、AI、Results、Inspection 或 GlobalVariables capability。
+- FrontendV2 的历史构建入口是 Desktop `.csproj`；Wave 0 已删除其 production build/copy/publish 和 release Gate 路径，源码仅作为被项目文件隔离的 non-production 开发资产。未来只有另行批准完整迁移 epic 才能重建 production 路径。
+- G02B 曾以 `Studio:WorkspaceV2Enabled` 切换宿主页面；该运行时选项、Host 注入和 startup resolver 分支现已删除，Desktop 对 `/v2` 固定返回 404。
+- G03 的 `/v2/index.html` Workspace Shell MVP 只保留为历史/non-production 源码事实，不是本次 release 可挂载入口。
 
 ## 2026-07 capability 迁移历史台账
 
@@ -55,21 +56,22 @@
 
 | capability | `appsettings.json` | 额外客户端门禁 | 当前 effective 状态 | G16 disposition |
 | --- | --- | --- | --- | --- |
-| Property、Preview、GlobalVariables、Project、ResultsReview | `true` | 无已知额外实验门禁 | on | 验证唯一 mounted owner 与回归，不按历史 token 自动判完成 |
-| Settings | `false` | 另要求 `window.__CLEARVISION_ENABLE_EXPERIMENTAL_SETTINGS_CAPABILITY` | off | 补 parity 后晋级，或删除实验 owner/flag |
-| Inspection | `true` | 仍要求 `window.__CLEARVISION_ENABLE_EXPERIMENTAL_INSPECTION_CAPABILITY`，仓库未注入 | effective off | 消除双重 flag authority，并作晋级/删除决定 |
-| AI Panel | `false` | 另要求 `window.__CLEARVISION_ENABLE_EXPERIMENTAL_AI_PANEL_CAPABILITY` | off | 补 parity 后晋级，或删除实验 owner/flag |
+| Property、Preview、GlobalVariables、Project、ResultsReview | 各自为 `true` | 无额外实验门禁；各 flag 只从 Host startup `featureFlags` 读取一次 | 各自唯一 capability owner | `RETAINED_PRODUCTION_OWNER_WAVE0` |
+| Settings | 实验 flag key 已删除 | experimental global、adapter、实验 owner 均已删除 | legacy `SettingsView` 唯一 production owner | `RETIRED_EXPERIMENTAL_OWNER_WAVE0` |
+| Inspection | 实验 flag key 已删除 | experimental global、adapter、实验 owner 均已删除 | legacy `InspectionPanel` 唯一 production owner | `RETIRED_EXPERIMENTAL_OWNER_WAVE0` |
+| AI Panel | 实验 flag key 已删除 | experimental global、adapter、实验 owner 均已删除 | legacy `AiPanel` 唯一 production owner | `RETIRED_EXPERIMENTAL_OWNER_WAVE0` |
 
-- `appsettings` 与客户端 experimental global 不得形成两个互相矛盾的 flag authority；每个 capability 最终只能保留一个服务端注入且可测试的决定源。
+- Settings `destroy()` 经 `deactivate()` 清除 tracked timeout/modal；Inspection `dispose()` 取消 completion/error subscription；AI `dispose()` 清理 message subscriptions、EventSource/transports、timeout 与 animation frame。三者不是 CSS 隐藏的第二 owner。
+- `appsettings`、`StudioOptions`、WebView2 startup payload 与 `app.js` 均不再包含 Settings/Inspection/AI 实验 flag authority；每个保留 capability 只有一个服务端注入且客户端 snapshot-once 的决定源。
 - 上方历史表的 `on/PRODUCTION_DEFAULT_ON_G16_PARTIAL` 不再代表当前 effective 状态，不能用于关闭 G16。
 - legacy 删除门禁仍保留：clean CI、Playwright、真实 WebView2、no-Node 目标机、DPI/分辨率矩阵通过前，不删除仍承担 current production 行为的实现。
+- 当前代码证据：`Studio2ArchitectureGuardTests`、`WebView2HostTests`、`StudioStartupPageResolverTests`、`ProgramStaticAssetsTests` 与 `g15x-capability-owners.test.mjs`。Wave 0 Desktop 六类合并回归 `62/62`、UI owner/lifecycle focused `10/10`、UI 完整 unit `988/988`、七个 Playwright spec 非视觉回归 `68/68` PASS；本地 Release publish 确认 legacy root 资产存在且 `/v2`、FrontendV2、Node/package 资产为 0。5 个字体抗锯齿 visual baseline、真实 WebView2、clean clone、no-Node 目标机、DPI/分辨率矩阵和同 SHA CI 仍由 G16 阻断。
 
 ## 非阻断技术债
 
 - G01 只登记 Feature Flag，不实现 runtime flag、配置文件或发布包切换。
-- G02A 只建立 FrontendV2 构建底座和发布资产链路，不挂载 Vue root，不实现 runtime flag。
-- G02A 收口修复固定 Vite base 为 `/v2/`，增加构建后 HTML/manifest 路径校验，消除 CI/MSBuild 重复 production build，并把 HostBridge guard 收敛为唯一 adapter 白名单规则。
-- G02B 只实现宿主级 root 切换、`/v2` 静态映射、启动配置注入、legacy module facade 和无业务测试岛；不迁移 Workspace Shell、Flow、Project、Variables、Inspection、AI 或 Results capability。
+- FrontendV2 的 Vite/HostBridge/Workspace Shell 源码继续作为 non-production 历史开发资产；Desktop project、publish 与主 CI 均不消费它。
+- G02A/G02B 的 build、发布映射和宿主 root switch 已从当前 release 路径退役；若未来恢复，必须先批准新的完整 parity/migration epic。
 - G03 只实现 Workspace Shell MVP 和 hosted FlowCanvas 载入链；真实 WebView2 人工启动未执行。
 - G04A 已将 V2 Flow 写入口收敛为 `StudioFlowEditorPort`，并加入本地 `projectId`、`requestSequence`、`flowRevision`、`selectionRevision` stale 防护。G04A 不保存工程，不创建 Project API client，不改变 `ProjectSaveCoordinator`、Agent apply、Runtime Package 或 Station。
 - G04B 已建立 `StudioProjectPersistencePort`，注册键为 `studio2.projectPersistencePort`；它只复用 legacy `httpClient`，通过既有 `PUT /api/projects/{id}` 单请求提交 metadata、Flow 与 GlobalVariables。`ExpectedPersistenceRevision`/`PersistenceRevision` 是后端持久化身份；`flowRevision` 不参与后端并发。旧 Project 页面和 `projectManager.saveProject()` 仍保留，Project capability 正式迁移仍等待 G15.8。

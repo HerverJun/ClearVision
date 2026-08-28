@@ -5,7 +5,7 @@ status: "active"
 topic: "跨计划闭环治理"
 created: "2026-08-28"
 updated: "2026-08-28"
-code_baseline: "c504ae1919cca0ff4df993c956c45742440fc471"
+code_baseline: "1e2342c3909cb1f157d902aef1338e92f1ac44a3"
 review_input_revision: "78d693fb4"
 ---
 
@@ -13,7 +13,7 @@ review_input_revision: "78d693fb4"
 
 > 本文是七组保留文档的唯一横向责任入口，也是 2026-08-28 专业当前性复核后的最终执行计划。专项文档继续保存历史背景和细节，但其中与本文冲突的早期判断、架构假设和验收口径均由本文取代。
 >
-> 代码事实冻结在 `c504ae1919cca0ff4df993c956c45742440fc471`；其后的 `78d693fb4` 仅含上一轮文档治理。只存在于其他分支、stash、历史工作树或旧 CI SHA 的实现不算当前分支闭环。2026-08-28 重新 `fetch` 因 TLS EOF 失败，故 `origin/studio-ui-next@0c44df6c` 只作为 2026-08-25 的缓存分支观察，不作为当前分支事实或新鲜远端证明。
+> Wave 0 代码事实与本地验证绑定 implementation/evidence SHA `1e2342c3909cb1f157d902aef1338e92f1ac44a3`；随后仅以独立文档提交回填该 SHA。只存在于其他分支、stash、历史工作树或旧 CI SHA 的实现不算当前分支闭环。`origin/studio-ui-next@0c44df6c` 只作为 2026-08-25 的缓存分支观察，不作为当前分支事实或新鲜远端证明。
 
 ## 1. 状态与证据口径
 
@@ -38,12 +38,12 @@ review_input_revision: "78d693fb4"
 
 | 主题 | 当前事实 | 最终决定 |
 | --- | --- | --- |
-| 前端生产路线 | 当前分支存在 `Desktop/FrontendV2`，不存在 `Desktop/StudioUI`；`WorkspaceV2Enabled=false`，V2 Tool/Review 仍显示 capability 未挂载。缓存的 `studio-ui-next` 与当前分支大幅分叉。 | 本次发布继续以 `wwwroot/index.html + app.js + capability owners` 为唯一 production root；FrontendV2 为 non-production。未来 Vue/StudioUI 迁移必须另立完整 parity/migration epic，不再作为 G16 的“最后开关”。 |
+| 前端生产路线 | 当前分支保留被 Desktop project/CI 隔离的 `Desktop/FrontendV2` 源码，不存在 `Desktop/StudioUI`；`WorkspaceV2Enabled` 已删除且 `/v2` 固定 404。缓存的 `studio-ui-next` 与当前分支大幅分叉。 | 本次发布以 `wwwroot/index.html + app.js + capability owners` 为唯一 production root；FrontendV2 为 non-production。未来 Vue/StudioUI 迁移必须另立完整 parity/migration epic，不再作为 G16 的“最后开关”。 |
 | DeepLearning tensor 复制 | 正式推理从 `DeepLearningOperator.cs:559` 使用 `PreprocessImageLease()`；带 `ToArray()` 的 `PreprocessImage()` 是无调用私有 wrapper。 | 删除“整张 tensor 复制是生产阻断”的旧结论；可删除死 wrapper，但不作为发布门禁。真正残项是证据类型、模型身份、provider 和目标硬件性能。 |
 | DeepLearning 精度证据 | `DeepLearning_coco_real_model_baseline` 使用 generated constant smoke model，AP50/Precision/Recall 为 0，却仍可 `Accepted=true` 并被质量聚合计为 Pass。 | 该报告降为机器可判的 inference smoke；模型精度按实际交付模型、manifest、hash、数据集和非零门槛验收。 |
 | 数据库权威 | 生产只注册 `VisionDbContext`，启动/旧库修复已集中到 `VisionDatabaseInitializer`/maintenance；`AppDbContext` 无注册、无调用。 | 不重写全部 legacy repair SQL，也不要求任意 down migration；只删除/隔离死上下文并加架构守卫。 |
 | 算子人口 | 产品目录为 158；若干 `full155` 工具、registry 和描述仍固定 155。`FrameChangeTrigger` 已有 product-public/package-internal 边界及测试。 | 保留稳定 artifact ID `full155`，人口和 completeness 改为从受治理 catalog 动态计算；不重开 FrameChangeTrigger 旧问题。 |
-| SDK | `global.json` 为 `9.0.300 + latestFeature`，README/项目总览却声称 exact 或 `disable`。 | 目标策略定为 `latestPatch`：固定 9.0.3xx feature band，允许安全 patch；统一配置、说明、脚本与 CI resolved SDK 证据。 |
+| SDK | Wave 0 已将 `global.json`、本地 wrapper、文档和 CI 统一为 `9.0.300 + latestPatch`；validator 实际只接受 `9.0.300`–`9.0.399`。 | 固定 9.0.3xx feature band，允许安全 patch，不跨 feature band；portable/SBOM/license 仍由 U04 后续项承接。 |
 | Release | tag workflow 直接 publish+zip，只生成简化启动 bat；现场指南却把 GitHub Release 当交付入口。仓库 SPDX 是预制 seed，不是从最终产物生成。 | tag Release 定义为现场可交付 portable package；workflow 复用 portable packaging 或等价流程，并从最终 nupkg/zip 生成、校验和上传供应链产物。 |
 | 测试分级 | 已有 `TestClassificationAttribute`、Domain/Purpose/Lane/Evidence/Oracle/Resource、`quality/test-gates.json` 和串行 Gate。 | 删除另建 A/B/C 分类体系；只补 critical-contract baseline、Owner、动态人口防回退和风险修复产生的公共合同测试。 |
 | 全量五次 repeat | 没有证据证明所有测试都需重复五次，且全量 repeat 成本和噪声过高。 | 只对 blocking lane、已知 flaky、时序/资源敏感测试做重复运行并登记失败签名；普通全量 Gate 不机械 5 次。 |
@@ -59,7 +59,7 @@ review_input_revision: "78d693fb4"
 | [全面提升 TODO](./ClearVision-全面提升TODO-2026-05-09.md) | 按 46 个主题：35 个 `IMPLEMENTED_SYNC_PENDING`、10 个 `OPEN_RESCOPED`、P2-2 被本次前端架构决定取代。按 147 个 checkbox：原勾 3、实现待同步 106、实质残项 33、总关闭条件 5。 | U01-U06、U14 |
 | [T01 测试与覆盖率治理总体计划](./测试治理/ClearVision_T01_测试与覆盖率治理总体计划_PROPOSED_AUDITED.md) | G01 阶段证据已归档，G01B-R3/G02 仍需当前 SHA；G03-G06 原方案有重复建设，G07 引用了非当前分支架构，G08 仍应 report-only，G09 按 SKU 外部验收。 | U05-U07 |
 | [Studio2](../Studio2/README.md) | G00-G15 Goal 卡已完成或历史回填，但 G16 不能通过直接打开不具产品 parity 的 `/v2` 关闭；当前 release root 决定改为 legacy root + capability owners。 | U05 |
-| [持续问题排查记录](../待复核/持续问题排查记录-2026-07-06.md) | 102 个源 ID：31 个 `IMPLEMENTED_SYNC_PENDING`，71 个仍开放；开放 ID 中多项需收窄或合并实现，但每个 ID 保留独立验收。 | U08-U14 |
+| [持续问题排查记录](../待复核/持续问题排查记录-2026-07-06.md) | 102 个源 ID：31 个 `IMPLEMENTED_SYNC_PENDING`、70 个仍开放、`CV-AUDIT-044` 已由 Wave 0 单独关闭；开放 ID 中多项需收窄或合并实现，但每个 ID 保留独立验收。 | U08-U14 |
 | [0407 Qwen 排查](../未闭环事项/0407-Qwen排查未闭环.md) | #1-#26 已由当前实现、文件移除或等价契约覆盖，原状态未同步。 | U14 回填 |
 | [0418 临时问题记录](../未闭环事项/0418-临时问题记录.md) | 主体实现已落地；工业证据尾项去重并入 U01/U03/U13。 | U01、U03、U13、U14 |
 | [深度学习算子问题](../未闭环事项/深度学习算子问题.md) | 灰度/16-bit、NMS、异步加载和工程化契约已改造；旧 tensor-copy 阻断是死代码误判。真实残项是证据声明、模型身份、交付 profile 性能和现场签核。 | U01、U07、U14 |
@@ -95,22 +95,24 @@ review_input_revision: "78d693fb4"
 - [ ] Core20 人工结论放 sidecar ledger，记录 reviewer/date/card fingerprint/verdict、算法边界、失败模式、典型 I/O 和不可用场景；生成器不得覆盖人工结论。
 - [ ] 保留稳定 artifact ID `full155`，但 suite、registry 和生成器从受治理 catalog 动态取得实际人口（当前 158）；新增算子缺 evidence entry 即失败，并输出 Contract/Golden/Dataset/Field replay delta/trend。
 
+Wave 0 只做了一次既有 Gate 的 generated artifact hygiene：通过 `OperatorKnowledgeGraphRunner` 正式再生成 cards/graph/report，使 `StringFormat` 输出与当前 metadata 对齐为 `Result`、`IsEmpty`、`Length`，并新增两条确定性 PRODUCES edge；158 张卡中仅该算子发生结构变化，catalog fingerprint 保持 `3C7C69D1A08C481E227D2A3BCF11A839324B429BD01E3568E5EC8BB8C2DB4C53`。这不表示 U03 动态人口、catalog 分类或人工证据治理已开始或关闭。
+
 ### U04 SDK、现场 Release 与供应链契约
 
 优先级：P1。状态：`OPEN_CONFIRMED`。Owner：构建发布/供应链。
 
-- [ ] 将 SDK 策略统一为 `9.0.300 + rollForward: latestPatch`，同步 `global.json`、根 README、项目总览、SDK 指南、`scripts/dotnet.ps1` 和 CI；CI 记录实际 resolved SDK 并在 feature band 漂移时失败。
+- [x] 将 SDK 策略统一为 `9.0.300 + rollForward: latestPatch`，同步 `global.json`、根 README、项目总览、SDK 指南、`scripts/dotnet.ps1` 和 CI；`scripts/validate-dotnet-sdk-policy.ps1` 自测、实际 resolved SDK 与 10/10 workflow coverage 校验通过。
 - [ ] 明确 PR/main 的 raw build artifact 不是现场交付包；tag Release 必须调用 `package-portable-deployment.ps1` 或功能等价的唯一 packaging implementation，统一启动文件、离线依赖和 `README-site-deploy.txt`。
 - [ ] 从最终 `.nupkg` 与 portable zip 生成并核验 SPDX/SBOM、THIRD-PARTY-NOTICES 和 dependency report，随同一 GitHub Release 上传；仓库内预制 seed 只作输入，不作最终产物证据。
 - [ ] 明确漏洞/许可证 fail-or-approved-exception 策略，发布前处置 `S7NetPlus` 的 `NOASSERTION`。
 
 ### U05 当前生产前端、Studio2 G16 与 T01-G07
 
-优先级：P1 Release。状态：`OPEN_RESCOPED`。Owner：Desktop/Studio2。当前阻断：`BLOCKED_OWNER_DISPOSITION_GAP`、`BLOCKED_RELEASE_EVIDENCE_GAP`。
+优先级：P1 Release。状态：`OPEN_RESCOPED`。Owner：Desktop/Studio2。当前阻断：`BLOCKED_RELEASE_EVIDENCE_GAP`；`BLOCKED_OWNER_DISPOSITION_GAP` 已由 Wave 0 解除。
 
-- [ ] 执行本次架构决定：`wwwroot/index.html + app.js + capability owners` 是当前 release 唯一 production root；G15 capability owner 模块位于当前 `app.js` root，不等于 `Desktop/FrontendV2`。`FrontendV2`/`/v2` 明确为 non-production，不得以打开 `WorkspaceV2Enabled` 作为 G16 验收，也不得在退役 FrontendV2 时误删 production owner。
-- [ ] Settings/AI 等默认关闭的 capability owner 逐项决定“补齐 parity 后在当前 production root 晋级”或“删除实验 owner/flag”；卡片状态、默认 flag 与实际 mounted owner 必须一致。
-- [ ] 若没有另行批准、具备完整 Project/Flow/Property/Preview/Globals/Settings/Station/AI/Inspection/Results parity 的迁移 epic，则退役 FrontendV2 production build/flag/publish 路径；若批准迁移，迁移工作另立计划且不阻断本次 G16。
+- [x] 执行本次架构决定：`wwwroot/index.html + app.js + capability owners` 是当前 release 唯一 production root；删除 `WorkspaceV2Enabled`、V2 startup injection/root resolver，并以 `/v2` 固定 404 和 architecture guard 防止误切。
+- [x] Settings/Inspection/AI 的 disposition 固定为删除不完整实验 owner、adapter、服务端 flag 和客户端双重门禁；legacy `SettingsView`、`InspectionPanel`、`AiPanel` 分别担任唯一 production owner，并验证 lifecycle cleanup。
+- [x] 退役 FrontendV2 production build/flag/publish 与 release Gate 路径；源码通过 Desktop project `Content/None Remove` 隔离为 non-production，未来迁移须另立完整 parity/migration epic。
 - [ ] T01-G07 改为当前 UI 栈的 capability owner/legacy replacement matrix，覆盖现有 `wwwroot` unit、Playwright 和真实 WebView2；不得执行只存在于 `studio-ui-next` 的路径和命令。
 - [ ] G16 仍需 clean clone build/publish、无 Node 目标机离线启动、真实 WebView2、100/125/150/200% OS scale 与 1366x768/1920x1080/2560x1440/3840x2160 批准组合、300/1000 primitive 性能、旧工程/包/Station/Agent/Project save 回归和同 SHA GitHub CI。Node 微基准只作 CPU signal，release 性能必须在最终 publish/current root 的真实 WebView2 记录 input-to-paint、RAF long-frame、p95 和 working set。
 
@@ -165,7 +167,7 @@ review_input_revision: "78d693fb4"
 - [ ] 数据库 repair/backup/restore/cleanup 通过同一 maintenance operation gate 串行；恢复期间不得让并发清理/备份命中不确定库，失败保留 safety backup 和明确 recovery state。
 - [ ] legacy `/api/ai/agent-plan` 的 workspace mutation 携带 expected revision/clientMutationId 并服从同一 CAS，或删除该 fallback；长请求不得覆盖期间的新 workspace snapshot。
 - [ ] Project create 进入 ProjectSaveCoordinator staged commit/recovery；DB project、flow body、metadata 任一步失败都不得留下 API 报失败但列表可见/可读的半创建工程。
-- [ ] `CV-AUDIT-044` 先作产品决定：若模板是权威用户数据，GET pure 并提供 last-good/显式 repair；若只是可重建缓存，文档化当前自动重建契约并关闭该 ID。不能同时保留“损坏即重建成功”测试又要求 GET 无副作用。
+- [x] `CV-AUDIT-044` 产品决定与实现已落地：`flow_templates.json` 是权威用户数据；GET pure，未初始化/损坏/空库/不可用统一返回稳定 degraded 503，不修改 active bytes 或生成 backup；built-in 初始化/升级只在显式 startup migration，修复只经 Admin maintenance endpoint。focused regression Product `24/24`、Desktop endpoint `9/9` PASS；该源 ID 已单独关闭，U09 其余 authority 项仍开放。
 - [ ] 为各 authority 注入并发、旧 revision、磁盘满、权限、损坏 JSON、进程中断、半写 secret 和 runtime apply 失败，验证响应、原数据保留与重启恢复。
 
 `CV-AUDIT-021` 的非 Admin 主题写入已关闭，只剩 stale read-modify-write 并入 AppConfig authority。AI metrics 不参与主结果成败，但其 auxiliary persistence、mutation 和 recovery 仍由 U09 承接。
@@ -240,7 +242,7 @@ review_input_revision: "78d693fb4"
 优先级：随项。状态：`OPEN_CONFIRMED`。Owner：文档治理。
 
 - [ ] 每个源 ID 建 ledger：disposition、精确剩余动作、acceptance、evidence SHA、Owner、依赖；合并实现不等于合并验收或丢失 ID。
-- [ ] 31 个 `IMPLEMENTED_SYNC_PENDING` 逐项回填实现/测试依据后才标 `CLOSED`；71 个开放 ID 按本计划实际关闭，不能按治理线整体勾选。
+- [ ] 31 个 `IMPLEMENTED_SYNC_PENDING` 逐项回填实现/测试依据后才标 `CLOSED`；除 Wave 0 已单独关闭的 `CV-AUDIT-044` 外，其余 70 个开放 ID 按本计划实际关闭，不能按治理线整体勾选。
 - [ ] 全面提升 TODO 回填 35 个已实现主题（106 checkbox），10 个窄化主题随 U01-U06 关闭，P2-2 标记由前端架构决定取代；5 个总关闭条件最后验收。
 - [ ] 0407、0418、深度学习文档继续保留为历史快照；Studio2 仅在 G16 当前 release 验收关闭后整批归档 Goal 卡。
 - [ ] U01-U13 与 U14 的逐 ID ledger、源文档回填、关闭核对全部完成后，才关闭 U14、将本文改为 `closed` 并生成归档说明；任一 required release profile 仍外部阻断时不得宣称全项目闭环。
@@ -281,10 +283,23 @@ review_input_revision: "78d693fb4"
 
 ## 7. 执行顺序与归档门禁
 
-1. **Wave 0：事实与产品决定** — 同步本文、T01、Studio2 G16、深度学习和审计池口径；完成 U09 模板 authority、U05 owner disposition、U04 SDK policy 决定。
+1. **Wave 0：事实与产品决定** — 本轮已完成 U09 模板 authority、U05 owner disposition、U04 SDK policy 及对应 canonical 文档同步；U04/U05/U09 的后续 release/authority 子项不因此整体关闭。
 2. **Wave 1：安全与不可逆副作用** — U08 的 P0 子项、U10 Draft capability escalation、U13 Script/S7/FINS fail-closed，以及 U11 replay fail-soft。
 3. **Wave 2：一致性与长进程稳定性** — U02、U09、U11 其余项、U12。
 4. **Wave 3：质量、发布和当前 UI 证据** — U01、U03、U04、U05、U06。
 5. **Wave 4：目标 SKU 外部验收与归档** — U07、U14。
+
+### 7.1 Wave 0 验证证据（2026-08-28）
+
+- Implementation/evidence SHA：`1e2342c3909cb1f157d902aef1338e92f1ac44a3`（`feat: close wave 0 governance decisions`）。本节所在的后续文档提交只引用该实现 SHA，不把提交自身 SHA 写入 tracked 文件。
+- Build：Product test project PASS（1 个既存 `System.Collections.Immutable` 冲突 warning，0 error）；Desktop test project PASS（0 warning，0 error）。
+- 模板 pure-read/repair：通过 `scripts/run-dotnet-test-serial.ps1` 串行执行 Product canonical focused，`58/58` PASS；其中 `Sprint7_AiEvolutionTests` `24/24`、knowledge-graph runtime 精确回归 `3/3` PASS。Desktop 六类合并回归 `62/62` PASS，其中 `TemplateEndpointTests` `9/9` PASS。
+- StringFormat hygiene：`& './scripts/dotnet.ps1' run --project 'quality/tools/OperatorKnowledgeGraphRunner/OperatorKnowledgeGraphRunner.csproj' --configuration Debug` PASS（158 cards / 1984 edges）；`Artifact_ShouldAlignPortsAndParametersWithOperatorMetadata` 精确回归 `1/1` PASS；加入该项的 Product 扩展集合 `59/59` PASS。生成器先显式执行 startup migration，未手改 JSON，也未勾选 U03。
+- UI archived gate：精确 Node test `1/1` PASS；完整 `npm run test:unit` 为 `988/988` PASS。测试现读取 `docs/归档/过期计划/VisionAgent-旧阶段计划/VisionAgent_RuntimePreview_Pilot_Gate.md` 并同时断言归档 README 的 superseded 历史定位；fixed shadow、permission negative、default closed、resource allowlist、offline fallback 等安全契约保留，旧计划未复制回当前计划。
+- Playwright：首次实际运行本次 7 个 spec 为 `67 passed / 6 failed`；其中 1 项是 PLC 旧断言错误要求同时写 `/api/plc/settings` 与 `/api/settings`，修正为反向证明第二写 authority 为 0 后精确回归 `1/1` PASS，七 spec 的非视觉最终回归 `68/68` PASS。剩余 5 个 `ai-shell-visual` baseline 在当前 Chromium 环境为字体抗锯齿像素差异（约 1%–4%）；未覆盖治理快照，仍是 G16 release evidence blocker，不能写成 Playwright full PASS。
+- SDK：`validate-dotnet-sdk-policy.ps1 -SelfTest` 为 `12/12` PASS；普通 policy validation 解析系统 SDK `9.0.301`；`-ValidateWorkflows` 为 `10 setup-dotnet / 10 validator` PASS；`scripts/dotnet.ps1 --version` 为 `9.0.300`。
+- 本地 publish：`scripts/dotnet.ps1 publish ClearVision.Product.Desktop.csproj --configuration Release --no-restore --output ./.tmp/publish-check/wave0-close/` PASS。产物共 198 files / 332,738,267 bytes；`wwwroot/index.html`、`wwwroot/src/app.js` 存在，`wwwroot/v2`、FrontendV2、Node runtime、`node_modules`、package manifest/lockfile 均为 0；检查后已删除该临时目录。这只证明当前工作树 production publish path，不替代 clean clone、最终 release candidate 或真实 no-Node 目标机启动。
+- 静态终验：changed JS/MJS `node --check` 3/3、PowerShell AST parse 3/3、JSON parse 4/4、production retired flag/owner/global 与 FrontendV2 build/publish 残余扫描 0、`git diff --check` PASS；未发现仓库/Playwright 关联的 `dotnet`、`testhost`、Node/http-server 或浏览器服务进程。
+- 仍未完成：真实 WebView2、DPI/分辨率批准矩阵、no-Node 目标机离线启动、clean clone 全链路、300/1000 primitive 最终 publish 性能、旧工程/包/Station/Agent/Project save 完整回归与同 SHA GitHub CI；继续归入 G16/U04 release evidence。
 
 Wave 可以拆成小提交，但每个源 ID 必须保留独立验收行。只有在 required profiles、最终 Release SHA 和源文档回填全部关闭后，才归档本文及用户指定的七组文档。
