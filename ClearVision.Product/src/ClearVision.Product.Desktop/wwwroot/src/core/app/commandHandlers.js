@@ -1,3 +1,5 @@
+import localDraftStorage from '../../features/project/localDraftStorage.js';
+
 function bindButton(documentRef, id, handler, cleanup) {
     const button = documentRef.getElementById(id);
     if (!button || button.dataset.cvCommandBound) {
@@ -78,6 +80,7 @@ function tryOpenFinalDecisionFromError(error) {
  * @property {(message: string, type?: string) => void} showToast
  * @property {(options?: any) => void} handleNewProject
  * @property {() => boolean} [canEditProject]
+ * @property {(projectId: string) => boolean | Promise<boolean>} [clearLocalDraft]
  * @property {(view: string) => void} setCurrentView
  * @property {(view: string) => void} syncActiveNavButton
  * @property {(view: string) => Promise<void>} switchView
@@ -105,6 +108,7 @@ export function bindToolbarCommands(options) {
         showToast,
         handleNewProject,
         canEditProject = () => true,
+        clearLocalDraft = projectId => localDraftStorage.clear(projectId),
         setCurrentView,
         syncActiveNavButton,
         switchView,
@@ -140,21 +144,10 @@ export function bindToolbarCommands(options) {
                 }
 
                 await projectManager.saveProject(projectManager?.getCurrentProject?.() || project);
-                const storage = typeof localStorage !== 'undefined' ? localStorage : null;
-                if (storage) {
-                    try {
-                        const rawBackup = storage.getItem('cv_autosave_backup');
-                        const backup = rawBackup ? JSON.parse(rawBackup) : null;
-                        if (!backup?.projectId || backup.projectId === project.id) {
-                            storage.removeItem('cv_autosave_backup');
-                        }
-                    } catch {
-                        try {
-                            storage.removeItem('cv_autosave_backup');
-                        } catch {
-                            // Saving already succeeded; ignore unavailable backup storage.
-                        }
-                    }
+                try {
+                    await clearLocalDraft(project.id);
+                } catch (error) {
+                    console.warn('[CommandHandlers] 工程已保存，但本机草稿清理失败。', error);
                 }
 
                 showToast(`工程已保存到服务端工程库（版本 v${project.version || '1.0.0'}）`, 'success');

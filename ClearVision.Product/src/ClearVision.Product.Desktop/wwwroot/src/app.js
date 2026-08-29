@@ -62,7 +62,14 @@ debugLogger.debug(`[App] ${t('app.startingImports', 'Starting module imports')}.
 // ============================================
 // Auth session bootstrap
 // ============================================
-import { PermissionGuard, bootstrapAuthSession, installUnauthorizedHandler, logout } from './features/auth/auth.js';
+import {
+    PermissionGuard,
+    bootstrapAuthSession,
+    getCurrentUser,
+    installUnauthorizedHandler,
+    logout,
+    subscribeAuthContext
+} from './features/auth/auth.js';
 
 import httpClient from './core/messaging/httpClient.js';
 import { createSignal } from './core/state/store.js';
@@ -109,6 +116,7 @@ import projectManager, {
     getCurrentProject,
     subscribeProject
 } from './features/project/projectManager.js';
+import localDraftStorage from './features/project/localDraftStorage.js';
 
 const NODE_PREVIEW_INSPECTOR_FLAG_KEY = 'Studio:NodePreviewInspectorEnabled';
 const PROPERTY_PANEL_CAPABILITY_FLAG_KEY = 'Studio2.PropertyPanel';
@@ -273,7 +281,6 @@ let aiPanelModulePromise = null;
 // Encoding cleanup: previous comment text was unreadable.
 let autoSaveInterval = null;
 const AUTO_SAVE_DELAY = 5 * 60 * 1000;
-const LOCAL_DRAFT_BACKUP_KEY = 'cv_autosave_backup';
 const PROJECT_FLOW_SYNC_DEBOUNCE_MS = 250;
 const PROJECT_FLOW_SYNC_IDLE_TIMEOUT_MS = 1500;
 const promptedLocalDraftKeys = new Set();
@@ -284,51 +291,47 @@ let pendingProjectFlowSyncProjectId = null;
 let pendingProjectFlowSyncRevision = null;
 let pendingProjectFlowSyncReason = null;
 
-function getLocalDraftBackupSignature(project, flow) {
+function getAuthenticatedUserId() {
+    const value = getCurrentUser()?.userId ?? getCurrentUser()?.id ?? null;
+    if (typeof value !== 'string') {
+        return null;
+    }
+
+    const normalized = value.trim();
+    return normalized || null;
+}
+
+function resetLocalDraftSessionState() {
+    promptedLocalDraftKeys.clear();
+    lastLocalDraftBackupSignature = null;
+}
+
+function getLocalDraftBackupSignature(project, flow, userId = getAuthenticatedUserId()) {
+    if (!userId) {
+        return null;
+    }
+
     const projectId = project?.id || '';
     const modifiedAt = project?.modifiedAt || project?.ModifiedAt || '';
     const flowRevision = flow?.flowRevision ?? flow?.FlowRevision ?? '';
-    return `${projectId}:${modifiedAt}:${flowRevision}`;
+    return `${userId}:${projectId}:${modifiedAt}:${flowRevision}`;
 }
 
-function readLocalDraftBackup() {
-    try {
-        const raw = localStorage.getItem(LOCAL_DRAFT_BACKUP_KEY);
-        return raw ? JSON.parse(raw) : null;
-    } catch (error) {
-        debugLogger.warn('[LocalDraftBackup] 本机草稿读取失败:', error);
-        return null;
-    }
-}
-
-function saveLocalDraftBackup(project, flow, source = 'timer') {
+function writeLocalDraftBackup(project, flow, source = 'timer') {
     if (!project || !flow) {
         return null;
     }
 
-    const backup = {
-        projectId: project.id,
-        projectName: project.name || '',
-        timestamp: new Date().toISOString(),
+    const backup = localDraftStorage.write(project, flow, {
         source,
-        nodeCount: getFlowNodeCount(flow),
-        flow
-    };
-
-    localStorage.setItem(LOCAL_DRAFT_BACKUP_KEY, JSON.stringify(backup));
-    lastLocalDraftBackupSignature = getLocalDraftBackupSignature(project, flow);
-    return backup;
-}
-
-function clearLocalDraftBackup(projectId = null) {
-    const backup = readLocalDraftBackup();
+        nodeCount: getFlowNodeCount(flow)
+    });
     if (!backup) {
-        return;
+        return null;
     }
 
-    if (!projectId || backup.projectId === projectId) {
-        localStorage.removeItem(LOCAL_DRAFT_BACKUP_KEY);
-    }
+    lastLocalDraftBackupSignature = getLocalDraftBackupSignature(project, flow, backup.userId);
+    return backup;
 }
 
 function loadProjectViewModule() {
@@ -545,8 +548,8 @@ function promptLocalDraftRestore(project) {
         return;
     }
 
-    const backup = readLocalDraftBackup();
-    const promptKey = `${backup?.projectId || ''}:${backup?.timestamp || ''}`;
+    const backup = localDraftStorage.read(project.id);
+    const promptKey = `${backup?.userId || ''}:${backup?.projectId || ''}:${backup?.timestamp || ''}`;
     if (!backup || backup.projectId !== project.id || promptedLocalDraftKeys.has(promptKey)) {
         return;
     }
@@ -2591,6 +2594,9 @@ async function initializeApp() {
         return false;
     }
 
+    localDraftStorage.purgeOwnerlessLegacyDraft();
+    trackedSubscribe(subscribeAuthContext, resetLocalDraftSessionState);
+    resetLocalDraftSessionState();
     updateAuthenticatedUserDisplay();
     initializeNavigation();
     initializeOperatorLibraryPanel();
@@ -2807,11 +2813,16 @@ function startAutoSave() {
                 }
 
                 const signature = getLocalDraftBackupSignature(project, flow);
-                if (signature === lastLocalDraftBackupSignature) {
+                if (!signature || signature === lastLocalDraftBackupSignature) {
                     return;
                 }
 
-                saveLocalDraftBackup(project, flow, 'timer');
+                const backup = writeLocalDraftBackup(project, flow, 'timer');
+                if (!backup) {
+                    debugLogger.warn('[LocalDraftBackup] 缺少已完成认证的用户上下文，本轮草稿未写入。');
+                    return;
+                }
+
                 debugLogger.debug('[LocalDraftBackup] 本机草稿备份完成:', new Date().toLocaleTimeString());
             } catch (err) {
                 console.error('[LocalDraftBackup] 本机草稿备份失败:', err);
@@ -2846,7 +2857,13 @@ async function triggerAutoSave() {
                 return;
             }
 
-            saveLocalDraftBackup(project, project.flow, 'manual');
+            const backup = writeLocalDraftBackup(project, project.flow, 'manual');
+            if (!backup) {
+                debugLogger.warn('[LocalDraftBackup] 缺少已完成认证的用户上下文，手动草稿未写入。');
+                showToast('本机草稿备份失败：请重新登录后再试', 'error');
+                return;
+            }
+
             debugLogger.debug('[LocalDraftBackup] 手动触发本机草稿备份完成');
             showToast('本机草稿已更新；正式工程仍需点击“保存工程”。', 'success');
         } catch (err) {

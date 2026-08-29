@@ -126,6 +126,7 @@ test('toolbar save syncs serialized canvas flow into project manager before pers
   const serializedFlow = { operators: [{ id: 'node-1' }], connections: [] };
   const updates = [];
   const saves = [];
+  const clearedDrafts = [];
 
   bindToolbarCommands({
     documentRef,
@@ -150,6 +151,10 @@ test('toolbar save syncs serialized canvas flow into project manager before pers
         saves.push(projectToSave);
       }
     },
+    clearLocalDraft(projectId) {
+      clearedDrafts.push(projectId);
+      return true;
+    },
     inspectionController: {},
     showToast() {},
     handleNewProject() {},
@@ -168,6 +173,7 @@ test('toolbar save syncs serialized canvas flow into project manager before pers
   assert.equal(updates[0], serializedFlow);
   assert.equal(saves.length, 1);
   assert.equal(saves[0].flow, serializedFlow);
+  assert.deepEqual(clearedDrafts, ['project-1']);
 });
 
 test('toolbar save persists draft flows without requiring run-ready validation', async () => {

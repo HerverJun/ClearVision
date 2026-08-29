@@ -40,8 +40,37 @@ function isLoginPage() {
     return String(getAuthWindow().location?.pathname || '').includes('/login.html');
 }
 
+const authContextSubscribers = new Set();
+
+function getStableUserId(user) {
+    const value = user?.userId ?? user?.id ?? null;
+    if (typeof value !== 'string') {
+        return null;
+    }
+
+    const normalized = value.trim();
+    return normalized || null;
+}
+
 function applyCurrentUser(user) {
-    getAuthWindow().currentUser = user || null;
+    const authWindow = getAuthWindow();
+    const previousUser = authWindow.currentUser || null;
+    const nextUser = user || null;
+    const previousUserId = getStableUserId(previousUser);
+    const nextUserId = getStableUserId(nextUser);
+
+    authWindow.currentUser = nextUser;
+    if (previousUserId === nextUserId) {
+        return;
+    }
+
+    for (const subscriber of [...authContextSubscribers]) {
+        try {
+            subscriber(nextUser, previousUser);
+        } catch (error) {
+            console.error('[Auth] 认证上下文订阅回调失败:', error);
+        }
+    }
 }
 
 export const Capabilities = Object.freeze({
@@ -180,6 +209,15 @@ export function getCurrentUser() {
     return getAuthWindow().currentUser || null;
 }
 
+export function subscribeAuthContext(callback) {
+    if (typeof callback !== 'function') {
+        throw new TypeError('认证上下文订阅者必须是函数。');
+    }
+
+    authContextSubscribers.add(callback);
+    return () => authContextSubscribers.delete(callback);
+}
+
 export function isAuthenticated() {
     return !!getToken();
 }
@@ -220,7 +258,7 @@ export async function logout() {
         console.warn('[Auth] 服务端登出失败，将继续清理本地会话。', error);
         writeLogoutNotice('服务端登出失败，但本地会话已清理。若其他终端仍在线，请稍后确认会话状态。');
     } finally {
-        clearAuthSession();
+        resetAuthState();
         getAuthWindow().location.href = buildAppUrl('./login.html');
     }
 }

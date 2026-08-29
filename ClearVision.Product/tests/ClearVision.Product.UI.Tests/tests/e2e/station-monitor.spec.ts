@@ -191,9 +191,9 @@ async function mockStationApis(page: Page, eventBody = '', stationList = station
   });
 }
 
-async function openMonitor(page: Page) {
+async function openMonitor(page: Page, user?: Parameters<typeof bootAuthenticatedApp>[1]) {
   await mockBaseApis(page);
-  await bootAuthenticatedApp(page);
+  await bootAuthenticatedApp(page, user);
   await page.locator('.nav-btn[data-view="stations"]').click();
   await expect(page.locator('#sm-results-workbench')).toBeVisible();
 }
@@ -290,5 +290,39 @@ test.describe('Station monitor', () => {
     await expect(focus).toContainText('防火墙规则');
     await expect(focus).toContainText('spool 磁盘空间/权限');
     await expect(focus).toContainText('StationSync 队列容量');
+  });
+
+  test('non-Admin capability gate blocks Station mutation requests at the handler boundary', async ({ page }) => {
+    const mutationRequests: string[] = [];
+    page.on('request', request => {
+      if (request.method() !== 'GET' && new URL(request.url()).pathname.startsWith('/api/stations/')) {
+        mutationRequests.push(`${request.method()} ${new URL(request.url()).pathname}`);
+      }
+    });
+
+    await mockStationApis(page);
+    await openMonitor(page, {
+      userId: 'operator-e2e',
+      id: 'operator-e2e',
+      username: 'operator-e2e',
+      displayName: 'E2E Operator',
+      role: 'Operator',
+      capabilities: ['station.packages.read'],
+      passwordPolicy: { minimumLength: 12 },
+    });
+    await page.locator('[data-station-id="station-a"]').click();
+
+    const pingButton = page.locator('[data-station-action="ping"]');
+    await expect(pingButton).toBeDisabled();
+    await expect(page.locator('[data-station-action="deploy"]')).toBeDisabled();
+    await expect(page.locator('[data-station-action="testDeploy"]')).toBeDisabled();
+
+    await pingButton.evaluate((button: HTMLButtonElement) => {
+      button.disabled = false;
+      button.click();
+    });
+
+    await expect(page.locator('.sm-command-status')).toContainText('没有执行此 Station 操作的权限');
+    expect(mutationRequests).toEqual([]);
   });
 });

@@ -1,6 +1,16 @@
 import { expect, Page } from '@playwright/test';
 
-const E2E_USER = {
+type E2EAuthenticatedUser = {
+  userId: string;
+  id?: string;
+  username: string;
+  displayName: string;
+  role: string;
+  capabilities?: string[];
+  passwordPolicy?: { minimumLength: number };
+};
+
+const E2E_USER: E2EAuthenticatedUser = {
   userId: 'e2e-admin',
   id: 'e2e-admin',
   username: 'admin',
@@ -8,12 +18,15 @@ const E2E_USER = {
   role: 'Admin',
 };
 
-export async function bootAuthenticatedApp(page: Page): Promise<void> {
+export async function bootAuthenticatedApp(
+  page: Page,
+  user: E2EAuthenticatedUser = E2E_USER,
+): Promise<void> {
   await page.route('**/api/auth/me', async route => {
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
-      body: JSON.stringify(E2E_USER),
+      body: JSON.stringify(user),
     });
   });
 
@@ -21,7 +34,7 @@ export async function bootAuthenticatedApp(page: Page): Promise<void> {
     sessionStorage.setItem('cv_auth_token', 'e2e-token');
     sessionStorage.setItem('cv_current_user', JSON.stringify(user));
     localStorage.setItem('cv_welcome_shown', 'true');
-  }, E2E_USER);
+  }, user);
 
   await page.goto('/index.html');
   await expect(page.locator('#app')).toBeVisible();
