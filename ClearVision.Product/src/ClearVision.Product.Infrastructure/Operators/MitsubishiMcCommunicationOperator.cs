@@ -15,6 +15,7 @@ namespace ClearVision.Product.Infrastructure.Operators;
     Description = "三菱 MC 协议 PLC 读写通信。",
     CategoryId = OperatorCategoryId.Communication,
     IconName = "mc-plc",
+    Version = "1.0.1",
     Keywords = new[] { "PLC", "Mitsubishi", "MC", "Read", "Write" }
 )]
 [OperatorParameterRule("IpAddress", RequiredWhenAll = new[] { "UseGlobalFallback==false" }, ResourceKind = OperatorResourceKind.PlcEndpoint, ReasonCode = "MITSUBISHI_OPERATOR_IP_REQUIRED_WITHOUT_GLOBAL_FALLBACK")]
@@ -54,10 +55,21 @@ namespace ClearVision.Product.Infrastructure.Operators;
 [OperatorParam("PollingInterval", "Polling Interval (ms)", "int", Description = "Interval between polling reads in milliseconds.", DefaultValue = 50, Min = 10, Max = 5000)]
 public sealed class MitsubishiMcCommunicationOperator : PlcCommunicationOperatorBase
 {
+    private readonly Func<string, int, IPlcClient> _clientFactory;
+
     public override OperatorType OperatorType => OperatorType.MitsubishiMcCommunication;
 
-    public MitsubishiMcCommunicationOperator(ILogger<MitsubishiMcCommunicationOperator> logger) : base(logger)
+    public MitsubishiMcCommunicationOperator(ILogger<MitsubishiMcCommunicationOperator> logger)
+        : this(logger, CreateClient)
     {
+    }
+
+    internal MitsubishiMcCommunicationOperator(
+        ILogger<MitsubishiMcCommunicationOperator> logger,
+        Func<string, int, IPlcClient> clientFactory)
+        : base(logger)
+    {
+        _clientFactory = clientFactory;
     }
 
     protected override async Task<OperatorExecutionOutput> ExecuteCoreAsync(
@@ -90,6 +102,20 @@ public sealed class MitsubishiMcCommunicationOperator : PlcCommunicationOperator
             return CreateFailureOutput("Operation must be Read or Write.");
         }
 
+        if (PlcOperatorParameterContract.IsRead(operation) &&
+            !PlcOperatorParameterContract.IsSupportedPollingMode(pollingMode))
+        {
+            return CreateFailureOutput("PLC_POLLING_MODE_INVALID: PollingMode must be None or WaitForValue.");
+        }
+
+        if (PlcOperatorParameterContract.IsRead(operation) &&
+            PlcOperatorParameterContract.IsWaitForValue(pollingMode) &&
+            !PlcOperatorParameterContract.IsSupportedPollingCondition(pollingCondition))
+        {
+            return CreateFailureOutput(
+                $"PLC_POLLING_CONDITION_INVALID: PollingCondition must be one of: {string.Join(", ", PlcOperatorParameterContract.SupportedPollingConditions)}.");
+        }
+
         if (operation.Equals("Write", StringComparison.OrdinalIgnoreCase) &&
             OperatorParameterValueSemantics.IsMissing(writeValue))
         {
@@ -110,16 +136,9 @@ public sealed class MitsubishiMcCommunicationOperator : PlcCommunicationOperator
             logPort = port;
 
             var connectionKey = $"MC:{ipAddress}:{port}";
-            var (client, _) = await GetOrCreateConnectionAsync(connectionKey, () =>
-            {
-                var mcClient = PlcClientFactory.CreateMitsubishiMc(ipAddress);
-                if (mcClient is MitsubishiMcClient typed)
-                {
-                    typed.Port = port;
-                }
-
-                return mcClient;
-            });
+            var (client, _) = await GetOrCreateConnectionAsync(
+                connectionKey,
+                () => _clientFactory(ipAddress, port));
 
             if (operation.Equals("Read", StringComparison.OrdinalIgnoreCase))
             {
@@ -211,6 +230,7 @@ public sealed class MitsubishiMcCommunicationOperator : PlcCommunicationOperator
         var address = GetStringParam(@operator, "Address", string.Empty);
         var length = GetIntParam(@operator, "Length", 1);
         var pollingMode = GetStringParam(@operator, "PollingMode", "None");
+        var pollingCondition = GetStringParam(@operator, "PollingCondition", "Equal");
 
         try
         {
@@ -241,14 +261,31 @@ public sealed class MitsubishiMcCommunicationOperator : PlcCommunicationOperator
 
         if (operation.Equals("Read", StringComparison.OrdinalIgnoreCase))
         {
-            var validPollingModes = new[] { "None", "WaitForValue" };
-            if (!validPollingModes.Contains(pollingMode, StringComparer.OrdinalIgnoreCase))
+            if (!PlcOperatorParameterContract.IsSupportedPollingMode(pollingMode))
             {
-                return ValidationResult.Invalid($"PollingMode must be one of: {string.Join(", ", validPollingModes)}.");
+                return ValidationResult.Invalid("PLC_POLLING_MODE_INVALID: PollingMode must be None or WaitForValue.");
+            }
+
+            if (PlcOperatorParameterContract.IsWaitForValue(pollingMode) &&
+                !PlcOperatorParameterContract.IsSupportedPollingCondition(pollingCondition))
+            {
+                return ValidationResult.Invalid(
+                    $"PLC_POLLING_CONDITION_INVALID: PollingCondition must be one of: {string.Join(", ", PlcOperatorParameterContract.SupportedPollingConditions)}.");
             }
         }
 
         return ValidationResult.Valid();
+    }
+
+    private static IPlcClient CreateClient(string ipAddress, int port)
+    {
+        var client = PlcClientFactory.CreateMitsubishiMc(ipAddress);
+        if (client is MitsubishiMcClient typedClient)
+        {
+            typedClient.Port = port;
+        }
+
+        return client;
     }
 
     private async Task<OperatorExecutionOutput> ExecuteReadWithPollingAsync(
@@ -285,7 +322,7 @@ public sealed class MitsubishiMcCommunicationOperator : PlcCommunicationOperator
             var currentValue = ConvertBytesToValue(client, result.Content!, dataType);
             readCount++;
 
-            if (EvaluatePollingCondition(currentValue, pollingCondition, pollingValue))
+            if (PlcOperatorParameterContract.EvaluatePollingCondition(currentValue, pollingCondition, pollingValue))
             {
                 var output = CreateSuccessOutput(currentValue, dataType);
                 output.OutputData ??= new Dictionary<string, object>();
@@ -297,28 +334,6 @@ public sealed class MitsubishiMcCommunicationOperator : PlcCommunicationOperator
 
             await Task.Delay(intervalMs, ct);
         }
-    }
-
-    private static bool EvaluatePollingCondition(object currentValue, string condition, string targetValue)
-    {
-        var currentStr = currentValue?.ToString() ?? string.Empty;
-        var currentIsNumeric = double.TryParse(currentStr, out var currentNum);
-        var targetIsNumeric = double.TryParse(targetValue, out var targetNum);
-
-        return condition.ToLowerInvariant() switch
-        {
-            "equal" => currentIsNumeric && targetIsNumeric
-                ? Math.Abs(currentNum - targetNum) < 0.0001
-                : currentStr.Equals(targetValue, StringComparison.OrdinalIgnoreCase),
-            "notequal" => currentIsNumeric && targetIsNumeric
-                ? Math.Abs(currentNum - targetNum) >= 0.0001
-                : !currentStr.Equals(targetValue, StringComparison.OrdinalIgnoreCase),
-            "greaterthan" => currentIsNumeric && targetIsNumeric && currentNum > targetNum,
-            "lessthan" => currentIsNumeric && targetIsNumeric && currentNum < targetNum,
-            "greaterorequal" => currentIsNumeric && targetIsNumeric && currentNum >= targetNum,
-            "lessorequal" => currentIsNumeric && targetIsNumeric && currentNum <= targetNum,
-            _ => false
-        };
     }
 
     private static string ResolveWriteValue(Operator @operator, Dictionary<string, object>? inputs)

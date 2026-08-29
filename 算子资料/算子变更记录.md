@@ -1,6 +1,6 @@
 # 算子版本变更记录 / Operator Version Changelog
 
-> 生成时间 / Generated At: `2026-08-01 23:43:18 +08:00`
+> 生成时间 / Generated At: `2026-08-29 14:18:20 +08:00`
 > 算子总数 / Total Operators: **158**
 
 ## 当前版本快照 / Current Snapshot
@@ -134,7 +134,7 @@
 | `OperatorType.LogicGate` | 逻辑门 | `DataProcessing` | 数据处理 | `Stable` | `1.0.0` |
 | `OperatorType.MathOperation` | 数值计算 | `DataProcessing` | 数据处理 | `Stable` | `1.0.0` |
 | `OperatorType.PointSetTool` | 点集工具 | `DataProcessing` | 数据处理 | `Stable` | `1.0.0` |
-| `OperatorType.ScriptOperator` | 脚本算子 | `DataProcessing` | 数据处理 | `Stable` | `1.0.0` |
+| `OperatorType.ScriptOperator` | 脚本算子 | `DataProcessing` | 数据处理 | `Stable` | `1.0.1` |
 | `OperatorType.Statistics` | 统计分析 | `DataProcessing` | 数据处理 | `Stable` | `1.0.0` |
 | `OperatorType.StringFormat` | 字符串格式化 | `DataProcessing` | 数据处理 | `Stable` | `1.0.0` |
 | `OperatorType.TimerStatistics` | 计时统计 | `DataProcessing` | 数据处理 | `Stable` | `1.0.1` |
@@ -152,12 +152,12 @@
 | `OperatorType.TriggerModule` | 触发模块 | `FlowControl` | 流程控制 | `Stable` | `1.0.0` |
 | `OperatorType.TryCatch` | Try分支透传 | `FlowControl` | 流程控制 | `Stable` | `1.0.0` |
 | `OperatorType.HttpRequest` | HTTP 请求 | `Communication` | 通信 | `Stable` | `1.0.0` |
-| `OperatorType.MitsubishiMcCommunication` | 三菱MC通信 | `Communication` | 通信 | `Stable` | `1.0.0` |
+| `OperatorType.MitsubishiMcCommunication` | 三菱MC通信 | `Communication` | 通信 | `Stable` | `1.0.1` |
 | `OperatorType.ModbusCommunication` | Modbus TCP通信 | `Communication` | 通信 | `Stable` | `1.0.0` |
 | `OperatorType.MqttPublish` | MQTT 发布 | `Communication` | 通信 | `Reference` | `0.1.0` |
-| `OperatorType.OmronFinsCommunication` | 欧姆龙FINS通信 | `Communication` | 通信 | `Stable` | `1.0.0` |
-| `OperatorType.SerialCommunication` | 串口通信 | `Communication` | 通信 | `Stable` | `1.0.0` |
-| `OperatorType.SiemensS7Communication` | 西门子S7通信 | `Communication` | 通信 | `Stable` | `1.0.0` |
+| `OperatorType.OmronFinsCommunication` | 欧姆龙FINS通信 | `Communication` | 通信 | `Stable` | `1.0.1` |
+| `OperatorType.SerialCommunication` | 串口通信 | `Communication` | 通信 | `Stable` | `1.0.1` |
+| `OperatorType.SiemensS7Communication` | 西门子S7通信 | `Communication` | 通信 | `Stable` | `1.0.1` |
 | `OperatorType.TcpCommunication` | TCP通信 | `Communication` | 通信 | `Stable` | `1.0.0` |
 | `OperatorType.Comment` | 注释 | `OutputAndAuxiliary` | 输出与辅助 | `Stable` | `1.0.1` |
 | `OperatorType.DatabaseWrite` | 数据库写入 | `OutputAndAuxiliary` | 输出与辅助 | `Stable` | `1.0.0` |
@@ -1253,6 +1253,7 @@
 ### OperatorType.HttpRequest / HTTP 请求
 | 版本 (Version) | 记录时间 (Recorded At) | 组合指纹 (Generation Fingerprint) | 指纹方案 |
 |------|------|------|------|
+| `1.0.0` | `2026-08-29T14:18:20.2419055+08:00` | `63F21E1BDE5B` | `operator-runtime-metadata-v2` |
 | `1.0.0` | `2026-07-14T15:07:23.3198726+08:00` | `5D37FA5972A9` | `operator-runtime-metadata-v2` |
 | `1.0.0` | `2026-07-06T21:35:46.7699945+08:00` | `997E208EAA17` | `legacy-source-only` |
 | `1.0.0` | `2026-07-05T18:24:06.3177828+08:00` | `E3B0C44298FC` | `legacy-source-only` |
@@ -1681,6 +1682,7 @@
 ### OperatorType.MitsubishiMcCommunication / 三菱MC通信
 | 版本 (Version) | 记录时间 (Recorded At) | 组合指纹 (Generation Fingerprint) | 指纹方案 |
 |------|------|------|------|
+| `1.0.1` | `2026-08-29T14:18:20.2419055+08:00` | `CFFEEFB6ADB2` | `operator-runtime-metadata-v2` |
 | `1.0.0` | `2026-07-14T15:07:23.3198726+08:00` | `A392A906BB00` | `operator-runtime-metadata-v2` |
 | `1.0.0` | `2026-07-13T15:25:22.2877465+08:00` | `BCC4F47D87A7` | `legacy-source-only` |
 | `1.0.0` | `2026-07-13T11:23:19.7870903+08:00` | `92743F4BBC28` | `legacy-source-only` |
@@ -1805,6 +1807,7 @@
 ### OperatorType.OmronFinsCommunication / 欧姆龙FINS通信
 | 版本 (Version) | 记录时间 (Recorded At) | 组合指纹 (Generation Fingerprint) | 指纹方案 |
 |------|------|------|------|
+| `1.0.1` | `2026-08-29T14:18:20.2419055+08:00` | `86DC1BA110A6` | `operator-runtime-metadata-v2` |
 | `1.0.0` | `2026-07-14T15:07:23.3198726+08:00` | `636ED45E6067` | `operator-runtime-metadata-v2` |
 | `1.0.0` | `2026-07-06T21:35:46.7699945+08:00` | `D661A9481284` | `legacy-source-only` |
 | `1.0.0` | `2026-07-05T18:24:06.3177828+08:00` | `E3B0C44298FC` | `legacy-source-only` |
@@ -2055,6 +2058,7 @@
 ### OperatorType.PointSetTool / 点集工具
 | 版本 (Version) | 记录时间 (Recorded At) | 组合指纹 (Generation Fingerprint) | 指纹方案 |
 |------|------|------|------|
+| `1.0.0` | `2026-08-29T14:18:20.2419055+08:00` | `FF674FDFC638` | `operator-runtime-metadata-v2` |
 | `1.0.0` | `2026-07-14T15:07:23.3198726+08:00` | `FB08128EEF7D` | `operator-runtime-metadata-v2` |
 | `1.0.0` | `2026-07-06T21:35:46.7699945+08:00` | `EC6480D40F81` | `legacy-source-only` |
 | `1.0.0` | `2026-07-05T18:24:06.3177828+08:00` | `E3B0C44298FC` | `legacy-source-only` |
@@ -2070,6 +2074,7 @@
 ### OperatorType.PolarUnwrap / 极坐标展开
 | 版本 (Version) | 记录时间 (Recorded At) | 组合指纹 (Generation Fingerprint) | 指纹方案 |
 |------|------|------|------|
+| `1.0.0` | `2026-08-29T14:18:20.2419055+08:00` | `B98C6401D387` | `operator-runtime-metadata-v2:image-contract-v2.1` |
 | `1.0.0` | `2026-07-15T11:26:25.6098568+08:00` | `9E7C1802E2AB` | `operator-runtime-metadata-v2:image-contract-v2.1` |
 | `1.0.0` | `2026-07-14T15:07:23.3198726+08:00` | `B00804C1C0AE` | `operator-runtime-metadata-v2` |
 | `1.0.0` | `2026-07-06T21:35:46.7699945+08:00` | `11255525EFA8` | `legacy-source-only` |
@@ -2428,6 +2433,7 @@
 ### OperatorType.ScriptOperator / 脚本算子
 | 版本 (Version) | 记录时间 (Recorded At) | 组合指纹 (Generation Fingerprint) | 指纹方案 |
 |------|------|------|------|
+| `1.0.1` | `2026-08-29T14:18:20.2419055+08:00` | `3429501138E2` | `operator-runtime-metadata-v2` |
 | `1.0.0` | `2026-07-14T15:07:23.3198726+08:00` | `50289B6A4670` | `operator-runtime-metadata-v2` |
 | `1.0.0` | `2026-07-06T21:35:46.7699945+08:00` | `59D99403F4CC` | `legacy-source-only` |
 | `1.0.0` | `2026-07-05T18:24:06.3177828+08:00` | `E3B0C44298FC` | `legacy-source-only` |
@@ -2461,6 +2467,7 @@
 ### OperatorType.SerialCommunication / 串口通信
 | 版本 (Version) | 记录时间 (Recorded At) | 组合指纹 (Generation Fingerprint) | 指纹方案 |
 |------|------|------|------|
+| `1.0.1` | `2026-08-29T14:18:20.2419055+08:00` | `4668B4BC3F2C` | `operator-runtime-metadata-v2` |
 | `1.0.0` | `2026-07-14T15:07:23.3198726+08:00` | `53B241AD2E24` | `operator-runtime-metadata-v2` |
 | `1.0.0` | `2026-07-08T13:53:08.5202166+08:00` | `E8D5452533CE` | `legacy-source-only` |
 | `1.0.0` | `2026-07-08T13:51:33.9970116+08:00` | `077AD8F6531C` | `legacy-source-only` |
@@ -2542,6 +2549,7 @@
 ### OperatorType.SiemensS7Communication / 西门子S7通信
 | 版本 (Version) | 记录时间 (Recorded At) | 组合指纹 (Generation Fingerprint) | 指纹方案 |
 |------|------|------|------|
+| `1.0.1` | `2026-08-29T14:18:20.2419055+08:00` | `4A0DFA0D37B9` | `operator-runtime-metadata-v2` |
 | `1.0.0` | `2026-07-14T15:07:23.3198726+08:00` | `CB6E01785B91` | `operator-runtime-metadata-v2` |
 | `1.0.0` | `2026-07-06T21:35:46.7699945+08:00` | `59928B2C1308` | `legacy-source-only` |
 | `1.0.0` | `2026-07-05T18:24:06.3177828+08:00` | `E3B0C44298FC` | `legacy-source-only` |
@@ -2606,6 +2614,7 @@
 ### OperatorType.StringFormat / 字符串格式化
 | 版本 (Version) | 记录时间 (Recorded At) | 组合指纹 (Generation Fingerprint) | 指纹方案 |
 |------|------|------|------|
+| `1.0.0` | `2026-08-29T14:18:20.2419055+08:00` | `8A52E735E09C` | `operator-runtime-metadata-v2` |
 | `1.0.0` | `2026-07-14T15:07:23.3198726+08:00` | `149B3B790FF6` | `operator-runtime-metadata-v2` |
 | `1.0.0` | `2026-07-06T21:35:46.7699945+08:00` | `DE032F7E5B60` | `legacy-source-only` |
 | `1.0.0` | `2026-07-05T18:24:06.3177828+08:00` | `E3B0C44298FC` | `legacy-source-only` |

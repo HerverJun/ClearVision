@@ -160,6 +160,158 @@ public class SerialCommunicationOperatorTests
         Encoding.ASCII.GetString(fakeConnection.WrittenBytes.ToArray()).Should().Be("STATIC");
     }
 
+    [Theory]
+    [InlineData("One")]
+    [InlineData("OnePointFive")]
+    [InlineData("Two")]
+    public void ValidateParameters_WithSupportedStopBits_ShouldBeValid(string stopBits)
+    {
+        var op = CreateOperator(("StopBits", stopBits));
+
+        _operator.ValidateParameters(op).IsValid.Should().BeTrue();
+    }
+
+    [Theory]
+    [InlineData("None")]
+    [InlineData("Odd")]
+    [InlineData("Even")]
+    public void ValidateParameters_WithSupportedParity_ShouldBeValid(string parity)
+    {
+        var op = CreateOperator(("Parity", parity));
+
+        _operator.ValidateParameters(op).IsValid.Should().BeTrue();
+    }
+
+    [Theory]
+    [InlineData("UTF8")]
+    [InlineData("ASCII")]
+    [InlineData("HEX")]
+    public void ValidateParameters_WithSupportedEncoding_ShouldBeValid(string encoding)
+    {
+        var op = CreateOperator(("Encoding", encoding));
+
+        _operator.ValidateParameters(op).IsValid.Should().BeTrue();
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("One ")]
+    [InlineData("one")]
+    [InlineData("1")]
+    [InlineData("Zero")]
+    public async Task InvalidStopBits_ShouldFailValidationAndExecuteWithoutOpeningPort(string stopBits)
+    {
+        var fakeConnection = new FakeSerialPortConnection([]);
+        var sut = CreateWithConnection(fakeConnection);
+        var op = CreateOperator(("StopBits", stopBits), ("SendData", "PING"));
+
+        var validation = sut.ValidateParameters(op);
+        var result = await sut.ExecuteAsync(op);
+
+        validation.IsValid.Should().BeFalse();
+        validation.Errors.Should().ContainSingle().Which.Should().StartWith(SerialCommunicationOperator.InvalidStopBitsCode);
+        result.IsSuccess.Should().BeFalse();
+        result.ErrorMessage.Should().StartWith(SerialCommunicationOperator.InvalidStopBitsCode);
+        fakeConnection.OpenCalls.Should().Be(0);
+        fakeConnection.WriteCalls.Should().Be(0);
+        fakeConnection.WrittenBytes.Should().BeEmpty();
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("Even ")]
+    [InlineData("even")]
+    [InlineData("2")]
+    [InlineData("Mark")]
+    public async Task InvalidParity_ShouldFailValidationAndExecuteWithoutOpeningPort(string parity)
+    {
+        var fakeConnection = new FakeSerialPortConnection([]);
+        var sut = CreateWithConnection(fakeConnection);
+        var op = CreateOperator(("Parity", parity), ("SendData", "PING"));
+
+        var validation = sut.ValidateParameters(op);
+        var result = await sut.ExecuteAsync(op);
+
+        validation.IsValid.Should().BeFalse();
+        validation.Errors.Should().ContainSingle().Which.Should().StartWith(SerialCommunicationOperator.InvalidParityCode);
+        result.IsSuccess.Should().BeFalse();
+        result.ErrorMessage.Should().StartWith(SerialCommunicationOperator.InvalidParityCode);
+        fakeConnection.OpenCalls.Should().Be(0);
+        fakeConnection.WriteCalls.Should().Be(0);
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("HEX ")]
+    [InlineData("utf8")]
+    [InlineData("Binary")]
+    [InlineData("1")]
+    public async Task InvalidEncoding_ShouldFailValidationAndExecuteWithoutOpeningPort(string encoding)
+    {
+        var fakeConnection = new FakeSerialPortConnection([]);
+        var sut = CreateWithConnection(fakeConnection);
+        var op = CreateOperator(("Encoding", encoding), ("SendData", "01 02"));
+
+        var validation = sut.ValidateParameters(op);
+        var result = await sut.ExecuteAsync(op);
+
+        validation.IsValid.Should().BeFalse();
+        validation.Errors.Should().ContainSingle().Which.Should().StartWith(SerialCommunicationOperator.InvalidEncodingCode);
+        result.IsSuccess.Should().BeFalse();
+        result.ErrorMessage.Should().StartWith(SerialCommunicationOperator.InvalidEncodingCode);
+        fakeConnection.OpenCalls.Should().Be(0);
+        fakeConnection.WriteCalls.Should().Be(0);
+    }
+
+    [Theory]
+    [InlineData("0AFF", new byte[] { 0x0A, 0xFF })]
+    [InlineData("0A FF", new byte[] { 0x0A, 0xFF })]
+    [InlineData("0A-FF", new byte[] { 0x0A, 0xFF })]
+    [InlineData("00 7f-A5", new byte[] { 0x00, 0x7F, 0xA5 })]
+    public async Task SupportedHexRepresentations_ShouldDispatchExpectedBytes(
+        string payload,
+        byte[] expected)
+    {
+        var fakeConnection = new FakeSerialPortConnection([]);
+        var sut = CreateWithConnection(fakeConnection);
+        var op = CreateOperator(
+            ("Encoding", "HEX"),
+            ("SendData", payload),
+            ("ResponseWaitMs", 0));
+
+        var result = await sut.ExecuteAsync(op);
+
+        result.IsSuccess.Should().BeTrue(result.ErrorMessage);
+        fakeConnection.OpenCalls.Should().Be(1);
+        fakeConnection.WriteCalls.Should().Be(1);
+        fakeConnection.WrittenBytes.Should().Equal(expected);
+    }
+
+    [Theory]
+    [InlineData("0")]
+    [InlineData("ABC")]
+    [InlineData("0G")]
+    [InlineData("0x01")]
+    [InlineData("01:02")]
+    [InlineData("01 ZZ")]
+    public async Task InvalidHexPayload_ShouldFailValidationAndExecuteWithoutOpeningOrWriting(string payload)
+    {
+        var fakeConnection = new FakeSerialPortConnection([]);
+        var sut = CreateWithConnection(fakeConnection);
+        var op = CreateOperator(("Encoding", "HEX"), ("SendData", payload));
+
+        var validation = sut.ValidateParameters(op);
+        var result = await sut.ExecuteAsync(op);
+
+        validation.IsValid.Should().BeFalse();
+        validation.Errors.Should().ContainSingle().Which.Should().StartWith(SerialCommunicationOperator.InvalidHexCode);
+        result.IsSuccess.Should().BeFalse();
+        result.ErrorMessage.Should().StartWith(SerialCommunicationOperator.InvalidHexCode);
+        fakeConnection.OpenCalls.Should().Be(0);
+        fakeConnection.WriteCalls.Should().Be(0);
+        fakeConnection.WrittenBytes.Should().BeEmpty();
+    }
+
     private static SerialCommunicationOperator CreateWithConnection(FakeSerialPortConnection connection)
     {
         return new SerialCommunicationOperator(
@@ -194,6 +346,10 @@ public class SerialCommunicationOperatorTests
 
         public bool Opened { get; private set; }
 
+        public int OpenCalls { get; private set; }
+
+        public int WriteCalls { get; private set; }
+
         public List<byte> WrittenBytes { get; } = [];
 
         public int BytesToRead
@@ -208,6 +364,7 @@ public class SerialCommunicationOperatorTests
         public Task OpenAsync(CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
+            OpenCalls++;
             Opened = true;
             return Task.CompletedTask;
         }
@@ -215,6 +372,7 @@ public class SerialCommunicationOperatorTests
         public Task WriteAsync(byte[] bytes, CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
+            WriteCalls++;
             WrittenBytes.AddRange(bytes);
             return Task.CompletedTask;
         }

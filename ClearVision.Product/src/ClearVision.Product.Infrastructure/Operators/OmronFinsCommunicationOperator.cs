@@ -19,7 +19,8 @@ namespace ClearVision.Product.Infrastructure.Operators;
     DisplayName = "欧姆龙FINS通信",
     Description = "欧姆龙FINS/TCP协议PLC读写通信（CP1H/CJ2M/NJ/NX）",
     CategoryId = OperatorCategoryId.Communication,
-    IconName = "fins"
+    IconName = "fins",
+    Version = "1.0.1"
 )]
 [OperatorParameterRule("IpAddress", RequiredWhenAll = new[] { "UseGlobalFallback==false" }, ResourceKind = OperatorResourceKind.PlcEndpoint, ReasonCode = "OMRON_OPERATOR_IP_REQUIRED_WITHOUT_GLOBAL_FALLBACK")]
 [OperatorParameterRule("Port", RequiredWhenAll = new[] { "UseGlobalFallback==false" }, ReasonCode = "OMRON_OPERATOR_PORT_REQUIRED_WITHOUT_GLOBAL_FALLBACK")]
@@ -49,9 +50,22 @@ namespace ClearVision.Product.Infrastructure.Operators;
 [OperatorParam("PollingInterval", "轮询间隔(ms)", "int", Description = "每次读取间隔（毫秒）", DefaultValue = 50, Min = 10, Max = 5000)]
 public class OmronFinsCommunicationOperator : PlcCommunicationOperatorBase
 {
+    private readonly Func<string, int, IPlcClient> _clientFactory;
+
     public override OperatorType OperatorType => OperatorType.OmronFinsCommunication;
 
-    public OmronFinsCommunicationOperator(ILogger<OmronFinsCommunicationOperator> logger) : base(logger) { }
+    public OmronFinsCommunicationOperator(ILogger<OmronFinsCommunicationOperator> logger)
+        : this(logger, CreateClient)
+    {
+    }
+
+    internal OmronFinsCommunicationOperator(
+        ILogger<OmronFinsCommunicationOperator> logger,
+        Func<string, int, IPlcClient> clientFactory)
+        : base(logger)
+    {
+        _clientFactory = clientFactory;
+    }
 
     protected override async Task<OperatorExecutionOutput> ExecuteCoreAsync(
         Operator @operator,
@@ -66,9 +80,30 @@ public class OmronFinsCommunicationOperator : PlcCommunicationOperatorBase
         var length = GetIntParam(@operator, "Length", 1, 1, 999);
         var dataType = GetStringParam(@operator, "DataType", "Word");
         var operation = GetStringParam(@operator, "Operation", "Read");
+        var pollingMode = GetStringParam(@operator, "PollingMode", "None");
+        var pollingCondition = GetStringParam(@operator, "PollingCondition", "Equal");
+        var pollingValue = GetStringParam(@operator, "PollingValue", "1");
+        var pollingTimeout = GetIntParam(@operator, "PollingTimeout", 30000, 100, 300000);
+        var pollingInterval = GetIntParam(@operator, "PollingInterval", 50, 10, 5000);
 
-        // 【增强】支持从上游输入动态获取写入值
-        var writeValue = ResolveWriteValue(@operator, inputs);
+        if (!PlcOperatorParameterContract.IsSupportedOperation(operation))
+        {
+            return CreateFailureOutput("PLC_OPERATION_INVALID: Operation must be Read or Write.");
+        }
+
+        if (PlcOperatorParameterContract.IsRead(operation) &&
+            !PlcOperatorParameterContract.IsSupportedPollingMode(pollingMode))
+        {
+            return CreateFailureOutput("PLC_POLLING_MODE_INVALID: PollingMode must be None or WaitForValue.");
+        }
+
+        if (PlcOperatorParameterContract.IsRead(operation) &&
+            PlcOperatorParameterContract.IsWaitForValue(pollingMode) &&
+            !PlcOperatorParameterContract.IsSupportedPollingCondition(pollingCondition))
+        {
+            return CreateFailureOutput(
+                $"PLC_POLLING_CONDITION_INVALID: PollingCondition must be one of: {string.Join(", ", PlcOperatorParameterContract.SupportedPollingConditions)}.");
+        }
 
         var logIp = string.IsNullOrWhiteSpace(operatorIpAddress) ? "(unset)" : operatorIpAddress;
         var logPort = operatorPort;
@@ -87,15 +122,31 @@ public class OmronFinsCommunicationOperator : PlcCommunicationOperatorBase
             var connectionKey = $"FINS:{ipAddress}:{port}";
 
             // 获取或创建连接
-            var (client, isNew) = await GetOrCreateConnectionAsync(connectionKey, () =>
-            {
-                var finsClient = PlcClientFactory.CreateOmronFins(ipAddress);
-                ((ClearVision.PlcComm.Omron.OmronFinsClient)finsClient).Port = port;
-                return finsClient;
-            });
+            var (client, _) = await GetOrCreateConnectionAsync(
+                connectionKey,
+                () => _clientFactory(ipAddress, port));
 
-            if (operation.Equals("Read", StringComparison.OrdinalIgnoreCase))
+            if (PlcOperatorParameterContract.IsRead(operation))
             {
+                if (PlcOperatorParameterContract.IsWaitForValue(pollingMode))
+                {
+                    var pollingOutput = await ExecuteWithConnectionOperationLockAsync(
+                        connectionKey,
+                        () => ExecuteReadWithPollingAsync(
+                            client,
+                            address,
+                            dataType,
+                            (ushort)length,
+                            pollingCondition,
+                            pollingValue,
+                            pollingTimeout,
+                            pollingInterval,
+                            cancellationToken),
+                        cancellationToken);
+                    AttachConnectionAuditInfo(pollingOutput, connectionSource);
+                    return pollingOutput;
+                }
+
                 var readOutput = await ExecuteWithConnectionOperationLockAsync(
                     connectionKey,
                     () => ExecuteReadAsync(client, address, dataType, (ushort)length, cancellationToken),
@@ -103,8 +154,10 @@ public class OmronFinsCommunicationOperator : PlcCommunicationOperatorBase
                 AttachConnectionAuditInfo(readOutput, connectionSource);
                 return readOutput;
             }
-            else
+
+            if (PlcOperatorParameterContract.IsWrite(operation))
             {
+                var writeValue = ResolveWriteValue(@operator, inputs);
                 var writeOutput = await ExecuteWithConnectionOperationLockAsync(
                     connectionKey,
                     () => ExecuteWriteAsync(client, address, dataType, writeValue, cancellationToken),
@@ -112,6 +165,12 @@ public class OmronFinsCommunicationOperator : PlcCommunicationOperatorBase
                 AttachConnectionAuditInfo(writeOutput, connectionSource);
                 return writeOutput;
             }
+
+            return CreateFailureOutput("PLC_OPERATION_INVALID: Operation must be Read or Write.");
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
         }
         catch (Exception ex)
         {
@@ -149,6 +208,59 @@ public class OmronFinsCommunicationOperator : PlcCommunicationOperatorBase
         return CreateSuccessOutput(writeValue, dataType);
     }
 
+    private async Task<OperatorExecutionOutput> ExecuteReadWithPollingAsync(
+        IPlcClient client,
+        string address,
+        string dataType,
+        ushort length,
+        string pollingCondition,
+        string pollingValue,
+        int timeoutMs,
+        int intervalMs,
+        CancellationToken ct)
+    {
+        var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+        var readCount = 0;
+
+        while (true)
+        {
+            ct.ThrowIfCancellationRequested();
+            if (stopwatch.ElapsedMilliseconds >= timeoutMs)
+            {
+                return CreateFailureOutput(
+                    $"FINS_POLLING_TIMEOUT: Waiting for {pollingCondition} {pollingValue} exceeded {timeoutMs}ms.");
+            }
+
+            var result = await client.ReadAsync(address, length, ct);
+            if (result.IsSuccess)
+            {
+                var currentValue = ConvertBytesToValue(client, result.Content!, dataType);
+                readCount++;
+                if (PlcOperatorParameterContract.EvaluatePollingCondition(
+                        currentValue,
+                        pollingCondition,
+                        pollingValue))
+                {
+                    var output = CreateSuccessOutput(currentValue, dataType);
+                    output.OutputData ??= new Dictionary<string, object>();
+                    output.OutputData["PollingReadCount"] = readCount;
+                    output.OutputData["PollingElapsedMs"] = (int)stopwatch.ElapsedMilliseconds;
+                    output.OutputData["PollingMatched"] = true;
+                    return output;
+                }
+            }
+
+            var remainingMs = timeoutMs - (int)Math.Min(stopwatch.ElapsedMilliseconds, int.MaxValue);
+            if (remainingMs <= 0)
+            {
+                return CreateFailureOutput(
+                    $"FINS_POLLING_TIMEOUT: Waiting for {pollingCondition} {pollingValue} exceeded {timeoutMs}ms.");
+            }
+
+            await Task.Delay(Math.Min(intervalMs, remainingMs), ct);
+        }
+    }
+
     public override ValidationResult ValidateParameters(Operator @operator)
     {
         var operatorIpAddress = GetStringParam(@operator, "IpAddress", "");
@@ -156,6 +268,28 @@ public class OmronFinsCommunicationOperator : PlcCommunicationOperatorBase
         var useGlobalFallback = GetBoolParam(@operator, "UseGlobalFallback", false);
         var address = GetStringParam(@operator, "Address", "");
         var length = GetIntParam(@operator, "Length", 1);
+        var operation = GetStringParam(@operator, "Operation", "Read");
+        var pollingMode = GetStringParam(@operator, "PollingMode", "None");
+        var pollingCondition = GetStringParam(@operator, "PollingCondition", "Equal");
+
+        if (!PlcOperatorParameterContract.IsSupportedOperation(operation))
+        {
+            return ValidationResult.Invalid("PLC_OPERATION_INVALID: Operation must be Read or Write.");
+        }
+
+        if (PlcOperatorParameterContract.IsRead(operation) &&
+            !PlcOperatorParameterContract.IsSupportedPollingMode(pollingMode))
+        {
+            return ValidationResult.Invalid("PLC_POLLING_MODE_INVALID: PollingMode must be None or WaitForValue.");
+        }
+
+        if (PlcOperatorParameterContract.IsRead(operation) &&
+            PlcOperatorParameterContract.IsWaitForValue(pollingMode) &&
+            !PlcOperatorParameterContract.IsSupportedPollingCondition(pollingCondition))
+        {
+            return ValidationResult.Invalid(
+                $"PLC_POLLING_CONDITION_INVALID: PollingCondition must be one of: {string.Join(", ", PlcOperatorParameterContract.SupportedPollingConditions)}.");
+        }
 
         try
         {
@@ -169,10 +303,21 @@ public class OmronFinsCommunicationOperator : PlcCommunicationOperatorBase
         if (string.IsNullOrWhiteSpace(address))
             return ValidationResult.Invalid("PLC地址不能为空");
 
-        if (length < 1 || length > 999)
+        if (PlcOperatorParameterContract.IsRead(operation) && (length < 1 || length > 999))
             return ValidationResult.Invalid("读取长度必须在 1-999 之间");
 
         return ValidationResult.Valid();
+    }
+
+    private static IPlcClient CreateClient(string ipAddress, int port)
+    {
+        var client = PlcClientFactory.CreateOmronFins(ipAddress);
+        if (client is ClearVision.PlcComm.Omron.OmronFinsClient typedClient)
+        {
+            typedClient.Port = port;
+        }
+
+        return client;
     }
 
     /// <summary>

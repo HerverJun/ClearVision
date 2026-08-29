@@ -1,9 +1,9 @@
 # Operator Knowledge Graph Report
 
-GeneratedAtUtc: `2026-08-28T15:32:43.1039802Z`
+GeneratedAtUtc: `2026-08-29T06:18:23.2161602Z`
 SchemaVersion: `2026-07.operator-knowledge-graph.v4`
 Source: `OperatorMetadata + FlowTemplate + operator_quality_evidence_manifest`
-GenerationFingerprint: `3C7C69D1A08C481E227D2A3BCF11A839324B429BD01E3568E5EC8BB8C2DB4C53`
+GenerationFingerprint: `5686E6A8D15212F4B5CD953472941FB7088A6109028ED049374D8C99BCC08541`
 
 ## Summary
 

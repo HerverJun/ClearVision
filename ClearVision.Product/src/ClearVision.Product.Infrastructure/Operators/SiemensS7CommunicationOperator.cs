@@ -20,7 +20,8 @@ namespace ClearVision.Product.Infrastructure.Operators;
     DisplayName = "西门子S7通信",
     Description = "西门子S7系列PLC读写通信（S7-200/300/400/1200/1500）",
     CategoryId = OperatorCategoryId.Communication,
-    IconName = "s7"
+    IconName = "s7",
+    Version = "1.0.1"
 )]
 [OperatorParameterRule("IpAddress", RequiredWhenAll = new[] { "UseGlobalFallback==false" }, ResourceKind = OperatorResourceKind.PlcEndpoint, ReasonCode = "SIEMENS_OPERATOR_IP_REQUIRED_WITHOUT_GLOBAL_FALLBACK")]
 [OperatorParameterRule("Port", RequiredWhenAll = new[] { "UseGlobalFallback==false" }, ReasonCode = "SIEMENS_OPERATOR_PORT_REQUIRED_WITHOUT_GLOBAL_FALLBACK")]
@@ -51,9 +52,22 @@ namespace ClearVision.Product.Infrastructure.Operators;
 [OperatorParam("PollingInterval", "轮询间隔(ms)", "int", Description = "每次读取间隔（毫秒）", DefaultValue = 50, Min = 10, Max = 5000)]
 public class SiemensS7CommunicationOperator : PlcCommunicationOperatorBase
 {
+    private readonly Func<string, int, SiemensCpuType, int, int, IPlcClient> _clientFactory;
+
     public override OperatorType OperatorType => OperatorType.SiemensS7Communication;
 
-    public SiemensS7CommunicationOperator(ILogger<SiemensS7CommunicationOperator> logger) : base(logger) { }
+    public SiemensS7CommunicationOperator(ILogger<SiemensS7CommunicationOperator> logger)
+        : this(logger, CreateClient)
+    {
+    }
+
+    internal SiemensS7CommunicationOperator(
+        ILogger<SiemensS7CommunicationOperator> logger,
+        Func<string, int, SiemensCpuType, int, int, IPlcClient> clientFactory)
+        : base(logger)
+    {
+        _clientFactory = clientFactory;
+    }
 
     protected override async Task<OperatorExecutionOutput> ExecuteCoreAsync(
         Operator @operator,
@@ -78,8 +92,24 @@ public class SiemensS7CommunicationOperator : PlcCommunicationOperatorBase
         var pollingTimeout = GetIntParam(@operator, "PollingTimeout", 30000, 100, 300000); // 100ms - 5min
         var pollingInterval = GetIntParam(@operator, "PollingInterval", 50, 10, 5000); // 10ms - 5s
 
-        // 【增强】支持从上游输入动态获取写入值
-        var writeValue = ResolveWriteValue(@operator, inputs);
+        if (!PlcOperatorParameterContract.IsSupportedOperation(operation))
+        {
+            return CreateFailureOutput("PLC_OPERATION_INVALID: Operation must be Read or Write.");
+        }
+
+        if (PlcOperatorParameterContract.IsRead(operation) &&
+            !PlcOperatorParameterContract.IsSupportedPollingMode(pollingMode))
+        {
+            return CreateFailureOutput("PLC_POLLING_MODE_INVALID: PollingMode must be None or WaitForValue.");
+        }
+
+        if (PlcOperatorParameterContract.IsRead(operation) &&
+            PlcOperatorParameterContract.IsWaitForValue(pollingMode) &&
+            !PlcOperatorParameterContract.IsSupportedPollingCondition(pollingCondition))
+        {
+            return CreateFailureOutput(
+                $"PLC_POLLING_CONDITION_INVALID: PollingCondition must be one of: {string.Join(", ", PlcOperatorParameterContract.SupportedPollingConditions)}.");
+        }
 
         // 解析CPU类型
         var cpuType = cpuTypeStr.ToUpper() switch
@@ -110,17 +140,14 @@ public class SiemensS7CommunicationOperator : PlcCommunicationOperatorBase
             var connectionKey = $"S7:{ipAddress}:{port}:{cpuType}:{rack}:{slot}";
 
             // 获取或创建连接
-            var (client, isNew) = await GetOrCreateConnectionAsync(connectionKey, () =>
-            {
-                var s7Client = PlcClientFactory.CreateSiemensS7(ipAddress, cpuType, rack, slot);
-                ((ClearVision.PlcComm.Siemens.SiemensS7Client)s7Client).Port = port;
-                return s7Client;
-            });
+            var (client, _) = await GetOrCreateConnectionAsync(
+                connectionKey,
+                () => _clientFactory(ipAddress, port, cpuType, rack, slot));
 
-            if (operation.Equals("Read", StringComparison.OrdinalIgnoreCase))
+            if (PlcOperatorParameterContract.IsRead(operation))
             {
                 // 【第二优先级】支持轮询等待模式
-                if (pollingMode.Equals("WaitForValue", StringComparison.OrdinalIgnoreCase))
+                if (PlcOperatorParameterContract.IsWaitForValue(pollingMode))
                 {
                     var pollingReadOutput = await ExecuteWithConnectionOperationLockAsync(
                         connectionKey,
@@ -145,8 +172,10 @@ public class SiemensS7CommunicationOperator : PlcCommunicationOperatorBase
                 AttachConnectionAuditInfo(readOutput, connectionSource);
                 return readOutput;
             }
-            else
+
+            if (PlcOperatorParameterContract.IsWrite(operation))
             {
+                var writeValue = ResolveWriteValue(@operator, inputs);
                 var writeOutput = await ExecuteWithConnectionOperationLockAsync(
                     connectionKey,
                     () => ExecuteWriteAsync(client, address, dataType, writeValue, cancellationToken),
@@ -154,6 +183,8 @@ public class SiemensS7CommunicationOperator : PlcCommunicationOperatorBase
                 AttachConnectionAuditInfo(writeOutput, connectionSource);
                 return writeOutput;
             }
+
+            return CreateFailureOutput("PLC_OPERATION_INVALID: Operation must be Read or Write.");
         }
         catch (Exception ex)
         {
@@ -233,7 +264,7 @@ public class SiemensS7CommunicationOperator : PlcCommunicationOperatorBase
             readCount++;
 
             // 检查是否满足条件
-            if (EvaluatePollingCondition(currentValue, pollingCondition, pollingValue))
+            if (PlcOperatorParameterContract.EvaluatePollingCondition(currentValue, pollingCondition, pollingValue))
             {
                 var totalElapsed = (DateTime.UtcNow - startTime).TotalMilliseconds;
                 Logger.LogInformation("[SiemensS7] 轮询等待完成: Address={Address}, Value={Value}, 读取{Count}次, 耗时{Elapsed}ms",
@@ -253,40 +284,34 @@ public class SiemensS7CommunicationOperator : PlcCommunicationOperatorBase
         }
     }
 
-    /// <summary>
-    /// 评估轮询条件
-    /// </summary>
-    private bool EvaluatePollingCondition(object currentValue, string condition, string targetValue)
-    {
-        var currentStr = currentValue?.ToString() ?? "";
-
-        // 尝试数值比较
-        bool currentIsNumeric = double.TryParse(currentStr, out var currentNum);
-        bool targetIsNumeric = double.TryParse(targetValue, out var targetNum);
-
-        return condition.ToLower() switch
-        {
-            "equal" => currentIsNumeric && targetIsNumeric
-                ? Math.Abs(currentNum - targetNum) < 0.0001
-                : currentStr.Equals(targetValue, StringComparison.OrdinalIgnoreCase),
-            "notequal" => currentIsNumeric && targetIsNumeric
-                ? Math.Abs(currentNum - targetNum) >= 0.0001
-                : !currentStr.Equals(targetValue, StringComparison.OrdinalIgnoreCase),
-            "greaterthan" => currentIsNumeric && targetIsNumeric && currentNum > targetNum,
-            "lessthan" => currentIsNumeric && targetIsNumeric && currentNum < targetNum,
-            "greaterorequal" => currentIsNumeric && targetIsNumeric && currentNum >= targetNum,
-            "lessorequal" => currentIsNumeric && targetIsNumeric && currentNum <= targetNum,
-            _ => false
-        };
-    }
-
     public override ValidationResult ValidateParameters(Operator @operator)
     {
         var operatorIpAddress = GetStringParam(@operator, "IpAddress", "");
         var operatorPort = GetIntParam(@operator, "Port", 0);
         var useGlobalFallback = GetBoolParam(@operator, "UseGlobalFallback", false);
         var address = GetStringParam(@operator, "Address", "");
+        var operation = GetStringParam(@operator, "Operation", "Read");
         var pollingMode = GetStringParam(@operator, "PollingMode", "None");
+        var pollingCondition = GetStringParam(@operator, "PollingCondition", "Equal");
+
+        if (!PlcOperatorParameterContract.IsSupportedOperation(operation))
+        {
+            return ValidationResult.Invalid("PLC_OPERATION_INVALID: Operation must be Read or Write.");
+        }
+
+        if (PlcOperatorParameterContract.IsRead(operation) &&
+            !PlcOperatorParameterContract.IsSupportedPollingMode(pollingMode))
+        {
+            return ValidationResult.Invalid("PLC_POLLING_MODE_INVALID: PollingMode must be None or WaitForValue.");
+        }
+
+        if (PlcOperatorParameterContract.IsRead(operation) &&
+            PlcOperatorParameterContract.IsWaitForValue(pollingMode) &&
+            !PlcOperatorParameterContract.IsSupportedPollingCondition(pollingCondition))
+        {
+            return ValidationResult.Invalid(
+                $"PLC_POLLING_CONDITION_INVALID: PollingCondition must be one of: {string.Join(", ", PlcOperatorParameterContract.SupportedPollingConditions)}.");
+        }
 
         try
         {
@@ -300,14 +325,23 @@ public class SiemensS7CommunicationOperator : PlcCommunicationOperatorBase
         if (string.IsNullOrWhiteSpace(address))
             return ValidationResult.Invalid("PLC地址不能为空");
 
-        // 【第二优先级】验证轮询模式参数
-        var validPollingModes = new[] { "None", "WaitForValue" };
-        if (!validPollingModes.Contains(pollingMode, StringComparer.OrdinalIgnoreCase))
+        return ValidationResult.Valid();
+    }
+
+    private static IPlcClient CreateClient(
+        string ipAddress,
+        int port,
+        SiemensCpuType cpuType,
+        int rack,
+        int slot)
+    {
+        var client = PlcClientFactory.CreateSiemensS7(ipAddress, cpuType, rack, slot);
+        if (client is SiemensS7Client typedClient)
         {
-            return ValidationResult.Invalid($"轮询模式必须是以下之一: {string.Join(", ", validPollingModes)}");
+            typedClient.Port = port;
         }
 
-        return ValidationResult.Valid();
+        return client;
     }
 
     /// <summary>

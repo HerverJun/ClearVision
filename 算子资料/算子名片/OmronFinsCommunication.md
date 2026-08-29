@@ -8,7 +8,7 @@
 | 分类 ID (CategoryId) | `Communication` |
 | 分类 (Category) | 通信 |
 | 分类顺序 (CategoryOrder) | 13 |
-| 版本 (Version) | `1.0.0` |
+| 版本 (Version) | `1.0.1` |
 | 生命周期 (Lifecycle) | 稳定 `Stable` |
 | 生命周期说明 (Lifecycle Note) | - |
 | 默认隐藏 (Default Hidden) | No |
@@ -35,6 +35,7 @@
 
 ## 核心 API 调用链 / Core API Call Chain
 - `OperatorBase.Get*Param(...)`
+- `Math.Min`
 - `PlcClientFactory.CreateOmronFins`
 
 ## 参数说明 / Parameters
@@ -87,11 +88,15 @@
 | - | - | - |
 
 ## 生成依赖 / Generation Dependencies
-- 组合指纹 (Generation Fingerprint)：`636ED45E60676562F4571C76E52DDB0CF6DC4E3BB464227445B0C6D1B9D7A99F`
+- 组合指纹 (Generation Fingerprint)：`86DC1BA110A638A72A19624EC50B88BF23808346146F5B3F38F34B6FF19F508E`
 - 显式共享依赖：无；指纹由最终运行时元数据与算子源码组成。
 
 ### 运行时附加输出 / Runtime Additional Outputs
-- 未在源码中发现除声明输出端口外的稳定附加输出字段；下游连线以输出端口表为准。
+| 名称 (Name) | 推断类型 (Inferred Type) | 说明 (Description) |
+|------|------|------|
+| `PollingElapsedMs` | `Any` | 源码通过输出字典索引赋值写入。 |
+| `PollingMatched` | `Any` | 源码通过输出字典索引赋值写入。 |
+| `PollingReadCount` | `Integer` | 源码通过输出字典索引赋值写入。 |
 
 ## 性能特征 / Performance
 | 指标 (Metric) | 值 (Value) |
@@ -111,9 +116,10 @@
 
 ## 已知限制 / Known Limitations
 1. 参数范围和枚举项来自当前元数据；旧流程若保存了过期参数值，加载后需要重新校验。
-2. 外部文件、网络、PLC、数据库或消息系统不可用时，算子结果会受环境状态影响。
+2. 运行时附加输出字段来自源码输出字典，部分字段未声明为可连线端口，下游稳定连线应优先使用输出端口表。
+3. 外部文件、网络、PLC、数据库或消息系统不可用时，算子结果会受环境状态影响。
 
 ## 变更记录 / Changelog
 | 版本 (Version) | 日期 (Date) | 变更内容 (Changes) |
 |------|------|----------|
-| 1.0.0 | 2026-07-14 | 按当前最终运行时元数据、条件契约和显式依赖口径重生成 / Regenerated from effective runtime metadata and declared dependencies |
+| 1.0.1 | 2026-08-29 | 按当前最终运行时元数据、条件契约和显式依赖口径重生成 / Regenerated from effective runtime metadata and declared dependencies |

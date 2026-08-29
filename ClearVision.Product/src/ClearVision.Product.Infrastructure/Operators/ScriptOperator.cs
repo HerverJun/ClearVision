@@ -14,9 +14,10 @@ namespace ClearVision.Product.Infrastructure.Operators;
 
 [OperatorMeta(
     DisplayName = "脚本算子",
-    Description = "运行用户自定义表达式或脚本片段。",
+    Description = "运行用户自定义 C# 表达式。",
     CategoryId = OperatorCategoryId.DataProcessing,
     IconName = "script",
+    Version = "1.0.1",
     Keywords = new[] { "script", "custom", "code", "expression", "formula" }
 )]
 [InputPort("Input1", "Input 1", PortDataType.Any, IsRequired = false)]
@@ -25,12 +26,28 @@ namespace ClearVision.Product.Infrastructure.Operators;
 [InputPort("Input4", "Input 4", PortDataType.Any, IsRequired = false)]
 [OutputPort("Output1", "Output 1", PortDataType.Any)]
 [OutputPort("Output2", "Output 2", PortDataType.Any)]
-[OperatorParam("ScriptLanguage", "Script Language", "enum", DefaultValue = "CSharpExpression", Options = new[] { "CSharpExpression|CSharpExpression", "CSharpScript|CSharpScript" })]
+[OperatorParam("ScriptLanguage", "Script Language", "enum", DefaultValue = "CSharpExpression", Options = new[] { "CSharpExpression|CSharpExpression" })]
 [OperatorParam("Code", "Code", "string", DefaultValue = "Input1 + Input2")]
 [OperatorParam("Timeout", "Timeout (ms)", "int", DefaultValue = 5000, Min = 1, Max = 120000)]
 public class ScriptOperator : OperatorBase
 {
-    private static readonly string[] SupportedLanguages = ["CSharpExpression", "CSharpScript"];
+    internal const string UnsupportedLanguageCode = "SCRIPT_LANGUAGE_UNSUPPORTED";
+    internal const string InvalidLanguageCode = "SCRIPT_LANGUAGE_INVALID";
+    internal const string InvalidAssignmentCode = "SCRIPT_ASSIGNMENT_INVALID";
+    internal const string UnresolvedVariableCode = "SCRIPT_VARIABLE_UNRESOLVED";
+    internal const string UnsupportedFunctionCode = "SCRIPT_FUNCTION_UNSUPPORTED";
+    internal const string InvalidExpressionCode = "SCRIPT_EXPRESSION_INVALID";
+
+    private const string SupportedLanguage = "CSharpExpression";
+    private static readonly Regex AssignmentTargetPattern = new(
+        @"^[A-Za-z_][A-Za-z0-9_]*$",
+        RegexOptions.CultureInvariant | RegexOptions.Compiled);
+    private static readonly Regex IdentifierPattern = new(
+        @"\b[A-Za-z_][A-Za-z0-9_]*\b",
+        RegexOptions.CultureInvariant | RegexOptions.Compiled);
+    private static readonly HashSet<string> ExpressionKeywords = new(
+        ["true", "false", "and", "or", "not", "null"],
+        StringComparer.OrdinalIgnoreCase);
 
     public override OperatorType OperatorType => OperatorType.ScriptOperator;
 
@@ -52,9 +69,9 @@ public class ScriptOperator : OperatorBase
             return Task.FromResult(OperatorExecutionOutput.Failure("Code is required"));
         }
 
-        if (!SupportedLanguages.Contains(language, StringComparer.OrdinalIgnoreCase))
+        if (!TryValidateLanguage(language, out var languageError))
         {
-            return Task.FromResult(OperatorExecutionOutput.Failure("ScriptLanguage must be CSharpExpression or CSharpScript"));
+            return Task.FromResult(OperatorExecutionOutput.Failure(languageError));
         }
 
         using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
@@ -80,25 +97,36 @@ public class ScriptOperator : OperatorBase
                 continue;
             }
 
-            if (TryParseAssignment(statement, out var target, out var expression))
+            var assignment = ParseAssignment(statement);
+            if (!assignment.IsValid)
             {
-                var value = EvaluateExpression(expression, context);
-                if (target.Equals("Output1", StringComparison.OrdinalIgnoreCase))
+                return Task.FromResult(OperatorExecutionOutput.Failure(
+                    $"{InvalidAssignmentCode}: Assignment targets must be identifiers and assignments must include an expression."));
+            }
+
+            if (!TryEvaluateExpression(assignment.Expression, context, out var value, out var evaluationError))
+            {
+                return Task.FromResult(OperatorExecutionOutput.Failure(evaluationError));
+            }
+
+            if (assignment.HasAssignment)
+            {
+                if (assignment.Target.Equals("Output1", StringComparison.OrdinalIgnoreCase))
                 {
                     output1 = value;
                 }
-                else if (target.Equals("Output2", StringComparison.OrdinalIgnoreCase))
+                else if (assignment.Target.Equals("Output2", StringComparison.OrdinalIgnoreCase))
                 {
                     output2 = value;
                 }
                 else
                 {
-                    context[target] = value;
+                    context[assignment.Target] = value!;
                 }
             }
             else
             {
-                output1 = EvaluateExpression(statement, context);
+                output1 = value;
             }
         }
 
@@ -114,9 +142,9 @@ public class ScriptOperator : OperatorBase
     public override ValidationResult ValidateParameters(Operator @operator)
     {
         var language = GetStringParam(@operator, "ScriptLanguage", "CSharpExpression");
-        if (!SupportedLanguages.Contains(language, StringComparer.OrdinalIgnoreCase))
+        if (!TryValidateLanguage(language, out var languageError))
         {
-            return ValidationResult.Invalid("ScriptLanguage must be CSharpExpression or CSharpScript");
+            return ValidationResult.Invalid(languageError);
         }
 
         var code = GetStringParam(@operator, "Code", string.Empty);
@@ -131,7 +159,54 @@ public class ScriptOperator : OperatorBase
             return ValidationResult.Invalid("Timeout must be greater than 0");
         }
 
+        var statements = SplitStatements(code);
+        if (statements.Count == 0)
+        {
+            return ValidationResult.Invalid($"{InvalidExpressionCode}: Code does not contain an expression.");
+        }
+
+        var context = BuildContext(null);
+        foreach (var raw in statements)
+        {
+            var statement = NormalizeStatement(raw);
+            if (string.IsNullOrWhiteSpace(statement))
+            {
+                continue;
+            }
+
+            var assignment = ParseAssignment(statement);
+            if (!assignment.IsValid)
+            {
+                return ValidationResult.Invalid(
+                    $"{InvalidAssignmentCode}: Assignment targets must be identifiers and assignments must include an expression.");
+            }
+
+            if (!TryEvaluateExpression(assignment.Expression, context, out var value, out var evaluationError))
+            {
+                return ValidationResult.Invalid(evaluationError);
+            }
+
+            if (assignment.HasAssignment)
+            {
+                context[assignment.Target] = value!;
+            }
+        }
+
         return ValidationResult.Valid();
+    }
+
+    private static bool TryValidateLanguage(string language, out string error)
+    {
+        if (string.Equals(language, SupportedLanguage, StringComparison.Ordinal))
+        {
+            error = string.Empty;
+            return true;
+        }
+
+        error = string.Equals(language, "CSharpScript", StringComparison.OrdinalIgnoreCase)
+            ? $"{UnsupportedLanguageCode}: CSharpScript is not supported; use CSharpExpression."
+            : $"{InvalidLanguageCode}: ScriptLanguage must be exactly CSharpExpression.";
+        return false;
     }
 
     private static Dictionary<string, object> BuildContext(Dictionary<string, object>? inputs)
@@ -178,49 +253,111 @@ public class ScriptOperator : OperatorBase
         return trimmed;
     }
 
-    private static bool TryParseAssignment(string statement, out string target, out string expression)
+    private static AssignmentParseResult ParseAssignment(string statement)
     {
-        target = string.Empty;
-        expression = string.Empty;
-
-        var eqIndex = statement.IndexOf('=');
-        if (eqIndex <= 0)
+        var assignmentIndex = FindAssignmentIndex(statement);
+        if (assignmentIndex < 0)
         {
-            return false;
+            return new AssignmentParseResult(false, true, string.Empty, statement);
         }
 
-        target = statement[..eqIndex].Trim();
-        expression = statement[(eqIndex + 1)..].Trim();
-        return !string.IsNullOrWhiteSpace(target) && !string.IsNullOrWhiteSpace(expression);
+        var target = statement[..assignmentIndex].Trim();
+        var expression = statement[(assignmentIndex + 1)..].Trim();
+        var isValid = AssignmentTargetPattern.IsMatch(target) && !string.IsNullOrWhiteSpace(expression);
+        return new AssignmentParseResult(true, isValid, target, expression);
     }
 
-    private static object EvaluateExpression(string expression, IReadOnlyDictionary<string, object> context)
+    private static int FindAssignmentIndex(string statement)
     {
+        for (var index = 0; index < statement.Length; index++)
+        {
+            if (statement[index] != '=')
+            {
+                continue;
+            }
+
+            var previous = index > 0 ? statement[index - 1] : '\0';
+            var next = index + 1 < statement.Length ? statement[index + 1] : '\0';
+            if (previous is '<' or '>' or '!' or '=' || next == '=')
+            {
+                continue;
+            }
+
+            return index;
+        }
+
+        return -1;
+    }
+
+    private static bool TryEvaluateExpression(
+        string expression,
+        IReadOnlyDictionary<string, object> context,
+        out object? value,
+        out string error)
+    {
+        value = null;
+        error = string.Empty;
         if (string.IsNullOrWhiteSpace(expression))
         {
-            return string.Empty;
+            error = $"{InvalidExpressionCode}: Expression cannot be empty.";
+            return false;
         }
 
         var trimmed = expression.Trim();
 
         if (IsQuotedLiteral(trimmed))
         {
-            return trimmed[1..^1];
+            value = trimmed[1..^1];
+            return true;
         }
 
         if (context.TryGetValue(trimmed, out var directValue))
         {
-            return directValue;
+            value = directValue;
+            return true;
         }
 
         if (bool.TryParse(trimmed, out var booleanResult))
         {
-            return booleanResult;
+            value = booleanResult;
+            return true;
         }
 
         if (double.TryParse(trimmed, NumberStyles.Any, CultureInfo.InvariantCulture, out var numericResult))
         {
-            return numericResult;
+            value = numericResult;
+            return true;
+        }
+
+        var unquotedExpression = MaskQuotedText(trimmed);
+        var function = IdentifierPattern.Matches(unquotedExpression)
+            .Select(match => match.Value)
+            .FirstOrDefault(identifier =>
+            {
+                var identifierIndex = unquotedExpression.IndexOf(identifier, StringComparison.Ordinal);
+                if (identifierIndex < 0)
+                {
+                    return false;
+                }
+
+                var following = unquotedExpression[(identifierIndex + identifier.Length)..].TrimStart();
+                return following.StartsWith('(');
+            });
+        if (!string.IsNullOrWhiteSpace(function))
+        {
+            error = $"{UnsupportedFunctionCode}: Function calls are not supported by CSharpExpression.";
+            return false;
+        }
+
+        var unresolved = IdentifierPattern.Matches(unquotedExpression)
+            .Select(match => match.Value)
+            .FirstOrDefault(identifier =>
+                !ExpressionKeywords.Contains(identifier) &&
+                !context.ContainsKey(identifier));
+        if (!string.IsNullOrWhiteSpace(unresolved))
+        {
+            error = $"{UnresolvedVariableCode}: Variable '{unresolved}' is not defined.";
+            return false;
         }
 
         var numericExpression = ReplaceVariables(trimmed, context);
@@ -232,20 +369,51 @@ public class ScriptOperator : OperatorBase
 
             if (raw is null)
             {
-                return string.Empty;
+                value = string.Empty;
+                return true;
             }
 
             if (raw is bool b)
             {
-                return b;
+                value = b;
+                return true;
             }
 
-            return Convert.ToDouble(raw, CultureInfo.InvariantCulture);
+            value = Convert.ToDouble(raw, CultureInfo.InvariantCulture);
+            return true;
         }
         catch
         {
-            return trimmed;
+            error = $"{InvalidExpressionCode}: Expression syntax or operand types are invalid.";
+            return false;
         }
+    }
+
+    private static string MaskQuotedText(string expression)
+    {
+        var chars = expression.ToCharArray();
+        char quote = '\0';
+        for (var index = 0; index < chars.Length; index++)
+        {
+            if (quote == '\0' && chars[index] is '\'' or '"')
+            {
+                quote = chars[index];
+                chars[index] = ' ';
+                continue;
+            }
+
+            if (quote != '\0')
+            {
+                if (chars[index] == quote)
+                {
+                    quote = '\0';
+                }
+
+                chars[index] = ' ';
+            }
+        }
+
+        return new string(chars);
     }
 
     private static bool IsQuotedLiteral(string text)
@@ -295,5 +463,11 @@ public class ScriptOperator : OperatorBase
             _ => double.TryParse(raw.ToString(), NumberStyles.Any, CultureInfo.InvariantCulture, out value)
         };
     }
+
+    private readonly record struct AssignmentParseResult(
+        bool HasAssignment,
+        bool IsValid,
+        string Target,
+        string Expression);
 }
 

@@ -19,7 +19,8 @@ namespace ClearVision.Product.Infrastructure.Operators;
     DisplayName = "串口通信",
     Description = "RS-232/485 串口数据收发",
     CategoryId = OperatorCategoryId.Communication,
-    IconName = "serial"
+    IconName = "serial",
+    Version = "1.0.1"
 )]
 [InputPort("Data", "发送数据", PortDataType.Any, IsRequired = false)]
 [OutputPort("Response", "接收数据", PortDataType.Any)]
@@ -34,6 +35,11 @@ namespace ClearVision.Product.Infrastructure.Operators;
 [OperatorParam("ResponseWaitMs", "响应等待(毫秒)", "int", DefaultValue = 100, Min = 0, Max = 30000)]
 public class SerialCommunicationOperator : OperatorBase
 {
+    internal const string InvalidStopBitsCode = "SERIAL_STOP_BITS_INVALID";
+    internal const string InvalidParityCode = "SERIAL_PARITY_INVALID";
+    internal const string InvalidEncodingCode = "SERIAL_ENCODING_INVALID";
+    internal const string InvalidHexCode = "SERIAL_HEX_PAYLOAD_INVALID";
+
     private const int DefaultResponseWaitMs = 100;
     private const int ResponsePollIntervalMs = 10;
 
@@ -77,22 +83,44 @@ public class SerialCommunicationOperator : OperatorBase
             baudRate = 9600;
         }
 
-        // 解析停止位
-        if (!Enum.TryParse<StopBits>(stopBitsStr, out var stopBits))
+        if (!TryParseStopBits(stopBitsStr, out var stopBits))
         {
-            stopBits = StopBits.One;
+            return OperatorExecutionOutput.Failure(
+                $"{InvalidStopBitsCode}: StopBits must be One, OnePointFive, or Two.");
         }
 
-        // 解析校验位
-        if (!Enum.TryParse<Parity>(parityStr, out var parity))
+        if (!TryParseParity(parityStr, out var parity))
         {
-            parity = Parity.None;
+            return OperatorExecutionOutput.Failure(
+                $"{InvalidParityCode}: Parity must be None, Odd, or Even.");
+        }
+
+        if (!TryResolveEncoding(encoding, out var textEncoding))
+        {
+            return OperatorExecutionOutput.Failure(
+                $"{InvalidEncodingCode}: Encoding must be UTF8, ASCII, or HEX.");
         }
 
         // 验证数据位范围
         if (dataBits < 5 || dataBits > 8)
         {
             return OperatorExecutionOutput.Failure("数据位必须在 5-8 之间");
+        }
+
+        byte[]? bytesToSend = null;
+        if (!string.IsNullOrEmpty(sendData))
+        {
+            if (encoding == "HEX")
+            {
+                if (!TryParseHexPayload(sendData, out bytesToSend, out var hexError))
+                {
+                    return OperatorExecutionOutput.Failure(hexError);
+                }
+            }
+            else
+            {
+                bytesToSend = textEncoding!.GetBytes(sendData);
+            }
         }
 
         using var port = _connectionFactory(new SerialPortConnectionSettings(
@@ -108,38 +136,10 @@ public class SerialCommunicationOperator : OperatorBase
             await port.OpenAsync(cancellationToken);
 
             // 发送数据
-            if (!string.IsNullOrEmpty(sendData))
+            if (bytesToSend is not null)
             {
-                byte[] bytes;
-                if (encoding.Equals("HEX", StringComparison.OrdinalIgnoreCase))
-                {
-                    // HEX 模式：将十六进制字符串转换为字节数组
-                    var hexString = sendData.Replace(" ", "").Replace("-", "");
-                    if (hexString.Length % 2 != 0)
-                    {
-                        return OperatorExecutionOutput.Failure("HEX 数据长度必须是偶数");
-                    }
-
-                    bytes = new byte[hexString.Length / 2];
-                    for (int i = 0; i < hexString.Length; i += 2)
-                    {
-                        bytes[i / 2] = Convert.ToByte(hexString.Substring(i, 2), 16);
-                    }
-                }
-                else
-                {
-                    // 文本模式
-                    var textEncoding = encoding.ToUpper() switch
-                    {
-                        "ASCII" => Encoding.ASCII,
-                        "UTF8" => Encoding.UTF8,
-                        _ => Encoding.UTF8
-                    };
-                    bytes = textEncoding.GetBytes(sendData);
-                }
-
-                await port.WriteAsync(bytes, cancellationToken);
-                Logger.LogInformation("[SerialCommunication] 已发送 {Bytes} 字节到 {Port}", bytes.Length, portName);
+                await port.WriteAsync(bytesToSend, cancellationToken);
+                Logger.LogInformation("[SerialCommunication] 已发送 {Bytes} 字节到 {Port}", bytesToSend.Length, portName);
             }
 
             // 接收响应
@@ -151,19 +151,13 @@ public class SerialCommunicationOperator : OperatorBase
                 byte[] buffer = new byte[bytesAvailable];
                 bytesReceived = await port.ReadAsync(buffer, cancellationToken);
 
-                if (encoding.Equals("HEX", StringComparison.OrdinalIgnoreCase))
+                if (encoding == "HEX")
                 {
                     response = BitConverter.ToString(buffer, 0, bytesReceived).Replace("-", " ");
                 }
                 else
                 {
-                    var textEncoding = encoding.ToUpper() switch
-                    {
-                        "ASCII" => Encoding.ASCII,
-                        "UTF8" => Encoding.UTF8,
-                        _ => Encoding.UTF8
-                    };
-                    response = textEncoding.GetString(buffer, 0, bytesReceived);
+                    response = textEncoding!.GetString(buffer, 0, bytesReceived);
                 }
 
                 Logger.LogInformation("[SerialCommunication] 从 {Port} 接收 {Bytes} 字节", portName, bytesReceived);
@@ -272,6 +266,10 @@ public class SerialCommunicationOperator : OperatorBase
         var portName = GetStringParam(@operator, "PortName", "COM1");
         var baudRateStr = GetStringParam(@operator, "BaudRate", "9600");
         var dataBits = GetIntParam(@operator, "DataBits", 8);
+        var stopBits = GetStringParam(@operator, "StopBits", "One");
+        var parity = GetStringParam(@operator, "Parity", "None");
+        var encoding = GetStringParam(@operator, "Encoding", "UTF8");
+        var sendData = GetStringParam(@operator, "SendData", string.Empty);
 
         if (string.IsNullOrWhiteSpace(portName))
         {
@@ -293,7 +291,102 @@ public class SerialCommunicationOperator : OperatorBase
             return ValidationResult.Invalid("数据位必须在 5-8 之间");
         }
 
+        if (!TryParseStopBits(stopBits, out _))
+        {
+            return ValidationResult.Invalid(
+                $"{InvalidStopBitsCode}: StopBits must be One, OnePointFive, or Two.");
+        }
+
+        if (!TryParseParity(parity, out _))
+        {
+            return ValidationResult.Invalid(
+                $"{InvalidParityCode}: Parity must be None, Odd, or Even.");
+        }
+
+        if (!TryResolveEncoding(encoding, out _))
+        {
+            return ValidationResult.Invalid(
+                $"{InvalidEncodingCode}: Encoding must be UTF8, ASCII, or HEX.");
+        }
+
+        if (encoding == "HEX" &&
+            !string.IsNullOrEmpty(sendData) &&
+            !TryParseHexPayload(sendData, out _, out var hexError))
+        {
+            return ValidationResult.Invalid(hexError);
+        }
+
         return ValidationResult.Valid();
+    }
+
+    private static bool TryParseStopBits(string value, out StopBits stopBits)
+    {
+        stopBits = value switch
+        {
+            "One" => StopBits.One,
+            "OnePointFive" => StopBits.OnePointFive,
+            "Two" => StopBits.Two,
+            _ => default
+        };
+        return value is "One" or "OnePointFive" or "Two";
+    }
+
+    private static bool TryParseParity(string value, out Parity parity)
+    {
+        parity = value switch
+        {
+            "None" => Parity.None,
+            "Odd" => Parity.Odd,
+            "Even" => Parity.Even,
+            _ => default
+        };
+        return value is "None" or "Odd" or "Even";
+    }
+
+    private static bool TryResolveEncoding(string value, out Encoding? encoding)
+    {
+        encoding = value switch
+        {
+            "UTF8" => Encoding.UTF8,
+            "ASCII" => Encoding.ASCII,
+            "HEX" => null,
+            _ => null
+        };
+        return value is "UTF8" or "ASCII" or "HEX";
+    }
+
+    internal static bool TryParseHexPayload(
+        string payload,
+        out byte[] bytes,
+        out string error)
+    {
+        var normalized = payload.Replace(" ", string.Empty, StringComparison.Ordinal)
+            .Replace("-", string.Empty, StringComparison.Ordinal);
+        bytes = [];
+
+        if (normalized.Length % 2 != 0)
+        {
+            error = $"{InvalidHexCode}: HEX payload must contain an even number of hexadecimal characters.";
+            return false;
+        }
+
+        if (normalized.Any(character =>
+                character is not (>= '0' and <= '9') and
+                not (>= 'A' and <= 'F') and
+                not (>= 'a' and <= 'f')))
+        {
+            error = $"{InvalidHexCode}: HEX payload contains an invalid byte token.";
+            return false;
+        }
+
+        bytes = new byte[normalized.Length / 2];
+        for (var index = 0; index < normalized.Length; index += 2)
+        {
+            bytes[index / 2] = Convert.ToByte(normalized.Substring(index, 2), 16);
+        }
+
+        error = string.Empty;
+        return true;
     }
 
     internal readonly record struct SerialPortConnectionSettings(

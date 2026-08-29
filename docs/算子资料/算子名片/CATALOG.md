@@ -1,6 +1,6 @@
 # 算子目录 / Operator Catalog
 
-> 生成时间 / Generated At: `2026-08-01 23:43:18 +08:00`
+> 生成时间 / Generated At: `2026-08-29 14:18:20 +08:00`
 > 算子总数 / Total Operators: **158**
 
 ## 分类统计 / Category Summary
@@ -201,9 +201,9 @@
 | `OperatorType.LogicGate` | 逻辑门 | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | 2 | 1 | 1 | `1.0.0` | 该算子用于布尔逻辑运算 (AND, OR, NOT, XOR, NAND, NOR)… | [LogicGate](./LogicGate.md) |
 | `OperatorType.MathOperation` | 数值计算 | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | 2 | 2 | 1 | `1.0.0` | 该算子用于支持加减乘除、取绝对值、开方等常用运算。运行时从声明输入端口读取数据，按参… | [MathOperation](./MathOperation.md) |
 | `OperatorType.PointSetTool` | 点集工具 | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | 2 | 4 | 6 | `1.0.0` | 该算子用于合并、排序、过滤点列表并计算集合属性。运行时从声明输入端口读取数据，按参数… | [PointSetTool](./PointSetTool.md) |
-| `OperatorType.ScriptOperator` | 脚本算子 | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | 4 | 2 | 3 | `1.0.0` | 该算子用于运行用户自定义表达式或脚本片段。运行时从声明输入端口读取数据，按参数表解析… | [ScriptOperator](./ScriptOperator.md) |
+| `OperatorType.ScriptOperator` | 脚本算子 | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | 4 | 2 | 3 | `1.0.1` | 该算子用于运行用户自定义 C# 表达式。运行时从声明输入端口读取数据，按参数表解析配… | [ScriptOperator](./ScriptOperator.md) |
 | `OperatorType.Statistics` | 统计分析 | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | 1 | 7 | 5 | `1.0.0` | 该算子用于基于滚动历史计算均值、标准差和 Cpk 统计结果。运行时从声明输入端口读取… | [Statistics](./Statistics.md) |
-| `OperatorType.StringFormat` | 字符串格式化 | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | 2 | 1 | 1 | `1.0.0` | 该算子用于按模板生成字符串。运行时从声明输入端口读取数据，按参数表解析配置，并把处理… | [StringFormat](./StringFormat.md) |
+| `OperatorType.StringFormat` | 字符串格式化 | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | 2 | 3 | 4 | `1.0.0` | 该算子用于按模板生成字符串。运行时从声明输入端口读取数据，按参数表解析配置，并把处理… | [StringFormat](./StringFormat.md) |
 | `OperatorType.TimerStatistics` | 计时统计 | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | 1 | 4 | 4 | `1.0.1` | 该算子用于统计耗时和周期时间。运行时从声明输入端口读取数据，按参数表解析配置，并把处… | [TimerStatistics](./TimerStatistics.md) |
 | `OperatorType.TypeConvert` | 类型转换 | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | 1 | 6 | 2 | `1.0.0` | 该算子用于在字符串、浮点、整数、布尔等类型之间转换输入数据。运行时从声明输入端口读取… | [TypeConvert](./TypeConvert.md) |
 | `OperatorType.UnitConvert` | 单位换算 | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | 2 | 2 | 4 | `1.0.0` | 该算子用于在像素、mm、um 和英寸之间进行数值换算。运行时从声明输入端口读取数据，… | [UnitConvert](./UnitConvert.md) |
@@ -227,12 +227,12 @@
 | 枚举 (Enum) | 显示名 (DisplayName) | Execution | AlgorithmQuality | ProductionReadiness | FieldValidation | 输入 | 输出 | 参数 | 版本 (Version) | 算法 (Algorithm) | 文档 |
 |------|------|------|------|------|------|------:|------:|------:|------|------|------|
 | `OperatorType.HttpRequest` | HTTP 请求 | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | 2 | 3 | 6 | `1.0.0` | 该算子用于调用外部 REST API。运行时从声明输入端口读取数据，按参数表解析配置… | [HttpRequest](./HttpRequest.md) |
-| `OperatorType.MitsubishiMcCommunication` | 三菱MC通信 | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | 1 | 2 | 13 | `1.0.0` | 该算子用于三菱 MC 协议 PLC 读写通信。运行时从声明输入端口读取数据，按参数表… | [MitsubishiMcCommunication](./MitsubishiMcCommunication.md) |
+| `OperatorType.MitsubishiMcCommunication` | 三菱MC通信 | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | 1 | 2 | 13 | `1.0.1` | 该算子用于三菱 MC 协议 PLC 读写通信。运行时从声明输入端口读取数据，按参数表… | [MitsubishiMcCommunication](./MitsubishiMcCommunication.md) |
 | `OperatorType.ModbusCommunication` | Modbus TCP通信 | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | 1 | 2 | 9 | `1.0.0` | 该算子用于通过 Modbus TCP 读写线圈和保持寄存器；当前算子不执行 Modb… | [ModbusCommunication](./ModbusCommunication.md) |
 | `OperatorType.MqttPublish` | MQTT 发布 | `Implemented` | `Unknown` | `Reference` | `NotValidated` | 2 | 1 | 6 | `0.1.0` | 该算子用于在启用可选 MQTT 集成时发布检测数据。运行时从声明输入端口读取数据，按… | [MqttPublish](./MqttPublish.md) |
-| `OperatorType.OmronFinsCommunication` | 欧姆龙FINS通信 | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | 1 | 2 | 13 | `1.0.0` | 该算子用于欧姆龙FINS/TCP协议PLC读写通信（CP1H/CJ2M/NJ/NX）… | [OmronFinsCommunication](./OmronFinsCommunication.md) |
-| `OperatorType.SerialCommunication` | 串口通信 | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | 1 | 1 | 9 | `1.0.0` | 该算子用于RS-232/485 串口数据收发。运行时从声明输入端口读取数据，按参数表… | [SerialCommunication](./SerialCommunication.md) |
-| `OperatorType.SiemensS7Communication` | 西门子S7通信 | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | 1 | 2 | 15 | `1.0.0` | 该算子用于西门子S7系列PLC读写通信（S7-200/300/400/1200/15… | [SiemensS7Communication](./SiemensS7Communication.md) |
+| `OperatorType.OmronFinsCommunication` | 欧姆龙FINS通信 | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | 1 | 2 | 13 | `1.0.1` | 该算子用于欧姆龙FINS/TCP协议PLC读写通信（CP1H/CJ2M/NJ/NX）… | [OmronFinsCommunication](./OmronFinsCommunication.md) |
+| `OperatorType.SerialCommunication` | 串口通信 | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | 1 | 1 | 9 | `1.0.1` | 该算子用于RS-232/485 串口数据收发。运行时从声明输入端口读取数据，按参数表… | [SerialCommunication](./SerialCommunication.md) |
+| `OperatorType.SiemensS7Communication` | 西门子S7通信 | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | 1 | 2 | 15 | `1.0.1` | 该算子用于西门子S7系列PLC读写通信（S7-200/300/400/1200/15… | [SiemensS7Communication](./SiemensS7Communication.md) |
 | `OperatorType.TcpCommunication` | TCP通信 | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | 1 | 12 | 39 | `1.0.0` | 该算子用于TCP/IP网络通信。运行时从声明输入端口读取数据，按参数表解析配置，并把… | [TcpCommunication](./TcpCommunication.md) |
 
 ### 输出与辅助 / `OutputAndAuxiliary` (5)

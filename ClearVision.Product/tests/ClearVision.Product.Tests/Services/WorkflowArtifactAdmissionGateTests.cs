@@ -29,6 +29,31 @@ public sealed class WorkflowArtifactAdmissionGateTests
     }
 
     [Fact]
+    public void InspectJson_LegacyCSharpScriptFlow_ShouldLoadWithoutSilentMigration()
+    {
+        var flow = CreateFlow(OperatorType.ScriptOperator);
+        flow.Operators.Single().Parameters
+            .Single(parameter => parameter.Name == "ScriptLanguage")
+            .Value = "CSharpScript";
+        var options = new JsonSerializerOptions
+        {
+            PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+            Converters = { new JsonStringEnumConverter() }
+        };
+        var original = JsonSerializer.Serialize(flow, options);
+
+        var result = CreateGate().InspectJson(original, "test.legacy-csharp-script");
+
+        result.Disposition.Should().Be(WorkflowArtifactAdmissionDisposition.Canonical);
+        result.Flow.Should().NotBeNull();
+        result.Flow!.Operators.Single().Parameters
+            .Single(parameter => parameter.Name == "ScriptLanguage")
+            .Value!.ToString().Should().Be("CSharpScript");
+        result.Report.Repairs.Should().NotContain(repair =>
+            repair.FromValue == "CSharpScript" || repair.ToValue == "CSharpExpression");
+    }
+
+    [Fact]
     public void EntityRoundTrip_ShouldPreserveAiAdmissionMetadata()
     {
         var factory = new OperatorFactory();

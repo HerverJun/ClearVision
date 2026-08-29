@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-08-01T23:43:18.9236021+08:00",
-  "generationFingerprint": "3C7C69D1A08C481E227D2A3BCF11A839324B429BD01E3568E5EC8BB8C2DB4C53",
+  "generatedAt": "2026-08-29T14:18:20.2419055+08:00",
+  "generationFingerprint": "5686E6A8D15212F4B5CD953472941FB7088A6109028ED049374D8C99BCC08541",
   "totalCount": 158,
   "categories": {
     "采集": {
@@ -7750,7 +7750,7 @@
       ],
       "resourceRequirements": [],
       "generationDependencies": [],
-      "generationFingerprint": "9E7C1802E2AB4941E2BCB232057F2ED714BC5AEF376C6694D26AB353B259BA0E",
+      "generationFingerprint": "B98C6401D387A581654B801671EE114CABF9E9CE20D4BB2491947F2EF631E9AF",
       "docPath": "算子资料/算子名片/PolarUnwrap.md"
     },
     {
@@ -39517,14 +39517,14 @@
       "imageInputContracts": [],
       "resourceRequirements": [],
       "generationDependencies": [],
-      "generationFingerprint": "FB08128EEF7D6169261D342A45FEF736233041B85A24C0A6979FC449F50C703F",
+      "generationFingerprint": "FF674FDFC6384E3F53EC9ACACF9178E3CB9425140AC33A4F97C47F72B0CBFDE4",
       "docPath": "算子资料/算子名片/PointSetTool.md"
     },
     {
       "id": "ScriptOperator",
       "type": 160,
       "displayName": "脚本算子",
-      "description": "运行用户自定义表达式或脚本片段。",
+      "description": "运行用户自定义 C# 表达式。",
       "categoryId": "DataProcessing",
       "categoryOrder": 11,
       "category": "数据处理",
@@ -39543,7 +39543,7 @@
         "evidenceIdentity": "clearvision-operator-quality-phase5-evidence@1.0.0:7ed1d600eead23e8185d6fef730b3995bec7db29c7d65a6cc3248a1ca95770cf",
         "modeEvidence": []
       },
-      "version": "1.0.0",
+      "version": "1.0.1",
       "keywords": [
         "code",
         "custom",
@@ -39562,7 +39562,7 @@
         "生命周期:Stable",
         "算法类型:自研"
       ],
-      "algorithm": "该算子用于运行用户自定义表达式或脚本片段。运行时从声明输入端口读取数据，按参数表解析…",
+      "algorithm": "该算子用于运行用户自定义 C# 表达式。运行时从声明输入端口读取数据，按参数表解析配…",
       "inputPorts": [
         {
           "name": "Input1",
@@ -39617,10 +39617,6 @@
             {
               "value": "CSharpExpression",
               "label": "CSharpExpression"
-            },
-            {
-              "value": "CSharpScript",
-              "label": "CSharpScript"
             }
           ]
         },
@@ -39652,7 +39648,7 @@
       "imageInputContracts": [],
       "resourceRequirements": [],
       "generationDependencies": [],
-      "generationFingerprint": "50289B6A4670C54F7C4012DEAEFD1D95909A11E7A6A6C17FA845CE55BD0E16BB",
+      "generationFingerprint": "3429501138E27DF79E2497B5B3056F929E72B7D9D9D5349A1C62F37484DF6F4E",
       "docPath": "算子资料/算子名片/ScriptOperator.md"
     },
     {
@@ -39864,9 +39860,45 @@
           "displayName": "结果",
           "dataType": "String",
           "isRequired": false
+        },
+        {
+          "name": "Length",
+          "displayName": "结果长度",
+          "dataType": "Integer",
+          "isRequired": false
+        },
+        {
+          "name": "IsEmpty",
+          "displayName": "结果为空",
+          "dataType": "Boolean",
+          "isRequired": false
         }
       ],
       "parameters": [
+        {
+          "name": "Mode",
+          "displayName": "格式模式",
+          "dataType": "enum",
+          "description": "",
+          "defaultValue": "Template",
+          "min": null,
+          "max": null,
+          "isRequired": true,
+          "options": [
+            {
+              "value": "Template",
+              "label": "模板"
+            },
+            {
+              "value": "Join",
+              "label": "拼接"
+            },
+            {
+              "value": "Date",
+              "label": "日期时间"
+            }
+          ]
+        },
         {
           "name": "Template",
           "displayName": "模板",
@@ -39877,14 +39909,169 @@
           "max": null,
           "isRequired": true,
           "options": null
+        },
+        {
+          "name": "Separator",
+          "displayName": "分隔符",
+          "dataType": "string",
+          "description": "",
+          "defaultValue": "",
+          "min": null,
+          "max": null,
+          "isRequired": true,
+          "options": null
+        },
+        {
+          "name": "DateFormat",
+          "displayName": "日期格式",
+          "dataType": "string",
+          "description": "",
+          "defaultValue": "yyyy-MM-dd HH:mm:ss",
+          "min": null,
+          "max": null,
+          "isRequired": true,
+          "options": null
         }
       ],
-      "parameterConditions": [],
+      "parameterConditions": [
+        {
+          "parameter": "DateFormat",
+          "requiredPolicy": "metadata",
+          "requiredWhen": null,
+          "enabledWhen": null,
+          "disabledWhen": {
+            "all": [
+              {
+                "parameter": "Mode",
+                "comparison": "not-equals",
+                "value": "Date"
+              }
+            ],
+            "any": null
+          },
+          "atLeastOneGroup": null,
+          "mutuallyExclusiveGroup": null,
+          "aliasFor": null,
+          "deprecated": false,
+          "resourceKind": null,
+          "reasonCode": "STRING_FORMAT_DATE_MODE_ONLY",
+          "visibleWhen": null,
+          "hiddenWhen": {
+            "all": [
+              {
+                "parameter": "Mode",
+                "comparison": "not-equals",
+                "value": "Date"
+              }
+            ],
+            "any": null
+          },
+          "ignoredWhen": {
+            "all": [
+              {
+                "parameter": "Mode",
+                "comparison": "not-equals",
+                "value": "Date"
+              }
+            ],
+            "any": null
+          },
+          "satisfiedByInputPorts": null
+        },
+        {
+          "parameter": "Separator",
+          "requiredPolicy": "metadata",
+          "requiredWhen": null,
+          "enabledWhen": null,
+          "disabledWhen": {
+            "all": [
+              {
+                "parameter": "Mode",
+                "comparison": "not-equals",
+                "value": "Join"
+              }
+            ],
+            "any": null
+          },
+          "atLeastOneGroup": null,
+          "mutuallyExclusiveGroup": null,
+          "aliasFor": null,
+          "deprecated": false,
+          "resourceKind": null,
+          "reasonCode": "STRING_FORMAT_JOIN_MODE_ONLY",
+          "visibleWhen": null,
+          "hiddenWhen": {
+            "all": [
+              {
+                "parameter": "Mode",
+                "comparison": "not-equals",
+                "value": "Join"
+              }
+            ],
+            "any": null
+          },
+          "ignoredWhen": {
+            "all": [
+              {
+                "parameter": "Mode",
+                "comparison": "not-equals",
+                "value": "Join"
+              }
+            ],
+            "any": null
+          },
+          "satisfiedByInputPorts": null
+        },
+        {
+          "parameter": "Template",
+          "requiredPolicy": "metadata",
+          "requiredWhen": null,
+          "enabledWhen": null,
+          "disabledWhen": {
+            "all": [
+              {
+                "parameter": "Mode",
+                "comparison": "not-equals",
+                "value": "Template"
+              }
+            ],
+            "any": null
+          },
+          "atLeastOneGroup": null,
+          "mutuallyExclusiveGroup": null,
+          "aliasFor": null,
+          "deprecated": false,
+          "resourceKind": null,
+          "reasonCode": "STRING_FORMAT_TEMPLATE_MODE_ONLY",
+          "visibleWhen": null,
+          "hiddenWhen": {
+            "all": [
+              {
+                "parameter": "Mode",
+                "comparison": "not-equals",
+                "value": "Template"
+              }
+            ],
+            "any": null
+          },
+          "ignoredWhen": {
+            "all": [
+              {
+                "parameter": "Mode",
+                "comparison": "not-equals",
+                "value": "Template"
+              }
+            ],
+            "any": null
+          },
+          "satisfiedByInputPorts": null
+        }
+      ],
       "outputConditions": [],
       "imageInputContracts": [],
       "resourceRequirements": [],
       "generationDependencies": [],
-      "generationFingerprint": "149B3B790FF62C6E7DA8113AED8CA7CA3CCDA31C4A3A68FB1EBC885DBB67F6EA",
+      "generationFingerprint": "8A52E735E09CD061D94CEBFA756218F1DFCF3ABCAFA9D1C5000D2C990BCDC9C1",
       "docPath": "算子资料/算子名片/StringFormat.md"
     },
     {
@@ -42800,7 +42987,7 @@
       "imageInputContracts": [],
       "resourceRequirements": [],
       "generationDependencies": [],
-      "generationFingerprint": "5D37FA5972A94464C387770A58B327971EB575BA8D70B260FD15D93CBA1C7D8D",
+      "generationFingerprint": "63F21E1BDE5B0FD035E214BCFF3F98C85CAB80363D9EC34A686CF278B69F198C",
       "docPath": "算子资料/算子名片/HttpRequest.md"
     },
     {
@@ -42826,7 +43013,7 @@
         "evidenceIdentity": "clearvision-operator-quality-phase5-evidence@1.0.0:7ed1d600eead23e8185d6fef730b3995bec7db29c7d65a6cc3248a1ca95770cf",
         "modeEvidence": []
       },
-      "version": "1.0.0",
+      "version": "1.0.1",
       "keywords": [
         "MC",
         "Mitsubishi",
@@ -43553,7 +43740,7 @@
         }
       ],
       "generationDependencies": [],
-      "generationFingerprint": "A392A906BB0040C501FD4CD50108F7061A13E33205E8540DAF11E93393950E5E",
+      "generationFingerprint": "CFFEEFB6ADB23B1F2AFF357B29E8FA0CBE027189E79E7BBBD7DE1BBF57470633",
       "docPath": "算子资料/算子名片/MitsubishiMcCommunication.md"
     },
     {
@@ -44110,7 +44297,7 @@
         "evidenceIdentity": "clearvision-operator-quality-phase5-evidence@1.0.0:7ed1d600eead23e8185d6fef730b3995bec7db29c7d65a6cc3248a1ca95770cf",
         "modeEvidence": []
       },
-      "version": "1.0.0",
+      "version": "1.0.1",
       "keywords": [],
       "tags": [
         "AlgorithmQuality:Unknown",
@@ -44831,7 +45018,7 @@
         }
       ],
       "generationDependencies": [],
-      "generationFingerprint": "636ED45E60676562F4571C76E52DDB0CF6DC4E3BB464227445B0C6D1B9D7A99F",
+      "generationFingerprint": "86DC1BA110A638A72A19624EC50B88BF23808346146F5B3F38F34B6FF19F508E",
       "docPath": "算子资料/算子名片/OmronFinsCommunication.md"
     },
     {
@@ -44857,7 +45044,7 @@
         "evidenceIdentity": "clearvision-operator-quality-phase5-evidence@1.0.0:7ed1d600eead23e8185d6fef730b3995bec7db29c7d65a6cc3248a1ca95770cf",
         "modeEvidence": []
       },
-      "version": "1.0.0",
+      "version": "1.0.1",
       "keywords": [],
       "tags": [
         "AlgorithmQuality:Unknown",
@@ -45052,7 +45239,7 @@
       "imageInputContracts": [],
       "resourceRequirements": [],
       "generationDependencies": [],
-      "generationFingerprint": "53B241AD2E2435FAB993500C5BF935ECB16C7E7AF6469CC7432A5B681126478E",
+      "generationFingerprint": "4668B4BC3F2C0495536B6F15E0FF6E3BF682B3F92C0E874E7B6315E714A3AD3D",
       "docPath": "算子资料/算子名片/SerialCommunication.md"
     },
     {
@@ -45078,7 +45265,7 @@
         "evidenceIdentity": "clearvision-operator-quality-phase5-evidence@1.0.0:7ed1d600eead23e8185d6fef730b3995bec7db29c7d65a6cc3248a1ca95770cf",
         "modeEvidence": []
       },
-      "version": "1.0.0",
+      "version": "1.0.1",
       "keywords": [
         "西门子S7"
       ],
@@ -45812,7 +45999,7 @@
         }
       ],
       "generationDependencies": [],
-      "generationFingerprint": "CB6E01785B9123A83BF3FD069471D13B7444A8FDC3DF37FDBF600395225908E9",
+      "generationFingerprint": "4A0DFA0D37B90029DFAB10FF82E293AD51052A885DE1BFD222FEB2CFC2B91312",
       "docPath": "算子资料/算子名片/SiemensS7Communication.md"
     },
     {

@@ -8,7 +8,7 @@
 | 分类 ID (CategoryId) | `DataProcessing` |
 | 分类 (Category) | 数据处理 |
 | 分类顺序 (CategoryOrder) | 11 |
-| 版本 (Version) | `1.0.0` |
+| 版本 (Version) | `1.0.1` |
 | 生命周期 (Lifecycle) | 稳定 `Stable` |
 | 生命周期说明 (Lifecycle Note) | - |
 | 默认隐藏 (Default Hidden) | No |
@@ -22,7 +22,7 @@
 | 标签 (Tags) | `AlgorithmQuality:Unknown`, `Execution:Implemented`, `FieldValidation:NotValidated`, `ProductionReadiness:Unknown`, `分类:DataProcessing`, `分类显示:数据处理`, `生命周期:Stable`, `算法类型:自研` |
 
 ## 算法原理 / Algorithm Principle
-该算子用于运行用户自定义表达式或脚本片段。运行时从声明输入端口读取数据，按参数表解析配置，并把处理结果写入输出字典。
+该算子用于运行用户自定义 C# 表达式。运行时从声明输入端口读取数据，按参数表解析配置，并把处理结果写入输出字典。
 处理过程遵循统一算子框架：输入检查、参数解析、核心计算、输出封装和可选参数校验分层完成。
 
 ## 实现策略 / Implementation Strategy
@@ -42,7 +42,7 @@
 ## 参数说明 / Parameters
 | 参数名 (Name) | 显示名 (DisplayName) | 类型 (Type) | 默认值 (Default) | 范围/选项 (Range/Options) | 必填 (Required) | 说明 (Description) |
 |--------|------|------|--------|------|------|------|
-| `ScriptLanguage` | 脚本语言 | `enum` | CSharpExpression | CSharpExpression；CSharpScript | Yes | - |
+| `ScriptLanguage` | 脚本语言 | `enum` | CSharpExpression | CSharpExpression | Yes | - |
 | `Code` | 代码 | `string` | Input1 + Input2 | - | Yes | - |
 | `Timeout` | 超时（ms） | `int` | 5000 | [1, 120000] | Yes | - |
 
@@ -73,7 +73,7 @@
 | - | - | - |
 
 ## 生成依赖 / Generation Dependencies
-- 组合指纹 (Generation Fingerprint)：`50289B6A4670C54F7C4012DEAEFD1D95909A11E7A6A6C17FA845CE55BD0E16BB`
+- 组合指纹 (Generation Fingerprint)：`3429501138E27DF79E2497B5B3056F929E72B7D9D9D5349A1C62F37484DF6F4E`
 - 显式共享依赖：无；指纹由最终运行时元数据与算子源码组成。
 
 ### 运行时附加输出 / Runtime Additional Outputs
@@ -90,7 +90,7 @@
 - 单元/契约测试：已在 `ClearVision.Product/tests/ClearVision.Product.Tests/Operators` 中发现对应测试入口。
 - Golden/回放证据：质量报告中存在通过的 baseline 证据。
 - 参数失败契约：源码包含 `ValidateParameters`，非法参数会被明确拦截或返回错误说明。
-- 执行失败契约：源码中发现 3 条 `OperatorExecutionOutput.Failure(...)` 路径。
+- 执行失败契约：源码中发现 5 条 `OperatorExecutionOutput.Failure(...)` 路径。
 
 ## 适用场景 / Use Cases
 - 适合 (Suitable)：输入数据结构稳定、下游明确消费当前输出字段的常规流程节点。
@@ -103,4 +103,4 @@
 ## 变更记录 / Changelog
 | 版本 (Version) | 日期 (Date) | 变更内容 (Changes) |
 |------|------|----------|
-| 1.0.0 | 2026-07-14 | 按当前最终运行时元数据、条件契约和显式依赖口径重生成 / Regenerated from effective runtime metadata and declared dependencies |
+| 1.0.1 | 2026-08-29 | 按当前最终运行时元数据、条件契约和显式依赖口径重生成 / Regenerated from effective runtime metadata and declared dependencies |

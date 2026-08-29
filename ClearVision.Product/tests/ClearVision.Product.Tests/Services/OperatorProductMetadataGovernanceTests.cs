@@ -24,7 +24,7 @@ namespace ClearVision.Product.Tests.Services;
 [TestClassification(TestDomain.General, TestPurpose.Regression, TestLane.Pr, TestEvidenceType.Contract, TestOracleType.Contract, TestResourceRequirement.None, TestExpectedDuration.Fast, TestFlakyPolicy.Blocking, "product", Suites = "ServicesRegression")]
 public sealed class OperatorProductMetadataGovernanceTests
 {
-    private const string ExpectedIdentityHash = "A3FEACCDF3D84FF9ABCEDCE4AC636E8EC2BE252E884521BBC14A4F0270C3F055";
+    private const string ExpectedIdentityHash = "8A40F224C5FC16FE04225B4C0DE457DB4DAFD7DC4F6DD85DC622D40FA1DAE44D";
     private static readonly string RepoRoot = ResolveRepoRoot();
 
     private static readonly IReadOnlyDictionary<OperatorCategoryId, int> ExpectedCategoryCounts =
@@ -668,6 +668,20 @@ public sealed class OperatorProductMetadataGovernanceTests
         detailJson.Should().Contain("\"Range\"");
         detailJson.Should().Contain("\"Failure\"");
         detailJson.Should().Contain("\"Evidence\"");
+    }
+
+    [Fact]
+    public async Task OperatorSchemaTool_ScriptOperator_ShouldExposeOnlyExpressionLanguage()
+    {
+        var result = await new OperatorSchemaTool().ExecuteAsync(
+            new VisionAgentToolContext(),
+            JsonSerializer.SerializeToElement(new { operatorType = nameof(OperatorType.ScriptOperator) }),
+            CancellationToken.None);
+
+        result.Success.Should().BeTrue(result.ErrorMessage);
+        var json = JsonSerializer.Serialize(result.Data);
+        json.Should().Contain("CSharpExpression");
+        json.Should().NotContain("CSharpScript");
     }
 
     [Theory]
