@@ -4,8 +4,8 @@ doc_type: "plan"
 status: "active"
 topic: "跨计划闭环治理"
 created: "2026-08-28"
-updated: "2026-08-28"
-code_baseline: "1e2342c3909cb1f157d902aef1338e92f1ac44a3"
+updated: "2026-08-29"
+code_baseline: "16c03126774aaa18b6cb9c3105c44b5022f163d6"
 review_input_revision: "78d693fb4"
 ---
 
@@ -14,6 +14,8 @@ review_input_revision: "78d693fb4"
 > 本文是七组保留文档的唯一横向责任入口，也是 2026-08-28 专业当前性复核后的最终执行计划。专项文档继续保存历史背景和细节，但其中与本文冲突的早期判断、架构假设和验收口径均由本文取代。
 >
 > Wave 0 代码事实与本地验证绑定 implementation/evidence SHA `1e2342c3909cb1f157d902aef1338e92f1ac44a3`；随后仅以独立文档提交回填该 SHA。只存在于其他分支、stash、历史工作树或旧 CI SHA 的实现不算当前分支闭环。`origin/studio-ui-next@0c44df6c` 只作为 2026-08-25 的缓存分支观察，不作为当前分支事实或新鲜远端证明。
+>
+> Wave 1A 的 U13 实现 SHA 为 `d757efa3bcc0f69d1443c78a5982ff93e45da329`，U13 + replay P0 的 integration/evidence SHA 为 `16c03126774aaa18b6cb9c3105c44b5022f163d6`。`CV-AUDIT-092/099/100/101` 已按该 integration SHA 的 focused acceptance 关闭；`CV-AUDIT-086` 仅关闭“replay 写失败阻断正式结果”的 P0 子范围，P1 retention 仍开放。
 
 ## 1. 状态与证据口径
 
@@ -59,7 +61,7 @@ review_input_revision: "78d693fb4"
 | [全面提升 TODO](./ClearVision-全面提升TODO-2026-05-09.md) | 按 46 个主题：35 个 `IMPLEMENTED_SYNC_PENDING`、10 个 `OPEN_RESCOPED`、P2-2 被本次前端架构决定取代。按 147 个 checkbox：原勾 3、实现待同步 106、实质残项 33、总关闭条件 5。 | U01-U06、U14 |
 | [T01 测试与覆盖率治理总体计划](./测试治理/ClearVision_T01_测试与覆盖率治理总体计划_PROPOSED_AUDITED.md) | G01 阶段证据已归档，G01B-R3/G02 仍需当前 SHA；G03-G06 原方案有重复建设，G07 引用了非当前分支架构，G08 仍应 report-only，G09 按 SKU 外部验收。 | U05-U07 |
 | [Studio2](../Studio2/README.md) | G00-G15 Goal 卡已完成或历史回填，但 G16 不能通过直接打开不具产品 parity 的 `/v2` 关闭；当前 release root 决定改为 legacy root + capability owners。 | U05 |
-| [持续问题排查记录](../待复核/持续问题排查记录-2026-07-06.md) | 102 个源 ID：31 个 `IMPLEMENTED_SYNC_PENDING`、70 个仍开放、`CV-AUDIT-044` 已由 Wave 0 单独关闭；开放 ID 中多项需收窄或合并实现，但每个 ID 保留独立验收。 | U08-U14 |
+| [持续问题排查记录](../待复核/持续问题排查记录-2026-07-06.md) | 102 个源 ID：31 个 `IMPLEMENTED_SYNC_PENDING`、66 个仍开放；`CV-AUDIT-044` 已由 Wave 0 关闭，`CV-AUDIT-092/099/100/101` 已由 Wave 1A 关闭。`CV-AUDIT-086` 保持 `OPEN_RESCOPED / P0_SUBRANGE_CLOSED`。 | U08-U14 |
 | [0407 Qwen 排查](../未闭环事项/0407-Qwen排查未闭环.md) | #1-#26 已由当前实现、文件移除或等价契约覆盖，原状态未同步。 | U14 回填 |
 | [0418 临时问题记录](../未闭环事项/0418-临时问题记录.md) | 主体实现已落地；工业证据尾项去重并入 U01/U03/U13。 | U01、U03、U13、U14 |
 | [深度学习算子问题](../未闭环事项/深度学习算子问题.md) | 灰度/16-bit、NMS、异步加载和工程化契约已改造；旧 tensor-copy 阻断是死代码误判。真实残项是证据声明、模型身份、交付 profile 性能和现场签核。 | U01、U07、U14 |
@@ -201,7 +203,7 @@ Wave 0 只做了一次既有 Gate 的 generated artifact hygiene：通过 `Opera
 | 071 | 不改变桌面进程期会话策略；增加每用户/全局容量、最旧 token 淘汰和密码/权限/安全事件撤销。 |
 | 081 | 上传图与正式结果图使用独立 namespace/budget；上传压力不得驱逐结果图。读取授权归 U08。 |
 | 084 | 绑定删除/换 SerialNumber 安全停止旧流并 close/dispose provider；持久化/apply 事务归 U09。 |
-| 086 | P0：replay I/O/磁盘满不得终止 scheduler，正式结果仍发布并记录 `replaySkipped`；P1：按 bytes/days/tracks trim 并暴露 health。 |
+| 086 | [x] P0：replay recorder/factory 可注入；初始化/写入失败 fail-soft，当前及后续正式结果与事件继续发布，记录 `replaySkipped`、`CONTINUOUS_REPLAY_WRITE_FAILED` 和公开摘要；subscriber 异常逐个隔离并进入日志/计数。[ ] P1：按 bytes/days/tracks trim 并暴露完整 health。状态：`OPEN_RESCOPED / P0_SUBRANGE_CLOSED`。 |
 | 087 | spool JSONL 不嵌大图；spool/deadletter 各有 records/bytes/days 上限、trim/gap/health，行大小与图像大小解耦。 |
 | 090 | command-result spool 独立 records/bytes/days 上限；trim 记录 gap，health 暴露 pending/bytes/oldest/trimmed，覆盖长断网恢复。 |
 | 093 | 实现图片 RetentionDays 与 MinFreeSpaceGb 告警/生产启动保护，或删除/禁用字段和承诺；Runtime Preview cleanup 不能替代。 |
@@ -226,14 +228,14 @@ Wave 0 只做了一次既有 Gate 的 generated artifact hygiene：通过 `Opera
 
 | ID | 精确剩余动作与验收 |
 | --- | --- |
-| 092 | 从 metadata/import 移除 `CSharpScript`，不引入 Roslyn；旧 flow 以稳定 unsupported code 失败；非法 CSharpExpression 返回 failure，不能把源码字符串当成功结果。 |
+| 092 | [x] 从 metadata/import/正式生成资产移除 `CSharpScript`，不引入 Roslyn；旧 flow 以 `SCRIPT_LANGUAGE_UNSUPPORTED` 失败；非法 CSharpExpression 返回稳定 failure，不再把源码字符串当成功结果。 |
 | 095 | 从 public metadata 移除/disabled RTU；旧 RTU flow 稳定 unsupported；alias public/internal 分类归 U03。 |
 | 096 | canonical detection adapter 下沉 Core/Application，统一正式、实时、worker 解析 DetectionList/typed/dictionary/JSON；真实 DeepLearning 输出持久化 Defects。 |
 | 097 | 复用 096 adapter；以真实 `DeepLearning.Defects -> DualModalVoting` 连线验收，不用手工 dictionary 替身。 |
 | 098 | Comparator Condition 在 validator/execute 双层 allowlist；未知值 fail-fast，不得成功返回 false。 |
-| 099 | FINS 实现 polling 或移除 metadata；S7/MC PollingCondition 在 admission/direct execute 均拒绝未知值。 |
-| 100 | 只修 S7/FINS Operation `Read|Write` 双层 allowlist；矩阵锁定 MC 已有正确行为，非法值绝不发送写帧。 |
-| 101 | StopBits/Parity/Encoding/HEX payload 在 validator/execute 双层 fail-fast，不得静默默认或按 UTF8 发送。 |
+| 099 | [x] FINS 实现与 S7/MC 一致的 WaitForValue；三类 PLC 在 validator/direct execute 共用六值精确条件 allowlist，非法值在连接/读取/帧发送前失败。 |
+| 100 | [x] S7/FINS Operation 仅接受精确 `Read|Write`，非法值在连接、write-value 解析或帧发送前失败；MC 既有双层保护由回归矩阵锁定。 |
+| 101 | [x] StopBits/Parity/Encoding/HEX payload 在 validator/execute 双层 fail-fast；非法枚举或 HEX 不打开串口、不发送 bytes。 |
 
 派生 UX 项：移除/重命名 node-local `Mode=Server`；由 `ProfileId` 对应全局 profile 决定 server/client，UI 不再暗示算子内启动 listener。`CV-AUDIT-094` 本身不重开。`CV-AUDIT-102` 的剩余 execution-surface validation 已移 U10。
 
@@ -242,7 +244,7 @@ Wave 0 只做了一次既有 Gate 的 generated artifact hygiene：通过 `Opera
 优先级：随项。状态：`OPEN_CONFIRMED`。Owner：文档治理。
 
 - [ ] 每个源 ID 建 ledger：disposition、精确剩余动作、acceptance、evidence SHA、Owner、依赖；合并实现不等于合并验收或丢失 ID。
-- [ ] 31 个 `IMPLEMENTED_SYNC_PENDING` 逐项回填实现/测试依据后才标 `CLOSED`；除 Wave 0 已单独关闭的 `CV-AUDIT-044` 外，其余 70 个开放 ID 按本计划实际关闭，不能按治理线整体勾选。
+- [ ] 31 个 `IMPLEMENTED_SYNC_PENDING` 逐项回填实现/测试依据后才标 `CLOSED`；已关闭的 `CV-AUDIT-044/092/099/100/101` 保留独立证据，余下 66 个开放 ID 按本计划实际关闭，不能按治理线整体勾选。`CV-AUDIT-086` 的 P0 子范围完成不等于整体关闭。
 - [ ] 全面提升 TODO 回填 35 个已实现主题（106 checkbox），10 个窄化主题随 U01-U06 关闭，P2-2 标记由前端架构决定取代；5 个总关闭条件最后验收。
 - [ ] 0407、0418、深度学习文档继续保留为历史快照；Studio2 仅在 G16 当前 release 验收关闭后整批归档 Goal 卡。
 - [ ] U01-U13 与 U14 的逐 ID ledger、源文档回填、关闭核对全部完成后，才关闭 U14、将本文改为 `closed` 并生成归档说明；任一 required release profile 仍外部阻断时不得宣称全项目闭环。
@@ -255,18 +257,28 @@ Wave 0 只做了一次既有 Gate 的 generated artifact hygiene：通过 `Opera
 
 这些 ID 只能在源文档补齐当前事实和证据后转 `CLOSED`。其中 `CV-AUDIT-094` 的关闭依据是全局 Profile/TcpDeviceManager 已实现真实 TCP Server；node-local UX 是派生项，不占用该 ID。
 
-### 5.2 仍开放（71）
+### 5.2 仍开放（66）
 
 | 唯一治理线 | ID |
 | --- | --- |
 | U08 身份/能力/authority | `CV-AUDIT-011, CV-AUDIT-014, CV-AUDIT-015, CV-AUDIT-018, CV-AUDIT-023, CV-AUDIT-024, CV-AUDIT-025, CV-AUDIT-028, CV-AUDIT-034, CV-AUDIT-036, CV-AUDIT-064, CV-AUDIT-077, CV-AUDIT-091` |
-| U09 持久化/apply/recovery | `CV-AUDIT-006, CV-AUDIT-009, CV-AUDIT-012, CV-AUDIT-021, CV-AUDIT-029, CV-AUDIT-040, CV-AUDIT-041, CV-AUDIT-042, CV-AUDIT-044, CV-AUDIT-069, CV-AUDIT-070, CV-AUDIT-079, CV-AUDIT-080, CV-AUDIT-082, CV-AUDIT-083, CV-AUDIT-089` |
+| U09 持久化/apply/recovery | `CV-AUDIT-006, CV-AUDIT-009, CV-AUDIT-012, CV-AUDIT-021, CV-AUDIT-029, CV-AUDIT-040, CV-AUDIT-041, CV-AUDIT-042, CV-AUDIT-069, CV-AUDIT-070, CV-AUDIT-079, CV-AUDIT-080, CV-AUDIT-082, CV-AUDIT-083, CV-AUDIT-089` |
 | U10 execution authority/state | `CV-AUDIT-032, CV-AUDIT-048, CV-AUDIT-049, CV-AUDIT-050, CV-AUDIT-051, CV-AUDIT-052, CV-AUDIT-053, CV-AUDIT-055, CV-AUDIT-056, CV-AUDIT-065, CV-AUDIT-072, CV-AUDIT-102` |
 | U11 长进程资源/保留 | `CV-AUDIT-057, CV-AUDIT-058, CV-AUDIT-059, CV-AUDIT-060, CV-AUDIT-063, CV-AUDIT-066, CV-AUDIT-067, CV-AUDIT-068, CV-AUDIT-071, CV-AUDIT-081, CV-AUDIT-084, CV-AUDIT-086, CV-AUDIT-087, CV-AUDIT-090, CV-AUDIT-093` |
 | U12 查询/发布/导出 | `CV-AUDIT-001, CV-AUDIT-003, CV-AUDIT-074, CV-AUDIT-075, CV-AUDIT-076, CV-AUDIT-078, CV-AUDIT-088` |
-| U13 算子契约 | `CV-AUDIT-092, CV-AUDIT-095, CV-AUDIT-096, CV-AUDIT-097, CV-AUDIT-098, CV-AUDIT-099, CV-AUDIT-100, CV-AUDIT-101` |
+| U13 算子契约 | `CV-AUDIT-095, CV-AUDIT-096, CV-AUDIT-097, CV-AUDIT-098` |
 
-部分已关闭子范围不得回退：`021` 非 Admin 主题写入、`024` legacy execution bridge、`025` 路径逃逸、`057` OnnxPatch cache、`071` 原时间 TTL 诉求、`100` Mitsubishi MC Operation、`102` Studio formal/realtime/node preview admission。剩余动作仍按对应源 ID 独立验收。
+部分已关闭子范围不得回退：`021` 非 Admin 主题写入、`024` legacy execution bridge、`025` 路径逃逸、`057` OnnxPatch cache、`071` 原时间 TTL 诉求、`086` replay fail-soft P0、`102` Studio formal/realtime/node preview admission。剩余动作仍按对应源 ID 独立验收。
+
+### 5.3 已关闭（5）
+
+| ID | 关闭证据 |
+| --- | --- |
+| `CV-AUDIT-044` | Wave 0 implementation/evidence SHA `1e2342c3909cb1f157d902aef1338e92f1ac44a3`。 |
+| `CV-AUDIT-092` | U13 implementation SHA `d757efa3bcc0f69d1443c78a5982ff93e45da329`；Wave 1A integration/evidence SHA `16c03126774aaa18b6cb9c3105c44b5022f163d6`。 |
+| `CV-AUDIT-099` | 同上；三 PLC polling allowlist 与 FINS 匹配/超时/取消 focused acceptance 已通过。 |
+| `CV-AUDIT-100` | 同上；S7/FINS 非法 Operation 与 MC 回归均证明零 device I/O。 |
+| `CV-AUDIT-101` | 同上；非法 Serial 枚举/HEX 均证明零 open/zero bytes dispatch。 |
 
 ## 6. 全面提升主题映射
 
@@ -284,7 +296,7 @@ Wave 0 只做了一次既有 Gate 的 generated artifact hygiene：通过 `Opera
 ## 7. 执行顺序与归档门禁
 
 1. **Wave 0：事实与产品决定** — 本轮已完成 U09 模板 authority、U05 owner disposition、U04 SDK policy 及对应 canonical 文档同步；U04/U05/U09 的后续 release/authority 子项不因此整体关闭。
-2. **Wave 1：安全与不可逆副作用** — U08 的 P0 子项、U10 Draft capability escalation、U13 Script/S7/FINS fail-closed，以及 U11 replay fail-soft。
+2. **Wave 1：安全与不可逆副作用** — Wave 1A 已完成 `CV-AUDIT-092/099/100/101` 与 `CV-AUDIT-086` replay fail-soft P0；下一入口 Wave 1B 为 U08 身份、能力与主体 authority。U10 Draft capability escalation 未开始，仍在后续 Wave 1 范围。
 3. **Wave 2：一致性与长进程稳定性** — U02、U09、U11 其余项、U12。
 4. **Wave 3：质量、发布和当前 UI 证据** — U01、U03、U04、U05、U06。
 5. **Wave 4：目标 SKU 外部验收与归档** — U07、U14。
@@ -301,5 +313,18 @@ Wave 0 只做了一次既有 Gate 的 generated artifact hygiene：通过 `Opera
 - 本地 publish：`scripts/dotnet.ps1 publish ClearVision.Product.Desktop.csproj --configuration Release --no-restore --output ./.tmp/publish-check/wave0-close/` PASS。产物共 198 files / 332,738,267 bytes；`wwwroot/index.html`、`wwwroot/src/app.js` 存在，`wwwroot/v2`、FrontendV2、Node runtime、`node_modules`、package manifest/lockfile 均为 0；检查后已删除该临时目录。这只证明当前工作树 production publish path，不替代 clean clone、最终 release candidate 或真实 no-Node 目标机启动。
 - 静态终验：changed JS/MJS `node --check` 3/3、PowerShell AST parse 3/3、JSON parse 4/4、production retired flag/owner/global 与 FrontendV2 build/publish 残余扫描 0、`git diff --check` PASS；未发现仓库/Playwright 关联的 `dotnet`、`testhost`、Node/http-server 或浏览器服务进程。
 - 仍未完成：真实 WebView2、DPI/分辨率批准矩阵、no-Node 目标机离线启动、clean clone 全链路、300/1000 primitive 最终 publish 性能、旧工程/包/Station/Agent/Project save 完整回归与同 SHA GitHub CI；继续归入 G16/U04 release evidence。
+
+### 7.2 Wave 1A 验证证据（2026-08-29）
+
+- U13 implementation SHA：`d757efa3bcc0f69d1443c78a5982ff93e45da329`（`fix: fail closed industrial operator contracts`）。Wave 1A integration/evidence SHA：`16c03126774aaa18b6cb9c3105c44b5022f163d6`（`fix: keep continuous results alive when replay fails`）。本节所在的后续文档提交只引用上述实现 SHA，不把提交自身 SHA 写入 tracked 文件。
+- Build：在 integration HEAD 顺序执行 Product test project `dotnet build --no-restore`，PASS，0 error；仅有既存 `System.Collections.Immutable` 8.0/9.0 冲突 warning。
+- 最终合并 focused：通过 `scripts/run-dotnet-test-serial.ps1` 在一次 Product invocation 合并 Script、Serial、PLC、metadata/import/admission、knowledge、ContinuousRuntime、InspectionWorker 与 runtime DI 共 12 类，`223/223` PASS。精确非法值/零 dispatch 9 个 method filter 为 `64/64` PASS（Script 9、Serial 21、PLC 34）。
+- PLC 与 services Gate：非 virtual `run-tests-plc-regression.ps1` 为 `126/126` PASS；`run-tests-services-regression.ps1` 为 `548/548` PASS。operator contract smoke 7 类为 `88/88` PASS。所有 Product 测试均按根 `AGENTS.md` 串行执行。
+- Replay failure injection：纯内存 failing recorder 连续两次抛出带伪造敏感路径的 `IOException`；两个正式结果均写入 result channel，两个 `InspectionResultEvent` 均发布，下一 decision 继续处理。公开结果/SSE 投影均为 `replaySkipped=true`、`replayStatus=skipped_write_failed`、`replayFailureCode=CONTINUOUS_REPLAY_WRITE_FAILED` 与固定公开摘要，未包含路径、异常文本或堆栈。scheduler 坏 subscriber 不阻止其它 subscriber 或下一 item，错误进入日志与 `SubscriberFailureCount`。两条精确验收 `2/2` PASS。
+- Script/PLC/Serial acceptance：正式 metadata、import/admission、生成 catalog/cards/knowledge graph 与前端生产投影不再公开 `CSharpScript`；旧 flow 原值不迁移并以稳定 unsupported code 失败。S7/MC/FINS 非法 PollingCondition、S7/FINS 非法 Operation 及 MC 保护回归均为零 device I/O；FINS WaitForValue 覆盖合法六条件、匹配、超时、interval 与取消。Serial 非法 StopBits/Parity/Encoding/HEX 为零 open、零 bytes dispatch。
+- 生成资产：受治理 `OperatorDocGenerator` 目标生成 5 个算子；`OperatorKnowledgeGraphRunner` 生成 158 cards / 1984 edges。45 个受治理文件确定性再运行 `DETERMINISM_CHANGED=0`，13 个变更 JSON 全部解析。没有手改生成 JSON，也不表示 U03 开始或关闭。
+- 残余扫描：正式生成资产和 production frontend/AI runtime surface 的 `CSharpScript` 命中为 0；生产 C# 仅保留两行旧值识别与 `SCRIPT_LANGUAGE_UNSUPPORTED` 拒绝逻辑。`scripts/OperatorDocGenerator` 旧兼容样例、`tools/sft/clearvision_sft_data.jsonl` 和归档文档仍保留历史样本，不属于正式 runtime/public generated surface。
+- NOT RUN / 外部项：`P3CoreContractRunner` 与 `G1P3ContractBatch2Runner` 的受影响 quick-contract runner 因各自 csproj 仍引用不存在的 `Acme.Product/src/Acme.PlcComm` 而在 runner build 阶段阻断，记为 `NOT RUN`，不推断通过；Desktop metadata/API 专项未运行（本轮无 Desktop source 或 endpoint projection diff）；真实 PLC、串口、现场设备、磁盘填满、replay bytes/days/tracks retention、完整 GitHub CI、G16 visual/release evidence 均未运行或未实施。
+- Disposition：`CV-AUDIT-092/099/100/101 = CLOSED`；`CV-AUDIT-086 = OPEN_RESCOPED / P0_SUBRANGE_CLOSED`，P1 bytes/days/tracks trim、后台清理和完整 replay health 预算仍由 U11 承接。
 
 Wave 可以拆成小提交，但每个源 ID 必须保留独立验收行。只有在 required profiles、最终 Release SHA 和源文档回填全部关闭后，才归档本文及用户指定的七组文档。
