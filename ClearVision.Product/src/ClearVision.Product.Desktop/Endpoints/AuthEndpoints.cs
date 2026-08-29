@@ -76,7 +76,10 @@ public static class AuthEndpoints
             return Results.Ok(new { Message = "已登出", Audit = "server-session-cleared" });
         });
 
-        app.MapGet("/api/auth/me", async (HttpContext context, IAuthService authService) =>
+        app.MapGet("/api/auth/me", async (
+            HttpContext context,
+            IAuthService authService,
+            AuthenticatedContextProjectionService contextProjection) =>
         {
             var token = GetTokenFromHeader(context);
             if (string.IsNullOrEmpty(token))
@@ -90,12 +93,7 @@ public static class AuthEndpoints
                 return Results.Unauthorized();
             }
 
-            return Results.Ok(new
-            {
-                session.UserId,
-                session.Username,
-                session.Role
-            });
+            return Results.Ok(contextProjection.Project(session));
         });
 
         app.MapPost("/api/auth/change-password", async (

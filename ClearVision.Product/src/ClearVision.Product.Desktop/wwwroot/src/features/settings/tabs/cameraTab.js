@@ -2,6 +2,7 @@ import settingsApi from '../settingsApi.js';
 import { validateCameraParameterDraft } from '../settingsValidators.js';
 import { showToast, closeModal } from '../../../shared/components/uiComponents.js';
 import inspectionController from '../../inspection/inspectionController.js';
+import { Capabilities } from '../../auth/auth.js';
 
 export function installCameraTab(SettingsView) {
     Object.assign(SettingsView.prototype, {
@@ -54,6 +55,7 @@ export function installCameraTab(SettingsView) {
         }
         ,
         async loadSerialPhotoelectricPorts({ silent = false, applyRecommended = false } = {}) {
+            if (!this.hasCapability(Capabilities.TRIGGER_INPUT_OPERATE)) return [];
             const refreshBtn = this.container?.querySelector('#btn-refresh-serial-photoelectric-port');
             const portInput = this.container?.querySelector('#cam-param-serial-port-name');
             const previousText = refreshBtn?.textContent;
@@ -183,6 +185,7 @@ export function installCameraTab(SettingsView) {
                         const binding = this.cameraBindings.find(item => item.id === id);
                         const label = binding?.displayName || binding?.serialNumber || id;
                         if (confirm(`确定要删除相机绑定“${label}”吗？\n\n删除后会立即保存相机绑定列表；如果相机流正在运行，后端可能拒绝本次操作。`)) {
+                            if (!this.requireCapability(Capabilities.CAMERA_BINDINGS_UPDATE)) return;
                             const previousBindings = [...this.cameraBindings];
                             this.cameraBindings = this.cameraBindings.filter(b => b.id !== id);
                             if (this.selectedCameraBindingId === id) {
@@ -248,6 +251,11 @@ export function installCameraTab(SettingsView) {
         }
         ,
         async loadCameraBindings() {
+            if (!this.hasCapability(Capabilities.CAMERA_BINDINGS_UPDATE)) {
+                this.cameraBindings = [];
+                this.refreshCameraTable();
+                return;
+            }
             const tbody = this.container.querySelector('#camera-bindings-table tbody');
             if (tbody) {
                 tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; padding: 24px;"><div class="cv-spinner" style="margin-right:8px; display:inline-block;"></div>正在加载相机配置...</td></tr>`;
@@ -315,6 +323,7 @@ export function installCameraTab(SettingsView) {
         }
         ,
         async discoverCameras(vendor = 'all', sourceButton = null) {
+            if (!this.requireCapability(Capabilities.CAMERA_BINDINGS_UPDATE)) return;
             const vendorMeta = {
                 huaray: { text: '华睿', endpoint: '/cameras/discover/huaray' },
                 hikvision: { text: '海康', endpoint: '/cameras/discover/hikvision' },
@@ -417,6 +426,7 @@ export function installCameraTab(SettingsView) {
             const bindBtns = contentDiv.querySelectorAll('.btn-bind-camera');
             bindBtns.forEach(btn => {
                 eventCleanups.push(this.lifecycle.trackEvent(btn, 'click', async () => {
+                    if (!this.requireCapability(Capabilities.CAMERA_BINDINGS_UPDATE)) return;
                     const sn = btn.dataset.sn;
                     const manufacturer = btn.dataset.man;
                     const model = btn.dataset.model;
@@ -498,6 +508,9 @@ export function installCameraTab(SettingsView) {
             }
 
             tbody.innerHTML = this.cameraBindings.map((b, index) => {
+                const bindingMutationDisabled = this.hasCapability(Capabilities.CAMERA_BINDINGS_UPDATE)
+                    ? ''
+                    : 'disabled aria-disabled="true"';
                 const rawConnectionStatus = String(
                     b.connectionStatus ?? b.ConnectionStatus ?? b.status ?? b.Status ?? ''
                 ).trim();
@@ -540,7 +553,7 @@ export function installCameraTab(SettingsView) {
                     <td>${manufacturer}</td>
                     <td><span class="font-mono">${pixelFormat}</span></td>
                     <td><span class="settings-status-badge ${statusClass}"><span class="${statusDotClass}"></span> ${statusText}</span></td>
-                    <td><button class="action-icon-btn" title="删除" style="color:var(--cinnabar);"><svg viewBox="0 0 24 24"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg></button></td>
+                    <td><button class="action-icon-btn" title="删除" ${bindingMutationDisabled} style="color:var(--cinnabar);"><svg viewBox="0 0 24 24"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg></button></td>
                 </tr>
                 `;
             }).join('');
@@ -575,6 +588,9 @@ export function installCameraTab(SettingsView) {
         }
         ,
         updateCameraParameterPanel(cam) {
+            const bindingMutationBlocked = !this.hasCapability(Capabilities.CAMERA_BINDINGS_UPDATE);
+            const cameraOperationBlocked = !this.hasCapability(Capabilities.CAMERA_CAPTURE) ||
+                !this.hasCapability(Capabilities.CAMERA_PREVIEW_OPERATE);
             const nameEl = this.container.querySelector('#current-cam-name');
             if (nameEl) {
                 nameEl.textContent = cam?.displayName || '未选择相机';
@@ -599,27 +615,27 @@ export function installCameraTab(SettingsView) {
 
             if (exposureInput) {
                 exposureInput.value = cam ? String(cam.exposureTimeUs ?? 5000) : '';
-                exposureInput.disabled = !cam;
+                exposureInput.disabled = !cam || bindingMutationBlocked;
             }
             if (gainInput) {
                 gainInput.value = cam ? String(cam.gainDb ?? 1.0) : '';
-                gainInput.disabled = !cam;
+                gainInput.disabled = !cam || bindingMutationBlocked;
             }
             if (pixelFormatSelect) {
                 pixelFormatSelect.value = this.normalizeCameraPixelFormat(cam?.pixelFormat ?? cam?.PixelFormat);
-                pixelFormatSelect.disabled = !cam;
+                pixelFormatSelect.disabled = !cam || bindingMutationBlocked;
             }
             if (triggerModeSelect) {
                 triggerModeSelect.value = this.normalizeCameraTriggerMode(cam?.triggerMode);
-                triggerModeSelect.disabled = !cam;
+                triggerModeSelect.disabled = !cam || bindingMutationBlocked;
             }
             if (hardwareTriggerSourceSelect) {
                 hardwareTriggerSourceSelect.value = this.normalizeHardwareTriggerSource(cam?.hardwareTriggerSource);
-                hardwareTriggerSourceSelect.disabled = !cam;
+                hardwareTriggerSourceSelect.disabled = !cam || bindingMutationBlocked;
             }
             if (triggerSourceSelect) {
                 triggerSourceSelect.value = this.normalizeSoftwareTriggerSource(cam?.softwareTriggerSource);
-                triggerSourceSelect.disabled = !cam;
+                triggerSourceSelect.disabled = !cam || bindingMutationBlocked;
             }
             if (enterDebounceInput) {
                 enterDebounceInput.value = cam ? String(this.normalizeEnterDebounceMs(cam.enterPhotoelectricDebounceMs)) : '';
@@ -632,7 +648,7 @@ export function installCameraTab(SettingsView) {
             }
             if (ignoreBusyInput) {
                 ignoreBusyInput.checked = cam?.ignoreEnterTriggerWhileBusy !== false;
-                ignoreBusyInput.disabled = !cam;
+                ignoreBusyInput.disabled = !cam || bindingMutationBlocked;
             }
             if (serialPortInput) {
                 serialPortInput.value = cam ? String(cam.serialPhotoelectricPortName || '') : '';
@@ -648,30 +664,30 @@ export function installCameraTab(SettingsView) {
             }
             if (ignoreSerialBusyInput) {
                 ignoreSerialBusyInput.checked = cam?.ignoreSerialPhotoelectricTriggerWhileBusy !== false;
-                ignoreSerialBusyInput.disabled = !cam;
+                ignoreSerialBusyInput.disabled = !cam || bindingMutationBlocked;
             }
             if (frameRateInput) {
                 frameRateInput.value = cam ? String(this.normalizeCameraTargetFrameRate(cam.targetFrameRateFps)) : '';
             }
             this.updateSerialPhotoelectricPortHint();
-            this.syncCameraFrameRateInputState(cam?.triggerMode, !cam);
-            this.syncCameraTriggerSourceInputState(cam, !cam);
-            this.syncCameraHardwareTriggerSourceInputState(cam, !cam);
+            this.syncCameraFrameRateInputState(cam?.triggerMode, !cam || bindingMutationBlocked);
+            this.syncCameraTriggerSourceInputState(cam, !cam || bindingMutationBlocked);
+            this.syncCameraHardwareTriggerSourceInputState(cam, !cam || bindingMutationBlocked);
 
             const saveBtn = this.container.querySelector('#btn-save-camera-params');
             if (saveBtn) {
-                saveBtn.disabled = !cam;
+                saveBtn.disabled = !cam || bindingMutationBlocked;
             }
 
             const previewBtn = this.container.querySelector('#btn-camera-preview');
             if (previewBtn) {
-                previewBtn.disabled = !cam;
+                previewBtn.disabled = !cam || cameraOperationBlocked;
                 previewBtn.title = cam ? `预览 ${cam.displayName || cam.serialNumber || cam.id}` : '请先在列表中选择一台相机';
             }
 
             const calibBtn = this.container.querySelector('#btn-hand-eye-calib');
             if (calibBtn) {
-                calibBtn.disabled = !cam;
+                calibBtn.disabled = !cam || cameraOperationBlocked;
                 calibBtn.title = cam ? `对 ${cam.displayName || cam.serialNumber || cam.id} 启动二维平面标定` : '请先在列表中选择一台相机';
             }
 
@@ -742,7 +758,7 @@ export function installCameraTab(SettingsView) {
             }
 
             if (learnBtn) {
-                learnBtn.disabled = !enableEnterOptions;
+                learnBtn.disabled = !enableEnterOptions || !this.hasCapability(Capabilities.TRIGGER_INPUT_OPERATE);
             }
 
             [serialPortInput, serialBaudInput, serialDebounceInput, serialTimeoutInput].forEach(input => {
@@ -793,6 +809,7 @@ export function installCameraTab(SettingsView) {
         }
         ,
         async learnEnterPhotoelectricDevice() {
+            if (!this.requireCapability(Capabilities.TRIGGER_INPUT_OPERATE)) return;
             if (!this.selectedCameraBindingId) {
                 showToast('请先选择一台相机', 'warning');
                 return;
@@ -835,6 +852,7 @@ export function installCameraTab(SettingsView) {
         }
         ,
         async testSerialPhotoelectricTrigger() {
+            if (!this.requireCapability(Capabilities.TRIGGER_INPUT_OPERATE)) return;
             const button = this.container?.querySelector('#btn-test-serial-photoelectric');
             const portInput = this.container?.querySelector('#cam-param-serial-port-name');
             const baudInput = this.container?.querySelector('#cam-param-serial-baud-rate');
@@ -899,12 +917,16 @@ export function installCameraTab(SettingsView) {
         }
         ,
         async startContinuousPreviewSession(cameraBindingId) {
+            if (!this.requireCapability(Capabilities.CAMERA_PREVIEW_OPERATE)) {
+                throw new Error('当前账户不能启动相机预览。');
+            }
             return await settingsApi.startContinuousPreview({
                 cameraBindingId
             });
         }
         ,
         async stopContinuousPreviewSession(sessionId) {
+            if (!this.hasCapability(Capabilities.CAMERA_PREVIEW_OPERATE)) return;
             if (!sessionId) return;
             try {
                 await settingsApi.stopContinuousPreview({ sessionId });
@@ -914,6 +936,9 @@ export function installCameraTab(SettingsView) {
         }
         ,
         async fetchContinuousPreviewFrame(sessionId, options = {}) {
+            if (!this.requireCapability(Capabilities.CAMERA_PREVIEW_OPERATE)) {
+                throw new Error('当前账户不能读取相机预览。');
+            }
             const cacheKey = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
             const { blob, headers } = await settingsApi.fetchContinuousPreviewFrame(sessionId, cacheKey, {
                 signal: options.signal
@@ -968,6 +993,10 @@ export function installCameraTab(SettingsView) {
                 return await this.captureSharedFrame(cameraBindingId, options);
             }
 
+            if (!this.requireCapability(Capabilities.CAMERA_CAPTURE)) {
+                throw new Error('当前账户不能触发相机采集。');
+            }
+
             const request = {
                 cameraBindingId
             };
@@ -1000,6 +1029,7 @@ export function installCameraTab(SettingsView) {
         }
         ,
         async showContinuousCameraPreview(binding) {
+            if (!this.requireCapability(Capabilities.CAMERA_PREVIEW_OPERATE)) return;
             let currentPreviewUrl = null;
             let sessionId = null;
             let previewActive = false;
@@ -1177,6 +1207,7 @@ export function installCameraTab(SettingsView) {
         }
         ,
         async showSelectedCameraPreview() {
+            if (!this.requireCapability(Capabilities.CAMERA_CAPTURE)) return;
             let binding = this.getSelectedCameraBinding();
             if (!binding) {
                 showToast('请先在相机管理中选择一台相机，再打开相机预览', 'warning');
@@ -1424,6 +1455,7 @@ export function installCameraTab(SettingsView) {
         }
         ,
         async saveSelectedCameraParameters({ silent = false } = {}) {
+            if (!this.requireCapability(Capabilities.CAMERA_BINDINGS_UPDATE)) return false;
             if (!this.selectedCameraBindingId) {
                 showToast('请先在上方绑定列表中选择一台相机', 'warning');
                 return false;
@@ -1529,6 +1561,12 @@ export function installCameraTab(SettingsView) {
 
         ,
         renderCameraTab() {
+            const hardwareDisabled = this.hasCapability(Capabilities.CAMERA_BINDINGS_UPDATE)
+                ? ''
+                : 'disabled aria-disabled="true"';
+            const triggerDisabled = this.hasCapability(Capabilities.TRIGGER_INPUT_OPERATE)
+                ? ''
+                : 'disabled aria-disabled="true"';
             return `
                 <div class="settings-section-title" style="display:flex; justify-content:space-between; align-items:flex-end;">
                     <div>
@@ -1536,11 +1574,11 @@ export function installCameraTab(SettingsView) {
                         <p>配置和管理视觉系统连接的工业相机参数。</p>
                     </div>
                     <div class="settings-actions" style="display:flex; gap:12px; align-items:center; flex-wrap:wrap;">
-                        <button class="cv-btn settings-btn-light" id="btn-discover-huaray-cameras">
+                        <button class="cv-btn settings-btn-light" id="btn-discover-huaray-cameras" ${hardwareDisabled}>
                             <svg viewBox="0 0 24 24" style="width:16px; height:16px; margin-right:6px; fill:currentColor;"><path d="M17.65 6.35C16.2 4.9 14.21 4 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/></svg>
                             华睿搜索
                         </button>
-                        <button class="cv-btn settings-btn-light" id="btn-discover-hikvision-cameras">
+                        <button class="cv-btn settings-btn-light" id="btn-discover-hikvision-cameras" ${hardwareDisabled}>
                             <svg viewBox="0 0 24 24" style="width:16px; height:16px; margin-right:6px; fill:currentColor;"><path d="M17.65 6.35C16.2 4.9 14.21 4 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/></svg>
                             海康搜索
                         </button>
@@ -1701,8 +1739,8 @@ export function installCameraTab(SettingsView) {
                                     <label>串口号</label>
                                     <div style="display:flex; gap:8px;">
                                         <input type="text" class="cv-input" id="cam-param-serial-port-name" value="" placeholder="自动识别" style="min-width:0;" disabled readonly aria-disabled="true">
-                                        <button type="button" class="cv-btn settings-btn-light" id="btn-refresh-serial-photoelectric-port">识别</button>
-                                        <button type="button" class="cv-btn settings-btn-light" id="btn-test-serial-photoelectric">测试</button>
+                                        <button type="button" class="cv-btn settings-btn-light" id="btn-refresh-serial-photoelectric-port" ${triggerDisabled}>识别</button>
+                                        <button type="button" class="cv-btn settings-btn-light" id="btn-test-serial-photoelectric" ${triggerDisabled}>测试</button>
                                     </div>
                                     <span class="settings-field-hint" id="cam-param-serial-port-hint">进入本页后会自动识别 USB 串口。</span>
                                 </div>
@@ -1757,7 +1795,7 @@ export function installCameraTab(SettingsView) {
                     </div>
                     <div class="settings-card-body" style="border-top:1px solid var(--border-color); display:flex; justify-content:flex-end; gap:12px; padding:16px 24px;">
                         <button class="cv-btn settings-btn-light" id="btn-reset-camera-params">重置当前值</button>
-                        <button class="cv-btn settings-btn-danger" id="btn-save-camera-params">
+                        <button class="cv-btn settings-btn-danger" id="btn-save-camera-params" ${hardwareDisabled}>
                             <svg viewBox="0 0 24 24" style="width:16px; height:16px; margin-right:6px; fill:currentColor;"><path d="M17 3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V7l-4-4zm-5 16c-1.66 0-3-1.34-3-3s1.34-3 3-3 3 1.34 3 3-1.34 3-3 3zm3-10H5V5h10v4z"/></svg>
                             保存当前相机参数
                         </button>
@@ -1799,6 +1837,7 @@ export function installCameraTab(SettingsView) {
         }
         ,
         async saveCameraBindings({ silent = false } = {}) {
+            if (!this.requireCapability(Capabilities.CAMERA_BINDINGS_UPDATE)) return false;
             const activeCameraId = this.resolveActiveCameraId();
             const bindingsPayload = this.collectCameraBindings();
             this.lastCameraBindingSaveError = null;
@@ -1828,18 +1867,14 @@ export function installCameraTab(SettingsView) {
         }
         ,
         async saveCameraSettingsFromTop() {
+            if (!this.requireCapability(Capabilities.CAMERA_BINDINGS_UPDATE)) return;
             if (this.selectedCameraBindingId) {
                 const saved = await this.saveSelectedCameraParameters();
-                if (saved) {
-                    await this.saveAppSettingsForTab('cameras');
-                }
+                if (saved) showToast('相机绑定配置已保存。', 'success');
                 return;
             }
 
             const saved = await this.saveCameraBindings();
-            if (saved) {
-                await this.saveAppSettingsForTab('cameras');
-            }
             if (saved) {
                 showToast('相机绑定配置已保存。', 'success');
             }

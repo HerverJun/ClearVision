@@ -1,5 +1,6 @@
 ﻿import httpClient from '../../core/messaging/httpClient.js';
 import { getStoredToken } from '../auth/authStorage.js';
+import { Capabilities, PermissionGuard } from '../auth/auth.js';
 import { buildSseHeaders, buildSseUrl, parseSseFrame } from '../inspection/inspectionSseClient.mjs';
 import {
     buildResultCardsFromOutputData,
@@ -302,7 +303,9 @@ class StationMonitorView {
             const [summary, stations, packages] = await Promise.all([
                 httpClient.get('/stations/summary'),
                 httpClient.get('/stations'),
-                httpClient.get('/station-packages').catch(() => [])
+                PermissionGuard.has(Capabilities.STATION_PACKAGES_READ)
+                    ? httpClient.get('/station-packages').catch(() => [])
+                    : Promise.resolve([])
             ]);
 
             this.summary = this.normalizeSummary(summary);
@@ -790,6 +793,14 @@ class StationMonitorView {
             return;
         }
 
+        if (!this.canPerformStationAction(action)) {
+            this.commandStatusMessage = '当前账户没有执行此 Station 操作的权限。';
+            this.commandStatusLevel = 'warning';
+            this.markDirty();
+            this.render();
+            return;
+        }
+
         if (this.stationActionRequiresConfirmation(action) && !this.confirmStationAction(action)) {
             return;
         }
@@ -838,6 +849,9 @@ class StationMonitorView {
     }
 
     async createCommand(commandType, payload) {
+        if (!PermissionGuard.has(Capabilities.STATION_COMMANDS_CREATE)) {
+            throw new Error('当前账户不能创建 Station 命令。');
+        }
         return httpClient.post(`/stations/${encodeURIComponent(this.selectedStationId)}/commands`, {
             commandType,
             payloadJson: JSON.stringify(payload || {}),
@@ -846,6 +860,9 @@ class StationMonitorView {
     }
 
     async deployLatestPackage() {
+        if (!PermissionGuard.has(Capabilities.STATION_PACKAGES_DEPLOY)) {
+            throw new Error('当前账户不能部署 Station 运行包。');
+        }
         const targetPackage = this.getLatestProductionPackage();
         const packageId = targetPackage?.packageId ?? targetPackage?.PackageId;
         if (!packageId) {
@@ -1007,6 +1024,10 @@ class StationMonitorView {
     }
 
     async createAndDeployTestPackage() {
+        if (!PermissionGuard.has(Capabilities.STATION_TEST_PACKAGES_CREATE) ||
+            !PermissionGuard.has(Capabilities.STATION_PACKAGES_DEPLOY)) {
+            throw new Error('当前账户不能生成或下发 Station 测试包。');
+        }
         const createdPackage = await httpClient.post('/station-packages/test', {});
         const packageId = createdPackage?.packageId ?? createdPackage?.PackageId;
         if (!packageId) {
@@ -1031,6 +1052,22 @@ class StationMonitorView {
                 this.requestRender();
             }
         }, 5000);
+    }
+
+    canPerformStationAction(action) {
+        switch (action) {
+            case 'ping':
+            case 'reload':
+            case 'stop':
+                return PermissionGuard.has(Capabilities.STATION_COMMANDS_CREATE);
+            case 'deploy':
+                return PermissionGuard.has(Capabilities.STATION_PACKAGES_DEPLOY);
+            case 'testDeploy':
+                return PermissionGuard.has(Capabilities.STATION_TEST_PACKAGES_CREATE) &&
+                    PermissionGuard.has(Capabilities.STATION_PACKAGES_DEPLOY);
+            default:
+                return false;
+        }
     }
 
     render() {
@@ -1197,15 +1234,16 @@ class StationMonitorView {
         const healthDiagnosticMessage = latestHealth.lastErrorMessage || null;
         const activeDiagnosticCode = healthDiagnosticCode || detail.lastDiagnosticCode || null;
         const activeDiagnosticMessage = healthDiagnosticMessage || detail.lastDiagnosticMessage || null;
-        const actionsDisabled = this.commandBusy ? 'disabled' : '';
-        const productionActionDisabled = this.commandBusy || !isOnline
+        const commandCapabilityDenied = !this.canPerformStationAction('ping');
+        const actionsDisabled = this.commandBusy || commandCapabilityDenied ? 'disabled' : '';
+        const productionActionDisabled = this.commandBusy || !isOnline || !this.canPerformStationAction('stop')
             ? 'disabled title="工站离线或状态未知，不能下发会影响生产的命令"'
             : '';
         const productionPackages = this.getProductionPackages();
-        const deployDisabled = this.commandBusy || !isOnline || productionPackages.length === 0
+        const deployDisabled = this.commandBusy || !isOnline || productionPackages.length === 0 || !this.canPerformStationAction('deploy')
             ? 'disabled title="工站离线、状态未知或暂无正式运行包，不能部署正式包"'
             : '';
-        const testDeployDisabled = this.commandBusy || !isOnline
+        const testDeployDisabled = this.commandBusy || !isOnline || !this.canPerformStationAction('testDeploy')
             ? 'disabled title="工站离线或状态未知，不能下发测试包"'
             : '';
 

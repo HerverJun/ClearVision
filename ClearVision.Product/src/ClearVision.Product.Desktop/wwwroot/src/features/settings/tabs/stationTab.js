@@ -1,6 +1,7 @@
 import settingsApi from '../settingsApi.js';
 import { validateStationCommunicationDraft, assertValidation } from '../settingsValidators.js';
 import { showToast } from '../../../shared/components/uiComponents.js';
+import { Capabilities } from '../../auth/auth.js';
 
 export function installStationTab(SettingsView) {
     Object.assign(SettingsView.prototype, {
@@ -97,6 +98,11 @@ export function installStationTab(SettingsView) {
         }
         ,
         async loadStationCommunicationSettings({ force = false } = {}) {
+            if (!this.hasCapability(Capabilities.STATION_COMMUNICATION_UPDATE)) {
+                this.stationCommunicationLoaded = true;
+                this.refreshStationCommunicationPanel();
+                return;
+            }
             if (!force && this.stationCommunicationLoaded) {
                 this.refreshStationCommunicationPanel();
                 return;
@@ -234,8 +240,9 @@ export function installStationTab(SettingsView) {
         }
         ,
         async saveStationCommunicationSettings({ silent = false } = {}) {
-            if (!this.isAdmin) {
-                showToast('只有管理员可以保存 Station 设置', 'warning');
+            if (!this.requireCapability(
+                Capabilities.STATION_COMMUNICATION_UPDATE,
+                '当前账户不能保存 Station 设置。')) {
                 return { success: false };
             }
 
@@ -307,8 +314,9 @@ export function installStationTab(SettingsView) {
         }
         ,
         async revealStationToken() {
-            if (!this.isAdmin) {
-                showToast('只有管理员可以显示 Station token', 'warning');
+            if (!this.requireCapability(
+                Capabilities.STATION_COMMUNICATION_TOKEN_MANAGE,
+                '当前账户不能显示 Station token。')) {
                 return '';
             }
 
@@ -346,8 +354,9 @@ export function installStationTab(SettingsView) {
         }
         ,
         async regenerateStationToken() {
-            if (!this.isAdmin) {
-                showToast('只有管理员可以重新生成 Station token', 'warning');
+            if (!this.requireCapability(
+                Capabilities.STATION_COMMUNICATION_TOKEN_MANAGE,
+                '当前账户不能重新生成 Station token。')) {
                 return;
             }
 
@@ -404,7 +413,8 @@ export function installStationTab(SettingsView) {
             const modeMeta = this.getStationModeMeta(mode);
             const isDisabled = mode === 'Disabled';
             const isLan = mode === 'LanController';
-            const isAdminDisabled = this.isAdmin ? '' : 'disabled';
+            const settingsMutationDisabled = this.hasCapability(Capabilities.STATION_COMMUNICATION_UPDATE) ? '' : 'disabled aria-disabled="true"';
+            const tokenMutationDisabled = this.hasCapability(Capabilities.STATION_COMMUNICATION_TOKEN_MANAGE) ? '' : 'disabled aria-disabled="true"';
             const tokenDisplay = this.stationTokenVisible && this.stationTokenValue
                 ? this.stationTokenValue
                 : (settings.token?.hasToken ? settings.token.mask : '未生成');
@@ -520,9 +530,9 @@ export function installStationTab(SettingsView) {
                                 <input type="text" class="cv-input font-mono" readonly value="${this.escapeHtml(tokenDisplay)}">
                                 <span class="settings-field-hint">LAN 模式必须携带 token；保存启用通讯时会自动生成。</span>
                             </div>
-                            <button class="cv-btn settings-btn-light" id="btn-reveal-station-token" ${isAdminDisabled} style="padding:0 16px;">显示</button>
-                            <button class="cv-btn settings-btn-light" id="btn-copy-station-token" ${isAdminDisabled} style="padding:0 16px;">复制</button>
-                            <button class="cv-btn settings-btn-dark" id="btn-regenerate-station-token" ${isAdminDisabled}>重新生成</button>
+                            <button class="cv-btn settings-btn-light" id="btn-reveal-station-token" ${tokenMutationDisabled} style="padding:0 16px;">显示</button>
+                            <button class="cv-btn settings-btn-light" id="btn-copy-station-token" ${tokenMutationDisabled} style="padding:0 16px;">复制</button>
+                            <button class="cv-btn settings-btn-dark" id="btn-regenerate-station-token" ${tokenMutationDisabled}>重新生成</button>
                         </div>
                     </div>
                 </div>
@@ -571,7 +581,7 @@ export function installStationTab(SettingsView) {
                 <div class="settings-floating-footer">
                     <button class="cv-btn settings-btn-light" id="btn-open-station-monitor" style="padding:0 14px;">Station 监控</button>
                     <button class="cv-btn settings-btn-light" id="btn-reset-station-communication" style="width:100px;">取消</button>
-                    <button class="cv-btn settings-btn-danger" id="btn-save-station-communication" ${isAdminDisabled} style="width:150px;">保存 Station 设置</button>
+                    <button class="cv-btn settings-btn-danger" id="btn-save-station-communication" ${settingsMutationDisabled} style="width:150px;">保存 Station 设置</button>
                 </div>
             `;
         }

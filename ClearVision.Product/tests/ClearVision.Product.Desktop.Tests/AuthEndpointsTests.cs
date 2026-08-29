@@ -21,6 +21,59 @@ namespace ClearVision.Product.Desktop.Tests;
 public class AuthEndpointsTests
 {
     [Fact]
+    public async Task Me_ShouldReturnUnauthorized_WhenTokenIsMissing()
+    {
+        await using var host = await AuthEndpointsTestHost.CreateAsync();
+
+        using var response = await host.Client.GetAsync("/api/auth/me");
+
+        response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+    }
+
+    [Theory]
+    [InlineData("Admin", true, true)]
+    [InlineData("Engineer", false, true)]
+    [InlineData("Operator", false, false)]
+    public async Task Me_ShouldReturnExactAuthenticatedContextAndRoleCapabilities(
+        string role,
+        bool canManageUsers,
+        bool canOperateHardware)
+    {
+        await using var host = await AuthEndpointsTestHost.CreateAsync();
+        host.AuthService.GetSessionAsync("token-me").Returns(new UserSession
+        {
+            UserId = "user-id",
+            Username = "line-user",
+            Role = role
+        });
+
+        using var request = new HttpRequestMessage(HttpMethod.Get, "/api/auth/me");
+        request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", "token-me");
+        using var response = await host.Client.SendAsync(request);
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        document.RootElement.EnumerateObject().Select(property => property.Name).Should().BeEquivalentTo([
+            "userId", "username", "role", "capabilities", "passwordPolicy"
+        ]);
+        GetProperty(document.RootElement, "userId").GetString().Should().Be("user-id");
+        GetProperty(document.RootElement, "username").GetString().Should().Be("line-user");
+        GetProperty(document.RootElement, "role").GetString().Should().Be(role);
+        GetProperty(GetProperty(document.RootElement, "passwordPolicy"), "minimumLength").GetInt32().Should().Be(8);
+
+        var capabilities = GetProperty(document.RootElement, "capabilities")
+            .EnumerateArray()
+            .Select(item => item.GetString())
+            .ToArray();
+        capabilities.Contains("users.read").Should().Be(canManageUsers);
+        capabilities.Contains("cameras.bindings.update").Should().Be(canOperateHardware);
+        foreach (var capability in capabilities)
+        {
+            capability.Should().MatchRegex("^[a-z0-9.-]+$");
+        }
+    }
+
+    [Fact]
     public async Task SetupStatus_ShouldReturnCurrentInitialAdminRequirements()
     {
         await using var host = await AuthEndpointsTestHost.CreateAsync();
@@ -256,6 +309,7 @@ public class AuthEndpointsTests
 
             builder.Services.AddSingleton(authService);
             builder.Services.AddSingleton(configService);
+            builder.Services.AddSingleton<AuthenticatedContextProjectionService>();
 
             var app = builder.Build();
             app.MapAuthEndpoints();
@@ -308,6 +362,7 @@ public class AuthEndpointsTests
             builder.Services.AddLogging();
             builder.Services.AddSingleton(authService);
             builder.Services.AddSingleton(configService);
+            builder.Services.AddSingleton<AuthenticatedContextProjectionService>();
 
             var app = builder.Build();
             app.UseMiddleware<ClearVision.Product.Desktop.Middleware.AuthMiddleware>();

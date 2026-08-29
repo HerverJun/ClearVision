@@ -1,5 +1,6 @@
 ﻿import { showToast, createModal, closeModal } from '../../shared/components/uiComponents.js';
 import { applyFeatureToButton } from '../../shared/featureRegistry.js';
+import { Capabilities, PermissionGuard, getCurrentUser } from '../auth/auth.js';
 import { LifecycleRegistry } from './lifecycleRegistry.js';
 import settingsApi from './settingsApi.js';
 import { installSettingsNormalizers } from './settingsNormalizers.js';
@@ -21,9 +22,11 @@ export class SettingsView {
         this.cameraBindings = [];
         this.selectedCameraBindingId = null;
         
-        const currentUser = window.currentUser || {};
+        const currentUser = getCurrentUser() || {};
         this.currentUser = currentUser || {};
-        this.isAdmin = currentUser?.role === 'Admin';
+        this.passwordPolicy = currentUser?.passwordPolicy || { minimumLength: null };
+        this.canManageUsers = PermissionGuard.has(Capabilities.USERS_READ);
+        this.canManageRuntimePreviewPilot = PermissionGuard.has(Capabilities.SETTINGS_UPDATE);
         
         this.aiModels = [];
         this.activeAiModelId = null;
@@ -177,7 +180,7 @@ export class SettingsView {
             this.stationTokenVisible = false;
             this.stationTokenValue = '';
             
-            if (this.isAdmin) {
+            if (this.canManageUsers) {
                 this.users = await settingsApi.loadUsers();
                 if (refreshRequestId !== this._refreshRequestId) return;
             }
@@ -287,6 +290,36 @@ export class SettingsView {
         `;
     }
 
+    hasCapability(capability) {
+        return PermissionGuard.has(capability);
+    }
+
+    requireCapability(capability, message = '当前账户没有执行此操作的权限。') {
+        if (this.hasCapability(capability)) {
+            return true;
+        }
+
+        showToast(message, 'warning');
+        return false;
+    }
+
+    getSaveCapability(tabName = this.getActiveTabName()) {
+        const capabilities = {
+            general: Capabilities.SETTINGS_UPDATE,
+            communication: Capabilities.PLC_SETTINGS_UPDATE,
+            tcp: Capabilities.TCP_PROFILES_UPDATE,
+            station: Capabilities.STATION_COMMUNICATION_UPDATE,
+            storage: Capabilities.SETTINGS_UPDATE,
+            database: Capabilities.DATABASE_STATUS_READ,
+            runtime: Capabilities.SETTINGS_UPDATE,
+            cameras: Capabilities.CAMERA_BINDINGS_UPDATE,
+            ai: Capabilities.AI_MODELS_UPDATE,
+            users: Capabilities.SETTINGS_UPDATE
+        };
+
+        return capabilities[tabName] || null;
+    }
+
     updateSaveActionState(tabName = this.getActiveTabName()) {
         const meta = this.getSaveScopeMeta(tabName);
         const saveBtn = this.container?.querySelector('#btn-save-settings');
@@ -294,6 +327,12 @@ export class SettingsView {
         if (saveBtn) {
             saveBtn.textContent = meta.button;
             saveBtn.title = meta.body;
+            const capability = this.getSaveCapability(tabName);
+            saveBtn.disabled = !!capability && !this.hasCapability(capability);
+            saveBtn.setAttribute('aria-disabled', saveBtn.disabled ? 'true' : 'false');
+            if (saveBtn.disabled) {
+                saveBtn.title = `${meta.body} 当前账户没有此操作权限。`;
+            }
         }
         if (scopeText) {
             scopeText.textContent = meta.body;
@@ -304,11 +343,11 @@ export class SettingsView {
      * 基于两栏结构生成主 HTML
      */
     renderLayout() {
-        const userManagementTab = this.isAdmin ? `<div class="settings-menu-item" data-tab="users">
+        const userManagementTab = this.canManageUsers ? `<div class="settings-menu-item" data-tab="users">
             <svg class="settings-menu-icon" viewBox="0 0 24 24"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg> 
             用户管理
         </div>` : '';
-        const runtimePreviewPilotTab = this.isAdmin && this.isRuntimePreviewPilotDeveloperUiEnabled?.() ? `<div class="settings-menu-item" data-tab="runtime-preview-pilot">
+        const runtimePreviewPilotTab = this.canManageRuntimePreviewPilot && this.isRuntimePreviewPilotDeveloperUiEnabled?.() ? `<div class="settings-menu-item" data-tab="runtime-preview-pilot">
             <svg class="settings-menu-icon" viewBox="0 0 24 24"><path d="M4 4h16v4H4V4zm0 6h7v10H4V10zm9 0h7v10h-7V10zm2 2v2h3v-2h-3zm0 4v2h3v-2h-3z"/></svg>
             RuntimePreview Pilot
         </div>` : '';
@@ -376,8 +415,8 @@ export class SettingsView {
                         <div class="settings-panel settings-panel--standard" data-section="runtime">${this.renderRuntimeTab()}</div>
                         <div class="settings-panel settings-panel--wide" data-section="cameras">${this.renderCameraTab()}</div>
                         <div class="settings-panel settings-panel--full" data-section="ai">${this.renderAiTab()}</div>
-                        ${this.isAdmin && this.isRuntimePreviewPilotDeveloperUiEnabled?.() ? `<div class="settings-panel settings-panel--full" data-section="runtime-preview-pilot">${this.renderRuntimePreviewPilotConsoleTab()}</div>` : ''}
-                        ${this.isAdmin ? `<div class="settings-panel settings-panel--wide" data-section="users">${this.renderUserManagementTab()}</div>` : ''}
+                        ${this.canManageRuntimePreviewPilot && this.isRuntimePreviewPilotDeveloperUiEnabled?.() ? `<div class="settings-panel settings-panel--full" data-section="runtime-preview-pilot">${this.renderRuntimePreviewPilotConsoleTab()}</div>` : ''}
+                        ${this.canManageUsers ? `<div class="settings-panel settings-panel--wide" data-section="users">${this.renderUserManagementTab()}</div>` : ''}
                     </div>
                 </div>
             </div>
@@ -425,7 +464,7 @@ export class SettingsView {
         });
         
         // 如果是切换到用户管理且是管理员，需要刷新表格
-        if (tabName === 'users' && this.isAdmin) {
+        if (tabName === 'users' && this.canManageUsers) {
             this.refreshUserTable();
         } else if (tabName === 'cameras') {
             this.loadCameraBindings()
@@ -470,7 +509,7 @@ export class SettingsView {
         this.bindCameraManagementEvents();
 
         // 绑定用户管理事件（仅管理员）
-        if (this.isAdmin) {
+        if (this.canManageUsers) {
             this.bindUserManagementEvents();
         }
 
@@ -511,6 +550,10 @@ export class SettingsView {
 
     async save() {
         const activeTabName = this.getActiveTabName();
+        const requiredCapability = this.getSaveCapability(activeTabName);
+        if (requiredCapability && !this.requireCapability(requiredCapability)) {
+            return;
+        }
 
         if (activeTabName === 'station') {
             await this.saveStationCommunicationSettings();

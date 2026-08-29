@@ -1,6 +1,7 @@
 import settingsApi from '../settingsApi.js';
 import { validateAiModelDraftPayload, assertValidation } from '../settingsValidators.js';
 import { showToast } from '../../../shared/components/uiComponents.js';
+import { Capabilities } from '../../auth/auth.js';
 
 export function installAiTab(SettingsView) {
     Object.assign(SettingsView.prototype, {
@@ -286,6 +287,7 @@ export function installAiTab(SettingsView) {
                         btn.textContent = input.type === 'password' ? '👁' : '🔒';
                     }
                 } else if (btn.id === 'btn-add-llm') {
+                    if (!this.requireCapability(Capabilities.AI_MODELS_CREATE)) return;
                     try {
                         const result = await settingsApi.createAiModel({
                             name: '新建模型',
@@ -319,6 +321,7 @@ export function installAiTab(SettingsView) {
                     this._pendingFormEdits = {};
                     this.refreshAiTableAndForm();
                 } else if (btn.dataset.action === 'delete') {
+                    if (!this.requireCapability(Capabilities.AI_MODELS_DELETE)) return;
                     if (this.aiModels.length <= 1) {
                         showToast('至少需保留一个模型', 'warning');
                         return;
@@ -341,6 +344,7 @@ export function installAiTab(SettingsView) {
                         showToast('删除失败: ' + err.message, 'error');
                     }
                 } else if (btn.dataset.action === 'activate') {
+                    if (!this.requireCapability(Capabilities.AI_MODELS_ACTIVATE)) return;
                     const id = btn.dataset.id;
                     try {
                         await settingsApi.activateAiModel(id);
@@ -351,6 +355,7 @@ export function installAiTab(SettingsView) {
                         showToast('切换激活失败: ' + err.message, 'error');
                     }
                 } else if (btn.dataset.action === 'default-planner') {
+                    if (!this.requireCapability(Capabilities.AI_MODELS_SET_DEFAULT)) return;
                     const id = btn.dataset.id;
                     try {
                         await settingsApi.setDefaultPlannerAiModel(id);
@@ -361,6 +366,7 @@ export function installAiTab(SettingsView) {
                         showToast('Default planner update failed: ' + err.message, 'error');
                     }
                 } else if (btn.dataset.action === 'default-shadow-eval') {
+                    if (!this.requireCapability(Capabilities.AI_MODELS_SET_DEFAULT)) return;
                     const id = btn.dataset.id;
                     try {
                         await settingsApi.setDefaultShadowEvalAiModel(id);
@@ -371,6 +377,8 @@ export function installAiTab(SettingsView) {
                         showToast('Shadow eval model update failed: ' + err.message, 'error');
                     }
                 } else if (btn.id === 'btn-ai-test') {
+                    if (!this.requireCapability(Capabilities.AI_MODELS_TEST) ||
+                        !this.requireCapability(Capabilities.AI_MODELS_UPDATE)) return;
                     const modelId = this.editingAiModelId;
                     if (!modelId) return;
                     const resultEl = aiTab.querySelector('#ai-test-result');
@@ -396,10 +404,13 @@ export function installAiTab(SettingsView) {
                         if (resultEl) { resultEl.textContent = '❌ 请求失败: ' + err.message; resultEl.style.color = 'var(--cinnabar)'; }
                         showToast('AI 请求失败: ' + err.message, 'error');
                     } finally {
-                        btn.disabled = false;
+                        btn.disabled = !this.hasCapability(Capabilities.AI_MODELS_TEST) ||
+                            !this.hasCapability(Capabilities.AI_MODELS_UPDATE);
                         btn.textContent = '🔗 测试连接';
                     }
                 } else if (btn.id === 'btn-ai-save') {
+                    if (!this.requireCapability(Capabilities.AI_MODELS_UPDATE) ||
+                        !this.requireCapability(Capabilities.AI_MODELS_ACTIVATE)) return;
                     const modelId = this.editingAiModelId;
                     if (!modelId) return;
                     try {
@@ -672,6 +683,9 @@ export function installAiTab(SettingsView) {
         }
         ,
         async _saveCurrentForm() {
+            if (!this.requireCapability(Capabilities.AI_MODELS_UPDATE)) {
+                throw new Error('当前账户不能更新 AI 模型。');
+            }
             const modelId = this.editingAiModelId;
             if (!modelId) return;
             const aiTab = this.container.querySelector('[data-section="ai"]');
@@ -724,6 +738,9 @@ export function installAiTab(SettingsView) {
             if (!tbody) return;
 
             tbody.innerHTML = this.aiModels.map(m => {
+                const activateDisabled = this.hasCapability(Capabilities.AI_MODELS_ACTIVATE) ? '' : 'disabled aria-disabled="true"';
+                const defaultDisabled = this.hasCapability(Capabilities.AI_MODELS_SET_DEFAULT) ? '' : 'disabled aria-disabled="true"';
+                const deleteDisabled = this.hasCapability(Capabilities.AI_MODELS_DELETE) ? '' : 'disabled aria-disabled="true"';
                 const isEditing = m.id === this.editingAiModelId;
                 const id = this.escapeHtml(m.id || '');
                 const name = this.escapeHtml(m.name || '-');
@@ -745,15 +762,15 @@ export function installAiTab(SettingsView) {
                         <td>
                             ${m.isActive
                                 ? '<span class="settings-status-badge status-connected settings-ai-active-badge"><span class="status-dot"></span> 已启用</span>'
-                                : `<button class="cv-btn settings-btn-light" style="padding:2px 8px; font-size:12px; height:24px;" data-action="activate" data-id="${id}">设为激活</button>`}
+                                : `<button class="cv-btn settings-btn-light" style="padding:2px 8px; font-size:12px; height:24px;" data-action="activate" data-id="${id}" ${activateDisabled}>设为激活</button>`}
                         </td>
                         <td>
                             <button class="action-icon-btn" data-action="edit" data-id="${id}" title="编辑">
                                 <svg viewBox="0 0 24 24"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25z"/></svg>
                             </button>
-                            <button class="cv-btn settings-btn-light" style="padding:2px 8px; font-size:12px; height:24px;" data-action="default-planner" data-id="${id}">Planner</button>
-                            <button class="cv-btn settings-btn-light" style="padding:2px 8px; font-size:12px; height:24px;" data-action="default-shadow-eval" data-id="${id}">Shadow</button>
-                            <button class="action-icon-btn" data-action="delete" data-id="${id}" title="删除" style="color:var(--cinnabar);">
+                            <button class="cv-btn settings-btn-light" style="padding:2px 8px; font-size:12px; height:24px;" data-action="default-planner" data-id="${id}" ${defaultDisabled}>Planner</button>
+                            <button class="cv-btn settings-btn-light" style="padding:2px 8px; font-size:12px; height:24px;" data-action="default-shadow-eval" data-id="${id}" ${defaultDisabled}>Shadow</button>
+                            <button class="action-icon-btn" data-action="delete" data-id="${id}" title="删除" ${deleteDisabled} style="color:var(--cinnabar);">
                                 <svg viewBox="0 0 24 24"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>
                             </button>
                         </td>
@@ -922,12 +939,18 @@ export function installAiTab(SettingsView) {
                        <div id="ai-reasoning-help" style="margin-top:8px; font-size:12px; line-height:1.6; color:#475569;">${this.escapeHtml(support.helpText || '')}</div>
                    </details>
                   <div style="display:flex; justify-content:flex-end; gap:12px; margin-top:24px;">
-                      <button class="cv-btn settings-btn-light" id="btn-ai-test">🔗 测试连接</button>
-                      <button class="cv-btn settings-btn-danger" id="btn-ai-save">💾 保存并应用该模型集</button>
+                      <button class="cv-btn settings-btn-light" id="btn-ai-test" ${this.hasCapability(Capabilities.AI_MODELS_TEST) && this.hasCapability(Capabilities.AI_MODELS_UPDATE) ? '' : 'disabled aria-disabled="true"'}>🔗 测试连接</button>
+                      <button class="cv-btn settings-btn-danger" id="btn-ai-save" ${this.hasCapability(Capabilities.AI_MODELS_UPDATE) && this.hasCapability(Capabilities.AI_MODELS_ACTIVATE) ? '' : 'disabled aria-disabled="true"'}>💾 保存并应用该模型集</button>
                  </div>
                   <div id="ai-test-result" style="margin-top:10px; text-align:right; font-size:13px; font-weight:500;"></div>
             `;
             this.syncAiReasoningUiState();
+            if (!this.hasCapability(Capabilities.AI_MODELS_UPDATE)) {
+                formContainer.querySelectorAll('input, select, textarea').forEach(control => {
+                    control.disabled = true;
+                    control.setAttribute('aria-disabled', 'true');
+                });
+            }
         }
         ,
         readRuntimePreviewPilotConfigDraft(aiTab) {
@@ -1204,6 +1227,7 @@ export function installAiTab(SettingsView) {
         ,
         renderAiTab() {
             const aiInfo = this.getAiPerformanceModelLabel();
+            const createDisabled = this.hasCapability(Capabilities.AI_MODELS_CREATE) ? '' : 'disabled aria-disabled="true"';
             return `
                 <div class="settings-section-title">
                     <h2>AI & LLM 模型管理</h2>
@@ -1222,7 +1246,7 @@ export function installAiTab(SettingsView) {
                             </div>
                         </div>
                         <div style="margin-left:auto; padding:12px 24px;">
-                            <button class="cv-btn settings-btn-light" style="height:32px;" id="btn-add-llm">+ 添加 LLM</button>
+                            <button class="cv-btn settings-btn-light" style="height:32px;" id="btn-add-llm" ${createDisabled}>+ 添加 LLM</button>
                         </div>
                     </div>
                     <div class="settings-card-table-wrapper">
@@ -1305,6 +1329,7 @@ export function installAiTab(SettingsView) {
         }
         ,
         async saveAiDraftFromTop() {
+            if (!this.requireCapability(Capabilities.AI_MODELS_UPDATE)) return;
             if (!this.editingAiModelId) {
                 showToast('请先选择一个 AI 模型再保存。', 'warning');
                 return;

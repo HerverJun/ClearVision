@@ -44,7 +44,66 @@ function applyCurrentUser(user) {
     getAuthWindow().currentUser = user || null;
 }
 
-function normalizeServerUser(payload) {
+export const Capabilities = Object.freeze({
+    PROJECT_EDIT: 'project.edit',
+    STATION_COMMANDS_CREATE: 'station.commands.create',
+    STATION_PACKAGES_READ: 'station.packages.read',
+    STATION_PACKAGES_DEPLOY: 'station.packages.deploy',
+    STATION_TEST_PACKAGES_CREATE: 'station.test-packages.create',
+    SETTINGS_UPDATE: 'settings.update',
+    SETTINGS_RESET: 'settings.reset',
+    PLC_SETTINGS_UPDATE: 'plc.settings.update',
+    PLC_MAPPINGS_UPDATE: 'plc.mappings.update',
+    PLC_CONNECTION_TEST: 'plc.connection.test',
+    TCP_PROFILES_UPDATE: 'tcp.profiles.update',
+    TCP_CONNECTIONS_OPERATE: 'tcp.connections.operate',
+    STATION_COMMUNICATION_UPDATE: 'station.communication.update',
+    STATION_COMMUNICATION_TOKEN_MANAGE: 'station.communication-token.manage',
+    CAMERA_BINDINGS_UPDATE: 'cameras.bindings.update',
+    CAMERA_CAPTURE: 'cameras.capture',
+    CAMERA_PREVIEW_OPERATE: 'cameras.preview.operate',
+    TRIGGER_INPUT_OPERATE: 'trigger-input.operate',
+    AI_MODELS_CREATE: 'ai.models.create',
+    AI_MODELS_UPDATE: 'ai.models.update',
+    AI_MODELS_DELETE: 'ai.models.delete',
+    AI_MODELS_ACTIVATE: 'ai.models.activate',
+    AI_MODELS_SET_DEFAULT: 'ai.models.set-default',
+    AI_MODELS_TEST: 'ai.models.test',
+    DATABASE_STATUS_READ: 'database.status.read',
+    DATABASE_BACKUP: 'database.backup',
+    DATABASE_REPAIR: 'database.repair',
+    DATABASE_RESTORE: 'database.restore',
+    DATABASE_CLEANUP: 'database.cleanup',
+    USERS_READ: 'users.read',
+    USERS_CREATE: 'users.create',
+    USERS_UPDATE: 'users.update',
+    USERS_DELETE: 'users.delete',
+    USERS_RESET_PASSWORD: 'users.reset-password'
+});
+
+function normalizeCapabilities(value) {
+    if (!Array.isArray(value)) {
+        return [];
+    }
+
+    return [...new Set(value
+        .filter(item => typeof item === 'string')
+        .map(item => item.trim())
+        .filter(Boolean))]
+        .sort((left, right) => left.localeCompare(right, 'en'));
+}
+
+function normalizePasswordPolicy(value) {
+    const source = value && typeof value === 'object' ? value : {};
+    const minimumLength = Number(source.minimumLength ?? source.MinimumLength);
+    return {
+        minimumLength: Number.isInteger(minimumLength) && minimumLength > 0
+            ? minimumLength
+            : null
+    };
+}
+
+export function normalizeAuthenticatedContext(payload) {
     const source = payload?.user || payload?.User || payload || {};
     const userId = source.userId || source.UserId || source.id || source.Id || '';
     const username = source.username || source.Username || '';
@@ -60,7 +119,9 @@ function normalizeServerUser(payload) {
         userId,
         username,
         displayName,
-        role
+        role,
+        capabilities: normalizeCapabilities(source.capabilities ?? source.Capabilities),
+        passwordPolicy: normalizePasswordPolicy(source.passwordPolicy ?? source.PasswordPolicy)
     };
 }
 
@@ -70,7 +131,7 @@ async function applyAuthenticatedUserResponse(response, token) {
     }
 
     const payload = await response.json();
-    const user = normalizeServerUser(payload);
+    const user = normalizeAuthenticatedContext(payload);
     if (!user) {
         return null;
     }
@@ -128,12 +189,21 @@ export function hasRole(role) {
     return user && user.role === role;
 }
 
+export function hasCapability(capability) {
+    if (typeof capability !== 'string' || !capability) {
+        return false;
+    }
+
+    const capabilities = getCurrentUser()?.capabilities;
+    return Array.isArray(capabilities) && capabilities.includes(capability);
+}
+
 export function isAdmin() {
-    return hasRole('Admin');
+    return hasCapability(Capabilities.USERS_READ);
 }
 
 export function isEngineer() {
-    return hasRole('Engineer') || hasRole('Admin');
+    return hasCapability(Capabilities.PROJECT_EDIT);
 }
 
 export function isOperator() {
@@ -208,16 +278,22 @@ export function installUnauthorizedHandler() {
 }
 
 export const PermissionGuard = {
+    has(capability) {
+        return hasCapability(capability);
+    },
+
     canEdit() {
-        return isEngineer();
+        return hasCapability(Capabilities.PROJECT_EDIT);
     },
 
     canManageUsers() {
-        return isAdmin();
+        return hasCapability(Capabilities.USERS_READ);
     },
 
     canViewSettings() {
-        return isEngineer();
+        return hasCapability(Capabilities.SETTINGS_UPDATE) ||
+            hasCapability(Capabilities.PLC_CONNECTION_TEST) ||
+            hasCapability(Capabilities.CAMERA_BINDINGS_UPDATE);
     },
 
     canRunInspection() {

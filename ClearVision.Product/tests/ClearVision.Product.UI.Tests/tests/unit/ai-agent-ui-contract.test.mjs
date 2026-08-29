@@ -10135,7 +10135,9 @@ test('settings view exposes independent developer-only RuntimePreview Pilot Cons
   assert.match(source, /data-tab="runtime-preview-pilot"/);
   assert.match(source, /data-section="runtime-preview-pilot"/);
   assert.match(source, /isRuntimePreviewPilotDeveloperUiEnabled/);
-  assert.match(source, /this\.isAdmin && this\.isRuntimePreviewPilotDeveloperUiEnabled/);
+  assert.match(source, /this\.canManageRuntimePreviewPilot && this\.isRuntimePreviewPilotDeveloperUiEnabled/);
+  assert.match(source, /this\.canManageRuntimePreviewPilot = PermissionGuard\.has\(Capabilities\.SETTINGS_UPDATE\)/);
+  assert.doesNotMatch(source, /this\.isAdmin\b/);
   assert.match(source, /renderRuntimePreviewPilotConsoleTab/);
   assert.match(source, /bindRuntimePreviewPilotConsoleEvents/);
 });

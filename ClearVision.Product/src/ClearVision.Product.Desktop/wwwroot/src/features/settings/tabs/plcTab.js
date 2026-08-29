@@ -1,6 +1,7 @@
 import settingsApi from '../settingsApi.js';
 import { validatePlcConnectionDraft, assertValidation } from '../settingsValidators.js';
 import { showToast } from '../../../shared/components/uiComponents.js';
+import { Capabilities } from '../../auth/auth.js';
 
 export function installPlcTab(SettingsView) {
     Object.assign(SettingsView.prototype, {
@@ -41,6 +42,7 @@ export function installPlcTab(SettingsView) {
                 }
 
                 if (button.id === 'btn-add-plc-mapping') {
+                    if (!this.requireCapability(Capabilities.PLC_MAPPINGS_UPDATE)) return;
                     this.addPlcMapping();
                     return;
                 }
@@ -56,6 +58,7 @@ export function installPlcTab(SettingsView) {
                 }
 
                 if (button.dataset.action === 'delete-mapping') {
+                    if (!this.requireCapability(Capabilities.PLC_MAPPINGS_UPDATE)) return;
                     const index = Number.parseInt(button.dataset.index || '-1', 10);
                     if (index >= 0) {
                         this.deletePlcMapping(index);
@@ -265,6 +268,9 @@ export function installPlcTab(SettingsView) {
             }
 
             const dataTypeOptions = ['Bool', 'Byte', 'Int16', 'Int32', 'Float', 'Double', 'String', 'Word', 'DWord'];
+            const mappingMutationDisabled = this.hasCapability(Capabilities.PLC_MAPPINGS_UPDATE)
+                ? ''
+                : 'disabled aria-disabled="true"';
             const rowsHtml = this.plcMappings.map((mapping, index) => {
                 const name = this.escapeHtml(mapping?.name || '');
                 const address = this.escapeHtml(mapping?.address || '');
@@ -281,28 +287,28 @@ export function installPlcTab(SettingsView) {
                 return `
                     <tr class="plc-mapping-row" data-index="${index}">
                         <td>
-                            <input type="text" class="cv-input ${nameErrors.length ? 'plc-invalid-input' : ''}" data-field="name" value="${name}" placeholder="变量名">
+                            <input type="text" class="cv-input ${nameErrors.length ? 'plc-invalid-input' : ''}" data-field="name" value="${name}" placeholder="变量名" ${mappingMutationDisabled}>
                             ${this.renderPlcErrorText(nameErrors)}
                         </td>
                         <td>
-                            <input type="text" class="cv-input ${addressErrors.length ? 'plc-invalid-input' : ''}" data-field="address" value="${address}" placeholder="${this.getActivePlcProtocol() === 'S7' ? '如 DB1.DBX0.0' : this.getActivePlcProtocol() === 'MC' ? '如 D100' : '如 DM100'}">
+                            <input type="text" class="cv-input ${addressErrors.length ? 'plc-invalid-input' : ''}" data-field="address" value="${address}" placeholder="${this.getActivePlcProtocol() === 'S7' ? '如 DB1.DBX0.0' : this.getActivePlcProtocol() === 'MC' ? '如 D100' : '如 DM100'}" ${mappingMutationDisabled}>
                             ${this.renderPlcErrorText(addressErrors)}
                         </td>
                         <td>
-                            <select class="cv-input ${dataTypeErrors.length ? 'plc-invalid-input' : ''}" data-field="dataType">
+                            <select class="cv-input ${dataTypeErrors.length ? 'plc-invalid-input' : ''}" data-field="dataType" ${mappingMutationDisabled}>
                                 ${optionsHtml}
                             </select>
                             ${this.renderPlcErrorText(dataTypeErrors)}
                         </td>
                         <td>
-                            <select class="cv-input" data-field="canWrite">
+                            <select class="cv-input" data-field="canWrite" ${mappingMutationDisabled}>
                                 <option value="false" ${canWrite ? '' : 'selected'}>R</option>
                                 <option value="true" ${canWrite ? 'selected' : ''}>W</option>
                             </select>
                         </td>
-                        <td><input type="text" class="cv-input" data-field="description" value="${description}" placeholder="说明"></td>
+                        <td><input type="text" class="cv-input" data-field="description" value="${description}" placeholder="说明" ${mappingMutationDisabled}></td>
                         <td>
-                            <button class="action-icon-btn" data-action="delete-mapping" data-index="${index}" title="删除">
+                            <button class="action-icon-btn" data-action="delete-mapping" data-index="${index}" title="删除" ${mappingMutationDisabled}>
                                 <svg viewBox="0 0 24 24"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>
                             </button>
                         </td>
@@ -380,6 +386,10 @@ export function installPlcTab(SettingsView) {
         }
         ,
         async savePlcSettings({ silent = false, persistAllProfiles = false } = {}) {
+            if (!this.requireCapability(Capabilities.PLC_SETTINGS_UPDATE) ||
+                !this.requireCapability(Capabilities.PLC_MAPPINGS_UPDATE)) {
+                return { success: false, settings: null };
+            }
             let payload;
             try {
                 this.validateActivePlcConnectionForm();
@@ -448,6 +458,7 @@ export function installPlcTab(SettingsView) {
         }
         ,
         async testPlcConnection() {
+            if (!this.requireCapability(Capabilities.PLC_CONNECTION_TEST)) return;
             try {
                 this.validateActivePlcConnectionForm();
             } catch (error) {
@@ -558,6 +569,11 @@ export function installPlcTab(SettingsView) {
                     ? '使用 Omron FINS/TCP 与 CP/CJ/NJ/NX 系列 PLC 通讯。'
                     : '使用 Siemens S7 协议与 S7-1200/1500 等 PLC 通讯。';
             const isTesting = this.plcConnectionStatus === 'testing';
+            const testDisabled = this.hasCapability(Capabilities.PLC_CONNECTION_TEST) ? '' : 'disabled aria-disabled="true"';
+            const settingsMutationDisabled = this.hasCapability(Capabilities.PLC_SETTINGS_UPDATE) &&
+                this.hasCapability(Capabilities.PLC_MAPPINGS_UPDATE)
+                ? ''
+                : 'disabled aria-disabled="true"';
 
             return `
                 <div class="settings-section-title plc-settings-title">
@@ -611,7 +627,7 @@ export function installPlcTab(SettingsView) {
                             ${this.renderPlcErrorText(connectionErrors.port)}
                         </div>
                         <div class="settings-fieldset-action plc-fieldset-action">
-                            <button class="cv-btn settings-btn-dark" id="btn-plc-test" ${isTesting ? 'disabled aria-busy="true"' : ''}>
+                            <button class="cv-btn settings-btn-dark" id="btn-plc-test" ${isTesting ? 'disabled aria-busy="true"' : testDisabled}>
                                 <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/></svg>
                                 <span class="plc-test-label">${isTesting ? '测试中...' : '连接测试'}</span>
                             </button>
@@ -653,7 +669,7 @@ export function installPlcTab(SettingsView) {
                             <span>${protocolLabel} 地址映射表</span>
                         </div>
                         <div class="settings-header-actions">
-                            <button class="cv-btn settings-btn-light plc-add-mapping-btn" id="btn-add-plc-mapping">
+                            <button class="cv-btn settings-btn-light plc-add-mapping-btn" id="btn-add-plc-mapping" ${settingsMutationDisabled}>
                                 <span aria-hidden="true">+</span> 添加变量
                             </button>
                         </div>
@@ -682,7 +698,7 @@ export function installPlcTab(SettingsView) {
 
                 <div class="plc-settings-actions" data-testid="plc-settings-actions">
                     <button class="cv-btn settings-btn-light plc-cancel-btn" id="btn-reset-plc">取消</button>
-                    <button class="cv-btn settings-btn-danger plc-save-btn" id="btn-save-plc">
+                    <button class="cv-btn settings-btn-danger plc-save-btn" id="btn-save-plc" ${settingsMutationDisabled}>
                         <svg viewBox="0 0 24 24" style="width: 18px; height: 18px; margin-right: 6px; fill: currentColor;"><path d="M12 4V1L8 5l4 4V6c3.31 0 6 2.69 6 6 0 1.01-.25 1.97-.7 2.8l1.46 1.46C19.54 15.03 20 13.57 20 12c0-4.42-3.58-8-8-8zm0 14c-3.31 0-6-2.69-6-6 0-1.01.25-1.97.7-2.8L5.24 7.74C4.46 8.97 4 10.43 4 12c0 4.42 3.58 8 8 8v3l4-4-4-4v3z"/></svg>
                         保存当前协议
                     </button>

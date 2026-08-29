@@ -1,6 +1,7 @@
 import settingsApi from '../settingsApi.js';
 import { assertValidation, validateTcpProfileDraft } from '../settingsValidators.js';
 import { showToast } from '../../../shared/components/uiComponents.js';
+import { Capabilities } from '../../auth/auth.js';
 
 export function installTcpTab(SettingsView) {
     Object.assign(SettingsView.prototype, {
@@ -56,9 +57,11 @@ export function installTcpTab(SettingsView) {
 
                 switch (button.id) {
                     case 'btn-add-tcp-profile':
+                        if (!this.requireCapability(Capabilities.TCP_PROFILES_UPDATE)) return;
                         this.addTcpProfile();
                         return;
                     case 'btn-delete-tcp-profile':
+                        if (!this.requireCapability(Capabilities.TCP_PROFILES_UPDATE)) return;
                         this.deleteSelectedTcpProfile();
                         return;
                     case 'btn-save-tcp':
@@ -109,6 +112,13 @@ export function installTcpTab(SettingsView) {
         }
         ,
         async loadTcpSettings({ force = false } = {}) {
+            if (!this.hasCapability(Capabilities.TCP_CONNECTIONS_OPERATE) &&
+                !this.hasCapability(Capabilities.TCP_PROFILES_UPDATE)) {
+                this.tcpProfiles = [];
+                this.tcpSettingsLoaded = true;
+                this.refreshTcpPanel();
+                return;
+            }
             if (!force && this.tcpSettingsLoaded) {
                 this.refreshTcpPanel();
                 await this.refreshSelectedTcpRuntimeState({ silent: true });
@@ -220,6 +230,9 @@ export function installTcpTab(SettingsView) {
         }
         ,
         async saveTcpSettings({ silent = false } = {}) {
+            if (!this.requireCapability(Capabilities.TCP_PROFILES_UPDATE)) {
+                return { success: false, profiles: null };
+            }
             let payload;
             try {
                 payload = this.buildTcpProfilesPayload();
@@ -265,9 +278,16 @@ export function installTcpTab(SettingsView) {
         }
         ,
         async ensureTcpProfileSavedForOperation() {
-            const result = await this.saveTcpSettings({ silent: true });
-            if (!result.success) {
-                showToast('请先修正并保存当前 TCP Profile。', 'warning');
+            if (!this.requireCapability(Capabilities.TCP_CONNECTIONS_OPERATE)) return null;
+
+            if (this.hasCapability(Capabilities.TCP_PROFILES_UPDATE)) {
+                const result = await this.saveTcpSettings({ silent: true });
+                if (!result.success) {
+                    showToast('请先修正并保存当前 TCP Profile。', 'warning');
+                    return null;
+                }
+            } else if (this.tcpDraftDirty) {
+                showToast('当前账户不能保存 TCP Profile；请先还原未保存修改。', 'warning');
                 return null;
             }
 
@@ -295,6 +315,7 @@ export function installTcpTab(SettingsView) {
         }
         ,
         async disconnectSelectedTcpProfile() {
+            if (!this.requireCapability(Capabilities.TCP_CONNECTIONS_OPERATE)) return;
             const selected = this.getSelectedTcpProfile();
             if (!selected) return;
 
@@ -322,6 +343,7 @@ export function installTcpTab(SettingsView) {
         }
         ,
         async stopSelectedTcpServer() {
+            if (!this.requireCapability(Capabilities.TCP_CONNECTIONS_OPERATE)) return;
             const selected = this.getSelectedTcpProfile();
             if (!selected) return;
 
@@ -361,6 +383,7 @@ export function installTcpTab(SettingsView) {
         }
         ,
         async clearSelectedTcpFrames() {
+            if (!this.requireCapability(Capabilities.TCP_CONNECTIONS_OPERATE)) return;
             const selected = this.getSelectedTcpProfile();
             if (!selected) return;
 
@@ -374,6 +397,7 @@ export function installTcpTab(SettingsView) {
         }
         ,
         async refreshSelectedTcpRuntimeState({ forceProfileId = null, silent = false } = {}) {
+            if (!this.hasCapability(Capabilities.TCP_CONNECTIONS_OPERATE)) return;
             const selected = forceProfileId
                 ? this.tcpProfiles.find(profile => profile.id === forceProfileId)
                 : this.getSelectedTcpProfile();
@@ -461,6 +485,12 @@ export function installTcpTab(SettingsView) {
         }
         ,
         renderTcpTab() {
+            const profileMutationDisabled = this.hasCapability(Capabilities.TCP_PROFILES_UPDATE)
+                ? ''
+                : 'disabled aria-disabled="true"';
+            const operationDisabled = this.hasCapability(Capabilities.TCP_CONNECTIONS_OPERATE)
+                ? ''
+                : 'disabled aria-disabled="true"';
             const selected = this.getSelectedTcpProfile();
             if (!selected) {
                 return `
@@ -471,7 +501,7 @@ export function installTcpTab(SettingsView) {
                     ${this.renderScopeNotice('tcp')}
                     <div class="settings-modern-card">
                         <div class="settings-card-body" style="display:flex; align-items:center; justify-content:center; min-height:260px;">
-                            <button class="cv-btn cv-btn-primary" id="btn-add-tcp-profile">新增 Profile</button>
+                            <button class="cv-btn cv-btn-primary" id="btn-add-tcp-profile" ${profileMutationDisabled}>新增 Profile</button>
                         </div>
                     </div>
                 `;
@@ -498,7 +528,7 @@ export function installTcpTab(SettingsView) {
                                 <svg viewBox="0 0 24 24" class="settings-header-icon"><path d="M4 7h16v2H4V7zm0 4h16v2H4v-2zm0 4h16v2H4v-2z"/></svg>
                                 <span>Profile</span>
                             </div>
-                            <button class="cv-btn settings-btn-light" id="btn-add-tcp-profile" style="padding:4px 10px;">新增</button>
+                            <button class="cv-btn settings-btn-light" id="btn-add-tcp-profile" ${profileMutationDisabled} style="padding:4px 10px;">新增</button>
                         </div>
                         <div class="settings-card-body" style="display:flex; flex-direction:column; gap:8px;">
                             ${this.renderTcpProfileList()}
@@ -516,7 +546,7 @@ export function installTcpTab(SettingsView) {
                                     <div class="settings-status-badge ${statusMeta.className}" title="${this.escapeHtml(status?.lastError || '')}">
                                         <span class="status-dot"></span> ${statusMeta.text}
                                     </div>
-                                    <button class="cv-btn settings-btn-light" id="btn-tcp-refresh">刷新</button>
+                                    <button class="cv-btn settings-btn-light" id="btn-tcp-refresh" ${operationDisabled}>刷新</button>
                                 </div>
                             </div>
                             <div class="settings-card-body">
@@ -603,16 +633,16 @@ export function installTcpTab(SettingsView) {
                                 <div style="display:flex; justify-content:space-between; gap:12px; margin-top:18px;">
                                     <div style="display:flex; gap:8px; flex-wrap:wrap;">
                                         ${isServer ? `
-                                            <button class="cv-btn settings-btn-dark" id="btn-tcp-server-start">开始监听</button>
-                                            <button class="cv-btn settings-btn-light" id="btn-tcp-server-stop">停止监听</button>
+                                            <button class="cv-btn settings-btn-dark" id="btn-tcp-server-start" ${operationDisabled}>开始监听</button>
+                                            <button class="cv-btn settings-btn-light" id="btn-tcp-server-stop" ${operationDisabled}>停止监听</button>
                                         ` : `
-                                            <button class="cv-btn settings-btn-dark" id="btn-tcp-connect">连接</button>
-                                            <button class="cv-btn settings-btn-light" id="btn-tcp-disconnect">断开</button>
+                                            <button class="cv-btn settings-btn-dark" id="btn-tcp-connect" ${operationDisabled}>连接</button>
+                                            <button class="cv-btn settings-btn-light" id="btn-tcp-disconnect" ${operationDisabled}>断开</button>
                                         `}
                                     </div>
                                     <div style="display:flex; gap:8px;">
-                                        <button class="cv-btn settings-btn-light" id="btn-delete-tcp-profile">删除</button>
-                                        <button class="cv-btn cv-btn-primary" id="btn-save-tcp">保存 Profile</button>
+                                        <button class="cv-btn settings-btn-light" id="btn-delete-tcp-profile" ${profileMutationDisabled}>删除</button>
+                                        <button class="cv-btn cv-btn-primary" id="btn-save-tcp" ${profileMutationDisabled}>保存 Profile</button>
                                     </div>
                                 </div>
                             </div>
@@ -631,12 +661,12 @@ export function installTcpTab(SettingsView) {
                                     <div class="settings-fieldset" style="flex:1;">
                                         <label>发送文本</label>
                                         <textarea class="cv-input" id="tcp-send-text" rows="3">${this.escapeHtml(textValue)}</textarea>
-                                        <button class="cv-btn settings-btn-dark" id="btn-tcp-send-text" style="margin-top:8px;">发送文本</button>
+                                        <button class="cv-btn settings-btn-dark" id="btn-tcp-send-text" ${operationDisabled} style="margin-top:8px;">发送文本</button>
                                     </div>
                                     <div class="settings-fieldset" style="flex:1;">
                                         <label>发送 HEX</label>
                                         <textarea class="cv-input" id="tcp-send-hex" rows="3" placeholder="50494E47">${this.escapeHtml(hexValue)}</textarea>
-                                        <button class="cv-btn settings-btn-dark" id="btn-tcp-send-hex" style="margin-top:8px;">发送 HEX</button>
+                                        <button class="cv-btn settings-btn-dark" id="btn-tcp-send-hex" ${operationDisabled} style="margin-top:8px;">发送 HEX</button>
                                     </div>
                                 </div>
                                 <div class="settings-fieldset" style="margin-top:12px;">
@@ -652,7 +682,7 @@ export function installTcpTab(SettingsView) {
                                     <svg viewBox="0 0 24 24" class="settings-header-icon"><path d="M4 4h16v16H4V4zm2 4h12V6H6v2zm0 5h12v-3H6v3zm0 5h12v-3H6v3z"/></svg>
                                     <span>收发日志</span>
                                 </div>
-                                <button class="cv-btn settings-btn-light" id="btn-tcp-clear-frames">清空日志</button>
+                                <button class="cv-btn settings-btn-light" id="btn-tcp-clear-frames" ${operationDisabled}>清空日志</button>
                             </div>
                             <div class="settings-card-table-wrapper">
                                 <table class="settings-modern-table">

@@ -314,6 +314,7 @@ public static class VisionRuntimeServiceCollectionExtensions
         services.AddScoped<IUserRepository, UserRepository>();
         services.AddSingleton<IPasswordHasher, PasswordHasher>();
         services.AddScoped<IAuthService, AuthService>();
+        services.AddScoped<AuthenticatedContextProjectionService>();
         services.AddScoped<UserManagementService>();
 
         return services;

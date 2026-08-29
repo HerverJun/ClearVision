@@ -3,12 +3,18 @@ import { validateIntegerValue, validateFloatValue, assertValidation } from '../s
 import { showToast, closeModal } from '../../../shared/components/uiComponents.js';
 import { applyTheme, getAppliedTheme, normalizeTheme } from '../../../core/theme/theme.js';
 import { applyFeatureToButton, getFeatureButtonLabel, getFeatureMeta, isFeatureEnabled } from '../../../shared/featureRegistry.js';
+import { Capabilities } from '../../auth/auth.js';
 
 export function installSystemTabs(SettingsView) {
     Object.assign(SettingsView.prototype, {
         renderGeneralTab() {
             const general = this.config?.general || this.getDefaultConfig().general;
-            const security = this.config?.security || this.getDefaultConfig().security;
+            const passwordMinimumLength = Number.isInteger(this.passwordPolicy?.minimumLength)
+                ? this.passwordPolicy.minimumLength
+                : null;
+            const passwordPolicyLabel = passwordMinimumLength ? `${passwordMinimumLength} 位` : '策略尚未加载';
+            const passwordPolicyDisabled = passwordMinimumLength ? '' : 'disabled aria-disabled="true"';
+            const settingsResetDisabled = this.hasCapability(Capabilities.SETTINGS_RESET) ? '' : 'disabled aria-disabled="true"';
             const runtimeTheme = normalizeTheme(general.theme, getAppliedTheme());
             const settingsResetFeature = getFeatureMeta('settings.reset');
             return `
@@ -69,7 +75,7 @@ export function installSystemTabs(SettingsView) {
                             </div>
                             <div class="settings-fieldset" style="flex:1; min-width:220px;">
                                 <label>新密码</label>
-                                <input type="password" class="cv-input" id="cfg-new-password" autocomplete="new-password" placeholder="至少 ${security.passwordMinLength || 6} 位">
+                                <input type="password" class="cv-input" id="cfg-new-password" autocomplete="new-password" ${passwordMinimumLength ? `minlength="${passwordMinimumLength}" placeholder="至少 ${passwordMinimumLength} 位"` : 'disabled placeholder="密码策略尚未加载"'}>
                             </div>
                             <div class="settings-fieldset" style="flex:1; min-width:220px;">
                                 <label>确认新密码</label>
@@ -77,10 +83,10 @@ export function installSystemTabs(SettingsView) {
                             </div>
                         </div>
                         <div style="display:flex; justify-content:space-between; align-items:center; gap:16px; margin-top:20px; flex-wrap:wrap;">
-                            <span class="settings-field-hint">当前密码策略：最少 ${security.passwordMinLength || 6} 位。</span>
+                            <span class="settings-field-hint">当前密码策略：${passwordPolicyLabel}。</span>
                             <div style="display:flex; gap:12px; flex-wrap:wrap;">
-                                <button class="cv-btn settings-btn-light" id="btn-reset-settings" title="${settingsResetFeature.title}">${getFeatureButtonLabel('settings.reset', '恢复默认设置')}</button>
-                                <button class="cv-btn settings-btn-danger" id="btn-change-password">修改密码</button>
+                                <button class="cv-btn settings-btn-light" id="btn-reset-settings" ${settingsResetDisabled} title="${settingsResetFeature.title}">${getFeatureButtonLabel('settings.reset', '恢复默认设置')}</button>
+                                <button class="cv-btn settings-btn-danger" id="btn-change-password" ${passwordPolicyDisabled}>修改密码</button>
                             </div>
                         </div>
                         <div style="margin-top:12px;">
@@ -204,6 +210,11 @@ export function installSystemTabs(SettingsView) {
             const databasePath = status.databasePath || '--';
             const packageRoot = status.packageRootDirectory || '--';
             const retentionDays = this.config?.storage?.retentionDays ?? 30;
+            const statusDisabled = this.hasCapability(Capabilities.DATABASE_STATUS_READ) ? '' : 'disabled aria-disabled="true"';
+            const backupDisabled = this.hasCapability(Capabilities.DATABASE_BACKUP) ? '' : 'disabled aria-disabled="true"';
+            const repairDisabled = this.hasCapability(Capabilities.DATABASE_REPAIR) ? '' : 'disabled aria-disabled="true"';
+            const restoreDisabled = this.hasCapability(Capabilities.DATABASE_RESTORE) ? '' : 'disabled aria-disabled="true"';
+            const cleanupDisabled = this.hasCapability(Capabilities.DATABASE_CLEANUP) ? '' : 'disabled aria-disabled="true"';
             return `
                 <div class="settings-section-title">
                     <h2>数据库维护</h2>
@@ -245,15 +256,15 @@ export function installSystemTabs(SettingsView) {
                         </div>
                         <div class="settings-card-body">
                             <div style="display:flex; gap:12px; flex-wrap:wrap; margin-bottom:18px;">
-                                <button class="cv-btn cv-btn-primary" id="btn-database-backup">创建备份</button>
-                                <button class="cv-btn settings-btn-light" id="btn-database-refresh">刷新状态</button>
-                                <button class="cv-btn settings-btn-light" id="btn-database-repair">执行维护</button>
+                                <button class="cv-btn cv-btn-primary" id="btn-database-backup" ${backupDisabled}>创建备份</button>
+                                <button class="cv-btn settings-btn-light" id="btn-database-refresh" ${statusDisabled}>刷新状态</button>
+                                <button class="cv-btn settings-btn-light" id="btn-database-repair" ${repairDisabled}>执行维护</button>
                             </div>
                             <div class="settings-fieldset">
                                 <label>恢复备份路径</label>
                                 <input type="text" class="cv-input" id="cfg-database-restore-path" placeholder="${this.escapeHtml(backupRoot)}">
                             </div>
-                            <button class="cv-btn settings-btn-danger" id="btn-database-restore" style="margin-top:12px;">恢复备份</button>
+                            <button class="cv-btn settings-btn-danger" id="btn-database-restore" ${restoreDisabled} style="margin-top:12px;">恢复备份</button>
                             <div id="database-last-action" class="settings-field-hint" style="display:block; margin-top:12px;"></div>
                         </div>
                     </div>
@@ -270,7 +281,7 @@ export function installSystemTabs(SettingsView) {
                                 <label>保留天数</label>
                                 <input type="number" class="cv-input" id="cfg-database-retention-days" value="${retentionDays}">
                             </div>
-                            <button class="cv-btn settings-btn-danger" id="btn-database-cleanup" style="width:100%; margin-top:16px;">清理历史数据</button>
+                            <button class="cv-btn settings-btn-danger" id="btn-database-cleanup" ${cleanupDisabled} style="width:100%; margin-top:16px;">清理历史数据</button>
                             <div style="margin-top:16px; display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; font-size:12px;">
                                 ${this.renderDatabaseMetric('检测历史', rowCounts.InspectionResults ?? 0)}
                                 ${this.renderDatabaseMetric('监控结果', rowCounts.StationResultSummaries ?? 0)}
@@ -365,6 +376,7 @@ export function installSystemTabs(SettingsView) {
         ,
         renderUserManagementTab() {
             const security = this.config?.security || this.getDefaultConfig().security;
+            const createDisabled = this.hasCapability(Capabilities.USERS_CREATE) ? '' : 'disabled aria-disabled="true"';
             return `
                 <div class="settings-section-title" style="display:flex; justify-content:space-between; align-items:flex-end;">
                     <div>
@@ -372,7 +384,7 @@ export function installSystemTabs(SettingsView) {
                         <p>管理系统操作人员账号，分配不同级别的使用权限。</p>
                     </div>
                     <div class="settings-actions">
-                        <button class="cv-btn settings-btn-danger" id="btn-add-user">
+                        <button class="cv-btn settings-btn-danger" id="btn-add-user" ${createDisabled}>
                             <span style="font-size:16px; margin-right:4px;">+</span> 新增用户
                         </button>
                     </div>
@@ -434,7 +446,7 @@ export function installSystemTabs(SettingsView) {
         }
         ,
         async refreshUserTable() {
-            if (!this.isAdmin) return;
+            if (!this.hasCapability(Capabilities.USERS_READ)) return;
             const tbody = this.container.querySelector('#settings-user-table tbody');
             if (!tbody) return;
 
@@ -477,10 +489,10 @@ export function installSystemTabs(SettingsView) {
                             <td class="text-muted">${lastLogin}</td>
                             <td>${statusHtml}</td>
                             <td>
-                                <button class="action-icon-btn" data-action="edit" data-id="${userId}" title="编辑用户"><svg viewBox="0 0 24 24"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25z"/></svg></button>
-                                ${username.toLowerCase() !== 'admin' ? `<button class="action-icon-btn" data-action="reset-pwd" data-id="${userId}" title="重置密码"><svg viewBox="0 0 24 24"><path d="M12.65 10C11.83 7.67 9.61 6 7 6c-3.31 0-6 2.69-6 6s2.69 6 6 6c2.61 0 4.83-1.67 5.65-4h2.35l2-2 2 2 2-2 2 2V10h-6.35zM7 14c-1.1 0-2-.89-2-2s.9-2 2-2 2 .89 2 2-.9 2-2 2z"/></svg></button>` : ''}
-                                ${username.toLowerCase() !== 'admin' ? `<button class="action-icon-btn" data-action="toggle-status" data-id="${userId}" title="${u.isActive?'禁用':'启用'}"><svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/></svg></button>` : ''}
-                                ${username.toLowerCase() !== 'admin' ? `<button class="action-icon-btn" data-action="delete" data-id="${userId}" title="删除用户" style="color:var(--cinnabar);"><svg viewBox="0 0 24 24"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg></button>` : ''}
+                                <button class="action-icon-btn" data-action="edit" data-id="${userId}" ${this.hasCapability(Capabilities.USERS_UPDATE) ? '' : 'disabled aria-disabled="true"'} title="编辑用户"><svg viewBox="0 0 24 24"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25z"/></svg></button>
+                                <button class="action-icon-btn" data-action="reset-pwd" data-id="${userId}" ${this.hasCapability(Capabilities.USERS_RESET_PASSWORD) ? '' : 'disabled aria-disabled="true"'} title="重置密码"><svg viewBox="0 0 24 24"><path d="M12.65 10C11.83 7.67 9.61 6 7 6c-3.31 0-6 2.69-6 6s2.69 6 6 6c2.61 0 4.83-1.67 5.65-4h2.35l2-2 2 2 2-2 2 2V10h-6.35zM7 14c-1.1 0-2-.89-2-2s.9-2 2-2 2 .89 2 2-.9 2-2 2z"/></svg></button>
+                                <button class="action-icon-btn" data-action="toggle-status" data-id="${userId}" ${this.hasCapability(Capabilities.USERS_UPDATE) ? '' : 'disabled aria-disabled="true"'} title="${u.isActive?'禁用':'启用'}"><svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/></svg></button>
+                                <button class="action-icon-btn" data-action="delete" data-id="${userId}" ${this.hasCapability(Capabilities.USERS_DELETE) ? '' : 'disabled aria-disabled="true"'} title="删除用户" style="color:var(--cinnabar);"><svg viewBox="0 0 24 24"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg></button>
                             </td>
                         </tr>
                     `;
@@ -500,6 +512,7 @@ export function installSystemTabs(SettingsView) {
                 if (!btn) return;
 
                 if (btn.id === 'btn-add-user') {
+                    if (!this.requireCapability(Capabilities.USERS_CREATE)) return;
                     this.showUserModal('create', null);
                     return;
                 }
@@ -512,8 +525,10 @@ export function installSystemTabs(SettingsView) {
                 if (!user) return;
 
                 if (action === 'edit') {
+                    if (!this.requireCapability(Capabilities.USERS_UPDATE)) return;
                     this.showUserModal('edit', user);
                 } else if (action === 'delete') {
+                    if (!this.requireCapability(Capabilities.USERS_DELETE)) return;
                     if (confirm(`确定要删除用户“${user.username}”吗？\n\n该账号将无法登录，历史审计记录仍会保留用户名。`)) {
                         try {
                             await settingsApi.deleteUser(id);
@@ -524,6 +539,7 @@ export function installSystemTabs(SettingsView) {
                         }
                     }
                 } else if (action === 'toggle-status') {
+                    if (!this.requireCapability(Capabilities.USERS_UPDATE)) return;
                     const nextAction = user.isActive ? '禁用' : '启用';
                     if (!confirm(`确定要${nextAction}用户“${user.username}”吗？${user.isActive ? '\n\n禁用后该账号将无法登录。' : ''}`)) {
                         return;
@@ -540,8 +556,18 @@ export function installSystemTabs(SettingsView) {
                         showToast('操作失败: ' + err.message, 'error');
                     }
                 } else if (action === 'reset-pwd') {
-                    const newPwd = prompt(`请输入为 ${user.username} 重置的新密码 (至少6位):`);
+                    if (!this.requireCapability(Capabilities.USERS_RESET_PASSWORD)) return;
+                    const minimumLength = this.passwordPolicy?.minimumLength;
+                    if (!Number.isInteger(minimumLength)) {
+                        showToast('密码策略尚未加载，不能重置密码。', 'warning');
+                        return;
+                    }
+                    const newPwd = prompt(`请输入为 ${user.username} 重置的新密码 (至少${minimumLength}位):`);
                     if (newPwd) {
+                        if (newPwd.trim().length < minimumLength) {
+                            showToast(`重置密码长度不能少于 ${minimumLength} 位`, 'warning');
+                            return;
+                        }
                         if (!confirm(`确定要重置用户“${user.username}”的密码吗？\n\n保存后旧密码立即失效，请通过安全渠道告知新密码。`)) {
                             return;
                         }
@@ -557,6 +583,15 @@ export function installSystemTabs(SettingsView) {
         }
         ,
         showUserModal(mode, user) {
+            const requiredCapability = mode === 'create'
+                ? Capabilities.USERS_CREATE
+                : Capabilities.USERS_UPDATE;
+            if (!this.requireCapability(requiredCapability)) return;
+            const minimumLength = this.passwordPolicy?.minimumLength;
+            if (mode === 'create' && !Number.isInteger(minimumLength)) {
+                showToast('密码策略尚未加载，不能创建用户。', 'warning');
+                return;
+            }
             const title = mode === 'create' ? '新增用户' : '编辑用户';
             let roleVal = user ? user.role : 2; // Default to Operator (2)
             if (roleVal === 'Admin') roleVal = 0;
@@ -573,8 +608,8 @@ export function installSystemTabs(SettingsView) {
                 </div>
                 ${mode === 'create' ? `
                 <div class="settings-fieldset" style="margin-bottom:16px;">
-                    <label>初始密码 (至少6位)</label>
-                    <input type="password" class="cv-input" id="modal-user-password">
+                    <label>初始密码 (至少${minimumLength}位)</label>
+                    <input type="password" class="cv-input" id="modal-user-password" minlength="${minimumLength}">
                 </div>
                 ` : ''}
                 <div class="settings-fieldset" style="margin-bottom:16px;">
@@ -616,6 +651,10 @@ export function installSystemTabs(SettingsView) {
                     if (mode === 'create') {
                         const username = content.querySelector('#modal-user-username').value;
                         const password = content.querySelector('#modal-user-password').value;
+                        if (password.trim().length < minimumLength) {
+                            showToast(`初始密码长度不能少于 ${minimumLength} 位`, 'warning');
+                            return;
+                        }
                         await settingsApi.createUser({ username, password, displayName, role });
                         showToast('用户创建成功', 'success');
                     } else {
@@ -771,6 +810,7 @@ export function installSystemTabs(SettingsView) {
         }
         ,
         async refreshDatabaseStatus() {
+            if (!this.requireCapability(Capabilities.DATABASE_STATUS_READ)) return;
             try {
                 this.databaseStatus = await settingsApi.getDatabaseStatus();
                 this.renderDatabasePanel();
@@ -788,6 +828,7 @@ export function installSystemTabs(SettingsView) {
         }
         ,
         async createDatabaseBackup() {
+            if (!this.requireCapability(Capabilities.DATABASE_BACKUP)) return;
             try {
                 const result = await settingsApi.backupDatabase();
                 showToast('数据库备份已创建', 'success');
@@ -799,6 +840,7 @@ export function installSystemTabs(SettingsView) {
         }
         ,
         async runDatabaseRepair() {
+            if (!this.requireCapability(Capabilities.DATABASE_REPAIR)) return;
             try {
                 this.databaseStatus = await settingsApi.repairDatabase();
                 this.renderDatabasePanel();
@@ -809,6 +851,7 @@ export function installSystemTabs(SettingsView) {
         }
         ,
         async cleanupDatabaseHistory() {
+            if (!this.requireCapability(Capabilities.DATABASE_CLEANUP)) return;
             let retentionDays;
             try {
                 retentionDays = this.readIntegerSetting('#cfg-database-retention-days', '数据库历史保留天数', { min: 1, max: 3650 });
@@ -833,6 +876,7 @@ export function installSystemTabs(SettingsView) {
         }
         ,
         async restoreDatabaseBackup() {
+            if (!this.requireCapability(Capabilities.DATABASE_RESTORE)) return;
             const input = this.container?.querySelector('#cfg-database-restore-path');
             const backupPath = String(input?.value || '').trim();
             if (!backupPath) {
@@ -874,9 +918,12 @@ export function installSystemTabs(SettingsView) {
             const currentPassword = this.container?.querySelector('#cfg-current-password')?.value || '';
             const newPassword = this.container?.querySelector('#cfg-new-password')?.value || '';
             const confirmPassword = this.container?.querySelector('#cfg-confirm-password')?.value || '';
-            const minLength = this.config?.security?.passwordMinLength
-                ?? this.config?.security?.PasswordMinLength
-                ?? this.getDefaultConfig().security.passwordMinLength;
+            const minLength = this.passwordPolicy?.minimumLength;
+
+            if (!Number.isInteger(minLength)) {
+                showToast('密码策略尚未加载，不能修改密码。', 'warning');
+                return;
+            }
 
             if (!currentPassword || !newPassword || !confirmPassword) {
                 showToast('请完整填写当前密码、新密码和确认密码', 'warning');
@@ -909,6 +956,7 @@ export function installSystemTabs(SettingsView) {
         }
         ,
         async resetSettings() {
+            if (!this.requireCapability(Capabilities.SETTINGS_RESET)) return;
             const resetFeature = getFeatureMeta('settings.reset');
             const resetLabel = getFeatureButtonLabel('settings.reset', '恢复默认设置');
             if (!confirm(`确定要${resetLabel}吗？\n\n将重置普通系统配置、PLC 配置、相机绑定和 AI 模型配置；Station token 保存在 Station 专用配置中，现场连接可能需要重新检查。${resetFeature.description}`)) {
@@ -1024,6 +1072,7 @@ export function installSystemTabs(SettingsView) {
         }
         ,
         async saveAppSettingsForTab(activeTabName) {
+            if (!this.requireCapability(Capabilities.SETTINGS_UPDATE)) return;
             let config;
             try {
                 config = this.buildAppConfigForSave(activeTabName);
@@ -1050,6 +1099,12 @@ export function installSystemTabs(SettingsView) {
                 }
                 if (activeTabName === 'storage') {
                     await this.loadDiskUsage();
+                }
+                if (activeTabName === 'users' && Number.isInteger(config.security?.passwordMinLength)) {
+                    this.passwordPolicy = { minimumLength: config.security.passwordMinLength };
+                    if (this.currentUser) {
+                        this.currentUser.passwordPolicy = this.passwordPolicy;
+                    }
                 }
 
                 showToast(`${this.getSaveScopeMeta(activeTabName).button}已完成。`, 'success');

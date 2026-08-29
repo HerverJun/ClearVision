@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using ClearVision.Product.Application.Security;
 using ClearVision.Product.Core.Enums;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
@@ -7,13 +8,13 @@ namespace ClearVision.Product.Desktop.Endpoints;
 
 public static class ClearVisionPermissionPolicies
 {
-    public const string RequireAuthenticated = nameof(RequireAuthenticated);
-    public const string RequireAdmin = nameof(RequireAdmin);
-    public const string RequireEngineerOrAdmin = nameof(RequireEngineerOrAdmin);
-    public const string RequireStationAdmin = nameof(RequireStationAdmin);
-    public const string CanEditProject = nameof(CanEditProject);
-    public const string CanOperateHardware = nameof(CanOperateHardware);
-    public const string CanReadSensitiveConfig = nameof(CanReadSensitiveConfig);
+    public const string RequireAuthenticated = ClearVisionAuthorizationPolicies.RequireAuthenticated;
+    public const string RequireAdmin = ClearVisionAuthorizationPolicies.RequireAdmin;
+    public const string RequireEngineerOrAdmin = ClearVisionAuthorizationPolicies.RequireEngineerOrAdmin;
+    public const string RequireStationAdmin = ClearVisionAuthorizationPolicies.RequireStationAdmin;
+    public const string CanEditProject = ClearVisionAuthorizationPolicies.CanEditProject;
+    public const string CanOperateHardware = ClearVisionAuthorizationPolicies.CanOperateHardware;
+    public const string CanReadSensitiveConfig = ClearVisionAuthorizationPolicies.CanReadSensitiveConfig;
 
     public static bool Authorize(HttpContext context, string policy, out ClearVisionPermissionDenial denial)
     {
@@ -25,17 +26,7 @@ public static class ClearVisionPermissionPolicies
             return false;
         }
 
-        var allowed = policy switch
-        {
-            RequireAuthenticated => true,
-            RequireAdmin => IsAdmin(role),
-            RequireEngineerOrAdmin => IsEngineerOrAdmin(role),
-            RequireStationAdmin => IsAdmin(role),
-            CanEditProject => IsEngineerOrAdmin(role),
-            CanOperateHardware => IsEngineerOrAdmin(role),
-            CanReadSensitiveConfig => IsAdmin(role),
-            _ => false
-        };
+        var allowed = ClearVisionAuthorizationPolicies.IsAllowed(role, policy);
 
         if (allowed)
         {

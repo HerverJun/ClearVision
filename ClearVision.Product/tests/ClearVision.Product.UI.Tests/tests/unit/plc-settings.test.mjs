@@ -124,6 +124,7 @@ function createStorage() {
 
 const dom = installDom();
 const { SettingsView } = await import('../../../../src/ClearVision.Product.Desktop/wwwroot/src/features/settings/settingsView.js');
+const { Capabilities } = await import('../../../../src/ClearVision.Product.Desktop/wwwroot/src/features/auth/auth.js');
 const settingsApi = (await import('../../../../src/ClearVision.Product.Desktop/wwwroot/src/features/settings/settingsApi.js')).default;
 
 function createField(value = '') {
@@ -202,6 +203,13 @@ function baseCommunication() {
 }
 
 function createView(communication = baseCommunication()) {
+  globalThis.window.currentUser = {
+    userId: 'admin-id',
+    username: 'admin-user',
+    role: 'Admin',
+    capabilities: Object.values(Capabilities),
+    passwordPolicy: { minimumLength: 12 }
+  };
   const root = createContainer();
   dom.register('settings-view', root);
   const view = new SettingsView('settings-view');
@@ -353,6 +361,49 @@ test('PLC connection test sends current protocol form values and restores loadin
   assert.equal(button.disabled, false);
   assert.equal(button.plcTestLabel.textContent, '连接测试');
   assert.equal(view.plcConnectionStatus, 'connected');
+});
+
+test('PLC hardware capability permits connection test but not Admin-only persistence', async () => {
+  const view = createView({
+    ...baseCommunication(),
+    activeProtocol: 'MC'
+  });
+  const button = createButton();
+  const badge = createBadge();
+  const originalTestConnection = settingsApi.testPlcConnection;
+  const originalSave = settingsApi.savePlcSettings;
+  let testRequests = 0;
+  let saveRequests = 0;
+
+  globalThis.window.currentUser.capabilities = [Capabilities.PLC_CONNECTION_TEST];
+  view.container = createContainer({
+    fields: {
+      ipAddress: createField('10.20.30.40'),
+      port: createField('5010')
+    },
+    button,
+    badge
+  });
+  settingsApi.testPlcConnection = async () => {
+    testRequests += 1;
+    return { success: true, message: '连接成功。' };
+  };
+  settingsApi.savePlcSettings = async () => {
+    saveRequests += 1;
+    return { success: true };
+  };
+
+  try {
+    await view.testPlcConnection();
+    const saveResult = await view.savePlcSettings({ silent: true });
+    assert.equal(saveResult.success, false);
+  } finally {
+    settingsApi.testPlcConnection = originalTestConnection;
+    settingsApi.savePlcSettings = originalSave;
+  }
+
+  assert.equal(testRequests, 1);
+  assert.equal(saveRequests, 0);
 });
 
 test('PLC mapping add, delete, edit, type, write permission, and blank filtering enter payload', () => {
