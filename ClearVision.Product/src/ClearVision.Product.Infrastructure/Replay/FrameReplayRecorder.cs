@@ -4,7 +4,33 @@ using ClearVision.Product.Infrastructure.Continuous;
 
 namespace ClearVision.Product.Infrastructure.Replay;
 
-public sealed class FrameReplayRecorder
+public interface IFrameReplayRecorder
+{
+    Task<string> SaveTrackAsync(
+        string trackId,
+        IReadOnlyList<FrameEnvelope> frames,
+        TrackDecision? decision = null,
+        CancellationToken cancellationToken = default);
+}
+
+public interface IFrameReplayRecorderFactory
+{
+    IFrameReplayRecorder Create(string rootDirectory);
+}
+
+public sealed class FrameReplayRecorderFactory : IFrameReplayRecorderFactory
+{
+    public static FrameReplayRecorderFactory Instance { get; } = new();
+
+    public IFrameReplayRecorder Create(string rootDirectory) => new FrameReplayRecorder(rootDirectory);
+}
+
+public static class FrameReplayFailureCodes
+{
+    public const string WriteFailed = "CONTINUOUS_REPLAY_WRITE_FAILED";
+}
+
+public sealed class FrameReplayRecorder : IFrameReplayRecorder
 {
     private static readonly JsonSerializerOptions JsonOptions = new() { WriteIndented = true };
     private readonly string _rootDirectory;

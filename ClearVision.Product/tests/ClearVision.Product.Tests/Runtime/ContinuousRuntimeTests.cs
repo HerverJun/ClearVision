@@ -100,6 +100,59 @@ public class ContinuousRuntimeTests
     }
 
     [Fact]
+    public async Task InferenceScheduler_WhenSubscriberThrows_ShouldNotifyOthersAndProcessNextItem()
+    {
+        var logger = new RecordingLogger<InferenceScheduler>();
+        await using var scheduler = new InferenceScheduler(queueLength: 4, logger);
+        var receivedSequences = new List<long>();
+        var receivedTwoResults = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        scheduler.ResultReady += result =>
+        {
+            if (result.Frame.Sequence == 1)
+            {
+                throw new InvalidOperationException("subscriber failed");
+            }
+
+            return Task.CompletedTask;
+        };
+        scheduler.ResultReady += result =>
+        {
+            receivedSequences.Add(result.Frame.Sequence);
+            if (receivedSequences.Count == 2)
+            {
+                receivedTwoResults.TrySetResult();
+            }
+
+            return Task.CompletedTask;
+        };
+
+        foreach (var sequence in new long[] { 1, 2 })
+        {
+            scheduler.TrySchedule(new ScheduledInferenceItem(
+                    CreateFrame(sequence, new Scalar(sequence, sequence, sequence)),
+                    $"track-{sequence}",
+                    (_, _) => Task.FromResult(new FlowExecutionResult
+                    {
+                        IsSuccess = true,
+                        OutputData = new Dictionary<string, object> { ["JudgmentResult"] = "OK" }
+                    })))
+                .Should()
+                .BeTrue();
+        }
+
+        await receivedTwoResults.Task.WaitAsync(TimeSpan.FromSeconds(2));
+
+        receivedSequences.Should().Equal(1, 2);
+        scheduler.Snapshot().Should().Match<InferenceSchedulerSnapshot>(snapshot =>
+            snapshot.CompletedCount == 2 && snapshot.SubscriberFailureCount == 1);
+        logger.Entries.Should().ContainSingle(entry =>
+            entry.Level == Microsoft.Extensions.Logging.LogLevel.Error &&
+            entry.Message.Contains("ResultReady subscriber failed", StringComparison.Ordinal) &&
+            entry.Exception is InvalidOperationException);
+    }
+
+    [Fact]
     public void TrackConsensusJudge_ShouldFinalizeAfterThreshold()
     {
         var judge = new TrackConsensusJudge(minConsensusFrames: 3, consensusThreshold: 0.66);
@@ -299,6 +352,97 @@ public class ContinuousRuntimeTests
                 Directory.Delete(root, recursive: true);
             }
         }
+    }
+
+    [Fact]
+    public async Task ContinuousInspectionWorker_Primary_WhenReplayWriteFails_ShouldPublishCurrentAndNextResults()
+    {
+        var startedAt = DateTimeOffset.UtcNow;
+        var frames = new[]
+        {
+            CreateFrame(1, new Scalar(0, 0, 0), 32, startedAt),
+            CreateFrame(2, new Scalar(255, 255, 255), 32, startedAt.AddMilliseconds(1300)),
+            CreateFrame(3, new Scalar(0, 0, 0), 32, startedAt.AddMilliseconds(2600))
+        };
+        var stream = new FakeStreamCoordinator(frames);
+        var flow = new FakeFlowExecutionService("NG");
+        var writer = new CapturingResultWriter();
+        var eventBus = new CapturingEventBus();
+        var recorderFactory = new FailingReplayRecorderFactory();
+        var logger = new RecordingLogger<ContinuousInspectionWorker>();
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+        eventBus.ResultPublished += () =>
+        {
+            if (eventBus.Results.Count == 2)
+            {
+                cts.Cancel();
+            }
+        };
+
+        var worker = new ContinuousInspectionWorker(logger, recorderFactory);
+        await worker.RunAsync(
+            CreateExecutionSnapshot("continuous-replay-fail-soft"),
+            Guid.NewGuid(),
+            "cam-1",
+            new ContinuousInspectionConfig
+            {
+                Mode = ContinuousInspectionMode.Primary,
+                DetectEveryNFrames = 1,
+                MinConsensusFrames = 1,
+                ConsensusThreshold = 1,
+                SchedulerQueueLength = 4,
+                PreEventFrames = 0,
+                PostEventFrames = 0,
+                SaveReplayOnNgOnly = false
+            },
+            ContinuousInspectionMode.Primary,
+            stream,
+            flow,
+            writer,
+            NullInspectionImagePersistenceService.Instance,
+            eventBus,
+            cts.Token);
+
+        recorderFactory.CreateCalls.Should().Be(1);
+        recorderFactory.Recorder.SaveCalls.Should().Be(2);
+        recorderFactory.Recorder.TrackIds.Should().Equal("cam-1:2", "cam-1:3");
+        writer.Results.Should().HaveCount(2);
+        eventBus.Results.Should().HaveCount(2);
+
+        foreach (var result in writer.Results)
+        {
+            result.Status.Should().Be(InspectionStatus.NG);
+            result.OutputDataJson.Should().NotBeNullOrWhiteSpace();
+            using var document = JsonDocument.Parse(result.OutputDataJson!);
+            var replay = document.RootElement.GetProperty("ContinuousInspection");
+            replay.GetProperty("replaySkipped").GetBoolean().Should().BeTrue();
+            replay.GetProperty("replayStatus").GetString().Should().Be("skipped_write_failed");
+            replay.GetProperty("replayFailureCode").GetString()
+                .Should().Be(FrameReplayFailureCodes.WriteFailed);
+            replay.GetProperty("replayFailureSummary").GetString()
+                .Should().Be("Replay capture was skipped because auxiliary persistence failed.");
+            result.OutputDataJson.Should().NotContain("customer-a");
+            result.OutputDataJson.Should().NotContain("metadata.json");
+            result.OutputDataJson.Should().NotContain("Access denied");
+        }
+
+        eventBus.Results.Select(evt => evt.ResultId)
+            .Should().Equal(writer.Results.Select(result => result.Id));
+        foreach (var resultEvent in eventBus.Results)
+        {
+            using var document = JsonDocument.Parse(JsonSerializer.Serialize(resultEvent.OutputData));
+            var replay = document.RootElement.GetProperty("ContinuousInspection");
+            replay.GetProperty("replaySkipped").GetBoolean().Should().BeTrue();
+            replay.GetProperty("replayFailureCode").GetString()
+                .Should().Be(FrameReplayFailureCodes.WriteFailed);
+            document.RootElement.GetRawText().Should().NotContain("customer-a");
+        }
+
+        logger.Entries.Where(entry =>
+                entry.Level == Microsoft.Extensions.Logging.LogLevel.Warning &&
+                entry.Message.Contains("Replay persistence failed", StringComparison.Ordinal))
+            .Should()
+            .HaveCount(2);
     }
 
     [Fact]
@@ -634,13 +778,17 @@ public class ContinuousRuntimeTests
         eventBus.Results.Should().BeEmpty();
     }
 
-    private static FrameEnvelope CreateFrame(long sequence, Scalar color, int size = 8)
+    private static FrameEnvelope CreateFrame(
+        long sequence,
+        Scalar color,
+        int size = 8,
+        DateTimeOffset? hostReceiveTimestampUtc = null)
     {
         using var mat = new Mat(size, size, MatType.CV_8UC3, color);
         return new FrameEnvelope(
             "cam-1",
             sequence,
-            DateTimeOffset.UtcNow.AddMilliseconds(sequence),
+            hostReceiveTimestampUtc ?? DateTimeOffset.UtcNow.AddMilliseconds(sequence),
             mat.Width,
             mat.Height,
             "image/png",
@@ -915,12 +1063,14 @@ public class ContinuousRuntimeTests
     private sealed class CapturingEventBus : IInspectionEventBus
     {
         public List<InspectionResultEvent> Results { get; } = new();
+        public event Action? ResultPublished;
 
         public Task PublishAsync<TEvent>(TEvent eventData, CancellationToken cancellationToken = default) where TEvent : IInspectionEvent
         {
             if (eventData is InspectionResultEvent result)
             {
                 Results.Add(result);
+                ResultPublished?.Invoke();
             }
 
             return Task.CompletedTask;
@@ -929,5 +1079,36 @@ public class ContinuousRuntimeTests
         public IDisposable Subscribe<TEvent>(Func<TEvent, CancellationToken, Task> handler) where TEvent : IInspectionEvent => new NoopDisposable();
         public IDisposable SubscribeInterface<TInterface>(Func<TInterface, CancellationToken, Task> handler) where TInterface : class, IInspectionEvent => new NoopDisposable();
         private sealed class NoopDisposable : IDisposable { public void Dispose() { } }
+    }
+
+    private sealed class FailingReplayRecorderFactory : IFrameReplayRecorderFactory
+    {
+        public FailingReplayRecorder Recorder { get; } = new();
+
+        public int CreateCalls { get; private set; }
+
+        public IFrameReplayRecorder Create(string rootDirectory)
+        {
+            CreateCalls++;
+            return Recorder;
+        }
+    }
+
+    private sealed class FailingReplayRecorder : IFrameReplayRecorder
+    {
+        public List<string> TrackIds { get; } = new();
+
+        public int SaveCalls { get; private set; }
+
+        public Task<string> SaveTrackAsync(
+            string trackId,
+            IReadOnlyList<FrameEnvelope> frames,
+            TrackDecision? decision = null,
+            CancellationToken cancellationToken = default)
+        {
+            SaveCalls++;
+            TrackIds.Add(trackId);
+            throw new IOException(@"Access denied for C:\secret\customer-a\replay\metadata.json");
+        }
     }
 }

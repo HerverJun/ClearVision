@@ -5,6 +5,7 @@ using ClearVision.Product.Core.Services;
 using ClearVision.Product.Infrastructure.Continuous;
 using ClearVision.Product.Infrastructure.DependencyInjection;
 using ClearVision.Product.Infrastructure.Operators;
+using ClearVision.Product.Infrastructure.Replay;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
@@ -44,6 +45,8 @@ public sealed class RuntimeDependencyBoundaryTests
 
         await using var provider = services.BuildServiceProvider();
         Assert.NotNull(provider.GetRequiredService<IFlowExecutionService>());
+        Assert.IsType<FrameReplayRecorderFactory>(
+            provider.GetRequiredService<IFrameReplayRecorderFactory>());
 
         var executorImplementationTypes = GetRuntimeOperatorExecutorImplementationTypes();
         var executors = provider.GetServices<IOperatorExecutor>().ToList();

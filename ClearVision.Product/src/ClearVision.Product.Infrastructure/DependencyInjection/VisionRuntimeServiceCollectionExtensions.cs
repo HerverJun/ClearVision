@@ -13,6 +13,7 @@ using ClearVision.Product.Infrastructure.Events;
 using ClearVision.Product.Infrastructure.Logging;
 using ClearVision.Product.Infrastructure.Metrics;
 using ClearVision.Product.Infrastructure.Operators;
+using ClearVision.Product.Infrastructure.Replay;
 using ClearVision.Product.Infrastructure.Repositories;
 using ClearVision.Product.Infrastructure.Services;
 using Microsoft.EntityFrameworkCore;
@@ -186,6 +187,7 @@ public static class VisionRuntimeServiceCollectionExtensions
 
         services.AddSingleton<FlowLinter>();
         services.TryAddSingleton<ISerialPhotoelectricTriggerInputService>(NoOpSerialPhotoelectricTriggerInputService.Instance);
+        services.TryAddSingleton<IFrameReplayRecorderFactory>(FrameReplayRecorderFactory.Instance);
         services.AddSingleton<ICameraManager, CameraManager>();
         services.AddSingleton<ICameraFrameStreamCoordinator, CameraFrameStreamCoordinator>();
 

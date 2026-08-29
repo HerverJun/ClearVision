@@ -21,6 +21,7 @@ using ClearVision.Product.Core.Outcomes;
 using ClearVision.Product.Core.ProjectVariables;
 using ClearVision.Product.Core.Services;
 using ClearVision.Product.Infrastructure.Metrics;
+using ClearVision.Product.Infrastructure.Replay;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -58,6 +59,7 @@ public class InspectionWorker : IHostedService, IInspectionWorker, IAsyncDisposa
     private readonly IImageCacheRepository _imageCacheRepository;
     private readonly IAnalysisDataBuilder _analysisDataBuilder;
     private readonly IInspectionImagePersistenceService _imagePersistenceService;
+    private readonly IFrameReplayRecorderFactory _replayRecorderFactory;
 
     // 并发控制：跟踪运行中的任务
     private readonly ConcurrentDictionary<Guid, RunningTaskEntry> _runningTasks = new();
@@ -101,7 +103,8 @@ public class InspectionWorker : IHostedService, IInspectionWorker, IAsyncDisposa
         InspectionMetrics metrics,
         IImageCacheRepository imageCacheRepository,
         IAnalysisDataBuilder analysisDataBuilder,
-        IInspectionImagePersistenceService? imagePersistenceService = null)
+        IInspectionImagePersistenceService? imagePersistenceService = null,
+        IFrameReplayRecorderFactory? replayRecorderFactory = null)
     {
         _scopeFactory = scopeFactory;
         _coordinator = coordinator;
@@ -112,6 +115,7 @@ public class InspectionWorker : IHostedService, IInspectionWorker, IAsyncDisposa
         _imageCacheRepository = imageCacheRepository;
         _analysisDataBuilder = analysisDataBuilder;
         _imagePersistenceService = imagePersistenceService ?? NullInspectionImagePersistenceService.Instance;
+        _replayRecorderFactory = replayRecorderFactory ?? FrameReplayRecorderFactory.Instance;
 
         // 订阅应用关闭事件
         _lifetime.ApplicationStopping.Register(OnApplicationStopping);
@@ -505,7 +509,9 @@ public class InspectionWorker : IHostedService, IInspectionWorker, IAsyncDisposa
             }
             else
             {
-                var continuousWorker = new ClearVision.Product.Infrastructure.Continuous.ContinuousInspectionWorker(_logger);
+                var continuousWorker = new ClearVision.Product.Infrastructure.Continuous.ContinuousInspectionWorker(
+                    _logger,
+                    _replayRecorderFactory);
                 await continuousWorker.RunAsync(
                     snapshot,
                     sessionId,

@@ -22,7 +22,10 @@ public sealed class ContinuousInspectionWorker
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
     private static readonly TimeSpan CameraStreamRestartDelay = TimeSpan.FromMilliseconds(500);
+    private const string ReplayWriteFailureSummary =
+        "Replay capture was skipped because auxiliary persistence failed.";
     private readonly ILogger _logger;
+    private readonly IFrameReplayRecorderFactory _replayRecorderFactory;
 
     private static string SanitizeLogValue(object? value)
     {
@@ -34,8 +37,17 @@ public sealed class ContinuousInspectionWorker
     }
 
     public ContinuousInspectionWorker(ILogger logger)
+        : this(logger, FrameReplayRecorderFactory.Instance)
     {
-        _logger = logger;
+    }
+
+    public ContinuousInspectionWorker(
+        ILogger logger,
+        IFrameReplayRecorderFactory replayRecorderFactory)
+    {
+        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        _replayRecorderFactory = replayRecorderFactory ??
+            throw new ArgumentNullException(nameof(replayRecorderFactory));
     }
 
     public async Task RunAsync(
@@ -70,7 +82,7 @@ public sealed class ContinuousInspectionWorker
         ArgumentNullException.ThrowIfNull(config);
         config.Normalize();
 
-        await using var scheduler = new InferenceScheduler(config.SchedulerQueueLength);
+        await using var scheduler = new InferenceScheduler(config.SchedulerQueueLength, _logger);
         using var detector = new FrameDifferenceArrivalDetector();
         var tracker = new LightweightTracker(new LightweightTrackerOptions(
             MaxSequenceGap: Math.Max(2, config.PreEventFrames + config.PostEventFrames + 1),
@@ -78,7 +90,7 @@ public sealed class ContinuousInspectionWorker
             FreezeAfterSignals: 1));
         var consensus = new TrackConsensusJudge(config.MinConsensusFrames, config.ConsensusThreshold);
         var metrics = new ContinuousMetricsCollector();
-        var replay = new FrameReplayRecorder(Path.Combine(AppContext.BaseDirectory, "continuous-replay"));
+        var replay = CreateReplayRecorder();
 
         scheduler.ResultReady += async scheduled =>
         {
@@ -194,9 +206,15 @@ public sealed class ContinuousInspectionWorker
             }
 
             metrics.RecordDecisionFinalized();
-            await PersistReplayIfNeededAsync(streamCoordinator, cameraId, config, replay, decision, cancellationToken);
+            var replayStatus = await PersistReplayIfNeededAsync(
+                streamCoordinator,
+                cameraId,
+                config,
+                replay,
+                decision,
+                cancellationToken);
 
-            var result = BuildInspectionResult(projectId, sessionId, decision, mode);
+            var result = BuildInspectionResult(projectId, sessionId, decision, mode, replayStatus);
             result.SetExecutionTraceability(executionSnapshot, null, sessionId);
             AppendRuntimeMetrics(
                 result,
@@ -388,6 +406,23 @@ public sealed class ContinuousInspectionWorker
         return exception.Message.Contains("stopped producing frames", StringComparison.OrdinalIgnoreCase);
     }
 
+    private IFrameReplayRecorder? CreateReplayRecorder()
+    {
+        try
+        {
+            return _replayRecorderFactory.Create(
+                Path.Combine(AppContext.BaseDirectory, "continuous-replay")) ??
+                throw new InvalidOperationException("Replay recorder factory returned no recorder.");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(
+                ex,
+                "[ContinuousInspection] Replay recorder initialization failed; formal results will continue without replay persistence.");
+            return null;
+        }
+    }
+
     private static async Task<IReadOnlyList<ClearVision.Product.Core.Streaming.FrameEnvelope>> CollectDecisionFramesAsync(
         ICameraFrameStreamCoordinator streamCoordinator,
         CameraStreamLease lease,
@@ -426,22 +461,22 @@ public sealed class ContinuousInspectionWorker
         return frames;
     }
 
-    private static async Task PersistReplayIfNeededAsync(
+    private async Task<ReplayPersistenceStatus> PersistReplayIfNeededAsync(
         ICameraFrameStreamCoordinator streamCoordinator,
         string cameraId,
         ContinuousInspectionConfig config,
-        FrameReplayRecorder replay,
+        IFrameReplayRecorder? replay,
         TrackDecision decision,
         CancellationToken cancellationToken)
     {
         if (config.SaveReplayOnNgOnly && decision.Status != InspectionStatus.NG)
         {
-            return;
+            return ReplayPersistenceStatus.NotRequired;
         }
 
         if (decision.ResultFrame == null)
         {
-            return;
+            return ReplayPersistenceStatus.NoResultFrame;
         }
 
         var frames = streamCoordinator.GetFrameEnvelopeWindow(
@@ -451,17 +486,40 @@ public sealed class ContinuousInspectionWorker
             config.PostEventFrames);
         if (frames.Count == 0)
         {
-            return;
+            return ReplayPersistenceStatus.NoFrames;
         }
 
-        await replay.SaveTrackAsync(decision.TrackId, frames, decision, cancellationToken);
+        if (replay == null)
+        {
+            return ReplayPersistenceStatus.Failed;
+        }
+
+        try
+        {
+            await replay.SaveTrackAsync(decision.TrackId, frames, decision, cancellationToken);
+            return ReplayPersistenceStatus.Saved;
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(
+                ex,
+                "[ContinuousInspection] Replay persistence failed; formal result publication will continue. CameraId={CameraId}, TrackId={TrackId}",
+                SanitizeLogValue(cameraId),
+                SanitizeLogValue(decision.TrackId));
+            return ReplayPersistenceStatus.Failed;
+        }
     }
 
     private static InspectionResult BuildInspectionResult(
         Guid projectId,
         Guid sessionId,
         TrackDecision decision,
-        ContinuousInspectionMode mode)
+        ContinuousInspectionMode mode,
+        ReplayPersistenceStatus replayStatus)
     {
         // The consensus decision owns its selected frame. Never fall back to the
         // callback that happened to close the window: its data can support the
@@ -481,7 +539,11 @@ public sealed class ContinuousInspectionWorker
             ["ConsensusScore"] = decision.ConsensusScore,
             ["CorrelationId"] = resultFrame?.CorrelationId,
             ["LatencyMs"] = resultFrame?.Latency.TotalMilliseconds ?? 0,
-            ["Confidence"] = resultFrame?.Confidence
+            ["Confidence"] = resultFrame?.Confidence,
+            ["replaySkipped"] = replayStatus.Skipped,
+            ["replayStatus"] = replayStatus.Status,
+            ["replayFailureCode"] = replayStatus.FailureCode,
+            ["replayFailureSummary"] = replayStatus.FailureSummary
         };
 
         var result = new InspectionResult(projectId);
@@ -592,6 +654,7 @@ public sealed class ContinuousInspectionWorker
             continuous["DroppedFrames"] = metrics.DroppedInferences;
             continuous["AverageInferenceLatencyMs"] = metrics.AverageInferenceLatencyMs;
             continuous["QueueDepth"] = scheduler.QueueDepth;
+            continuous["SchedulerSubscriberFailureCount"] = scheduler.SubscriberFailureCount;
             continuous["BufferCapacity"] = buffer.Capacity;
             continuous["BufferCount"] = buffer.Count;
             continuous["BufferOverwrittenCount"] = buffer.OverwrittenCount;
@@ -678,4 +741,30 @@ public sealed class ContinuousInspectionWorker
         outputData.TryGetValue("Image", out var image) && image is byte[] imageBytes
             ? imageBytes
             : null;
+
+    private readonly record struct ReplayPersistenceStatus(
+        bool Skipped,
+        string Status,
+        string? FailureCode,
+        string? FailureSummary)
+    {
+        public static ReplayPersistenceStatus Saved { get; } =
+            new(false, "saved", null, null);
+
+        public static ReplayPersistenceStatus NotRequired { get; } =
+            new(true, "skipped_not_required", null, null);
+
+        public static ReplayPersistenceStatus NoResultFrame { get; } =
+            new(true, "skipped_no_result_frame", null, null);
+
+        public static ReplayPersistenceStatus NoFrames { get; } =
+            new(true, "skipped_no_frames", null, null);
+
+        public static ReplayPersistenceStatus Failed { get; } =
+            new(
+                true,
+                "skipped_write_failed",
+                FrameReplayFailureCodes.WriteFailed,
+                ReplayWriteFailureSummary);
+    }
 }
