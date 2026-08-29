@@ -17,6 +17,8 @@ public class AuthService : IAuthService
     private const int UsernameMinLength = 3;
     private const int SessionTokenByteLength = 32;
     public const string InitialAdminSetupAlreadyCompletedMessage = "系统已完成初始化，请直接登录";
+    public const string InstallationAlreadyCompletedCode = "INSTALLATION_ALREADY_COMPLETED";
+    public const string SetupValidationErrorCode = "SETUP_VALIDATION_ERROR";
     private const string InitialAdminPasswordMismatchMessage = "两次输入的密码不一致";
 
     private readonly IUserRepository _userRepository;
@@ -27,7 +29,6 @@ public class AuthService : IAuthService
     private static readonly Dictionary<string, SessionRecord> _sessions = new();
     private static readonly Dictionary<string, LoginFailureState> _loginFailures = new(StringComparer.OrdinalIgnoreCase);
     private static readonly object _lock = new();
-    private static readonly SemaphoreSlim _initialAdminSetupGate = new(1, 1);
     private static readonly TimeSpan _lockoutDuration = TimeSpan.FromMinutes(15);
 
     public Func<DateTime> UtcNowProvider { get; set; } = static () => DateTime.UtcNow;
@@ -253,7 +254,7 @@ public class AuthService : IAuthService
     {
         return new InitialAdminSetupStatusResponse
         {
-            RequiresInitialAdminSetup = !await _userRepository.HasAnyUsersAsync(),
+            RequiresInitialAdminSetup = !await _userRepository.IsInstallationCompletedAsync(),
             UsernameMinLength = UsernameMinLength,
             PasswordMinLength = ResolvePasswordMinLength(),
             RequiresUppercase = false,
@@ -266,60 +267,56 @@ public class AuthService : IAuthService
     {
         if (request == null)
         {
-            return AuthResult.Fail("初始化请求不能为空");
+            return AuthResult.Fail("初始化请求不能为空", SetupValidationErrorCode);
         }
 
         var usernameError = ValidateUsername(request.Username);
         if (!string.IsNullOrEmpty(usernameError))
         {
-            return AuthResult.Fail(usernameError);
+            return AuthResult.Fail(usernameError, SetupValidationErrorCode);
         }
 
         if (string.IsNullOrWhiteSpace(request.Password) || string.IsNullOrWhiteSpace(request.ConfirmPassword))
         {
-            return AuthResult.Fail("密码不能为空");
+            return AuthResult.Fail("密码不能为空", SetupValidationErrorCode);
         }
 
         if (!string.Equals(request.Password, request.ConfirmPassword, StringComparison.Ordinal))
         {
-            return AuthResult.Fail(InitialAdminPasswordMismatchMessage);
+            return AuthResult.Fail(InitialAdminPasswordMismatchMessage, SetupValidationErrorCode);
         }
 
         var passwordPolicyError = ValidatePasswordLength(request.Password);
         if (!string.IsNullOrEmpty(passwordPolicyError))
         {
-            return AuthResult.Fail(passwordPolicyError);
+            return AuthResult.Fail(passwordPolicyError, SetupValidationErrorCode);
         }
 
         var normalizedUsername = request.Username.Trim();
 
-        await _initialAdminSetupGate.WaitAsync();
-        try
+        // Fast durable-latch check. TryCreateInitialAdminAsync still performs the authoritative
+        // transactional compare-and-set, so a concurrent setup race remains protected.
+        if (await _userRepository.IsInstallationCompletedAsync())
         {
-            if (await _userRepository.HasAnyUsersAsync())
-            {
-                return AuthResult.Fail(InitialAdminSetupAlreadyCompletedMessage);
-            }
-
-            if (await _userRepository.IsUsernameExistsAsync(normalizedUsername))
-            {
-                return AuthResult.Fail($"用户名 '{normalizedUsername}' 已存在");
-            }
-
-            var adminUser = User.Create(
-                normalizedUsername,
-                _passwordHasher.HashPassword(request.Password),
-                normalizedUsername,
-                UserRole.Admin);
-
-            await _userRepository.AddAsync(adminUser);
-            _logger.LogInformation("[AuthService] Initial admin created: {Username}", normalizedUsername);
-        }
-        finally
-        {
-            _initialAdminSetupGate.Release();
+            return AuthResult.Fail(
+                InitialAdminSetupAlreadyCompletedMessage,
+                InstallationAlreadyCompletedCode);
         }
 
+        var adminUser = User.Create(
+            normalizedUsername,
+            _passwordHasher.HashPassword(request.Password),
+            normalizedUsername,
+            UserRole.Admin);
+        var creation = await _userRepository.TryCreateInitialAdminAsync(adminUser);
+        if (creation.Status != UserAuthorityMutationStatus.Success)
+        {
+            return AuthResult.Fail(
+                InitialAdminSetupAlreadyCompletedMessage,
+                InstallationAlreadyCompletedCode);
+        }
+
+        _logger.LogInformation("[AuthService] Initial admin created: {Username}", normalizedUsername);
         return await LoginAsync(normalizedUsername, request.Password);
     }
 

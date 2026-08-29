@@ -44,6 +44,11 @@ public class VisionDbContext : DbContext
     /// </summary>
     public DbSet<User> Users { get; set; } = null!;
 
+    /// <summary>
+    /// Singleton installation-completion latch.
+    /// </summary>
+    public DbSet<InstallationStateEntity> InstallationStates { get; set; } = null!;
+
     public DbSet<StationNodeEntity> StationNodes { get; set; } = null!;
 
     public DbSet<StationResultSummaryEntity> StationResultSummaries { get; set; } = null!;
@@ -233,6 +238,24 @@ public class VisionDbContext : DbContext
             entity.Property(e => e.LastLoginAt);
             entity.HasIndex(e => e.Username).IsUnique();
             entity.HasIndex(e => e.IsActive);
+        });
+
+        modelBuilder.Entity<InstallationStateEntity>(entity =>
+        {
+            entity.ToTable("InstallationStates", table =>
+                table.HasCheckConstraint("CK_InstallationStates_Singleton", "\"Id\" = 1"));
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Id).ValueGeneratedNever();
+            entity.Property(e => e.IsCompleted).IsRequired();
+            entity.Property(e => e.CompletedAtUtc);
+            entity.Property(e => e.Revision).IsRequired();
+            entity.HasData(new
+            {
+                Id = InstallationStateEntity.SingletonId,
+                IsCompleted = false,
+                CompletedAtUtc = (DateTime?)null,
+                Revision = 0L
+            });
         });
 
         ConfigureStationSyncEntities(modelBuilder);

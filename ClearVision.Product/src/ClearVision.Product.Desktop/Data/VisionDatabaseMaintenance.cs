@@ -681,7 +681,7 @@ public sealed class VisionDatabaseRestoreRequest
 
 internal static class VisionDatabaseMaintenance
 {
-    public const int CurrentSqliteSchemaVersion = 5;
+    public const int CurrentSqliteSchemaVersion = 6;
 
     public static readonly JsonSerializerOptions JsonOptions = new()
     {
@@ -700,6 +700,7 @@ internal static class VisionDatabaseMaintenance
         await RepairStationPackageKindColumnAsync(dbContext, cancellationToken);
         await EnsureStationCanonicalOutcomeSchemaAsync(dbContext, cancellationToken);
         await EnsureStationExecutionIdentitySchemaAsync(dbContext, cancellationToken);
+        await EnsureInstallationAuthoritySchemaAsync(dbContext, cancellationToken);
         await dbContext.Database.ExecuteSqlRawAsync("PRAGMA journal_mode=WAL;", cancellationToken);
         await dbContext.Database.ExecuteSqlRawAsync("PRAGMA synchronous=NORMAL;", cancellationToken);
         await SetUserVersionAsync(dbContext.Database.GetDbConnection(), CurrentSqliteSchemaVersion, cancellationToken);
@@ -769,6 +770,7 @@ internal static class VisionDatabaseMaintenance
 
         await EnsureStationCanonicalOutcomeSchemaAsync(dbContext, cancellationToken);
         await EnsureStationExecutionIdentitySchemaAsync(dbContext, cancellationToken);
+        await EnsureInstallationAuthoritySchemaAsync(dbContext, cancellationToken);
 
         if (!await ColumnExistsAsync(
                 dbContext.Database.GetDbConnection(),
@@ -829,6 +831,54 @@ internal static class VisionDatabaseMaintenance
                 await connection.CloseAsync();
             }
         }
+    }
+
+    private static async Task EnsureInstallationAuthoritySchemaAsync(
+        VisionDbContext dbContext,
+        CancellationToken cancellationToken)
+    {
+        await dbContext.Database.ExecuteSqlRawAsync(
+            """
+            CREATE TABLE IF NOT EXISTS "InstallationStates" (
+                "Id" INTEGER NOT NULL CONSTRAINT "PK_InstallationStates" PRIMARY KEY,
+                "IsCompleted" INTEGER NOT NULL,
+                "CompletedAtUtc" TEXT NULL,
+                "Revision" INTEGER NOT NULL,
+                CONSTRAINT "CK_InstallationStates_Singleton" CHECK ("Id" = 1)
+            );
+
+            INSERT OR IGNORE INTO "InstallationStates"
+                ("Id", "IsCompleted", "CompletedAtUtc", "Revision")
+            SELECT 1,
+                   CASE WHEN EXISTS (
+                       SELECT 1 FROM "Users" WHERE "IsDeleted" = 0
+                   ) THEN 1 ELSE 0 END,
+                   CASE WHEN EXISTS (
+                       SELECT 1 FROM "Users" WHERE "IsDeleted" = 0
+                   ) THEN CURRENT_TIMESTAMP ELSE NULL END,
+                   CASE WHEN EXISTS (
+                       SELECT 1 FROM "Users" WHERE "IsDeleted" = 0
+                   ) THEN 1 ELSE 0 END;
+
+            UPDATE "InstallationStates"
+            SET "IsCompleted" = 1,
+                "CompletedAtUtc" = COALESCE("CompletedAtUtc", CURRENT_TIMESTAMP),
+                "Revision" = "Revision" + 1
+            WHERE "Id" = 1
+              AND "IsCompleted" = 0
+              AND EXISTS (
+                  SELECT 1 FROM "Users" WHERE "IsDeleted" = 0
+              );
+
+            CREATE TRIGGER IF NOT EXISTS "TR_InstallationStates_PreventReopen"
+            BEFORE UPDATE OF "IsCompleted" ON "InstallationStates"
+            FOR EACH ROW
+            WHEN OLD."IsCompleted" = 1 AND NEW."IsCompleted" = 0
+            BEGIN
+                SELECT RAISE(ABORT, 'installation completion latch cannot be reopened');
+            END;
+            """,
+            cancellationToken);
     }
 
     private static async Task EnsureStationExecutionIdentitySchemaAsync(
@@ -1260,6 +1310,7 @@ internal static class VisionDatabaseMaintenance
         "column:InspectionResults.ExecutionRunMode",
         "column:InspectionResults.ShadowRole",
         "column:Projects.Flow_DecisionConfiguration",
+        "table:InstallationStates",
         "table:StationAlarmEvents",
         "table:StationAuditRecords",
         "table:StationCommandRecords",

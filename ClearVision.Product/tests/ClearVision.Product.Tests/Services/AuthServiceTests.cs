@@ -387,7 +387,7 @@ public class AuthServiceTests
         var repository = Substitute.For<IUserRepository>();
         var passwordHasher = Substitute.For<IPasswordHasher>();
         var configurationService = CreateConfigurationService(sessionTimeoutMinutes: 30, loginFailureLockoutCount: 2, passwordMinLength: 10);
-        repository.HasAnyUsersAsync(Arg.Any<CancellationToken>()).Returns(false);
+        repository.IsInstallationCompletedAsync(Arg.Any<CancellationToken>()).Returns(false);
 
         var service = new AuthService(repository, passwordHasher, configurationService);
 
@@ -409,15 +409,15 @@ public class AuthServiceTests
         var configurationService = CreateConfigurationService(sessionTimeoutMinutes: 30, loginFailureLockoutCount: 2, passwordMinLength: 8);
         passwordHasher.HashPassword("password1").Returns("hashed-admin");
         passwordHasher.VerifyPassword("password1", "hashed-admin").Returns(true);
-        repository.HasAnyUsersAsync(Arg.Any<CancellationToken>()).Returns(false);
-        repository.IsUsernameExistsAsync("factory-admin", Arg.Any<CancellationToken>()).Returns(false);
-        repository.AddAsync(Arg.Any<User>()).Returns(call => Task.FromResult(call.Arg<User>()));
-        repository.GetByUsernameAsync("factory-admin", Arg.Any<CancellationToken>())
+        User? createdAdmin = null;
+        repository.TryCreateInitialAdminAsync(Arg.Any<User>(), Arg.Any<CancellationToken>())
             .Returns(call =>
             {
-                var createdUser = call.ArgAt<string>(0);
-                return Task.FromResult<User?>(User.Create(createdUser, "hashed-admin", createdUser, UserRole.Admin));
+                createdAdmin = call.ArgAt<User>(0);
+                return UserAuthorityMutationResult.Succeeded(createdAdmin);
             });
+        repository.GetByUsernameAsync("factory-admin", Arg.Any<CancellationToken>())
+            .Returns(_ => createdAdmin);
 
         var service = new AuthService(repository, passwordHasher, configurationService);
 
@@ -433,10 +433,10 @@ public class AuthServiceTests
         result.User.Should().NotBeNull();
         result.User!.Role.Should().Be(UserRole.Admin);
         result.User.Username.Should().Be("factory-admin");
-        await repository.Received(1).AddAsync(Arg.Is<User>(user =>
+        await repository.Received(1).TryCreateInitialAdminAsync(Arg.Is<User>(user =>
             user.Username == "factory-admin" &&
             user.DisplayName == "factory-admin" &&
-            user.Role == UserRole.Admin));
+            user.Role == UserRole.Admin), Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -445,7 +445,7 @@ public class AuthServiceTests
         var repository = Substitute.For<IUserRepository>();
         var passwordHasher = Substitute.For<IPasswordHasher>();
         var configurationService = CreateConfigurationService(sessionTimeoutMinutes: 30, loginFailureLockoutCount: 2, passwordMinLength: 8);
-        repository.HasAnyUsersAsync(Arg.Any<CancellationToken>()).Returns(true);
+        repository.IsInstallationCompletedAsync(Arg.Any<CancellationToken>()).Returns(true);
 
         var service = new AuthService(repository, passwordHasher, configurationService);
 
@@ -458,7 +458,10 @@ public class AuthServiceTests
 
         result.Success.Should().BeFalse();
         result.ErrorMessage.Should().Be(AuthService.InitialAdminSetupAlreadyCompletedMessage);
-        await repository.DidNotReceive().AddAsync(Arg.Any<User>());
+        result.ErrorCode.Should().Be(AuthService.InstallationAlreadyCompletedCode);
+        await repository.DidNotReceive().TryCreateInitialAdminAsync(
+            Arg.Any<User>(),
+            Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -467,8 +470,6 @@ public class AuthServiceTests
         var repository = Substitute.For<IUserRepository>();
         var passwordHasher = Substitute.For<IPasswordHasher>();
         var configurationService = CreateConfigurationService(sessionTimeoutMinutes: 30, loginFailureLockoutCount: 2, passwordMinLength: 8);
-        repository.HasAnyUsersAsync(Arg.Any<CancellationToken>()).Returns(false);
-
         var service = new AuthService(repository, passwordHasher, configurationService);
 
         var result = await service.SetupInitialAdminAsync(new InitialAdminSetupRequest
@@ -480,7 +481,10 @@ public class AuthServiceTests
 
         result.Success.Should().BeFalse();
         result.ErrorMessage.Should().Be("新密码长度不能少于 8 位");
-        await repository.DidNotReceive().AddAsync(Arg.Any<User>());
+        result.ErrorCode.Should().Be(AuthService.SetupValidationErrorCode);
+        await repository.DidNotReceive().TryCreateInitialAdminAsync(
+            Arg.Any<User>(),
+            Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -489,8 +493,6 @@ public class AuthServiceTests
         var repository = Substitute.For<IUserRepository>();
         var passwordHasher = Substitute.For<IPasswordHasher>();
         var configurationService = CreateConfigurationService(sessionTimeoutMinutes: 30, loginFailureLockoutCount: 2, passwordMinLength: 8);
-        repository.HasAnyUsersAsync(Arg.Any<CancellationToken>()).Returns(false);
-
         var service = new AuthService(repository, passwordHasher, configurationService);
 
         var result = await service.SetupInitialAdminAsync(new InitialAdminSetupRequest
@@ -502,7 +504,10 @@ public class AuthServiceTests
 
         result.Success.Should().BeFalse();
         result.ErrorMessage.Should().Be("两次输入的密码不一致");
-        await repository.DidNotReceive().AddAsync(Arg.Any<User>());
+        result.ErrorCode.Should().Be(AuthService.SetupValidationErrorCode);
+        await repository.DidNotReceive().TryCreateInitialAdminAsync(
+            Arg.Any<User>(),
+            Arg.Any<CancellationToken>());
     }
 
     private static IConfigurationService CreateConfigurationService(int sessionTimeoutMinutes, int loginFailureLockoutCount, int passwordMinLength = 6)

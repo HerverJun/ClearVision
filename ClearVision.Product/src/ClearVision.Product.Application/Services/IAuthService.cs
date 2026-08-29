@@ -35,6 +35,8 @@ public class AuthResult
 
     public string? ErrorMessage { get; set; }
 
+    public string? ErrorCode { get; set; }
+
     public static AuthResult Ok(string token, UserDto user) => new()
     {
         Success = true,
@@ -42,10 +44,11 @@ public class AuthResult
         User = user
     };
 
-    public static AuthResult Fail(string error) => new()
+    public static AuthResult Fail(string error, string? code = null) => new()
     {
         Success = false,
-        ErrorMessage = error
+        ErrorMessage = error,
+        ErrorCode = code
     };
 }
 

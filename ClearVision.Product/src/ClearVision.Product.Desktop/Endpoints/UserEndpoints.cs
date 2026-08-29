@@ -4,8 +4,6 @@
 
 using ClearVision.Product.Application.DTOs;
 using ClearVision.Product.Application.Services;
-using ClearVision.Product.Core.Enums;
-using ClearVision.Product.Core.Interfaces;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
@@ -20,154 +18,111 @@ public static class UserEndpoints
     public static IEndpointRouteBuilder MapUserEndpoints(this IEndpointRouteBuilder app)
     {
         // 获取所有用户 - Admin
-        app.MapGet("/api/users", async (UserManagementService userService, HttpContext context) =>
+        app.MapGet("/api/users", async (UserManagementService userService) =>
         {
-            if (!await IsAdminAsync(context))
-            {
-                return Results.Forbid();
-            }
-
             var users = await userService.GetAllUsersAsync();
             return Results.Ok(users);
-        });
+        })
+        .RequireClearVisionPermission(ClearVisionPermissionPolicies.RequireAdmin);
 
         // 获取单个用户 - Admin
-        app.MapGet("/api/users/{id}", async (string id, UserManagementService userService, HttpContext context) =>
+        app.MapGet("/api/users/{id}", async (string id, UserManagementService userService) =>
         {
-            if (!await IsAdminAsync(context))
-            {
-                return Results.Forbid();
-            }
-
             var user = await userService.GetUserByIdAsync(id);
             if (user == null)
             {
-                return Results.NotFound(new { Error = $"用户 {id} 不存在" });
+                return Results.NotFound(new
+                {
+                    code = UserManagementErrorCodes.UserNotFound,
+                    error = $"用户 {id} 不存在"
+                });
             }
 
             return Results.Ok(user);
-        });
+        })
+        .RequireClearVisionPermission(ClearVisionPermissionPolicies.RequireAdmin);
 
         // 创建用户 - Admin
-        app.MapPost("/api/users", async (CreateUserRequest request, UserManagementService userService, HttpContext context, IConfigurationService configService) =>
+        app.MapPost("/api/users", async (CreateUserRequest request, UserManagementService userService) =>
         {
-            if (!await IsAdminAsync(context))
-            {
-                return Results.Forbid();
-            }
-
-            var minPasswordLength = Math.Max(6, configService.GetCurrent()?.Security?.PasswordMinLength ?? 6);
-            if (string.IsNullOrWhiteSpace(request.Password) || request.Password.Trim().Length < minPasswordLength)
-            {
-                return Results.BadRequest(new { Error = $"初始密码长度不能少于 {minPasswordLength} 位" });
-            }
-
             var result = await userService.CreateUserAsync(request);
 
             if (!result.Success)
             {
-                return Results.BadRequest(new { Error = result.ErrorMessage });
+                return ToErrorResult(result);
             }
 
             return Results.Created($"/api/users/{result.User!.Id}", result.User);
-        });
+        })
+        .RequireClearVisionPermission(ClearVisionPermissionPolicies.RequireAdmin);
 
         // 更新用户 - Admin
         app.MapPut("/api/users/{id}", async (
             string id,
             UpdateUserRequest request,
-            UserManagementService userService,
-            HttpContext context) =>
+            UserManagementService userService) =>
         {
-            if (!await IsAdminAsync(context))
-            {
-                return Results.Forbid();
-            }
-
             var result = await userService.UpdateUserAsync(id, request);
 
             if (!result.Success)
             {
-                if (result.ErrorMessage?.Contains("不存在") == true)
-                {
-                    return Results.NotFound(new { Error = result.ErrorMessage });
-                }
-                return Results.BadRequest(new { Error = result.ErrorMessage });
+                return ToErrorResult(result);
             }
 
             return Results.Ok(result.User);
-        });
+        })
+        .RequireClearVisionPermission(ClearVisionPermissionPolicies.RequireAdmin);
 
         // 删除用户 - Admin
-        app.MapDelete("/api/users/{id}", async (string id, UserManagementService userService, HttpContext context) =>
+        app.MapDelete("/api/users/{id}", async (string id, UserManagementService userService) =>
         {
-            if (!await IsAdminAsync(context))
-            {
-                return Results.Forbid();
-            }
-
             var result = await userService.DeleteUserAsync(id);
 
             if (!result.Success)
             {
-                if (result.ErrorMessage?.Contains("不存在") == true)
-                {
-                    return Results.NotFound(new { Error = result.ErrorMessage });
-                }
-                return Results.BadRequest(new { Error = result.ErrorMessage });
+                return ToErrorResult(result);
             }
 
             return Results.NoContent();
-        });
+        })
+        .RequireClearVisionPermission(ClearVisionPermissionPolicies.RequireAdmin);
 
         // 重置密码 - Admin
         app.MapPost("/api/users/{id}/reset-password", async (
             string id,
             ResetPasswordRequest request,
-            UserManagementService userService,
-            HttpContext context,
-            IConfigurationService configService) =>
+            UserManagementService userService) =>
         {
-            if (!await IsAdminAsync(context))
-            {
-                return Results.Forbid();
-            }
-
-            var minPasswordLength = Math.Max(6, configService.GetCurrent()?.Security?.PasswordMinLength ?? 6);
-            if (string.IsNullOrWhiteSpace(request.NewPassword) || request.NewPassword.Trim().Length < minPasswordLength)
-            {
-                return Results.BadRequest(new { Error = $"重置密码长度不能少于 {minPasswordLength} 位" });
-            }
-
             var result = await userService.ResetPasswordAsync(id, request.NewPassword);
 
             if (!result.Success)
             {
-                if (result.ErrorMessage?.Contains("不存在") == true)
-                {
-                    return Results.NotFound(new { Error = result.ErrorMessage });
-                }
-                return Results.BadRequest(new { Error = result.ErrorMessage });
+                return ToErrorResult(result);
             }
 
             return Results.Ok(new { Message = "密码重置成功" });
-        });
+        })
+        .RequireClearVisionPermission(ClearVisionPermissionPolicies.RequireAdmin);
 
         return app;
     }
 
-    /// <summary>
-    /// 检查当前用户是否为 Admin
-    /// </summary>
-    private static Task<bool> IsAdminAsync(HttpContext context)
+    private static IResult ToErrorResult(UserResult result)
     {
-        // 从 Items 中获取当前用户信息（由 AuthMiddleware 注入）
-        if (context.Items.TryGetValue("CurrentUser", out var userObj) && userObj is UserSession user)
+        var payload = new
         {
-            return Task.FromResult(user.Role == UserRole.Admin.ToString());
-        }
+            code = result.ErrorCode ?? UserManagementErrorCodes.ValidationError,
+            error = result.ErrorMessage ?? "用户操作失败"
+        };
 
-        return Task.FromResult(false);
+        return result.ErrorCode switch
+        {
+            UserManagementErrorCodes.UserNotFound => Results.NotFound(payload),
+            UserManagementErrorCodes.LastActiveAdmin or
+                UserManagementErrorCodes.RevisionConflict or
+                UserManagementErrorCodes.UsernameConflict => Results.Conflict(payload),
+            _ => Results.UnprocessableEntity(payload)
+        };
     }
 }
 

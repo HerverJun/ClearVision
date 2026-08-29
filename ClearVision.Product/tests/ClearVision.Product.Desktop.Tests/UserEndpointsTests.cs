@@ -35,6 +35,8 @@ public sealed class UserEndpointsTests
         using var response = await host.Client.GetAsync("/api/users");
 
         response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        var payload = await ReadJsonAsync(response);
+        GetProperty(payload, "code").GetString().Should().Be("AdminRequired");
     }
 
     [Fact]
@@ -112,9 +114,10 @@ public sealed class UserEndpointsTests
             Role = UserRole.Engineer
         });
 
-        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        response.StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity);
         var payload = await ReadJsonAsync(response);
         GetProperty(payload, "error").GetString().Should().Be("初始密码长度不能少于 10 位");
+        GetProperty(payload, "code").GetString().Should().Be(UserManagementErrorCodes.ValidationError);
         host.Repository.Users.Should().BeEmpty();
     }
 
@@ -132,6 +135,52 @@ public sealed class UserEndpointsTests
         response.StatusCode.Should().Be(HttpStatusCode.NotFound);
         var payload = await ReadJsonAsync(response);
         GetProperty(payload, "error").GetString().Should().Be("用户不存在");
+        GetProperty(payload, "code").GetString().Should().Be(UserManagementErrorCodes.UserNotFound);
+    }
+
+    [Fact]
+    public async Task LastActiveAdminMutations_ShouldReturnConflictWithStableCode()
+    {
+        await using var host = await UserEndpointsTestHost.CreateAsync();
+
+        using var createResponse = await host.Client.PostAsJsonAsync("/api/users", new CreateUserRequest
+        {
+            Username = "authority-admin",
+            Password = "Password123",
+            DisplayName = "Authority Admin",
+            Role = UserRole.Admin
+        });
+        var created = await ReadJsonAsync(createResponse);
+        var userId = GetProperty(created, "id").GetString();
+
+        foreach (var update in new[]
+                 {
+                     new UpdateUserRequest
+                     {
+                         DisplayName = "Disabled Admin",
+                         Role = UserRole.Admin,
+                         IsActive = false
+                     },
+                     new UpdateUserRequest
+                     {
+                         DisplayName = "Downgraded Admin",
+                         Role = UserRole.Engineer,
+                         IsActive = true
+                     }
+                 })
+        {
+            using var response = await host.Client.PutAsJsonAsync($"/api/users/{userId}", update);
+            response.StatusCode.Should().Be(HttpStatusCode.Conflict);
+            var payload = await ReadJsonAsync(response);
+            GetProperty(payload, "code").GetString().Should().Be(UserManagementErrorCodes.LastActiveAdmin);
+        }
+
+        using var deleteResponse = await host.Client.DeleteAsync($"/api/users/{userId}");
+        deleteResponse.StatusCode.Should().Be(HttpStatusCode.Conflict);
+        var deletePayload = await ReadJsonAsync(deleteResponse);
+        GetProperty(deletePayload, "code").GetString().Should().Be(UserManagementErrorCodes.LastActiveAdmin);
+        host.Repository.Users.Should().ContainSingle(user =>
+            user.Role == UserRole.Admin && user.IsActive);
     }
 
     private static async Task<JsonElement> ReadJsonAsync(HttpResponseMessage response)
@@ -263,6 +312,7 @@ public sealed class UserEndpointsTests
     private sealed class InMemoryUserRepository : IUserRepository
     {
         private readonly Dictionary<Guid, User> _users = new();
+        private bool _installationCompleted;
 
         public IReadOnlyCollection<User> Users => _users.Values.ToArray();
 
@@ -333,6 +383,96 @@ public sealed class UserEndpointsTests
         public Task<bool> HasAnyUsersAsync(CancellationToken cancellationToken = default)
         {
             return Task.FromResult(_users.Count > 0);
+        }
+
+        public Task<bool> IsInstallationCompletedAsync(CancellationToken cancellationToken = default)
+        {
+            _installationCompleted |= _users.Values.Any(user => !user.IsDeleted);
+            return Task.FromResult(_installationCompleted);
+        }
+
+        public Task<UserAuthorityMutationResult> TryCreateInitialAdminAsync(
+            User adminUser,
+            CancellationToken cancellationToken = default)
+        {
+            if (_installationCompleted || _users.Values.Any(user => !user.IsDeleted))
+            {
+                return Task.FromResult(UserAuthorityMutationResult.Failed(
+                    UserAuthorityMutationStatus.InstallationAlreadyCompleted));
+            }
+
+            _installationCompleted = true;
+            _users[adminUser.Id] = adminUser;
+            return Task.FromResult(UserAuthorityMutationResult.Succeeded(adminUser));
+        }
+
+        public Task<UserAuthorityMutationResult> TryUpdatePreservingActiveAdminAsync(
+            Guid userId,
+            string? displayName,
+            UserRole role,
+            bool isActive,
+            CancellationToken cancellationToken = default)
+        {
+            if (!_users.TryGetValue(userId, out var user) || user.IsDeleted)
+            {
+                return Task.FromResult(UserAuthorityMutationResult.Failed(
+                    UserAuthorityMutationStatus.NotFound));
+            }
+
+            var removesActiveAdmin = user.Role == UserRole.Admin &&
+                                     user.IsActive &&
+                                     (role != UserRole.Admin || !isActive);
+            if (removesActiveAdmin && !_users.Values.Any(candidate =>
+                    candidate.Id != userId &&
+                    candidate.Role == UserRole.Admin &&
+                    candidate.IsActive &&
+                    !candidate.IsDeleted))
+            {
+                return Task.FromResult(UserAuthorityMutationResult.Failed(
+                    UserAuthorityMutationStatus.LastActiveAdmin));
+            }
+
+            if (!string.IsNullOrWhiteSpace(displayName))
+            {
+                user.UpdateDisplayName(displayName);
+            }
+
+            user.ChangeRole(role);
+            if (isActive)
+            {
+                user.Activate();
+            }
+            else
+            {
+                user.Deactivate();
+            }
+
+            return Task.FromResult(UserAuthorityMutationResult.Succeeded(user));
+        }
+
+        public Task<UserAuthorityMutationResult> TryDeletePreservingActiveAdminAsync(
+            Guid userId,
+            CancellationToken cancellationToken = default)
+        {
+            if (!_users.TryGetValue(userId, out var user) || user.IsDeleted)
+            {
+                return Task.FromResult(UserAuthorityMutationResult.Failed(
+                    UserAuthorityMutationStatus.NotFound));
+            }
+
+            if (user.Role == UserRole.Admin && user.IsActive && !_users.Values.Any(candidate =>
+                    candidate.Id != userId &&
+                    candidate.Role == UserRole.Admin &&
+                    candidate.IsActive &&
+                    !candidate.IsDeleted))
+            {
+                return Task.FromResult(UserAuthorityMutationResult.Failed(
+                    UserAuthorityMutationStatus.LastActiveAdmin));
+            }
+
+            _users.Remove(userId);
+            return Task.FromResult(new UserAuthorityMutationResult(
+                UserAuthorityMutationStatus.Success));
         }
     }
 }

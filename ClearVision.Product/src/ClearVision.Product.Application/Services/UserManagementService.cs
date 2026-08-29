@@ -16,6 +16,17 @@ public class UserManagementService
 {
     private readonly IUserRepository _userRepository;
     private readonly IPasswordHasher _passwordHasher;
+    private readonly IConfigurationService? _configurationService;
+
+    public UserManagementService(
+        IUserRepository userRepository,
+        IPasswordHasher passwordHasher,
+        IConfigurationService configurationService)
+    {
+        _userRepository = userRepository;
+        _passwordHasher = passwordHasher;
+        _configurationService = configurationService;
+    }
 
     public UserManagementService(IUserRepository userRepository, IPasswordHasher passwordHasher)
     {
@@ -60,20 +71,28 @@ public class UserManagementService
     {
         // 验证请求
         if (string.IsNullOrWhiteSpace(request.Username))
-            return UserResult.Fail("用户名不能为空");
+            return UserResult.Fail("用户名不能为空", UserManagementErrorCodes.ValidationError);
 
-        if (request.Username.Length < 3)
-            return UserResult.Fail("用户名长度至少为3位");
+        if (request.Username.Trim().Length < 3)
+            return UserResult.Fail("用户名长度至少为3位", UserManagementErrorCodes.ValidationError);
 
         if (string.IsNullOrWhiteSpace(request.Password))
-            return UserResult.Fail("密码不能为空");
+            return UserResult.Fail("密码不能为空", UserManagementErrorCodes.ValidationError);
 
-        if (request.Password.Length < 6)
-            return UserResult.Fail("密码长度至少为6位");
+        var passwordMinLength = ResolvePasswordMinLength();
+        if (request.Password.Trim().Length < passwordMinLength)
+            return UserResult.Fail(
+                $"初始密码长度不能少于 {passwordMinLength} 位",
+                UserManagementErrorCodes.ValidationError);
+
+        if (!Enum.IsDefined(request.Role))
+            return UserResult.Fail("用户角色无效", UserManagementErrorCodes.ValidationError);
 
         // 检查用户名是否已存在
         if (await _userRepository.IsUsernameExistsAsync(request.Username))
-            return UserResult.Fail($"用户名 '{request.Username}' 已存在");
+            return UserResult.Fail(
+                $"用户名 '{request.Username}' 已存在",
+                UserManagementErrorCodes.UsernameConflict);
 
         // 哈希密码
         var passwordHash = _passwordHasher.HashPassword(request.Password);
@@ -97,33 +116,17 @@ public class UserManagementService
     public async Task<UserResult> UpdateUserAsync(string id, UpdateUserRequest request)
     {
         if (!Guid.TryParse(id, out var userId))
-            return UserResult.Fail("无效的用户ID");
+            return UserResult.Fail("无效的用户ID", UserManagementErrorCodes.ValidationError);
 
-        var user = await _userRepository.GetByIdAsync(userId);
-        if (user == null)
-            return UserResult.Fail("用户不存在");
+        if (!Enum.IsDefined(request.Role))
+            return UserResult.Fail("用户角色无效", UserManagementErrorCodes.ValidationError);
 
-        // 更新显示名称
-        if (!string.IsNullOrWhiteSpace(request.DisplayName))
-        {
-            user.UpdateDisplayName(request.DisplayName.Trim());
-        }
-
-        // 更新角色
-        user.ChangeRole(request.Role);
-
-        // 更新启用状态
-        if (request.IsActive != user.IsActive)
-        {
-            if (request.IsActive)
-                user.Activate();
-            else
-                user.Deactivate();
-        }
-
-        await _userRepository.UpdateAsync(user);
-
-        return UserResult.Ok(MapToDto(user));
+        var mutation = await _userRepository.TryUpdatePreservingActiveAdminAsync(
+            userId,
+            request.DisplayName,
+            request.Role,
+            request.IsActive);
+        return MapAuthorityMutation(mutation);
     }
 
     /// <summary>
@@ -132,15 +135,10 @@ public class UserManagementService
     public async Task<UserResult> DeleteUserAsync(string id)
     {
         if (!Guid.TryParse(id, out var userId))
-            return UserResult.Fail("无效的用户ID");
+            return UserResult.Fail("无效的用户ID", UserManagementErrorCodes.ValidationError);
 
-        var user = await _userRepository.GetByIdAsync(userId);
-        if (user == null)
-            return UserResult.Fail("用户不存在");
-
-        await _userRepository.DeleteAsync(user);
-
-        return UserResult.Ok(MapToDto(user));
+        var mutation = await _userRepository.TryDeletePreservingActiveAdminAsync(userId);
+        return MapAuthorityMutation(mutation);
     }
 
     /// <summary>
@@ -149,14 +147,17 @@ public class UserManagementService
     public async Task<UserResult> ResetPasswordAsync(string id, string newPassword)
     {
         if (!Guid.TryParse(id, out var userId))
-            return UserResult.Fail("无效的用户ID");
+            return UserResult.Fail("无效的用户ID", UserManagementErrorCodes.ValidationError);
 
-        if (string.IsNullOrWhiteSpace(newPassword) || newPassword.Length < 6)
-            return UserResult.Fail("密码长度至少为6位");
+        var passwordMinLength = ResolvePasswordMinLength();
+        if (string.IsNullOrWhiteSpace(newPassword) || newPassword.Trim().Length < passwordMinLength)
+            return UserResult.Fail(
+                $"重置密码长度不能少于 {passwordMinLength} 位",
+                UserManagementErrorCodes.ValidationError);
 
         var user = await _userRepository.GetByIdAsync(userId);
         if (user == null)
-            return UserResult.Fail("用户不存在");
+            return UserResult.Fail("用户不存在", UserManagementErrorCodes.UserNotFound);
 
         var newHash = _passwordHasher.HashPassword(newPassword);
         user.ChangePassword(newHash);
@@ -188,6 +189,27 @@ public class UserManagementService
             LastLoginAt = user.LastLoginAt
         };
     }
+
+    private int ResolvePasswordMinLength()
+    {
+        return Math.Max(6, _configurationService?.GetCurrent()?.Security?.PasswordMinLength ?? 6);
+    }
+
+    private static UserResult MapAuthorityMutation(UserAuthorityMutationResult mutation)
+    {
+        return mutation.Status switch
+        {
+            UserAuthorityMutationStatus.Success =>
+                UserResult.Ok(mutation.User == null ? null : MapToDto(mutation.User)),
+            UserAuthorityMutationStatus.NotFound =>
+                UserResult.Fail("用户不存在", UserManagementErrorCodes.UserNotFound),
+            UserAuthorityMutationStatus.LastActiveAdmin =>
+                UserResult.Fail(
+                    "必须保留至少一个已启用的管理员账户",
+                    UserManagementErrorCodes.LastActiveAdmin),
+            _ => UserResult.Fail("用户操作冲突", UserManagementErrorCodes.RevisionConflict)
+        };
+    }
 }
 
 /// <summary>
@@ -199,8 +221,24 @@ public class UserResult
     public UserDto? User { get; set; }
     public string? ErrorMessage { get; set; }
 
-    public static UserResult Ok(UserDto user) => new() { Success = true, User = user };
-    public static UserResult Fail(string error) => new() { Success = false, ErrorMessage = error };
+    public string? ErrorCode { get; set; }
+
+    public static UserResult Ok(UserDto? user = null) => new() { Success = true, User = user };
+    public static UserResult Fail(string error, string code) => new()
+    {
+        Success = false,
+        ErrorMessage = error,
+        ErrorCode = code
+    };
+}
+
+public static class UserManagementErrorCodes
+{
+    public const string ValidationError = "VALIDATION_ERROR";
+    public const string UserNotFound = "USER_NOT_FOUND";
+    public const string UsernameConflict = "USERNAME_ALREADY_EXISTS";
+    public const string LastActiveAdmin = "LAST_ACTIVE_ADMIN";
+    public const string RevisionConflict = "REVISION_CONFLICT";
 }
 
 /// <summary>

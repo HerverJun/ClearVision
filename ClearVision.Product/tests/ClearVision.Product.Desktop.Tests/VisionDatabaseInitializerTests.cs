@@ -279,6 +279,59 @@ public sealed class VisionDatabaseInitializerTests
     }
 
     [Fact]
+    public async Task InitializeAsync_ShouldRepairLegacyDatabaseMissingInstallationLatch_AndBackfillCompleted()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "ClearVision.DatabaseInitializer.Tests", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        var dbPath = Path.Combine(root, "vision.db");
+
+        try
+        {
+            await CreateCompleteDatabaseWithoutMigrationHistoryAsync(dbPath);
+            await using (var connection = new SqliteConnection($"Data Source={dbPath}"))
+            {
+                await connection.OpenAsync();
+                await using var command = connection.CreateCommand();
+                command.CommandText =
+                    """
+                    DROP TABLE "InstallationStates";
+                    INSERT INTO "Users"
+                        ("Id", "Username", "PasswordHash", "DisplayName", "Role", "IsActive", "LastLoginAt", "CreatedAt", "ModifiedAt", "IsDeleted")
+                    VALUES
+                        ('00000000-0000-0000-0000-000000000028', 'legacy-operator', 'hash', 'Legacy Operator', 2, 1, NULL, '2026-01-01T00:00:00', NULL, 0);
+                    """;
+                await command.ExecuteNonQueryAsync();
+            }
+
+            var options = new DbContextOptionsBuilder<VisionDbContext>()
+                .UseSqlite($"Data Source={dbPath}")
+                .Options;
+            await using (var dbContext = new VisionDbContext(options))
+            {
+                await VisionDatabaseInitializer.InitializeAsync(dbContext);
+            }
+
+            await using var verifyConnection = new SqliteConnection($"Data Source={dbPath}");
+            await verifyConnection.OpenAsync();
+            (await ScalarLongAsync(
+                verifyConnection,
+                "SELECT \"IsCompleted\" FROM \"InstallationStates\" WHERE \"Id\" = 1;"))
+                .Should().Be(1);
+            (await SchemaObjectExistsAsync(
+                verifyConnection,
+                "trigger",
+                "TR_InstallationStates_PreventReopen")).Should().BeTrue();
+            (await MigrationHistoryCountAsync(verifyConnection)).Should().Be(CurrentMigrationCount());
+            (await UserVersionAsync(verifyConnection)).Should().Be(VisionDatabaseMaintenance.CurrentSqliteSchemaVersion);
+        }
+        finally
+        {
+            SqliteConnection.ClearAllPools();
+            DeleteDirectoryIfExists(root);
+        }
+    }
+
+    [Fact]
     public async Task InitializeAsync_ShouldRejectIncompleteLegacySqliteSchema_WhenDatabaseAlreadyExists()
     {
         var root = Path.Combine(Path.GetTempPath(), "ClearVision.DatabaseInitializer.Tests", Guid.NewGuid().ToString("N"));

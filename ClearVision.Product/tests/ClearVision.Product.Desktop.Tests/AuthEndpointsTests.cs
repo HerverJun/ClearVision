@@ -128,7 +128,9 @@ public class AuthEndpointsTests
     {
         await using var host = await AuthEndpointsTestHost.CreateAsync();
         host.AuthService.SetupInitialAdminAsync(Arg.Any<InitialAdminSetupRequest>())
-            .Returns(AuthResult.Fail(AuthService.InitialAdminSetupAlreadyCompletedMessage));
+            .Returns(AuthResult.Fail(
+                AuthService.InitialAdminSetupAlreadyCompletedMessage,
+                AuthService.InstallationAlreadyCompletedCode));
 
         using var response = await host.Client.PostAsJsonAsync("/api/auth/setup-admin", new InitialAdminSetupRequest
         {
@@ -140,6 +142,26 @@ public class AuthEndpointsTests
         response.StatusCode.Should().Be(HttpStatusCode.Conflict);
         using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
         GetProperty(document.RootElement, "Error").GetString().Should().Be(AuthService.InitialAdminSetupAlreadyCompletedMessage);
+        GetProperty(document.RootElement, "Code").GetString().Should().Be(AuthService.InstallationAlreadyCompletedCode);
+    }
+
+    [Fact]
+    public async Task SetupAdmin_ShouldReturnUnprocessableEntity_ForValidationFailure()
+    {
+        await using var host = await AuthEndpointsTestHost.CreateAsync();
+        host.AuthService.SetupInitialAdminAsync(Arg.Any<InitialAdminSetupRequest>())
+            .Returns(AuthResult.Fail("两次输入的密码不一致", AuthService.SetupValidationErrorCode));
+
+        using var response = await host.Client.PostAsJsonAsync("/api/auth/setup-admin", new InitialAdminSetupRequest
+        {
+            Username = "factory-admin",
+            Password = "password1",
+            ConfirmPassword = "password2"
+        });
+
+        response.StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity);
+        using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        GetProperty(document.RootElement, "Code").GetString().Should().Be(AuthService.SetupValidationErrorCode);
     }
 
     [Fact]
@@ -182,7 +204,7 @@ public class AuthEndpointsTests
 
         using var response = await host.Client.SendAsync(request);
 
-        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        response.StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity);
         using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
         GetProperty(document.RootElement, "ErrorCode").GetString().Should().Be("WEAK_PASSWORD");
     }
@@ -210,7 +232,7 @@ public class AuthEndpointsTests
 
         using var response = await host.Client.SendAsync(request);
 
-        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        response.StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity);
         using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
         GetProperty(document.RootElement, "ErrorCode").GetString().Should().Be("PASSWORD_REUSE");
     }

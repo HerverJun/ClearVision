@@ -31,6 +31,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ClearVision.Product.Tests",
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ClearVision.Product.Desktop.Tests", "tests\ClearVision.Product.Desktop.Tests\ClearVision.Product.Desktop.Tests.csproj", "{CD8B5708-C130-46F3-A996-56DAF2A52F2C}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ClearVision.Product.AdminRecovery", "src\ClearVision.Product.AdminRecovery\ClearVision.Product.AdminRecovery.csproj", "{3E66946D-B499-4886-986C-C52CCB59215D}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -185,6 +187,18 @@ Global
 		{CD8B5708-C130-46F3-A996-56DAF2A52F2C}.Release|x64.Build.0 = Release|Any CPU
 		{CD8B5708-C130-46F3-A996-56DAF2A52F2C}.Release|x86.ActiveCfg = Release|Any CPU
 		{CD8B5708-C130-46F3-A996-56DAF2A52F2C}.Release|x86.Build.0 = Release|Any CPU
+		{3E66946D-B499-4886-986C-C52CCB59215D}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{3E66946D-B499-4886-986C-C52CCB59215D}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{3E66946D-B499-4886-986C-C52CCB59215D}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{3E66946D-B499-4886-986C-C52CCB59215D}.Debug|x64.Build.0 = Debug|Any CPU
+		{3E66946D-B499-4886-986C-C52CCB59215D}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{3E66946D-B499-4886-986C-C52CCB59215D}.Debug|x86.Build.0 = Debug|Any CPU
+		{3E66946D-B499-4886-986C-C52CCB59215D}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{3E66946D-B499-4886-986C-C52CCB59215D}.Release|Any CPU.Build.0 = Release|Any CPU
+		{3E66946D-B499-4886-986C-C52CCB59215D}.Release|x64.ActiveCfg = Release|Any CPU
+		{3E66946D-B499-4886-986C-C52CCB59215D}.Release|x64.Build.0 = Release|Any CPU
+		{3E66946D-B499-4886-986C-C52CCB59215D}.Release|x86.ActiveCfg = Release|Any CPU
+		{3E66946D-B499-4886-986C-C52CCB59215D}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -193,5 +207,6 @@ Global
 		{A5CECD7E-162E-4156-B5CF-A58FB4812F9F} = {827E0CD3-B72D-47B6-A68D-7590B98EB39B}
 		{364FEEDD-3930-4571-B6EE-95819943E2A5} = {0AB3BF05-4346-4AA6-1389-037BE0695223}
 		{CD8B5708-C130-46F3-A996-56DAF2A52F2C} = {0AB3BF05-4346-4AA6-1389-037BE0695223}
+		{3E66946D-B499-4886-986C-C52CCB59215D} = {827E0CD3-B72D-47B6-A68D-7590B98EB39B}
 	EndGlobalSection
 EndGlobal

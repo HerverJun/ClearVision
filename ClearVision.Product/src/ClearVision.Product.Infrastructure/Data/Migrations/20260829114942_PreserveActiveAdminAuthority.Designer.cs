@@ -3,6 +3,7 @@ using System;
 using ClearVision.Product.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -10,9 +11,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace ClearVision.Product.Infrastructure.Data.Migrations
 {
     [DbContext(typeof(VisionDbContext))]
-    partial class VisionDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260829114942_PreserveActiveAdminAuthority")]
+    partial class PreserveActiveAdminAuthority
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "8.0.0");
@@ -84,16 +87,8 @@ namespace ClearVision.Product.Infrastructure.Data.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("TEXT");
 
-                    b.Property<string>("ErrorMessage")
-                        .HasColumnType("TEXT");
-
-                    b.Property<int?>("ExecutionOutcome")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<bool?>("HasJudgmentSignal")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<string>("FlowVersionHash")
+                    b.Property<string>("DecisionConfigurationHash")
+                        .HasMaxLength(128)
                         .HasColumnType("TEXT");
 
                     b.Property<int?>("DecisionOutcome")
@@ -103,8 +98,14 @@ namespace ClearVision.Product.Infrastructure.Data.Migrations
                         .HasMaxLength(500)
                         .HasColumnType("TEXT");
 
-                    b.Property<string>("DecisionConfigurationHash")
-                        .HasMaxLength(128)
+                    b.Property<string>("ErrorMessage")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int?>("ExecutionOutcome")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("ExecutionRunMode")
+                        .HasMaxLength(64)
                         .HasColumnType("TEXT");
 
                     b.Property<Guid?>("ExecutionSnapshotId")
@@ -114,9 +115,11 @@ namespace ClearVision.Product.Infrastructure.Data.Migrations
                         .HasMaxLength(64)
                         .HasColumnType("TEXT");
 
-                    b.Property<string>("ExecutionRunMode")
-                        .HasMaxLength(64)
+                    b.Property<string>("FlowVersionHash")
                         .HasColumnType("TEXT");
+
+                    b.Property<bool?>("HasJudgmentSignal")
+                        .HasColumnType("INTEGER");
 
                     b.Property<Guid?>("ImageId")
                         .HasColumnType("TEXT");
@@ -139,11 +142,11 @@ namespace ClearVision.Product.Infrastructure.Data.Migrations
                     b.Property<long>("ProcessingTimeMs")
                         .HasColumnType("INTEGER");
 
-                    b.Property<long?>("ProjectPersistenceRevision")
-                        .HasColumnType("INTEGER");
-
                     b.Property<Guid>("ProjectId")
                         .HasColumnType("TEXT");
+
+                    b.Property<long?>("ProjectPersistenceRevision")
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("ReasonCode")
                         .HasMaxLength(200)
@@ -899,7 +902,6 @@ namespace ClearVision.Product.Infrastructure.Data.Migrations
 
                     b.Property<string>("FlowHash")
                         .IsRequired()
-                        .HasMaxLength(128)
                         .HasColumnType("TEXT");
 
                     b.Property<string>("PackageId")
@@ -909,6 +911,7 @@ namespace ClearVision.Product.Infrastructure.Data.Migrations
 
                     b.Property<string>("PackageKind")
                         .IsRequired()
+                        .ValueGeneratedOnAdd()
                         .HasMaxLength(40)
                         .HasColumnType("TEXT")
                         .HasDefaultValue("Production");
@@ -953,12 +956,12 @@ namespace ClearVision.Product.Infrastructure.Data.Migrations
                     b.Property<DateTimeOffset>("CreatedAtUtc")
                         .HasColumnType("TEXT");
 
-                    b.Property<string>("DecisionOutcome")
-                        .HasMaxLength(50)
-                        .HasColumnType("TEXT");
-
                     b.Property<string>("DecisionConfigurationHash")
                         .HasMaxLength(128)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("DecisionOutcome")
+                        .HasMaxLength(50)
                         .HasColumnType("TEXT");
 
                     b.Property<string>("DecisionSource")
@@ -973,15 +976,12 @@ namespace ClearVision.Product.Infrastructure.Data.Migrations
                     b.Property<string>("DiagnosticMessage")
                         .HasColumnType("TEXT");
 
-                    b.Property<long>("ExecutionTimeMs")
-                        .HasColumnType("INTEGER");
+                    b.Property<string>("ExecutionFlowHash")
+                        .HasMaxLength(128)
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("ExecutionOutcome")
                         .HasMaxLength(50)
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("ExecutionFlowHash")
-                        .HasMaxLength(128)
                         .HasColumnType("TEXT");
 
                     b.Property<string>("ExecutionRunMode")
@@ -991,16 +991,20 @@ namespace ClearVision.Product.Infrastructure.Data.Migrations
                     b.Property<Guid?>("ExecutionSnapshotId")
                         .HasColumnType("TEXT");
 
+                    b.Property<long>("ExecutionTimeMs")
+                        .HasColumnType("INTEGER");
+
                     b.Property<string>("FlowHash")
                         .IsRequired()
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("ImageId")
-                        .IsRequired()
+                        .HasMaxLength(128)
                         .HasColumnType("TEXT");
 
                     b.Property<bool?>("HasJudgmentSignal")
                         .HasColumnType("INTEGER");
+
+                    b.Property<string>("ImageId")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("InspectionStatus")
                         .HasMaxLength(50)
@@ -1016,12 +1020,12 @@ namespace ClearVision.Product.Infrastructure.Data.Migrations
                         .HasMaxLength(50)
                         .HasColumnType("TEXT");
 
-                    b.Property<string>("PackageId")
-                        .IsRequired()
+                    b.Property<string>("PackageFlowHash")
                         .HasMaxLength(128)
                         .HasColumnType("TEXT");
 
-                    b.Property<string>("PackageFlowHash")
+                    b.Property<string>("PackageId")
+                        .IsRequired()
                         .HasMaxLength(128)
                         .HasColumnType("TEXT");
 
@@ -1070,10 +1074,10 @@ namespace ClearVision.Product.Infrastructure.Data.Migrations
 
                     b.HasIndex("StationId", "CompletedAtUtc");
 
-                    b.HasIndex("StationId", "ExecutionOutcome", "DecisionOutcome");
-
                     b.HasIndex("StationId", "SequenceId")
                         .IsUnique();
+
+                    b.HasIndex("StationId", "ExecutionOutcome", "DecisionOutcome");
 
                     b.ToTable("StationResultSummaries");
                 });

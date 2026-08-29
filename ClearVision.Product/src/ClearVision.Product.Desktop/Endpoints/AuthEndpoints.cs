@@ -26,12 +26,23 @@ public static class AuthEndpoints
             var result = await authService.SetupInitialAdminAsync(request);
             if (!result.Success)
             {
-                if (string.Equals(result.ErrorMessage, AuthService.InitialAdminSetupAlreadyCompletedMessage, StringComparison.Ordinal))
+                if (string.Equals(
+                        result.ErrorCode,
+                        AuthService.InstallationAlreadyCompletedCode,
+                        StringComparison.Ordinal))
                 {
-                    return Results.Conflict(new { Error = result.ErrorMessage });
+                    return Results.Conflict(new
+                    {
+                        code = AuthService.InstallationAlreadyCompletedCode,
+                        error = result.ErrorMessage
+                    });
                 }
 
-                return Results.BadRequest(new { Error = result.ErrorMessage ?? "管理员初始化失败" });
+                return Results.UnprocessableEntity(new
+                {
+                    code = result.ErrorCode ?? AuthService.SetupValidationErrorCode,
+                    error = result.ErrorMessage ?? "管理员初始化失败"
+                });
             }
 
             return Results.Ok(new
@@ -116,13 +127,23 @@ public static class AuthEndpoints
 
             if (string.IsNullOrWhiteSpace(request.OldPassword) || string.IsNullOrWhiteSpace(request.NewPassword))
             {
-                return Results.BadRequest(new { ErrorCode = "EMPTY_PASSWORD", Error = "密码不能为空" });
+                return Results.UnprocessableEntity(new
+                {
+                    code = "EMPTY_PASSWORD",
+                    errorCode = "EMPTY_PASSWORD",
+                    error = "密码不能为空"
+                });
             }
 
             var minPasswordLength = Math.Max(6, configService.GetCurrent()?.Security?.PasswordMinLength ?? 6);
             if (request.NewPassword.Trim().Length < minPasswordLength)
             {
-                return Results.BadRequest(new { ErrorCode = "WEAK_PASSWORD", Error = $"新密码长度不能少于 {minPasswordLength} 位" });
+                return Results.UnprocessableEntity(new
+                {
+                    code = "WEAK_PASSWORD",
+                    errorCode = "WEAK_PASSWORD",
+                    error = $"新密码长度不能少于 {minPasswordLength} 位"
+                });
             }
 
             var result = await authService.ChangePasswordAsync(
@@ -132,10 +153,12 @@ public static class AuthEndpoints
 
             if (!result.Success)
             {
-                return Results.BadRequest(new
+                var errorCode = ResolveChangePasswordErrorCode(result.ErrorMessage);
+                return Results.UnprocessableEntity(new
                 {
-                    ErrorCode = ResolveChangePasswordErrorCode(result.ErrorMessage),
-                    Error = result.ErrorMessage
+                    code = errorCode,
+                    errorCode,
+                    error = result.ErrorMessage
                 });
             }
 
