@@ -31,13 +31,14 @@ public class AuthEndpointsTests
     }
 
     [Theory]
-    [InlineData("Admin", true, true)]
-    [InlineData("Engineer", false, true)]
-    [InlineData("Operator", false, false)]
+    [InlineData("Admin", true, true, true)]
+    [InlineData("Engineer", false, true, false)]
+    [InlineData("Operator", false, false, false)]
     public async Task Me_ShouldReturnExactAuthenticatedContextAndRoleCapabilities(
         string role,
         bool canManageUsers,
-        bool canOperateHardware)
+        bool canOperateHardware,
+        bool canReadSensitiveStationData)
     {
         await using var host = await AuthEndpointsTestHost.CreateAsync();
         host.AuthService.GetSessionAsync("token-me").Returns(new UserSession
@@ -67,6 +68,7 @@ public class AuthEndpointsTests
             .ToArray();
         capabilities.Contains("users.read").Should().Be(canManageUsers);
         capabilities.Contains("cameras.bindings.update").Should().Be(canOperateHardware);
+        capabilities.Contains("station.sensitive.read").Should().Be(canReadSensitiveStationData);
         foreach (var capability in capabilities)
         {
             capability.Should().MatchRegex("^[a-z0-9.-]+$");

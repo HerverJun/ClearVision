@@ -292,11 +292,17 @@ test.describe('Station monitor', () => {
     await expect(focus).toContainText('StationSync 队列容量');
   });
 
-  test('non-Admin capability gate blocks Station mutation requests at the handler boundary', async ({ page }) => {
-    const mutationRequests: string[] = [];
+  test('non-Admin sees safe monitoring without sensitive tabs, payloads or requests', async ({ page }) => {
+    const unexpectedRequests: string[] = [];
     page.on('request', request => {
-      if (request.method() !== 'GET' && new URL(request.url()).pathname.startsWith('/api/stations/')) {
-        mutationRequests.push(`${request.method()} ${new URL(request.url()).pathname}`);
+      const path = new URL(request.url()).pathname;
+      const isMutation = request.method() !== 'GET' && path.startsWith('/api/stations/');
+      const isSensitiveRead = path.startsWith('/api/station-packages') ||
+        path.endsWith('/logs') ||
+        path.endsWith('/commands') ||
+        path.endsWith('/audit');
+      if (isMutation || isSensitiveRead) {
+        unexpectedRequests.push(`${request.method()} ${path}`);
       }
     });
 
@@ -307,22 +313,18 @@ test.describe('Station monitor', () => {
       username: 'operator-e2e',
       displayName: 'E2E Operator',
       role: 'Operator',
-      capabilities: ['station.packages.read'],
+      capabilities: [],
       passwordPolicy: { minimumLength: 12 },
     });
     await page.locator('[data-station-id="station-a"]').click();
 
-    const pingButton = page.locator('[data-station-action="ping"]');
-    await expect(pingButton).toBeDisabled();
-    await expect(page.locator('[data-station-action="deploy"]')).toBeDisabled();
-    await expect(page.locator('[data-station-action="testDeploy"]')).toBeDisabled();
-
-    await pingButton.evaluate((button: HTMLButtonElement) => {
-      button.disabled = false;
-      button.click();
-    });
-
-    await expect(page.locator('.sm-command-status')).toContainText('没有执行此 Station 操作的权限');
-    expect(mutationRequests).toEqual([]);
+    const focus = page.locator('#sm-detail');
+    await expect(focus.locator('[data-station-action]')).toHaveCount(0);
+    await expect(focus).not.toContainText('指令队列');
+    await expect(focus).not.toContainText('日志');
+    await expect(focus).not.toContainText('Live Package');
+    await expect(page.locator('#sm-result-list')).not.toContainText('Live Package');
+    await expect(page.locator('#sm-result-list')).not.toContainText('暂无主输出预览');
+    expect(unexpectedRequests).toEqual([]);
   });
 });

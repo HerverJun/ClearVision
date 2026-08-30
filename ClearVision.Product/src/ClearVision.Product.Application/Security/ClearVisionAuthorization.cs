@@ -58,6 +58,7 @@ public static class ClearVisionCapabilities
     public const string ProjectEdit = "project.edit";
     public const string InspectionResultsRead = "inspection.results.read";
 
+    public const string StationSensitiveRead = "station.sensitive.read";
     public const string StationCommandsCreate = "station.commands.create";
     public const string StationPackagesRead = "station.packages.read";
     public const string StationPackagesDeploy = "station.packages.deploy";

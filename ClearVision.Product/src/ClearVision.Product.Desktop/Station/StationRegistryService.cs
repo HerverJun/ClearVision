@@ -329,7 +329,14 @@ public sealed class StationRegistryService
             var stationViewModel = ToStatusViewModelLocked(entry, now);
             events =
             [
-                CreateEventLocked("stationHealthUpdated", new { StationId = entry.StationId, Health = CloneHealth(snapshot), Station = stationViewModel }),
+                CreateEventLocked(
+                    "stationHealthUpdated",
+                    new StationHealthEventViewModel
+                    {
+                        StationId = entry.StationId,
+                        Health = CloneHealth(snapshot),
+                        Station = stationViewModel
+                    }),
                 CreateEventLocked("stationUpserted", stationViewModel),
                 CreateEventLocked("summaryUpdated", BuildSummaryLocked(now))
             ];

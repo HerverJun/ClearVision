@@ -18,9 +18,12 @@ public static class StationEndpoints
 
     public static IEndpointRouteBuilder MapStationEndpoints(this IEndpointRouteBuilder app)
     {
-        app.MapGet("/api/stations", ([FromServices] StationRegistryService registry) =>
+        app.MapGet("/api/stations", ([FromServices] StationRegistryService registry, HttpContext context) =>
         {
-            return Results.Ok(registry.GetStations());
+            var stations = registry.GetStations();
+            return Results.Ok(IsStationAdmin(context)
+                ? stations
+                : stations.Select(StationMonitoringProjection.ToSafeStatus).ToList());
         });
 
         app.MapGet("/api/stations/summary", ([FromServices] StationRegistryService registry) =>
@@ -37,30 +40,48 @@ public static class StationEndpoints
             int? take,
             int? pageIndex,
             int? pageSize,
-            [FromServices] StationRegistryService registry) =>
+            [FromServices] StationRegistryService registry,
+            HttpContext context) =>
         {
             var resolvedPageSize = take.HasValue
                 ? Math.Clamp(take.Value, 1, 500)
                 : Math.Clamp(pageSize.GetValueOrDefault(50), 1, 500);
             var resolvedPageIndex = Math.Max(0, pageIndex.GetValueOrDefault(0));
-            return Results.Ok(registry.GetResultsPage(
+            var page = registry.GetResultsPage(
                 stationId,
                 from,
                 to,
                 status,
                 diagnosticCode,
                 resolvedPageIndex,
-                resolvedPageSize));
+                resolvedPageSize);
+            return Results.Ok(IsStationAdmin(context)
+                ? page
+                : StationMonitoringProjection.ToSafeResultsPage(page));
         });
 
-        app.MapGet("/api/stations/{stationId}/results", (string stationId, int? take, [FromServices] StationRegistryService registry) =>
+        app.MapGet("/api/stations/{stationId}/results", (
+            string stationId,
+            int? take,
+            [FromServices] StationRegistryService registry,
+            HttpContext context) =>
         {
-            return Results.Ok(registry.GetRecentResults(stationId, Math.Clamp(take ?? 100, 1, 500)));
+            var results = registry.GetRecentResults(stationId, Math.Clamp(take ?? 100, 1, 500));
+            return Results.Ok(IsStationAdmin(context)
+                ? results
+                : results.Select(StationMonitoringProjection.ToSafeResult).ToList());
         });
 
-        app.MapGet("/api/stations/{stationId}/health", (string stationId, int? take, [FromServices] StationRegistryService registry) =>
+        app.MapGet("/api/stations/{stationId}/health", (
+            string stationId,
+            int? take,
+            [FromServices] StationRegistryService registry,
+            HttpContext context) =>
         {
-            return Results.Ok(registry.GetRecentHealth(stationId, Math.Clamp(take ?? 100, 1, 500)));
+            var health = registry.GetRecentHealth(stationId, Math.Clamp(take ?? 100, 1, 500));
+            return Results.Ok(IsStationAdmin(context)
+                ? health
+                : health.Select(item => StationMonitoringProjection.ToSafeHealth(item)).ToList());
         });
 
         app.MapGet("/api/stations/{stationId}/logs", (string stationId, int? take, [FromServices] StationRegistryService registry) =>
@@ -261,12 +282,21 @@ public static class StationEndpoints
 
         app.MapGet("/api/stations/events", HandleSseEventsAsync);
 
-        app.MapGet("/api/stations/{stationId}", (string stationId, [FromServices] StationRegistryService registry) =>
+        app.MapGet("/api/stations/{stationId}", (
+            string stationId,
+            [FromServices] StationRegistryService registry,
+            HttpContext context) =>
         {
             var station = registry.GetStation(stationId);
-            return station == null ? Results.NotFound() : Results.Ok(station);
-        })
-        .RequireClearVisionPermission(ClearVisionPermissionPolicies.RequireStationAdmin);
+            if (station is null)
+            {
+                return Results.NotFound();
+            }
+
+            return Results.Ok(IsStationAdmin(context)
+                ? station
+                : StationMonitoringProjection.ToSafeDetail(station));
+        });
 
         return app;
     }
@@ -282,6 +312,7 @@ public static class StationEndpoints
         context.Response.Headers.Append("X-Accel-Buffering", "no");
         await context.Response.StartAsync(cancellationToken);
 
+        var includeSensitive = IsStationAdmin(context);
         var lastSequenceId = ParseLastEventId(context.Request);
         var replayWatermark = lastSequenceId;
         var channel = Channel.CreateBounded<StoredStationRegistryEvent>(new BoundedChannelOptions(SseChannelCapacity)
@@ -294,11 +325,14 @@ public static class StationEndpoints
         using var subscription = registry.Subscribe(evt => channel.Writer.TryWrite(evt));
         using var cancellationRegistration = cancellationToken.Register(() => channel.Writer.TryComplete());
 
+        var snapshot = registry.GetSseSnapshot();
         await context.Response.WriteSseMessageAsync(
             new SseMessage(
                 null,
                 "initialState",
-                registry.GetSseSnapshot()),
+                includeSensitive
+                    ? snapshot
+                    : StationMonitoringProjection.ToSafeSnapshot(snapshot)),
             cancellationToken);
 
         if (lastSequenceId > 0)
@@ -306,8 +340,16 @@ public static class StationEndpoints
             foreach (var storedEvent in registry.GetEventsAfter(lastSequenceId))
             {
                 replayWatermark = Math.Max(replayWatermark, storedEvent.SequenceId);
+                if (!StationMonitoringProjection.TryProjectEvent(
+                        storedEvent,
+                        includeSensitive,
+                        out var projectedEvent))
+                {
+                    continue;
+                }
+
                 await context.Response.WriteSseMessageAsync(
-                    new SseMessage(storedEvent.SequenceId, storedEvent.EventType, storedEvent.Data),
+                    new SseMessage(projectedEvent.SequenceId, projectedEvent.EventType, projectedEvent.Data),
                     cancellationToken);
             }
         }
@@ -323,8 +365,16 @@ public static class StationEndpoints
                     continue;
                 }
 
+                if (!StationMonitoringProjection.TryProjectEvent(
+                        evt,
+                        includeSensitive,
+                        out var projectedEvent))
+                {
+                    continue;
+                }
+
                 await context.Response.WriteSseMessageAsync(
-                    new SseMessage(evt.SequenceId, evt.EventType, evt.Data),
+                    new SseMessage(projectedEvent.SequenceId, projectedEvent.EventType, projectedEvent.Data),
                     cancellationToken);
             }
         }

@@ -249,3 +249,144 @@ test('result panel clears stale analytics when server distribution is empty', as
   assert.deepEqual(panel.trendData, []);
   assert.equal(filterUpdated, true);
 });
+
+test('station sensitive monitoring is capability-driven and never inferred from role', async () => {
+  const { Capabilities } = await import(
+    '../../../../src/ClearVision.Product.Desktop/wwwroot/src/features/auth/auth.js'
+  );
+  const { StationMonitorView } = await import(
+    '../../../../src/ClearVision.Product.Desktop/wwwroot/src/features/stations/stationMonitorView.js'
+  );
+  const previousWindow = global.window;
+
+  try {
+    global.window = {
+      currentUser: {
+        role: 'Admin',
+        capabilities: []
+      }
+    };
+    const view = Object.create(StationMonitorView.prototype);
+    assert.equal(view.canReadSensitiveMonitoring(), false);
+
+    global.window.currentUser.capabilities = [Capabilities.STATION_SENSITIVE_READ];
+    assert.equal(view.canReadSensitiveMonitoring(), true);
+  } finally {
+    global.window = previousWindow;
+  }
+});
+
+test('station safe monitor hides command, log, package and production-output content', async () => {
+  const { StationMonitorView } = await import(
+    '../../../../src/ClearVision.Product.Desktop/wwwroot/src/features/stations/stationMonitorView.js'
+  );
+  const previousWindow = global.window;
+
+  try {
+    global.window = {
+      currentUser: {
+        role: 'Operator',
+        capabilities: []
+      }
+    };
+    const view = Object.create(StationMonitorView.prototype);
+    view.focus = { innerHTML: '' };
+    view.focusMeta = { textContent: '' };
+    view.selectedStationId = 'station-safe';
+    view.stations = new Map([['station-safe', {
+      stationId: 'station-safe',
+      stationName: 'Safe station',
+      lineName: 'Line 1',
+      state: 'Running',
+      runtimeState: 'Running',
+      onlineState: 'Online',
+      isOnline: true,
+      lastSeenAtUtc: '2026-08-30T00:00:00Z'
+    }]]);
+    view.selectedStationDetail = {
+      ...view.stations.get('station-safe'),
+      packageId: 'PACKAGE-SECRET',
+      lastDiagnosticMessage: 'DIAGNOSTIC-SECRET',
+      sessionOutcomeStatistics: {
+        ok: 2,
+        ng: 1,
+        executionFailures: 0,
+        invalid: 0,
+        undetermined: 0
+      },
+      averageExecutionTimeMs: 12,
+      recentResults: [{
+        stationId: 'station-safe',
+        sequenceId: 8,
+        outcome: 'Ng',
+        diagnosticCode: 'WIRE_SWAP',
+        runId: 'RUN-SECRET',
+        imageId: 'IMAGE-SECRET',
+        completedAtUtc: '2026-08-30T00:00:00Z',
+        executionTimeMs: 12
+      }],
+      recentHealth: [{
+        sequenceId: 2,
+        runtimeState: 'Running',
+        healthState: 'Online',
+        currentPackageHealth: 'PACKAGE-HEALTH-SECRET',
+        diskFreeMb: 1,
+        diskTotalMb: 2,
+        createdAtUtc: '2026-08-30T00:00:00Z'
+      }],
+      recentLogs: [{ renderedMessage: 'LOG-SECRET' }],
+      recentCommands: [{ commandId: 'COMMAND-SECRET' }]
+    };
+    view.commandBusy = false;
+    view.commandStatusMessage = '';
+    view.commandStatusLevel = 'idle';
+    view.computeIsOnline = () => true;
+    view.getProductionPackages = () => [];
+    view.canPerformStationAction = () => false;
+    view.escapeHtml = (value) => String(value ?? '');
+    view.formatState = () => '运行中';
+    view.formatOutcome = () => 'NG';
+    view.formatRelativeTime = () => '刚刚';
+    view.formatMilliseconds = (value) => `${value}ms`;
+    view.formatBytes = (value) => `${value}B`;
+    view.formatDisk = () => 'disk-secret';
+    view.renderStationDiagnosticAdvice = () => 'DIAGNOSTIC-ADVICE-SECRET';
+
+    view.renderFocus();
+
+    assert.match(view.focus.innerHTML, /Line 1/);
+    assert.match(view.focus.innerHTML, /健康采样/);
+    assert.match(view.focus.innerHTML, /近期结果/);
+    assert.doesNotMatch(view.focus.innerHTML, /指令队列|日志|COMMAND-SECRET|LOG-SECRET/);
+    assert.doesNotMatch(view.focus.innerHTML, /PACKAGE-SECRET|PACKAGE-HEALTH-SECRET|RUN-SECRET|IMAGE-SECRET/);
+    assert.doesNotMatch(view.focus.innerHTML, /data-station-action|DIAGNOSTIC-ADVICE-SECRET|disk-secret/);
+
+    view.globalLogs = [{ stationId: 'station-safe', log: { renderedMessage: 'SSE-LOG-SECRET' } }];
+    view.selectedStationDetail = { recentLogs: [], recentCommands: [] };
+    view.markDirty = () => {};
+    view.applyLogEvent({ log: { renderedMessage: 'LIVE-LOG-SECRET' } });
+    view.applyCommandEvent({ commandId: 'LIVE-COMMAND-SECRET', stationId: 'station-safe' });
+    assert.equal(view.globalLogs.length, 1);
+    assert.deepEqual(view.selectedStationDetail, { recentLogs: [], recentCommands: [] });
+
+    view.toCssToken = () => 'ng';
+    const resultHtml = view.renderMonitorResultCard({
+      status: 'NG',
+      outcomeCategory: 'ng',
+      stationLabel: 'Safe station',
+      sequenceId: 8,
+      diagnosticCode: 'WIRE_SWAP',
+      decisionSource: 'DECISION-SOURCE-SECRET',
+      reasonCode: 'Reason',
+      executionTimeMs: 12,
+      packageName: 'PACKAGE-SECRET',
+      diagnosticMessage: 'DIAGNOSTIC-SECRET',
+      primaryOutputsPreview: { serialNumber: 'SN-SECRET' },
+      completedAtUtc: '2026-08-30T00:00:00Z'
+    });
+    assert.match(resultHtml, /WIRE_SWAP/);
+    assert.doesNotMatch(resultHtml, /PACKAGE-SECRET|DIAGNOSTIC-SECRET|DECISION-SOURCE-SECRET|SN-SECRET|主输出预览/);
+  } finally {
+    global.window = previousWindow;
+  }
+});

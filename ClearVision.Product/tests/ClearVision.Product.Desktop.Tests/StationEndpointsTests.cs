@@ -26,6 +26,84 @@ public sealed class StationEndpointsTests
 {
     private const string StationSharedToken = "station-secret";
 
+    private static readonly string[] SafeStationPropertyNames =
+    [
+        "stationId",
+        "stationName",
+        "lineName",
+        "onlineState",
+        "state",
+        "runtimeState",
+        "isOnline",
+        "lastSeenAtUtc",
+        "sessionOutcomeStatistics",
+        "lastOutcome",
+        "lastInspectionStatus",
+        "lastExecutionOutcome",
+        "lastDecisionOutcome",
+        "lastHasJudgmentSignal",
+        "lastResultAtUtc",
+        "averageExecutionTimeMs",
+        "recentResultCount"
+    ];
+
+    private static readonly string[] SafeResultPropertyNames =
+    [
+        "stationId",
+        "lineName",
+        "sequenceId",
+        "outcome",
+        "inspectionStatus",
+        "executionOutcome",
+        "decisionOutcome",
+        "hasJudgmentSignal",
+        "reasonCode",
+        "executionTimeMs",
+        "diagnosticCode",
+        "startedAtUtc",
+        "completedAtUtc",
+        "createdAtUtc"
+    ];
+
+    private static readonly string[] SafeHealthPropertyNames =
+    [
+        "stationId",
+        "sequenceId",
+        "runtimeState",
+        "healthState",
+        "createdAtUtc"
+    ];
+
+    private static readonly string[] SensitiveStationPropertyNames =
+    [
+        "machineName",
+        "clientVersion",
+        "packageId",
+        "packageName",
+        "packageFlowHash",
+        "executionFlowHash",
+        "flowHash",
+        "executionSnapshotId",
+        "projectRevision",
+        "decisionConfigurationHash",
+        "executionRunMode",
+        "currentRunId",
+        "spoolPendingCount",
+        "spoolBytes",
+        "cpuUsagePercent",
+        "workingSetMb",
+        "diskFreeMb",
+        "diskTotalMb",
+        "cameraStatusSummary",
+        "plcStatusSummary",
+        "currentPackageHealth",
+        "lastDiagnosticMessage",
+        "recentLogs",
+        "recentCommands"
+    ];
+
+    private static readonly JsonSerializerOptions WebJsonOptions = new(JsonSerializerDefaults.Web);
+
     [Fact]
     public async Task EventsEndpoint_ShouldStreamInitialSnapshotAndLiveStationUpdates()
     {
@@ -141,6 +219,127 @@ public sealed class StationEndpointsTests
         replayChunk.Should().Contain($"id: {checkpoint + 1}");
         replayChunk.Should().Contain("\"stationId\":\"station-a\"");
         replayChunk.Should().Contain("\"diagnosticCode\":\"WIRE_SWAP\"");
+    }
+
+    [Fact]
+    public async Task EventsEndpoint_ShouldUseTheSameSafeProjectionForInitialLiveAndReplay()
+    {
+        await using var host = await StationEndpointTestHost.CreateWithCentralStoreAsync(role: "Operator");
+        SeedSensitiveStationTelemetry(host.Registry, "conn-safe-sse", "station-safe-sse");
+
+        using (var liveResponse = await host.Client.SendAsync(
+                   new HttpRequestMessage(HttpMethod.Get, "/api/stations/events"),
+                   HttpCompletionOption.ResponseHeadersRead))
+        {
+            await using var liveStream = await liveResponse.Content.ReadAsStreamAsync();
+            var initial = await ReadSseEventDataAsync(liveStream, "initialState", TimeSpan.FromSeconds(2));
+            AssertExactProperties(initial, ["summary", "stations", "recentResults"]);
+            AssertExactProperties(initial.GetProperty("stations")[0], SafeStationPropertyNames);
+            AssertExactProperties(initial.GetProperty("recentResults")[0], ["stationId", "result", "station"]);
+            AssertExactProperties(initial.GetProperty("recentResults")[0].GetProperty("result"), SafeResultPropertyNames);
+            AssertExactProperties(initial.GetProperty("recentResults")[0].GetProperty("station"), SafeStationPropertyNames);
+
+            host.Registry.UpsertResultSummary("conn-safe-sse", BuildSensitiveResult("station-safe-sse", 2));
+            var liveResult = await ReadSseEventDataAsync(liveStream, "stationResultAdded", TimeSpan.FromSeconds(2));
+            AssertExactProperties(liveResult, ["stationId", "result", "station"]);
+            AssertExactProperties(liveResult.GetProperty("result"), SafeResultPropertyNames);
+            AssertExactProperties(liveResult.GetProperty("station"), SafeStationPropertyNames);
+
+            host.Registry.UpsertLogSummary("conn-safe-sse", new StationLogSummaryDto
+            {
+                StationId = "station-safe-sse",
+                SequenceId = 2,
+                MessageId = "log-live-sensitive",
+                TimestampUtc = DateTimeOffset.UtcNow,
+                Level = "ERROR",
+                RenderedMessage = "live-log-sensitive",
+                ExceptionMessage = "live-exception-sensitive",
+                CorrelationId = "live-correlation-sensitive"
+            });
+            host.Registry.UpsertHealthSnapshot("conn-safe-sse", new StationHealthSnapshotDto
+            {
+                StationId = "station-safe-sse",
+                SequenceId = 2,
+                MessageId = "health-live-sensitive",
+                RuntimeState = StationRuntimeState.Running,
+                CpuUsagePercent = 99,
+                CameraStatusSummary = "live-camera-sensitive",
+                PlcStatusSummary = "live-plc-sensitive",
+                LastErrorMessage = "live-health-error-sensitive",
+                CreatedAtUtc = DateTimeOffset.UtcNow
+            });
+            var liveEvents = new List<string>();
+            var liveHealth = await ReadSseEventDataAsync(
+                liveStream,
+                "stationHealthUpdated",
+                TimeSpan.FromSeconds(2),
+                liveEvents);
+            liveEvents.Should().NotContain("stationLogAdded");
+            AssertExactProperties(liveHealth, ["stationId", "health", "station"]);
+            AssertExactProperties(liveHealth.GetProperty("health"), SafeHealthPropertyNames);
+            AssertExactProperties(liveHealth.GetProperty("station"), SafeStationPropertyNames);
+        }
+
+        var checkpoint = host.Registry.GetEventsAfter(0).Max(evt => evt.SequenceId);
+        host.Registry.UpsertLogSummary("conn-safe-sse", new StationLogSummaryDto
+        {
+            StationId = "station-safe-sse",
+            SequenceId = 3,
+            MessageId = "log-replay-sensitive",
+            TimestampUtc = DateTimeOffset.UtcNow,
+            Level = "ERROR",
+            RenderedMessage = "replay-log-sensitive",
+            ExceptionMessage = "replay-exception-sensitive",
+            CorrelationId = "replay-correlation-sensitive"
+        });
+        host.Registry.UpsertResultSummary("conn-safe-sse", BuildSensitiveResult("station-safe-sse", 3));
+
+        using var replayRequest = new HttpRequestMessage(HttpMethod.Get, "/api/stations/events");
+        replayRequest.Headers.Add("Last-Event-ID", checkpoint.ToString());
+        using var replayResponse = await host.Client.SendAsync(replayRequest, HttpCompletionOption.ResponseHeadersRead);
+        await using var replayStream = await replayResponse.Content.ReadAsStreamAsync();
+        var replayEvents = new List<string>();
+        var replayResult = await ReadSseEventDataAsync(
+            replayStream,
+            "stationResultAdded",
+            TimeSpan.FromSeconds(2),
+            replayEvents);
+        replayEvents.Should().NotContain("stationLogAdded");
+        AssertExactProperties(replayResult.GetProperty("result"), SafeResultPropertyNames);
+        AssertExactProperties(replayResult.GetProperty("station"), SafeStationPropertyNames);
+    }
+
+    [Fact]
+    public async Task EventsEndpoint_ShouldPreserveCompleteAdminSnapshotAndSensitiveLiveEvents()
+    {
+        await using var host = await StationEndpointTestHost.CreateWithCentralStoreAsync(role: "Admin");
+        SeedSensitiveStationTelemetry(host.Registry, "conn-admin-sse", "station-admin-sse");
+
+        using var response = await host.Client.SendAsync(
+            new HttpRequestMessage(HttpMethod.Get, "/api/stations/events"),
+            HttpCompletionOption.ResponseHeadersRead);
+        await using var stream = await response.Content.ReadAsStreamAsync();
+        var initial = await ReadSseEventDataAsync(stream, "initialState", TimeSpan.FromSeconds(2));
+        initial.GetProperty("stations")[0].GetProperty("machineName").GetString().Should().Be("station-admin-sse-machine");
+        initial.GetProperty("stations")[0].GetProperty("packageId").GetString().Should().Be("pkg-sensitive");
+        initial.GetProperty("recentResults")[0].GetProperty("result").GetProperty("primaryOutputsPreview")
+            .GetProperty("serialNumber").GetString().Should().Be("SN-SECRET");
+
+        host.Registry.UpsertLogSummary("conn-admin-sse", new StationLogSummaryDto
+        {
+            StationId = "station-admin-sse",
+            SequenceId = 2,
+            MessageId = "admin-log-live",
+            TimestampUtc = DateTimeOffset.UtcNow,
+            Level = "ERROR",
+            RenderedMessage = "admin-rendered-sensitive",
+            ExceptionMessage = "admin-exception-sensitive",
+            CorrelationId = "admin-correlation-sensitive"
+        });
+
+        var liveLog = await ReadSseEventDataAsync(stream, "stationLogAdded", TimeSpan.FromSeconds(2));
+        liveLog.GetProperty("log").GetProperty("exceptionMessage").GetString().Should().Be("admin-exception-sensitive");
+        liveLog.GetProperty("log").GetProperty("correlationId").GetString().Should().Be("admin-correlation-sensitive");
     }
 
     [Fact]
@@ -292,15 +491,15 @@ public sealed class StationEndpointsTests
     }
 
     [Fact]
-    public async Task SensitiveReadEndpoints_ShouldRejectOperator()
+    public async Task SensitiveReadEndpoints_ShouldRejectOperatorWhileSafeDetailRemainsAvailable()
     {
         await using var host = await StationEndpointTestHost.CreateWithCentralStoreAsync(role: "Operator");
+        host.Registry.UpsertRegistration("conn-a", BuildRegistration("station-a"));
 
         var responses = new[]
         {
             await host.Client.GetAsync("/api/station-packages"),
             await host.Client.GetAsync("/api/station-packages/package-a/download"),
-            await host.Client.GetAsync("/api/stations/station-a"),
             await host.Client.GetAsync("/api/stations/station-a/logs"),
             await host.Client.GetAsync("/api/stations/station-a/commands"),
             await host.Client.GetAsync("/api/stations/audit")
@@ -317,6 +516,74 @@ public sealed class StationEndpointsTests
                 response.Dispose();
             }
         }
+
+        using var detailResponse = await host.Client.GetAsync("/api/stations/station-a");
+        detailResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+    }
+
+    [Theory]
+    [InlineData("Operator")]
+    [InlineData("Engineer")]
+    public async Task SafeMonitoringEndpoints_ShouldReturnExactNonSensitiveFields(string role)
+    {
+        await using var host = await StationEndpointTestHost.CreateWithCentralStoreAsync(role: role);
+        SeedSensitiveStationTelemetry(host.Registry, "conn-safe", "station-safe");
+
+        using var stationsDocument = JsonDocument.Parse(await host.Client.GetStringAsync("/api/stations"));
+        var station = stationsDocument.RootElement[0];
+        AssertExactProperties(station, SafeStationPropertyNames);
+
+        using var resultsDocument = JsonDocument.Parse(await host.Client.GetStringAsync("/api/stations/results?pageSize=10"));
+        AssertExactProperties(resultsDocument.RootElement, ["items", "totalCount", "pageIndex", "pageSize"]);
+        AssertExactProperties(resultsDocument.RootElement.GetProperty("items")[0], SafeResultPropertyNames);
+
+        using var recentResultsDocument = JsonDocument.Parse(await host.Client.GetStringAsync("/api/stations/station-safe/results"));
+        AssertExactProperties(recentResultsDocument.RootElement[0], SafeResultPropertyNames);
+
+        using var healthDocument = JsonDocument.Parse(await host.Client.GetStringAsync("/api/stations/station-safe/health"));
+        AssertExactProperties(healthDocument.RootElement[0], SafeHealthPropertyNames);
+
+        using var detailDocument = JsonDocument.Parse(await host.Client.GetStringAsync("/api/stations/station-safe"));
+        var detail = detailDocument.RootElement;
+        AssertExactProperties(detail, [.. SafeStationPropertyNames, "recentResults", "recentHealth"]);
+        AssertExactProperties(detail.GetProperty("recentResults")[0], SafeResultPropertyNames);
+        AssertExactProperties(detail.GetProperty("recentHealth")[0], SafeHealthPropertyNames);
+
+        foreach (var forbiddenName in SensitiveStationPropertyNames)
+        {
+            detail.TryGetProperty(forbiddenName, out _).Should().BeFalse($"safe Station detail must omit {forbiddenName}");
+        }
+    }
+
+    [Fact]
+    public async Task AdminMonitoringEndpoints_ShouldReturnTheCompleteAdminDtos()
+    {
+        await using var host = await StationEndpointTestHost.CreateWithCentralStoreAsync(role: "Admin");
+        SeedSensitiveStationTelemetry(host.Registry, "conn-admin", "station-admin");
+
+        using var stationsDocument = JsonDocument.Parse(await host.Client.GetStringAsync("/api/stations"));
+        AssertExactProperties(
+            stationsDocument.RootElement[0],
+            GetSerializedPropertyNames(new StationStatusViewModel()));
+
+        using var resultsDocument = JsonDocument.Parse(await host.Client.GetStringAsync("/api/stations/results?pageSize=10"));
+        AssertExactProperties(
+            resultsDocument.RootElement.GetProperty("items")[0],
+            GetSerializedPropertyNames(BuildSensitiveResult("station-admin", 1)));
+
+        using var healthDocument = JsonDocument.Parse(await host.Client.GetStringAsync("/api/stations/station-admin/health"));
+        AssertExactProperties(
+            healthDocument.RootElement[0],
+            GetSerializedPropertyNames(new StationHealthSnapshotDto()));
+
+        using var detailDocument = JsonDocument.Parse(await host.Client.GetStringAsync("/api/stations/station-admin"));
+        var detail = detailDocument.RootElement;
+        AssertExactProperties(detail, GetSerializedPropertyNames(new StationDetailViewModel()));
+        detail.GetProperty("machineName").GetString().Should().Be("station-admin-machine");
+        detail.GetProperty("packageId").GetString().Should().Be("pkg-sensitive");
+        detail.GetProperty("recentResults")[0].GetProperty("primaryOutputsPreview").GetProperty("serialNumber").GetString().Should().Be("SN-SECRET");
+        detail.GetProperty("recentHealth")[0].GetProperty("cameraStatusSummary").GetString().Should().Be("camera-sensitive");
+        detail.GetProperty("recentLogs")[0].GetProperty("exceptionMessage").GetString().Should().Be("exception-sensitive");
     }
 
     [Fact]
@@ -467,6 +734,193 @@ public sealed class StationEndpointsTests
             catch (IOException)
             {
             }
+        }
+    }
+
+    private static void SeedSensitiveStationTelemetry(
+        StationRegistryService registry,
+        string connectionId,
+        string stationId)
+    {
+        registry.UpsertRegistration(connectionId, BuildRegistration(stationId));
+        registry.UpsertHeartbeat(connectionId, new StationHeartbeatDto
+        {
+            StationId = stationId,
+            SequenceId = 1,
+            MessageId = "heartbeat-sensitive",
+            LineName = "line-sensitive",
+            RuntimeState = StationRuntimeState.Running,
+            ConnectionState = "connected-sensitive",
+            CurrentPackageId = "pkg-sensitive",
+            CurrentPackageName = "package-sensitive",
+            CurrentPackageVersion = "9.9.9",
+            PackageFlowHash = "package-flow-sensitive",
+            ExecutionFlowHash = "execution-flow-sensitive",
+            FlowHash = "execution-flow-sensitive",
+            ExecutionSnapshotId = Guid.Parse("11111111-1111-1111-1111-111111111111"),
+            ProjectRevision = 99,
+            DecisionConfigurationHash = "decision-sensitive",
+            ExecutionRunMode = "production-sensitive",
+            CurrentRunId = "run-sensitive",
+            SessionOkCount = 4,
+            SessionNgCount = 1,
+            SessionErrorCount = 0,
+            SpoolPendingCount = 12,
+            LastResultAtUtc = DateTimeOffset.UtcNow,
+            CreatedAtUtc = DateTimeOffset.UtcNow
+        });
+        registry.UpsertResultSummary(connectionId, BuildSensitiveResult(stationId, 1));
+        registry.UpsertHealthSnapshot(connectionId, new StationHealthSnapshotDto
+        {
+            StationId = stationId,
+            SequenceId = 1,
+            MessageId = "health-sensitive",
+            RuntimeState = StationRuntimeState.Running,
+            ProcessUptimeSeconds = 12345,
+            CpuUsagePercent = 87.5,
+            WorkingSetMb = 2048,
+            PrivateMemoryMb = 1024,
+            DiskFreeMb = 100,
+            DiskTotalMb = 1000,
+            SpoolPendingCount = 12,
+            SpoolBytes = 4096,
+            CameraStatusSummary = "camera-sensitive",
+            PlcStatusSummary = "plc-sensitive",
+            CurrentPackageId = "pkg-sensitive",
+            CurrentPackageHealth = "package-health-sensitive",
+            LastErrorCode = "error-sensitive",
+            LastErrorMessage = "error-message-sensitive",
+            CreatedAtUtc = DateTimeOffset.UtcNow
+        });
+        registry.UpsertLogSummary(connectionId, new StationLogSummaryDto
+        {
+            StationId = stationId,
+            SequenceId = 1,
+            MessageId = "log-sensitive",
+            TimestampUtc = DateTimeOffset.UtcNow,
+            Level = "ERROR",
+            Source = "source-sensitive",
+            EventId = "event-sensitive",
+            MessageTemplate = "template-sensitive",
+            RenderedMessage = "rendered-sensitive",
+            ExceptionType = "exception-type-sensitive",
+            ExceptionMessage = "exception-sensitive",
+            CorrelationId = "correlation-sensitive",
+            RunId = "run-sensitive",
+            PackageId = "pkg-sensitive",
+            CreatedAtUtc = DateTimeOffset.UtcNow
+        });
+    }
+
+    private static StationResultSummaryDto BuildSensitiveResult(string stationId, long sequenceId)
+    {
+        var completedAtUtc = DateTimeOffset.UtcNow;
+        return new StationResultSummaryDto
+        {
+            StationId = stationId,
+            LineName = "line-sensitive",
+            SequenceId = sequenceId,
+            MessageId = $"message-sensitive-{sequenceId}",
+            RunId = $"run-sensitive-{sequenceId}",
+            PackageId = "pkg-sensitive",
+            PackageName = "package-sensitive",
+            PackageVersion = "9.9.9",
+            PackageFlowHash = "package-flow-sensitive",
+            ExecutionFlowHash = "execution-flow-sensitive",
+            FlowHash = "execution-flow-sensitive",
+            ProjectRevision = 99,
+            DecisionConfigurationHash = "decision-sensitive",
+            ExecutionSnapshotId = Guid.Parse("22222222-2222-2222-2222-222222222222"),
+            ExecutionRunMode = "production-sensitive",
+            ImageId = "image-sensitive",
+            Outcome = RuntimeRunOutcome.Ng,
+            InspectionStatus = InspectionStatus.NG,
+            ExecutionOutcome = ExecutionOutcome.Succeeded,
+            DecisionOutcome = DecisionOutcome.Invalid,
+            HasJudgmentSignal = false,
+            DecisionSource = "decision-source-sensitive",
+            ReasonCode = "DecisionValueInvalid",
+            ExecutionTimeMs = 42,
+            DiagnosticCode = "WIRE_SWAP",
+            DiagnosticMessage = "diagnostic-message-sensitive",
+            PrimaryOutputsPreview = new Dictionary<string, string?>
+            {
+                ["serialNumber"] = "SN-SECRET"
+            },
+            StartedAtUtc = completedAtUtc.AddMilliseconds(-42),
+            CompletedAtUtc = completedAtUtc,
+            CreatedAtUtc = completedAtUtc
+        };
+    }
+
+    private static void AssertExactProperties(JsonElement element, IEnumerable<string> expectedPropertyNames)
+    {
+        element.ValueKind.Should().Be(JsonValueKind.Object);
+        element.EnumerateObject()
+            .Select(property => property.Name)
+            .Should()
+            .BeEquivalentTo(expectedPropertyNames);
+    }
+
+    private static IReadOnlyList<string> GetSerializedPropertyNames(object value)
+    {
+        return JsonSerializer.SerializeToElement(value, value.GetType(), WebJsonOptions)
+            .EnumerateObject()
+            .Select(property => property.Name)
+            .ToList();
+    }
+
+    private static async Task<JsonElement> ReadSseEventDataAsync(
+        Stream stream,
+        string expectedEventName,
+        TimeSpan timeout,
+        ICollection<string>? observedEventNames = null)
+    {
+        var buffer = new byte[2048];
+        var pending = new StringBuilder();
+        using var cts = new CancellationTokenSource(timeout);
+
+        while (true)
+        {
+            var normalized = pending.ToString().Replace("\r\n", "\n", StringComparison.Ordinal);
+            var separatorIndex = normalized.IndexOf("\n\n", StringComparison.Ordinal);
+            while (separatorIndex >= 0)
+            {
+                var frame = normalized[..separatorIndex];
+                normalized = normalized[(separatorIndex + 2)..];
+                pending.Clear();
+                pending.Append(normalized);
+
+                var lines = frame.Split('\n');
+                var eventName = lines
+                    .FirstOrDefault(line => line.StartsWith("event:", StringComparison.Ordinal))?
+                    .Substring("event:".Length)
+                    .Trim();
+                if (string.IsNullOrWhiteSpace(eventName))
+                {
+                    separatorIndex = normalized.IndexOf("\n\n", StringComparison.Ordinal);
+                    continue;
+                }
+
+                observedEventNames?.Add(eventName);
+                if (!string.Equals(eventName, expectedEventName, StringComparison.Ordinal))
+                {
+                    separatorIndex = normalized.IndexOf("\n\n", StringComparison.Ordinal);
+                    continue;
+                }
+
+                var data = string.Join(
+                    "\n",
+                    lines
+                        .Where(line => line.StartsWith("data:", StringComparison.Ordinal))
+                        .Select(line => line.Substring("data:".Length).TrimStart()));
+                using var document = JsonDocument.Parse(data);
+                return document.RootElement.Clone();
+            }
+
+            var bytesRead = await stream.ReadAsync(buffer.AsMemory(0, buffer.Length), cts.Token);
+            bytesRead.Should().BeGreaterThan(0);
+            pending.Append(Encoding.UTF8.GetString(buffer, 0, bytesRead));
         }
     }
 

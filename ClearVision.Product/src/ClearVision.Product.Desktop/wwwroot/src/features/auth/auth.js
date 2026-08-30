@@ -76,6 +76,7 @@ function applyCurrentUser(user) {
 export const Capabilities = Object.freeze({
     PROJECT_EDIT: 'project.edit',
     INSPECTION_RESULTS_READ: 'inspection.results.read',
+    STATION_SENSITIVE_READ: 'station.sensitive.read',
     STATION_COMMANDS_CREATE: 'station.commands.create',
     STATION_PACKAGES_READ: 'station.packages.read',
     STATION_PACKAGES_DEPLOY: 'station.packages.deploy',

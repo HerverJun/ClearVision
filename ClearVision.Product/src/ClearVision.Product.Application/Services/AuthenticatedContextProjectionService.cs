@@ -15,6 +15,7 @@ public sealed class AuthenticatedContextProjectionService
         new(ClearVisionCapabilities.ProjectEdit, ClearVisionAuthorizationPolicies.CanEditProject),
         new(ClearVisionCapabilities.InspectionResultsRead, ClearVisionAuthorizationPolicies.CanReadInspectionResults),
 
+        new(ClearVisionCapabilities.StationSensitiveRead, ClearVisionAuthorizationPolicies.RequireStationAdmin),
         new(ClearVisionCapabilities.StationCommandsCreate, ClearVisionAuthorizationPolicies.RequireStationAdmin),
         new(ClearVisionCapabilities.StationPackagesRead, ClearVisionAuthorizationPolicies.RequireStationAdmin),
         new(ClearVisionCapabilities.StationPackagesDeploy, ClearVisionAuthorizationPolicies.RequireStationAdmin),

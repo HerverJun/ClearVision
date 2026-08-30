@@ -690,6 +690,10 @@ class StationMonitorView {
     }
 
     applyLogEvent(payload) {
+        if (!this.canReadSensitiveMonitoring()) {
+            return;
+        }
+
         const station = this.normalizeStation(payload?.station);
         const log = this.normalizeLog(payload?.log);
         const stationId = station.stationId && station.stationId !== '--' ? station.stationId : log.stationId;
@@ -720,6 +724,10 @@ class StationMonitorView {
     }
 
     applyCommandEvent(payload) {
+        if (!this.canReadSensitiveMonitoring()) {
+            return;
+        }
+
         const command = this.normalizeCommand(payload);
         if (!command.stationId) {
             return;
@@ -1070,6 +1078,10 @@ class StationMonitorView {
         }
     }
 
+    canReadSensitiveMonitoring() {
+        return PermissionGuard.has(Capabilities.STATION_SENSITIVE_READ);
+    }
+
     render() {
         this._renderContextActive = true;
         this._renderNowMs = Date.now();
@@ -1211,29 +1223,38 @@ class StationMonitorView {
             : null;
 
         if (!selectedStation) {
+            const scopeDescription = this.canReadSensitiveMonitoring()
+                ? '选择左侧某个工作站后，健康、日志、命令和结果明细会联动到该工站。'
+                : '选择左侧某个工作站后，可查看脱敏的运行健康、判断结果和统计摘要。';
             this.focusMeta.textContent = '全站范围';
             this.focus.innerHTML = `
                 <div class="sm-empty is-center">
                     <strong>当前为全站监控</strong>
-                    <span>选择左侧某个工作站后，健康、日志、命令和结果明细会联动到该工站。</span>
+                    <span>${scopeDescription}</span>
                 </div>
             `;
             return;
         }
 
+        const canReadSensitive = this.canReadSensitiveMonitoring();
         const detail = this.selectedStationDetail && this.selectedStationDetail.stationId === selectedStation.stationId
             ? this.selectedStationDetail
             : { ...selectedStation, recentResults: [], recentHealth: [], recentLogs: [], recentCommands: [] };
         const isOnline = this.computeIsOnline(selectedStation);
         const recentResults = Array.isArray(detail.recentResults) ? detail.recentResults : [];
         const recentHealth = Array.isArray(detail.recentHealth) ? detail.recentHealth : [];
-        const recentLogs = Array.isArray(detail.recentLogs) ? detail.recentLogs : [];
-        const recentCommands = Array.isArray(detail.recentCommands) ? detail.recentCommands : [];
+        const recentLogs = canReadSensitive && Array.isArray(detail.recentLogs) ? detail.recentLogs : [];
+        const recentCommands = canReadSensitive && Array.isArray(detail.recentCommands) ? detail.recentCommands : [];
         const latestHealth = recentHealth[0] || detail;
-        const healthDiagnosticCode = latestHealth.lastErrorCode || null;
-        const healthDiagnosticMessage = latestHealth.lastErrorMessage || null;
-        const activeDiagnosticCode = healthDiagnosticCode || detail.lastDiagnosticCode || null;
-        const activeDiagnosticMessage = healthDiagnosticMessage || detail.lastDiagnosticMessage || null;
+        const healthDiagnosticCode = canReadSensitive ? latestHealth.lastErrorCode || null : null;
+        const healthDiagnosticMessage = canReadSensitive ? latestHealth.lastErrorMessage || null : null;
+        const activeDiagnosticCode = canReadSensitive ? healthDiagnosticCode || detail.lastDiagnosticCode || null : null;
+        const activeDiagnosticMessage = canReadSensitive ? healthDiagnosticMessage || detail.lastDiagnosticMessage || null : null;
+        const canShowStationActions = [
+            Capabilities.STATION_COMMANDS_CREATE,
+            Capabilities.STATION_PACKAGES_DEPLOY,
+            Capabilities.STATION_TEST_PACKAGES_CREATE
+        ].some((capability) => PermissionGuard.has(capability));
         const commandCapabilityDenied = !this.canPerformStationAction('ping');
         const actionsDisabled = this.commandBusy || commandCapabilityDenied ? 'disabled' : '';
         const productionActionDisabled = this.commandBusy || !isOnline || !this.canPerformStationAction('stop')
@@ -1253,21 +1274,25 @@ class StationMonitorView {
                 <div>
                     <span class="sm-detail-id">${this.escapeHtml(detail.stationId)}</span>
                     <h3>${this.escapeHtml(detail.stationName || detail.lineName || detail.machineName || '未命名工作站')}</h3>
-                    <p>${this.escapeHtml([detail.lineName, detail.areaName, detail.workcellName].filter(Boolean).join(' / ') || detail.packageName || '未加载包')}</p>
+                    <p>${this.escapeHtml(canReadSensitive
+                        ? ([detail.lineName, detail.areaName, detail.workcellName].filter(Boolean).join(' / ') || detail.packageName || '未加载包')
+                        : (detail.lineName || '安全监控视图'))}</p>
                 </div>
                 <span class="sm-detail-badge">${this.escapeHtml(this.formatState(detail.state, isOnline))}</span>
             </div>
-            <div class="sm-detail-actions">
-                <button type="button" data-station-action="ping" ${actionsDisabled}>Ping</button>
-                <button type="button" data-station-action="reload" ${actionsDisabled}>重载</button>
-                <button type="button" data-station-action="stop" data-risk="production-impact" ${productionActionDisabled}>停止运行</button>
-                <button type="button" data-station-action="deploy" data-risk="configuration-change" ${deployDisabled}>部署正式包</button>
-                <button type="button" class="sm-action-wide" data-station-action="testDeploy" data-risk="configuration-change" ${testDeployDisabled}>下发测试包</button>
-            </div>
+            ${canShowStationActions
+                ? `<div class="sm-detail-actions">
+                    <button type="button" data-station-action="ping" ${actionsDisabled}>Ping</button>
+                    <button type="button" data-station-action="reload" ${actionsDisabled}>重载</button>
+                    <button type="button" data-station-action="stop" data-risk="production-impact" ${productionActionDisabled}>停止运行</button>
+                    <button type="button" data-station-action="deploy" data-risk="configuration-change" ${deployDisabled}>部署正式包</button>
+                    <button type="button" class="sm-action-wide" data-station-action="testDeploy" data-risk="configuration-change" ${testDeployDisabled}>下发测试包</button>
+                </div>`
+                : ''}
             ${this.commandStatusMessage
                 ? `<div class="sm-command-status" data-level="${this.escapeHtml(this.commandStatusLevel)}">${this.escapeHtml(this.commandStatusMessage)}</div>`
                 : ''}
-            ${this.renderStationDiagnosticAdvice(activeDiagnosticCode, activeDiagnosticMessage)}
+            ${canReadSensitive ? this.renderStationDiagnosticAdvice(activeDiagnosticCode, activeDiagnosticMessage) : ''}
             <div class="sm-detail-stats">
                 <div><span>良品</span><b>${detail.sessionOutcomeStatistics.ok}</b></div>
                 <div><span>不良</span><b>${detail.sessionOutcomeStatistics.ng}</b></div>
@@ -1278,14 +1303,16 @@ class StationMonitorView {
             <dl class="sm-detail-meta">
                 <div><dt>上次在线</dt><dd>${this.escapeHtml(this.formatRelativeTime(detail.lastSeenAtUtc))}</dd></div>
                 <div><dt>最近结果</dt><dd>${this.escapeHtml(this.formatOutcome(detail.lastOutcome, detail.lastInspectionStatus, detail.lastExecutionOutcome, detail.lastDecisionOutcome))}</dd></div>
-                <div><dt>诊断码</dt><dd>${this.escapeHtml(activeDiagnosticCode || activeDiagnosticMessage || '--')}</dd></div>
-                <div><dt>包版本</dt><dd>${this.escapeHtml(detail.packageId || '--')}</dd></div>
-                <div><dt>缓存队列</dt><dd>${Number(detail.spoolPendingCount || latestHealth.spoolPendingCount || 0)} / ${this.formatBytes(detail.spoolBytes || latestHealth.spoolBytes || 0)}</dd></div>
-                <div><dt>磁盘剩余</dt><dd>${this.formatDisk(latestHealth.diskFreeMb, latestHealth.diskTotalMb)}</dd></div>
-                <div><dt>内存占用</dt><dd>${Number(latestHealth.workingSetMb || detail.workingSetMb || 0)} MB</dd></div>
+                ${canReadSensitive
+                    ? `<div><dt>诊断码</dt><dd>${this.escapeHtml(activeDiagnosticCode || activeDiagnosticMessage || '--')}</dd></div>
+                       <div><dt>包版本</dt><dd>${this.escapeHtml(detail.packageId || '--')}</dd></div>
+                       <div><dt>缓存队列</dt><dd>${Number(detail.spoolPendingCount || latestHealth.spoolPendingCount || 0)} / ${this.formatBytes(detail.spoolBytes || latestHealth.spoolBytes || 0)}</dd></div>
+                       <div><dt>磁盘剩余</dt><dd>${this.formatDisk(latestHealth.diskFreeMb, latestHealth.diskTotalMb)}</dd></div>
+                       <div><dt>内存占用</dt><dd>${Number(latestHealth.workingSetMb || detail.workingSetMb || 0)} MB</dd></div>`
+                    : ''}
                 <div><dt>健康状态</dt><dd>${this.escapeHtml(detail.onlineState || latestHealth.currentPackageHealth || '--')}</dd></div>
             </dl>
-            ${this.renderDetailSection('指令队列', recentCommands, (command) => `
+            ${canReadSensitive ? this.renderDetailSection('指令队列', recentCommands, (command) => `
                 <article class="sm-row">
                     <div class="sm-row-main">
                         <span class="sm-row-label">${this.escapeHtml(command.commandType || '--')}</span>
@@ -1296,20 +1323,24 @@ class StationMonitorView {
                         <span class="sm-row-time">${this.escapeHtml(command.resultMessage || command.errorCode || this.formatRelativeTime(command.createdAtUtc))}</span>
                     </div>
                 </article>
-            `, '暂无指令记录。', 6)}
+            `, '暂无指令记录。', 6) : ''}
             ${this.renderDetailSection('健康采样', recentHealth, (health) => `
                 <article class="sm-row">
                     <div class="sm-row-main">
                         <span class="sm-row-label">${this.escapeHtml(health.runtimeState || '--')}</span>
-                        <span class="sm-row-sublabel">${this.escapeHtml(health.currentPackageHealth || '--')}</span>
+                        <span class="sm-row-sublabel">${this.escapeHtml(canReadSensitive
+                            ? (health.currentPackageHealth || '--')
+                            : (health.healthState || '--'))}</span>
                     </div>
                     <div class="sm-row-side">
-                        <span class="sm-row-value">${this.formatDisk(health.diskFreeMb, health.diskTotalMb)}</span>
+                        ${canReadSensitive
+                            ? `<span class="sm-row-value">${this.formatDisk(health.diskFreeMb, health.diskTotalMb)}</span>`
+                            : ''}
                         <span class="sm-row-time">${this.escapeHtml(this.formatRelativeTime(health.createdAtUtc))}</span>
                     </div>
                 </article>
             `, '暂无健康采样。', 4)}
-            ${this.renderDetailSection('日志', recentLogs, (log) => `
+            ${canReadSensitive ? this.renderDetailSection('日志', recentLogs, (log) => `
                 <article class="sm-row sm-row--${this.escapeHtml(String(log.level || '').toLowerCase())}">
                     <div class="sm-row-main">
                         <span class="sm-row-label">${this.escapeHtml(log.level || '--')}</span>
@@ -1317,12 +1348,14 @@ class StationMonitorView {
                     </div>
                     <span class="sm-row-value">${this.escapeHtml(log.renderedMessage || log.exceptionMessage || '--')}</span>
                 </article>
-            `, '暂无 WARN 或 ERROR 级别日志。', 5)}
+            `, '暂无 WARN 或 ERROR 级别日志。', 5) : ''}
             ${this.renderDetailSection('近期结果', recentResults, (result) => `
                 <article class="sm-row">
                     <div class="sm-row-main">
                         <span class="sm-row-label">${this.escapeHtml(this.formatOutcome(result.outcome, result.inspectionStatus, result.executionOutcome, result.decisionOutcome))}</span>
-                        <span class="sm-row-sublabel">${this.escapeHtml(result.imageId || result.runId || '--')}</span>
+                        <span class="sm-row-sublabel">${this.escapeHtml(canReadSensitive
+                            ? (result.imageId || result.runId || '--')
+                            : (result.diagnosticCode || `序号 ${Number(result.sequenceId || 0)}`))}</span>
                     </div>
                     <div class="sm-row-side">
                         <span class="sm-row-value">${this.formatMilliseconds(result.executionTimeMs)}</span>
@@ -1379,6 +1412,7 @@ class StationMonitorView {
             return;
         }
 
+        const canReadSensitive = this.canReadSensitiveMonitoring();
         const flow = [
             ...this.globalResults.map((record) => ({
                 type: 'result',
@@ -1386,7 +1420,7 @@ class StationMonitorView {
                 atUtc: record.completedAtUtc,
                 data: record
             })),
-            ...this.globalLogs.map((item) => ({
+            ...(canReadSensitive ? this.globalLogs : []).map((item) => ({
                 type: 'log',
                 stationId: item.stationId,
                 atUtc: item.log?.timestampUtc,
@@ -1428,7 +1462,9 @@ class StationMonitorView {
                     <div class="sm-feed-main">
                         <span class="sm-feed-station">${this.escapeHtml(item.stationId)}</span>
                         <strong>${this.escapeHtml(item.data.status)}</strong>
-                        <span>${this.escapeHtml(item.data.imageId || item.data.runId || '--')}</span>
+                        <span>${this.escapeHtml(canReadSensitive
+                            ? (item.data.imageId || item.data.runId || '--')
+                            : `序号 ${Number(item.data.sequenceId || 0)}`)}</span>
                     </div>
                     <div class="sm-feed-extra">
                         <span>${this.escapeHtml(item.data.diagnosticCode || '--')}</span>
@@ -1622,9 +1658,12 @@ class StationMonitorView {
     }
 
     renderMonitorResultCard(record) {
-        const outputCards = buildResultCardsFromOutputData(record.primaryOutputsPreview || {}, {
-            status: record.status
-        });
+        const canReadSensitive = this.canReadSensitiveMonitoring();
+        const outputCards = canReadSensitive
+            ? buildResultCardsFromOutputData(record.primaryOutputsPreview || {}, {
+                status: record.status
+            })
+            : [];
         return `
             <article class="sm-monitor-result sm-monitor-result--${this.toCssToken(record.outcomeCategory)}">
                 <header>
@@ -1637,19 +1676,21 @@ class StationMonitorView {
                 <dl>
                     <div><dt>序号</dt><dd>${Number(record.sequenceId || 0)}</dd></div>
                     <div><dt>诊断</dt><dd>${this.escapeHtml(record.diagnosticCode || '--')}</dd></div>
-                    <div><dt>判定来源</dt><dd>${this.escapeHtml(record.decisionSource || '--')}</dd></div>
                     <div><dt>判定原因</dt><dd>${this.escapeHtml(record.reasonCode || '--')}</dd></div>
                     <div><dt>耗时</dt><dd>${this.formatMilliseconds(record.executionTimeMs)}</dd></div>
-                    <div><dt>包</dt><dd>${this.escapeHtml(record.packageName || record.packageId || '--')}</dd></div>
+                    ${canReadSensitive
+                        ? `<div><dt>判定来源</dt><dd>${this.escapeHtml(record.decisionSource || '--')}</dd></div>
+                           <div><dt>包</dt><dd>${this.escapeHtml(record.packageName || record.packageId || '--')}</dd></div>`
+                        : ''}
                 </dl>
-                ${record.diagnosticMessage
+                ${canReadSensitive && record.diagnosticMessage
                     ? `<p class="sm-result-message">${this.escapeHtml(record.diagnosticMessage)}</p>`
                     : ''}
-                <div class="sm-result-output">
+                ${canReadSensitive ? `<div class="sm-result-output">
                     ${outputCards.length === 0
                         ? '<div class="sm-empty compact"><span>暂无主输出预览。</span></div>'
                         : outputCards.map((card) => renderResultCardHtml(card, { fallbackStatus: record.status })).join('')}
-                </div>
+                </div>` : ''}
             </article>
         `;
     }
@@ -2020,6 +2061,7 @@ class StationMonitorView {
             stationId: health?.stationId ?? health?.StationId ?? null,
             sequenceId: Number(health?.sequenceId ?? health?.SequenceId ?? 0),
             runtimeState: health?.runtimeState ?? health?.RuntimeState ?? 'Unknown',
+            healthState: health?.healthState ?? health?.HealthState ?? null,
             workingSetMb: Number(health?.workingSetMb ?? health?.WorkingSetMb ?? 0),
             privateMemoryMb: Number(health?.privateMemoryMb ?? health?.PrivateMemoryMb ?? 0),
             diskFreeMb: Number(health?.diskFreeMb ?? health?.DiskFreeMb ?? 0),

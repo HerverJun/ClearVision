@@ -12,6 +12,8 @@ type E2EAuthenticatedUser = {
 
 const E2E_ADMIN_CAPABILITIES = [
   'project.edit',
+  'inspection.results.read',
+  'station.sensitive.read',
   'station.commands.create',
   'station.packages.read',
   'station.packages.deploy',
