@@ -7,11 +7,11 @@ namespace ClearVision.Product.Desktop.Tests;
 public class WebView2HostTests
 {
     [Theory]
-    [InlineData(5000, "http://localhost:5000/index.html")]
-    [InlineData(5010, "http://localhost:5010/index.html")]
-    public void CreateInitialPageUri_ShouldUseEmbeddedLocalhostOrigin(int port, string expected)
+    [InlineData(5000)]
+    [InlineData(5010)]
+    public void CreateInitialPageUri_ShouldUseAuthenticatedAppLocalOrigin(int port)
     {
-        WebView2Host.CreateInitialPageUri(port).ToString().Should().Be(expected);
+        WebView2Host.CreateInitialPageUri(port).ToString().Should().Be("https://app.local/index.html");
     }
 
     [Theory]

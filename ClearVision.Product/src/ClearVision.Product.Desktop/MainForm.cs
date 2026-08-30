@@ -42,7 +42,7 @@ public partial class MainForm : Form
         _triggerInputService = Program.ServiceProvider?.GetService<EnterPhotoelectricTriggerInputService>();
         var studioOptions = Program.ServiceProvider?.GetService<IOptions<StudioOptions>>()?.Value
             ?? new StudioOptions();
-        _webView2Host = new WebView2Host(_webView, _messageHandler, studioOptions);
+        _webView2Host = new WebView2Host(_webView, studioOptions);
 
         // 窗体加载时初始化 WebView2
         Load += MainForm_Load;

@@ -592,8 +592,7 @@ static class Program
 
         if (string.Equals(originUri.Host, "app.local", StringComparison.OrdinalIgnoreCase))
         {
-            return originUri.Scheme == Uri.UriSchemeHttp &&
-                   (originUri.IsDefaultPort || originUri.Port == 80);
+            return originUri.Scheme == Uri.UriSchemeHttps && originUri.IsDefaultPort;
         }
 
         if (!IsLoopbackHost(originUri.Host))

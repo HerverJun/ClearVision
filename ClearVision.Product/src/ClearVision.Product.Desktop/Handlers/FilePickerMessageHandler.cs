@@ -20,33 +20,60 @@ internal sealed class FilePickerMessageHandler
         _logger = logger;
     }
 
-    public async Task HandleAsync(string messageJson)
+    public async Task HandleAsync(string messageJson, WebMessageDeliveryBinding binding)
     {
         try
         {
-            var command = JsonSerializer.Deserialize<PickFileCommand>(messageJson, new JsonSerializerOptions
+            using var document = JsonDocument.Parse(messageJson);
+            var root = document.RootElement;
+            var commandElement = root.TryGetProperty("payload", out var payload) &&
+                                 payload.ValueKind == JsonValueKind.Object
+                ? payload
+                : root;
+            var command = commandElement.Deserialize<PickFileCommand>(new JsonSerializerOptions
             {
                 PropertyNameCaseInsensitive = true
             });
 
-            if (command == null)
+            if (command == null || string.IsNullOrWhiteSpace(command.ParameterName))
             {
-                _logger.LogWarning("[FilePickerMessageHandler] Failed to parse PickFileCommand.");
+                _client.SendBoundProgressMessage("PickFileCommandResult", new
+                {
+                    success = false,
+                    code = WebMessageErrorCodes.Validation,
+                    errorMessage = "parameterName is required."
+                }, binding);
                 return;
             }
 
             var (filePath, isCancelled) = await ShowFileDialogOnStaThreadAsync(command);
 
-            _client.SendEvent(new FilePickedEvent
+            _client.SendBoundEvent(new FilePickedEvent
             {
                 ParameterName = command.ParameterName,
                 FilePath = filePath,
                 IsCancelled = isCancelled
-            });
+            }, binding);
+        }
+        catch (JsonException ex)
+        {
+            _logger.LogWarning(ex, "[FilePickerMessageHandler] Invalid file picker payload.");
+            _client.SendBoundProgressMessage("PickFileCommandResult", new
+            {
+                success = false,
+                code = WebMessageErrorCodes.Validation,
+                errorMessage = "File picker payload is invalid."
+            }, binding);
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "[FilePickerMessageHandler] File picker command failed.");
+            _client.SendBoundProgressMessage("PickFileCommandResult", new
+            {
+                success = false,
+                code = WebMessageErrorCodes.Conflict,
+                errorMessage = "File picker is temporarily unavailable."
+            }, binding);
         }
     }
 

@@ -43,7 +43,7 @@ internal static class StudioStartupPageResolver
             throw new InvalidOperationException(decision.DiagnosticMessage ?? "Startup page is not navigable.");
         }
 
-        return new Uri($"http://localhost:{webPort}{decision.PagePath}");
+        return new Uri($"https://app.local{decision.PagePath}");
     }
 
     private static StudioStartupPageDecision ResolveLegacy(

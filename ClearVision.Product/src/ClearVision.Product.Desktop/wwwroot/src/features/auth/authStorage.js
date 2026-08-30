@@ -1,5 +1,14 @@
 const TOKEN_KEY = 'cv_auth_token';
 const USER_KEY = 'cv_current_user';
+const AUTH_BINDING_CHANGED_EVENT = 'clearvision:auth-binding-changed';
+
+function notifyAuthBindingChanged() {
+    try {
+        window.dispatchEvent(new CustomEvent(AUTH_BINDING_CHANGED_EVENT));
+    } catch {
+        // Storage remains authoritative when DOM events are unavailable.
+    }
+}
 
 function safeParseJson(value, fallback = null) {
     if (!value) {
@@ -74,6 +83,8 @@ export function storeAuthSession(token, user) {
         sessionStore?.setItem(USER_KEY, JSON.stringify(user));
         localStore?.removeItem(USER_KEY);
     }
+
+    notifyAuthBindingChanged();
 }
 
 export function clearAuthSession() {
@@ -84,5 +95,6 @@ export function clearAuthSession() {
     sessionStore?.removeItem(USER_KEY);
     localStore?.removeItem(TOKEN_KEY);
     localStore?.removeItem(USER_KEY);
+    notifyAuthBindingChanged();
 }
 

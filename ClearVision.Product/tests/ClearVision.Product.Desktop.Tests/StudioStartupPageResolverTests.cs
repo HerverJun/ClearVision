@@ -26,7 +26,7 @@ public sealed class StudioStartupPageResolverTests : IDisposable
         StudioStartupPageResolver.CreateInitialPageUri(5000, decision)
             .ToString()
             .Should()
-            .Be("http://localhost:5000/index.html");
+            .Be("https://app.local/index.html");
     }
 
     [Fact]

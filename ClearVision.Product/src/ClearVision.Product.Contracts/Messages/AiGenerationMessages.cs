@@ -75,6 +75,7 @@ public record GenerateFlowResponse
     public string Type => "GenerateFlowResult";
     public bool Success { get; init; }
     public string? Status { get; init; }
+    public string? Code { get; init; }
     public object? Flow { get; init; }   // OperatorFlowDto 序列化后的对象
     public string? ErrorMessage { get; init; }
     public string? FailureSummary { get; init; }
@@ -155,6 +156,7 @@ public record CancelGenerateFlowResponse
     public string? SessionId { get; init; }
     public string? RequestId { get; init; }
     public string? Message { get; init; }
+    public string? Code { get; init; }
     public string? ErrorMessage { get; init; }
 }
 

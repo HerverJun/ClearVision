@@ -4,6 +4,7 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using ConversationSessionDeleteStatus = ClearVision.Product.Infrastructure.AI.ConversationSessionDeleteStatus;
+using ConversationSession = ClearVision.Product.Infrastructure.AI.ConversationSession;
 using ConversationSessionSummary = ClearVision.Product.Infrastructure.AI.ConversationSessionSummary;
 using IConversationalFlowService = ClearVision.Product.Infrastructure.AI.IConversationalFlowService;
 using MicrosoftLogger = Microsoft.Extensions.Logging.ILogger<ClearVision.Product.Desktop.Handlers.AiSessionMessageHandler>;
@@ -26,35 +27,41 @@ internal sealed class AiSessionMessageHandler
         _logger = logger;
     }
 
-    public Task HandleListAsync()
+    public Task HandleListAsync(
+        AuthenticatedWebMessagePrincipal principal,
+        WebMessageDeliveryBinding binding)
     {
         try
         {
             using var scope = _scopeFactory.CreateScope();
             var service = scope.ServiceProvider.GetRequiredService<IConversationalFlowService>();
-            var sessions = service.ListSessions();
+            var sessions = service.ListSessions(principal.OwnerHash);
 
-            _client.SendProgressMessage("ListAiSessionsResult", new
+            _client.SendBoundProgressMessage("ListAiSessionsResult", new
             {
                 success = true,
                 sessions
-            });
+            }, binding);
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "[AiSessionMessageHandler] List AI sessions failed.");
-            _client.SendProgressMessage("ListAiSessionsResult", new
+            _client.SendBoundProgressMessage("ListAiSessionsResult", new
             {
                 success = false,
-                errorMessage = ex.Message,
+                code = WebMessageErrorCodes.Conflict,
+                errorMessage = "Session list is temporarily unavailable.",
                 sessions = Array.Empty<ConversationSessionSummary>()
-            });
+            }, binding);
         }
 
         return Task.CompletedTask;
     }
 
-    public Task HandleGetAsync(string messageJson)
+    public Task HandleGetAsync(
+        string messageJson,
+        AuthenticatedWebMessagePrincipal principal,
+        WebMessageDeliveryBinding binding)
     {
         var request = AiSessionRequestEnvelope.Empty;
         try
@@ -62,65 +69,72 @@ internal sealed class AiSessionMessageHandler
             request = ExtractSessionRequest(messageJson);
             if (string.IsNullOrWhiteSpace(request.SessionId))
             {
-                _client.SendProgressMessage("GetAiSessionResult", new
+                _client.SendBoundProgressMessage("GetAiSessionResult", new
                 {
                     success = false,
+                    code = WebMessageErrorCodes.Validation,
                     sessionId = request.SessionId,
                     requestId = request.RequestId,
                     navigationEpoch = request.NavigationEpoch,
                     errorMessage = "sessionId is required."
-                });
+                }, binding);
                 return Task.CompletedTask;
             }
 
             using var scope = _scopeFactory.CreateScope();
             var service = scope.ServiceProvider.GetRequiredService<IConversationalFlowService>();
-            var session = service.GetSession(request.SessionId);
+            var session = service.GetSession(principal.OwnerHash, request.SessionId);
 
-            _client.SendProgressMessage("GetAiSessionResult", new
+            _client.SendBoundProgressMessage("GetAiSessionResult", new
             {
                 success = session != null,
+                code = session == null ? WebMessageErrorCodes.NotFound : null,
                 sessionId = request.SessionId,
                 requestId = request.RequestId,
                 navigationEpoch = request.NavigationEpoch,
-                session,
+                session = session == null ? null : ProjectSession(session),
                 errorMessage = session == null ? "Session not found." : null
-            });
+            }, binding);
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "[AiSessionMessageHandler] Get AI session failed.");
-            _client.SendProgressMessage("GetAiSessionResult", new
+            _client.SendBoundProgressMessage("GetAiSessionResult", new
             {
                 success = false,
+                code = WebMessageErrorCodes.Conflict,
                 sessionId = request.SessionId,
                 requestId = request.RequestId,
                 navigationEpoch = request.NavigationEpoch,
-                errorMessage = ex.Message
-            });
+                errorMessage = "Session is temporarily unavailable."
+            }, binding);
         }
 
         return Task.CompletedTask;
     }
 
-    public Task HandleDeleteAsync(string messageJson)
+    public Task HandleDeleteAsync(
+        string messageJson,
+        AuthenticatedWebMessagePrincipal principal,
+        WebMessageDeliveryBinding binding)
     {
         try
         {
             var sessionId = ExtractSessionId(messageJson);
             if (string.IsNullOrWhiteSpace(sessionId))
             {
-                _client.SendProgressMessage("DeleteAiSessionResult", new
+                _client.SendBoundProgressMessage("DeleteAiSessionResult", new
                 {
                     success = false,
+                    code = WebMessageErrorCodes.Validation,
                     errorMessage = "sessionId is required."
-                });
+                }, binding);
                 return Task.CompletedTask;
             }
 
             using var scope = _scopeFactory.CreateScope();
             var service = scope.ServiceProvider.GetRequiredService<IConversationalFlowService>();
-            var deleteResult = service.DeleteSessionWithResult(sessionId);
+            var deleteResult = service.DeleteSessionWithResult(principal.OwnerHash, sessionId);
             var deleted = deleteResult.Status == ConversationSessionDeleteStatus.Deleted;
             var errorMessage = deleteResult.Status switch
             {
@@ -129,22 +143,29 @@ internal sealed class AiSessionMessageHandler
                 _ => "Session not found."
             };
 
-            _client.SendProgressMessage("DeleteAiSessionResult", new
+            _client.SendBoundProgressMessage("DeleteAiSessionResult", new
             {
                 success = deleted,
+                code = deleteResult.Status switch
+                {
+                    ConversationSessionDeleteStatus.NotFound => WebMessageErrorCodes.NotFound,
+                    ConversationSessionDeleteStatus.PersistenceFailed => WebMessageErrorCodes.Conflict,
+                    _ => (string?)null
+                },
                 sessionId,
                 persistenceStatus = deleteResult.PersistenceStatus,
                 errorMessage
-            });
+            }, binding);
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "[AiSessionMessageHandler] Delete AI session failed.");
-            _client.SendProgressMessage("DeleteAiSessionResult", new
+            _client.SendBoundProgressMessage("DeleteAiSessionResult", new
             {
                 success = false,
-                errorMessage = ex.Message
-            });
+                code = WebMessageErrorCodes.Conflict,
+                errorMessage = "Session could not be deleted."
+            }, binding);
         }
 
         return Task.CompletedTask;
@@ -154,6 +175,17 @@ internal sealed class AiSessionMessageHandler
     {
         return ExtractSessionRequest(messageJson).SessionId;
     }
+
+    private static object ProjectSession(ConversationSession session) => new
+    {
+        session.SessionId,
+        session.CurrentFlowJson,
+        session.CurrentCanvasFlowJson,
+        session.WorkspaceSnapshot,
+        session.History,
+        session.MutationReceipts,
+        session.UpdatedAtUtc
+    };
 
     private static AiSessionRequestEnvelope ExtractSessionRequest(string messageJson)
     {

@@ -14,12 +14,13 @@ namespace ClearVision.Product.Desktop.Tests;
 public class ProgramCorsTests
 {
     [Theory]
-    [InlineData("http://app.local", 5000, true)]
+    [InlineData("http://app.local", 5000, false)]
+    [InlineData("https://app.local", 5000, true)]
+    [InlineData("https://app.local:444", 5000, false)]
     [InlineData("http://localhost:5000", 5000, true)]
     [InlineData("http://127.0.0.1:5010", 5000, true)]
     [InlineData("http://[::1]:5000", 5000, true)]
     [InlineData("http://localhost:5173", 5000, false)]
-    [InlineData("https://app.local", 5000, false)]
     [InlineData("http://example.com", 5000, false)]
     [InlineData("file:///", 5000, false)]
     public void IsAllowedApiOrigin_ShouldOnlyAllowKnownLocalOrigins(

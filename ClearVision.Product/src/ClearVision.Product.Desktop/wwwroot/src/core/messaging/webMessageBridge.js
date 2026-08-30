@@ -1,6 +1,9 @@
 /**
  * WebMessage bridge for WebView2 host communication.
  */
+import { getStoredToken } from '../../features/auth/authStorage.js';
+
+const AUTH_BINDING_CHANGED_EVENT = 'clearvision:auth-binding-changed';
 const canCaptureEarlyWindowErrors = typeof window !== 'undefined' && typeof window.addEventListener === 'function';
 
 if (typeof window !== 'undefined' && !window._errorLogs) {
@@ -61,7 +64,10 @@ class WebMessageBridge {
         this.maxPendingRequests = DEFAULT_MAX_PENDING_REQUESTS;
         this._boundHandleMessage = this.handleMessage.bind(this);
         this._boundHandleSharedBuffer = this.handleSharedBuffer.bind(this);
+        this._boundHandleAuthBindingChanged = this.handleAuthBindingChanged.bind(this);
         this._isInitialized = false;
+        this.navigationEpoch = 1;
+        this.bindingId = this.createBindingId();
 
         this.initialize();
     }
@@ -74,7 +80,9 @@ class WebMessageBridge {
         if (window.chrome && window.chrome.webview) {
             window.chrome.webview.addEventListener('message', this._boundHandleMessage);
             window.chrome.webview.addEventListener('sharedbufferreceived', this._boundHandleSharedBuffer);
+            window.addEventListener(AUTH_BINDING_CHANGED_EVENT, this._boundHandleAuthBindingChanged);
             this._isInitialized = true;
+            this.announceBinding();
             debugWebMessageLog('[WebMessageBridge] Initialized in WebView2');
         } else {
             console.warn('[WebMessageBridge] Not in WebView2, using mock mode');
@@ -118,6 +126,30 @@ class WebMessageBridge {
         window.mockWebViewResponse = (message) => {
             this.handleMessage({ data: message });
         };
+    }
+
+    createBindingId() {
+        if (globalThis.crypto?.randomUUID) {
+            return globalThis.crypto.randomUUID();
+        }
+
+        const random = Math.random().toString(36).slice(2);
+        return `binding-${Date.now().toString(36)}-${random}`;
+    }
+
+    handleAuthBindingChanged() {
+        this.bindingId = this.createBindingId();
+        this.clearPendingRequests(new Error('Authentication binding changed'));
+        this.announceBinding();
+    }
+
+    announceBinding() {
+        this.postMessage({
+            messageType: 'BridgeBindingChanged',
+            requestId: `binding-${this.bindingId}`,
+            payload: { reason: 'auth-binding-changed' },
+            timestamp: new Date().toISOString()
+        });
     }
 
     handleMessage(event) {
@@ -205,13 +237,25 @@ class WebMessageBridge {
     }
 
     postMessage(message) {
+        const envelope = {
+            ...message,
+            bridge: {
+                token: getStoredToken() || '',
+                bindingId: this.bindingId,
+                navigationEpoch: this.navigationEpoch
+            }
+        };
+
         if (this.mockMode) {
-            debugWebMessageLog('[WebMessageBridge] Mock post:', message);
+            debugWebMessageLog('[WebMessageBridge] Mock post:', {
+                ...message,
+                bridge: { bindingId: this.bindingId, navigationEpoch: this.navigationEpoch }
+            });
             return;
         }
 
         if (window.chrome && window.chrome.webview) {
-            window.chrome.webview.postMessage(message);
+            window.chrome.webview.postMessage(envelope);
             return;
         }
 
@@ -331,6 +375,7 @@ class WebMessageBridge {
             window.chrome.webview.removeEventListener?.('message', this._boundHandleMessage);
             window.chrome.webview.removeEventListener?.('sharedbufferreceived', this._boundHandleSharedBuffer);
         }
+        window.removeEventListener?.(AUTH_BINDING_CHANGED_EVENT, this._boundHandleAuthBindingChanged);
 
         this.clearPendingRequests();
         this.messageHandlers.clear();

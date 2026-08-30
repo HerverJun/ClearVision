@@ -5,7 +5,6 @@
 using System.Net;
 using System.Reflection;
 using System.Text.Json;
-using ClearVision.Product.Contracts.Messages;
 using ClearVision.Product.Desktop.Configuration;
 using ClearVision.Product.Desktop.Handlers;
 using Microsoft.Web.WebView2.Core;
@@ -29,7 +28,6 @@ public sealed class WebView2Host : IAsyncDisposable
     private CoreWebView2Environment? _environment;
     private bool _isInitialized;
     private bool _isDisposed;
-    private readonly WebMessageHandler? _messageHandler;
 
     internal static Uri CreateInitialPageUri(int webPort)
     {
@@ -38,7 +36,7 @@ public sealed class WebView2Host : IAsyncDisposable
             throw new ArgumentOutOfRangeException(nameof(webPort), "Web port must be between 1 and 65535.");
         }
 
-        return new Uri($"http://localhost:{webPort}/index.html");
+        return new Uri("https://app.local/index.html");
     }
 
     internal static string BuildStartupInjectionScript(
@@ -114,11 +112,6 @@ public sealed class WebView2Host : IAsyncDisposable
     public event EventHandler? Initialized;
 
     /// <summary>
-    /// 收到 Web 消息事件。
-    /// </summary>
-    public event EventHandler<WebMessage>? MessageReceived;
-
-    /// <summary>
     /// 获取是否已初始化。
     /// </summary>
     public bool IsInitialized => _isInitialized;
@@ -132,14 +125,11 @@ public sealed class WebView2Host : IAsyncDisposable
     /// 创建 WebView2 宿主实例。
     /// </summary>
     /// <param name="webView">WebView2 控件实例</param>
-    /// <param name="messageHandler">Web 消息处理器</param>
     public WebView2Host(
         WebView2 webView,
-        WebMessageHandler? messageHandler = null,
         StudioOptions? studioOptions = null)
     {
         _webView = webView ?? throw new ArgumentNullException(nameof(webView));
-        _messageHandler = messageHandler;
         _studioOptions = studioOptions ?? new StudioOptions();
     }
 
@@ -185,9 +175,6 @@ public sealed class WebView2Host : IAsyncDisposable
 
             // 配置 WebView2
             await ConfigureWebView2Async();
-
-            // 注册消息处理器
-            RegisterMessageHandlers();
 
             // 加载初始页面
             LoadInitialPage();
@@ -280,89 +267,6 @@ public sealed class WebView2Host : IAsyncDisposable
     }
 
     /// <summary>
-    /// 注册消息处理器。
-    /// </summary>
-    private void RegisterMessageHandlers()
-    {
-        // 【修复】移除重复的 WebMessageReceived 订阅
-        // WebMessageHandler.Initialize() 已注册此事件，并能灵活匹配
-        // 前端发送的 messageType/type/Type 等不同字段名。
-        // WebView2Host 的 OnWebMessageReceived 将 JSON 反序列化为 WebMessage（期望 Type 属性），
-        // 但前端实际使用 messageType 字段名，导致 Type 为空、消息匹配失败。
-        // 保留此方法以便未来需要时重新启用。
-        // _webView.CoreWebView2.WebMessageReceived += OnWebMessageReceived;
-    }
-
-    /// <summary>
-    /// 处理收到的 Web 消息。
-    /// </summary>
-    private void OnWebMessageReceived(
-        object? sender,
-        CoreWebView2WebMessageReceivedEventArgs e)
-    {
-        try
-        {
-            var message = JsonSerializer.Deserialize<WebMessage>(
-                e.WebMessageAsJson,
-                new JsonSerializerOptions
-                {
-                    PropertyNameCaseInsensitive = true
-                });
-
-            if (message is not null)
-            {
-                // 触发消息接收事件
-                MessageReceived?.Invoke(this, message);
-
-                // 处理消息并发送响应
-                _ = HandleMessageAsync(message);
-            }
-        }
-        catch (JsonException ex)
-        {
-            System.Diagnostics.Debug.WriteLine(
-                $"无法解析 Web 消息: {ex.Message}");
-        }
-    }
-
-    /// <summary>
-    /// 异步处理消息。
-    /// </summary>
-    private async Task HandleMessageAsync(WebMessage message)
-    {
-        try
-        {
-            if (_messageHandler != null)
-            {
-                // 委托给 WebMessageHandler 处理
-                var result = await _messageHandler.HandleAsync(message);
-                await SendMessageAsync(result);
-            }
-            else
-            {
-                // 如果没有处理器，返回错误
-                await SendMessageAsync(new WebMessageResponse
-                {
-                    RequestId = message.Id,
-                    Success = false,
-                    Error = "消息处理器未初始化"
-                });
-            }
-        }
-        catch (Exception ex)
-        {
-            var errorResponse = new WebMessageResponse
-            {
-                RequestId = message.Id,
-                Success = false,
-                Error = ex.Message
-            };
-
-            await SendMessageAsync(errorResponse);
-        }
-    }
-
-    /// <summary>
     /// 执行 JavaScript 脚本。
     /// </summary>
     /// <typeparam name="T">消息类型</typeparam>
@@ -402,9 +306,8 @@ public sealed class WebView2Host : IAsyncDisposable
         var decision = StudioStartupPageResolver.Resolve(_studioOptions);
         if (decision.IsNavigable)
         {
-            // Keep the WebView2 document and API calls on the same localhost
-            // origin. In packaged installs, app.local -> localhost can be
-            // blocked or misreported as a missing backend.
+            // The document uses the fixed virtual-host origin. API traffic is
+            // still directed to the injected loopback base URL.
             _webView.Source = StudioStartupPageResolver.CreateInitialPageUri(
                 Program.GetWebPort(),
                 decision);
@@ -601,12 +504,6 @@ public sealed class WebView2Host : IAsyncDisposable
         }
 
         _isDisposed = true;
-
-        // 取消事件订阅
-        if (_webView.CoreWebView2 is not null)
-        {
-            _webView.CoreWebView2.WebMessageReceived -= OnWebMessageReceived;
-        }
 
         // 释放 WebView2 控件
         _webView.Dispose();

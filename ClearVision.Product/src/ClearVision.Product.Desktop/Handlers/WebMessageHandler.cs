@@ -20,7 +20,9 @@ using ClearVision.Product.Core.Interfaces;
 using ClearVision.Product.Core.Services;
 using ClearVision.Product.Desktop.Extensions;
 using ClearVision.Product.Desktop.Inspection;
+using ClearVision.Product.Desktop.PreviewArtifacts;
 using ClearVision.Product.Infrastructure.AI.AgentRun;
+using ClearVision.Product.Infrastructure.Calibration;
 using ClearVision.Product.Infrastructure.Data;
 using ClearVision.Product.Infrastructure.Services;
 using Microsoft.EntityFrameworkCore;
@@ -28,6 +30,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Web.WebView2.Core;
 using Microsoft.Web.WebView2.WinForms;
+using ConversationSessionAccessException = ClearVision.Product.Infrastructure.AI.ConversationSessionAccessException;
 
 namespace ClearVision.Product.Desktop.Handlers;
 
@@ -39,24 +42,24 @@ public class WebMessageHandler : IWebMessageClient, IDisposable
     private const int MaxPendingWebMessages = 512;
 
     private readonly IServiceScopeFactory _scopeFactory;
-    private readonly IOperatorFactory _operatorFactory;
     private readonly IInspectionEventBus _eventBus;
     private readonly ILogger<WebMessageHandler> _logger;
-    private readonly OperatorExecutionMessageHandler _operatorExecutionHandler;
-    private readonly ProjectFlowMessageHandler _projectFlowHandler;
-    private readonly InspectionMessageHandler _inspectionHandler;
     private readonly FilePickerMessageHandler _filePickerHandler;
     private readonly AiSessionMessageHandler _aiSessionHandler;
+    private readonly WebMessageAdmissionService _admissionService;
     private WebView2? _webViewControl;
     private CoreWebView2? _webView;
     private int _disposeState;
-    private readonly ConcurrentQueue<string> _pendingWebMessages = new();
+    private readonly ConcurrentQueue<PendingWebMessage> _pendingWebMessages = new();
     private int _pendingWebMessageCount;
     private int _webMessageDrainScheduled;
     private long _droppedWebMessageCount;
     private readonly ConcurrentDictionary<string, ActiveGenerateFlowRequest> _activeGenerateFlowRequests = new(StringComparer.OrdinalIgnoreCase);
     private readonly ConcurrentDictionary<string, string> _activeGenerateFlowRequestIdsBySessionId = new(StringComparer.OrdinalIgnoreCase);
-    private string? _latestGenerateFlowRequestId;
+    private readonly object _activeGenerateFlowGate = new();
+    private readonly object _bindingGate = new();
+    private WebMessageDeliveryBinding? _currentDeliveryBinding;
+    private long _deliveryEpoch;
 
     // 事件订阅句柄
     private readonly List<IDisposable> _subscriptions = new();
@@ -78,21 +81,9 @@ public class WebMessageHandler : IWebMessageClient, IDisposable
         ILoggerFactory loggerFactory)
     {
         _scopeFactory = scopeFactory;
-        _operatorFactory = operatorFactory;
+        ArgumentNullException.ThrowIfNull(operatorFactory);
         _eventBus = eventBus;
         _logger = logger;
-        _operatorExecutionHandler = new OperatorExecutionMessageHandler(
-            scopeFactory,
-            this,
-            loggerFactory.CreateLogger<OperatorExecutionMessageHandler>());
-        _projectFlowHandler = new ProjectFlowMessageHandler(
-            scopeFactory,
-            operatorFactory,
-            loggerFactory.CreateLogger<ProjectFlowMessageHandler>());
-        _inspectionHandler = new InspectionMessageHandler(
-            scopeFactory,
-            this,
-            loggerFactory.CreateLogger<InspectionMessageHandler>());
         _filePickerHandler = new FilePickerMessageHandler(
             this,
             loggerFactory.CreateLogger<FilePickerMessageHandler>());
@@ -100,6 +91,7 @@ public class WebMessageHandler : IWebMessageClient, IDisposable
             scopeFactory,
             this,
             loggerFactory.CreateLogger<AiSessionMessageHandler>());
+        _admissionService = new WebMessageAdmissionService(scopeFactory);
     }
 
     /// <summary>
@@ -107,53 +99,16 @@ public class WebMessageHandler : IWebMessageClient, IDisposable
     /// </summary>
     public async Task<WebMessageResponse> HandleAsync(WebMessage message)
     {
-        try
+        ArgumentNullException.ThrowIfNull(message);
+        var payload = ParsePayloadElement(message.Payload);
+        var json = JsonSerializer.Serialize(new
         {
-            _logger.LogInformation("[WebMessageHandler] 处理消息: {MessageType}", message.Type);
+            messageType = message.Type,
+            requestId = message.Id,
+            payload
+        }, _jsonOptions);
 
-            var messageJson = ExtractCommandJson(message);
-            if (IsLegacyExecutionMessage(message.Type))
-            {
-                var admission = GetLegacyWebMessageAdmission(message.Type);
-                _logger.LogWarning(
-                    "[WebMessageHandler] Blocked legacy execution WebMessage: {MessageType}",
-                    message.Type);
-                return new WebMessageResponse
-                {
-                    RequestId = message.Id,
-                    Success = false,
-                    Error = admission.Message
-                };
-            }
-
-            switch (message.Type)
-            {
-                case nameof(ExecuteOperatorCommand):
-                    await _operatorExecutionHandler.HandleAsync(messageJson);
-                    break;
-                case nameof(UpdateFlowCommand):
-                    await _projectFlowHandler.HandleUpdateFlowAsync(messageJson);
-                    break;
-                case nameof(StartInspectionCommand):
-                    await _inspectionHandler.HandleStartAsync(messageJson);
-                    break;
-                case nameof(StopInspectionCommand):
-                    await _inspectionHandler.HandleStopAsync();
-                    break;
-                case nameof(PickFileCommand):
-                    await _filePickerHandler.HandleAsync(messageJson);
-                    break;
-                default:
-                    return new WebMessageResponse { RequestId = message.Id, Success = false, Error = "未知消息类型" };
-            }
-
-            return new WebMessageResponse { RequestId = message.Id, Success = true };
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "[WebMessageHandler] 处理消息失败");
-            return new WebMessageResponse { RequestId = message.Id, Success = false, Error = ex.Message };
-        }
+        return await DispatchWebMessageAsync(json, source: null);
     }
 
     /// <summary>
@@ -167,6 +122,7 @@ public class WebMessageHandler : IWebMessageClient, IDisposable
         _webViewControl = webViewControl;
         _webView = webViewControl.CoreWebView2;
         _webView.WebMessageReceived += OnWebMessageReceived;
+        _webView.NavigationStarting += OnNavigationStarting;
 
         // 【架构修复 v2】订阅事件总线
         InitializeEventSubscriptions();
@@ -232,127 +188,163 @@ public class WebMessageHandler : IWebMessageClient, IDisposable
     /// </summary>
     private async Task HandleWebMessageAsync(CoreWebView2WebMessageReceivedEventArgs e)
     {
+        await DispatchWebMessageAsync(e.WebMessageAsJson, e.Source);
+    }
+
+    internal async Task<WebMessageResponse> DispatchWebMessageAsync(
+        string messageJson,
+        string? source,
+        CancellationToken cancellationToken = default)
+    {
+        var admission = await _admissionService.AdmitAsync(messageJson, source, cancellationToken);
+        if (!admission.Allowed)
+        {
+            if (string.Equals(
+                    admission.MessageType,
+                    WebMessageAdmissionService.BindingChangedMessageType,
+                    StringComparison.Ordinal) &&
+                WebMessageAdmissionService.IsTrustedOrigin(source))
+            {
+                InvalidateDeliveryBinding("client-auth-cleared");
+            }
+
+            SendProgressMessage("WebMessageRejected", new
+            {
+                success = false,
+                requestId = admission.RequestId,
+                messageType = admission.MessageType,
+                code = admission.ErrorCode,
+                errorMessage = admission.PublicMessage
+            });
+
+            return new WebMessageResponse
+            {
+                RequestId = admission.RequestId,
+                Success = false,
+                Data = JsonSerializer.Serialize(new { code = admission.ErrorCode }, _jsonOptions),
+                Error = admission.PublicMessage
+            };
+        }
+
+        var principal = admission.Principal!;
+        var binding = BindDeliveryPrincipal(
+            principal,
+            admission.ClientBindingId,
+            admission.NavigationEpoch);
+        var commandJson = JsonSerializer.Serialize(new
+        {
+            messageType = admission.MessageType,
+            requestId = admission.RequestId,
+            payload = admission.Payload
+        }, _jsonOptions);
+
         try
         {
-            var messageJson = e.WebMessageAsJson;
-            string messageType = string.Empty;
+            _logger.LogInformation(
+                "[WebMessageHandler] Admitted message: {MessageType}",
+                admission.MessageType);
 
-            try
+            switch (admission.MessageType)
             {
-                using (var doc = JsonDocument.Parse(messageJson))
-                {
-                    // 【修复】按优先级检查可能的消息类型字段
-                    // 前端修复后使用 messageType，但保留对旧格式 type 的兼容
-                    if (doc.RootElement.TryGetProperty("messageType", out var typeProp) ||
-                        doc.RootElement.TryGetProperty("MessageType", out typeProp) ||
-                        doc.RootElement.TryGetProperty("type", out typeProp) ||
-                        doc.RootElement.TryGetProperty("Type", out typeProp))
+                case WebMessageAdmissionService.BindingChangedMessageType:
+                    SendBoundProgressMessage("BridgeBindingChangedResult", new
                     {
-                        messageType = typeProp.GetString() ?? string.Empty;
-                    }
-                }
-            }
-            catch (JsonException)
-            {
-                // 忽略非JSON消息
-                return;
-            }
-
-            if (string.IsNullOrEmpty(messageType))
-                return;
-
-            _logger.LogInformation("[WebMessageHandler] 收到消息: {MessageType}", messageType);
-
-            if (IsLegacyExecutionMessage(messageType))
-            {
-                var admission = GetLegacyWebMessageAdmission(messageType);
-                _logger.LogWarning(
-                    "[WebMessageHandler] Blocked legacy execution WebMessage: {MessageType}",
-                    messageType);
-                SendProgressMessage("LegacyWebMessageBlocked", new
-                {
-                    messageType,
-                    code = admission.Code,
-                    error = admission.Message
-                });
-                return;
-            }
-
-            switch (messageType)
-            {
-                case nameof(ExecuteOperatorCommand):
-                    await _operatorExecutionHandler.HandleAsync(messageJson);
+                        success = true,
+                        requestId = admission.RequestId
+                    }, binding);
                     break;
-
-                case nameof(UpdateFlowCommand):
-                    await _projectFlowHandler.HandleUpdateFlowAsync(messageJson);
-                    break;
-
-                case nameof(StartInspectionCommand):
-                    await _inspectionHandler.HandleStartAsync(messageJson);
-                    break;
-
-                case nameof(StopInspectionCommand):
-                    await _inspectionHandler.HandleStopAsync();
-                    break;
-
                 case nameof(PickFileCommand):
-                    await _filePickerHandler.HandleAsync(messageJson);
+                    await _filePickerHandler.HandleAsync(commandJson, binding);
                     break;
-
                 case "ListAiSessions":
-                    await _aiSessionHandler.HandleListAsync();
+                    await _aiSessionHandler.HandleListAsync(principal, binding);
                     break;
-
                 case "GetAiSession":
-                    await _aiSessionHandler.HandleGetAsync(messageJson);
+                    await _aiSessionHandler.HandleGetAsync(commandJson, principal, binding);
                     break;
-
                 case "DeleteAiSession":
-                    await _aiSessionHandler.HandleDeleteAsync(messageJson);
+                    await _aiSessionHandler.HandleDeleteAsync(commandJson, principal, binding);
                     break;
-
                 case "GenerateFlow":
-                    await HandleGenerateFlowCommand(messageJson);
+                    await HandleGenerateFlowCommand(commandJson, principal, binding);
                     break;
-
                 case "CancelGenerateFlow":
-                    HandleCancelGenerateFlowCommand(messageJson);
+                    HandleCancelGenerateFlowCommand(commandJson, principal, binding);
                     break;
-
                 case "planar2d:solve":
-                    await HandlePlanarScaleOffsetSolveCommand(messageJson);
+                    await HandlePlanarScaleOffsetSolveCommand(commandJson, principal, binding);
                     break;
-
                 case "planar2d:save":
-                    await HandlePlanarScaleOffsetSaveCommand(messageJson);
+                    await HandlePlanarScaleOffsetSaveCommand(commandJson, principal, binding);
                     break;
-
                 default:
-                    _logger.LogWarning("[WebMessageHandler] 未知消息类型: {MessageType}", messageType);
-                    break;
+                    throw new InvalidOperationException("Default-deny WebMessage dispatcher invariant failed.");
             }
+
+            return new WebMessageResponse
+            {
+                RequestId = admission.RequestId,
+                Success = true
+            };
+        }
+        catch (ConversationSessionAccessException)
+        {
+            SendBoundProgressMessage("WebMessageCommandFailed", new
+            {
+                success = false,
+                requestId = admission.RequestId,
+                messageType = admission.MessageType,
+                code = WebMessageErrorCodes.NotFound,
+                errorMessage = "Resource not found."
+            }, binding);
+            return new WebMessageResponse
+            {
+                RequestId = admission.RequestId,
+                Success = false,
+                Data = JsonSerializer.Serialize(new { code = WebMessageErrorCodes.NotFound }, _jsonOptions),
+                Error = "Resource not found."
+            };
+        }
+        catch (JsonException)
+        {
+            return CommandFailure(
+                admission,
+                binding,
+                WebMessageErrorCodes.Validation,
+                "WebMessage payload is invalid.");
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "[WebMessageHandler] 处理消息失败");
+            _logger.LogError(
+                ex,
+                "[WebMessageHandler] Command failed. MessageType={MessageType}",
+                admission.MessageType);
+            return CommandFailure(
+                admission,
+                binding,
+                WebMessageErrorCodes.Conflict,
+                "WebMessage command could not be completed.");
         }
     }
 
-    private static string ExtractCommandJson(WebMessage message)
+    private static JsonElement ParsePayloadElement(string? payload)
     {
-        if (!string.IsNullOrWhiteSpace(message.Payload))
+        if (string.IsNullOrWhiteSpace(payload))
         {
-            return message.Payload;
+            return JsonSerializer.SerializeToElement(new { });
         }
 
-        return JsonSerializer.Serialize(message, new JsonSerializerOptions
+        try
         {
-            PropertyNamingPolicy = JsonNamingPolicy.CamelCase
-        });
+            return JsonSerializer.Deserialize<JsonElement>(payload);
+        }
+        catch (JsonException)
+        {
+            return JsonSerializer.SerializeToElement(payload);
+        }
     }
 
-    private static bool IsLegacyExecutionMessage(string? messageType)
+    internal static bool IsLegacyExecutionMessage(string? messageType)
     {
         return string.Equals(messageType, nameof(ExecuteOperatorCommand), StringComparison.Ordinal) ||
             string.Equals(messageType, nameof(UpdateFlowCommand), StringComparison.Ordinal) ||
@@ -360,31 +352,129 @@ public class WebMessageHandler : IWebMessageClient, IDisposable
             string.Equals(messageType, nameof(StopInspectionCommand), StringComparison.Ordinal);
     }
 
-    private ExecutionAdmissionResult GetLegacyWebMessageAdmission(string messageType)
+    private WebMessageResponse CommandFailure(
+        WebMessageAdmissionResult admission,
+        WebMessageDeliveryBinding binding,
+        string code,
+        string publicMessage)
     {
-        try
+        SendBoundProgressMessage("WebMessageCommandFailed", new
         {
-            using var scope = _scopeFactory.CreateScope();
-            var admissionService = scope.ServiceProvider.GetService<IExecutionAdmissionService>();
-            if (admissionService != null)
+            success = false,
+            requestId = admission.RequestId,
+            messageType = admission.MessageType,
+            code,
+            errorMessage = publicMessage
+        }, binding);
+
+        return new WebMessageResponse
+        {
+            RequestId = admission.RequestId,
+            Success = false,
+            Data = JsonSerializer.Serialize(new { code }, _jsonOptions),
+            Error = publicMessage
+        };
+    }
+
+    private WebMessageDeliveryBinding BindDeliveryPrincipal(
+        AuthenticatedWebMessagePrincipal principal,
+        string clientBindingId,
+        long navigationEpoch)
+    {
+        List<ActiveGenerateFlowRequest>? requestsToCancel = null;
+        WebMessageDeliveryBinding binding;
+        lock (_bindingGate)
+        {
+            var current = _currentDeliveryBinding;
+            if (current != null &&
+                string.Equals(current.OwnerHash, principal.OwnerHash, StringComparison.Ordinal) &&
+                string.Equals(current.ClientBindingId, clientBindingId, StringComparison.Ordinal) &&
+                current.NavigationEpoch == navigationEpoch)
             {
-                return admissionService.ValidateLegacyWebMessage(messageType);
+                return current;
             }
-        }
-        catch (Exception ex)
-        {
-            _logger.LogDebug(ex, "[WebMessageHandler] Failed to resolve execution admission service.");
+
+            if (current != null)
+            {
+                requestsToCancel = _activeGenerateFlowRequests.Values.ToList();
+            }
+
+            binding = new WebMessageDeliveryBinding(
+                Interlocked.Increment(ref _deliveryEpoch),
+                principal.OwnerHash,
+                clientBindingId,
+                navigationEpoch);
+            _currentDeliveryBinding = binding;
         }
 
-        return ExecutionAdmissionResult.Reject(
-            "ADMISSION_LEGACY_WEBMESSAGE_DISABLED",
-            $"Legacy WebMessage '{messageType}' is disabled. Use the authenticated HTTP API instead.");
+        CancelAndRemoveRequests(requestsToCancel);
+        if (requestsToCancel != null)
+        {
+            ClearPendingBoundWebMessages();
+        }
+        return binding;
+    }
+
+    private void OnNavigationStarting(object? sender, CoreWebView2NavigationStartingEventArgs e)
+    {
+        InvalidateDeliveryBinding("navigation-starting");
+    }
+
+    private void InvalidateDeliveryBinding(string reason)
+    {
+        List<ActiveGenerateFlowRequest> requests;
+        lock (_bindingGate)
+        {
+            _currentDeliveryBinding = null;
+            Interlocked.Increment(ref _deliveryEpoch);
+            requests = _activeGenerateFlowRequests.Values.ToList();
+        }
+
+        CancelAndRemoveRequests(requests);
+        ClearPendingBoundWebMessages();
+        _logger.LogInformation(
+            "[WebMessageHandler] Delivery binding invalidated. Reason={Reason}",
+            reason);
+    }
+
+    private void CancelAndRemoveRequests(IEnumerable<ActiveGenerateFlowRequest>? requests)
+    {
+        if (requests == null)
+        {
+            return;
+        }
+
+        foreach (var request in requests)
+        {
+            if (TryRemoveActiveGenerateFlowRequest(request))
+            {
+                try
+                {
+                    request.CancellationTokenSource.Cancel();
+                    CancelAgentRunForGenerateFlow(request);
+                }
+                catch (ObjectDisposedException)
+                {
+                }
+            }
+        }
+    }
+
+    private bool MatchesCurrentBinding(WebMessageDeliveryBinding binding)
+    {
+        lock (_bindingGate)
+        {
+            return _currentDeliveryBinding == binding;
+        }
     }
 
     /// <summary>
     /// 处理 AI 生成工作流请求
     /// </summary>
-    private async Task HandleGenerateFlowCommand(string messageJson)
+    private async Task HandleGenerateFlowCommand(
+        string messageJson,
+        AuthenticatedWebMessagePrincipal principal,
+        WebMessageDeliveryBinding binding)
     {
         ActiveGenerateFlowRequest? activeRequest = null;
         try
@@ -420,6 +510,7 @@ public class WebMessageHandler : IWebMessageClient, IDisposable
                 {
                     Success = false,
                     Status = AiFlowGenerationResult.CompletionStatusFailed,
+                    Code = WebMessageErrorCodes.Validation,
                     ErrorMessage = "BuildFromPlan payload is invalid.",
                     FailureSummary = "build_from_plan_payload_invalid: BuildFromPlan payload is invalid.",
                     SessionId = sessionId,
@@ -431,7 +522,8 @@ public class WebMessageHandler : IWebMessageClient, IDisposable
                 };
                 PostWebMessageJson(SerializeGenerateFlowResponse(
                     response,
-                    AiFlowGenerationResult.FailureTypeSystemError));
+                    AiFlowGenerationResult.FailureTypeSystemError),
+                    binding);
                 return;
             }
             var useVisionAgentGenerateFlow = TryGetBoolean(payload, "useVisionAgentGenerateFlow") ?? false;
@@ -451,7 +543,32 @@ public class WebMessageHandler : IWebMessageClient, IDisposable
 
             using var scope = _scopeFactory.CreateScope();
             var handler = scope.ServiceProvider.GetRequiredService<ClearVision.Product.Infrastructure.AI.GenerateFlowMessageHandler>();
-            var registeredRequest = RegisterGenerateFlowRequest(requestId, sessionId);
+            if (!TryRegisterGenerateFlowRequest(
+                    requestId,
+                    sessionId,
+                    principal.OwnerHash,
+                    binding,
+                    out var registeredRequest))
+            {
+                var conflictResponse = new GenerateFlowResponse
+                {
+                    Success = false,
+                    Status = AiFlowGenerationResult.CompletionStatusFailed,
+                    Code = WebMessageErrorCodes.Conflict,
+                    ErrorMessage = "An active generation already uses this request or session identifier.",
+                    FailureSummary = "An active generation already uses this request or session identifier.",
+                    SessionId = sessionId,
+                    RequestId = requestId,
+                    CompletionStatus = AiFlowGenerationResult.CompletionStatusFailed,
+                    InteractionState = AiInteractionStates.Failed
+                };
+                PostWebMessageJson(
+                    SerializeGenerateFlowResponse(
+                        conflictResponse,
+                        AiFlowGenerationResult.FailureTypeSystemError),
+                    binding);
+                return;
+            }
             activeRequest = registeredRequest;
 
             // 在后台线程执行 AI 生成，避免 WebView2/UI 线程被流式解析和回调压满。
@@ -470,11 +587,12 @@ public class WebMessageHandler : IWebMessageClient, IDisposable
                 useVisionAgentGenerateFlow,
                 agentGenerateFlowMode,
                 runtimePreviewConsent,
+                ownerHash: principal.OwnerHash,
                 onMessage: (type, payload) =>
                 {
                     // payload 已是 JSON 字符串，直接拼接外层 envelope，避免反序列化再序列化的额外开销。
                     var progressJson = $"{{\"messageType\":{JsonSerializer.Serialize(type)},\"payload\":{payload}}}";
-                    PostWebMessageJson(progressJson);
+                    PostWebMessageJson(progressJson, binding);
                 },
                 cancellationToken: registeredRequest.CancellationTokenSource.Token,
                 onAgentRunCreated: runId =>
@@ -483,27 +601,27 @@ public class WebMessageHandler : IWebMessageClient, IDisposable
                 }));
 
             // 发回前端（原始 JSON）
-            PostWebMessageJson(resultJson);
+            PostWebMessageJson(resultJson, binding);
         }
         catch (HttpRequestException ex) when (ex.InnerException is System.Net.Sockets.SocketException)
         {
             _logger.LogWarning(ex, "AI 服务连接被拦截");
-            SendProgressMessage("AiFirewallBlocked", new
+            SendBoundProgressMessage("AiFirewallBlocked", new
             {
                 message = "检测到网络连接被阻断（可能被防火墙拦截）",
                 detail = ex.Message,
                 timestamp = DateTime.Now
-            });
+            }, binding);
         }
         catch (TaskCanceledException ex)
         {
             _logger.LogWarning(ex, "AI 服务请求超时");
-            SendProgressMessage("AiFirewallBlocked", new
+            SendBoundProgressMessage("AiFirewallBlocked", new
             {
                 message = "AI 服务连接超时（可能被防火墙拦截）",
                 detail = "请检查网络环境或代理设置",
                 timestamp = DateTime.Now
-            });
+            }, binding);
         }
         catch (Exception ex)
         {
@@ -513,6 +631,7 @@ public class WebMessageHandler : IWebMessageClient, IDisposable
             {
                 Success = false,
                 Status = AiFlowGenerationResult.CompletionStatusFailed,
+                Code = WebMessageErrorCodes.Conflict,
                 ErrorMessage = "系统错误，请查看后端日志。",
                 FailureSummary = "系统错误，请查看后端日志。",
                 CompletionStatus = AiFlowGenerationResult.CompletionStatusFailed
@@ -523,7 +642,7 @@ public class WebMessageHandler : IWebMessageClient, IDisposable
                 PropertyNamingPolicy = JsonNamingPolicy.CamelCase
             });
 
-            PostWebMessageJson(json);
+            PostWebMessageJson(json, binding);
         }
         finally
         {
@@ -543,6 +662,7 @@ public class WebMessageHandler : IWebMessageClient, IDisposable
             response.Type,
             response.Success,
             response.Status,
+            response.Code,
             response.ErrorMessage,
             response.FailureSummary,
             response.ClarificationRequired,
@@ -633,15 +753,34 @@ public class WebMessageHandler : IWebMessageClient, IDisposable
     /// <summary>
     /// 处理二维平面比例偏移标定解算请求
     /// </summary>
-    private async Task HandlePlanarScaleOffsetSolveCommand(string messageJson)
+    private async Task HandlePlanarScaleOffsetSolveCommand(
+        string messageJson,
+        AuthenticatedWebMessagePrincipal principal,
+        WebMessageDeliveryBinding binding)
     {
         try
         {
             using var doc = JsonDocument.Parse(messageJson);
             var payload = doc.RootElement.GetProperty("payload");
+            var pointSource = payload.ValueKind == JsonValueKind.Object &&
+                              payload.TryGetProperty("points", out var configuredPoints)
+                ? configuredPoints
+                : payload;
+            var projectId = payload.ValueKind == JsonValueKind.Object
+                ? TryGetGuid(payload, "projectId")
+                : null;
+            var sourceSessionId = payload.ValueKind == JsonValueKind.Object
+                ? TryGetMessageString(payload, "sessionId")
+                : null;
+            var assetId = payload.ValueKind == JsonValueKind.Object
+                ? TryGetMessageString(payload, "assetId")
+                : null;
+            var cameraBindingId = payload.ValueKind == JsonValueKind.Object
+                ? TryGetMessageString(payload, "cameraBindingId")
+                : null;
 
             var points = new List<PlanarScaleOffsetCalibrationPoint>();
-            foreach (var pointElement in payload.EnumerateArray())
+            foreach (var pointElement in pointSource.EnumerateArray())
             {
                 points.Add(new PlanarScaleOffsetCalibrationPoint
                 {
@@ -655,63 +794,213 @@ public class WebMessageHandler : IWebMessageClient, IDisposable
             using var scope = _scopeFactory.CreateScope();
             var calibService = scope.ServiceProvider.GetRequiredService<IPlanarScaleOffsetCalibrationService>();
             var result = await calibService.SolveAsync(points);
+            PreviewArtifactReferenceV1? solveArtifact = null;
+            if (result.MeetsAcceptanceCriteria() && projectId.HasValue && projectId.Value != Guid.Empty)
+            {
+                var artifactStore = scope.ServiceProvider.GetRequiredService<PreviewArtifactStore>();
+                var bundle = PlanarScaleOffsetCalibrationService.CreateCalibrationBundle(result);
+                var provenance = new PlanarScaleOffsetSolveArtifactV1
+                {
+                    ProjectId = projectId.Value,
+                    SessionId = sourceSessionId ?? string.Empty,
+                    AssetId = assetId ?? string.Empty,
+                    CameraBindingId = cameraBindingId ?? string.Empty,
+                    Bundle = bundle
+                };
+                using var batch = artifactStore.CreateBatch(new PreviewArtifactOwnerScope(
+                    projectId.Value,
+                    Guid.Empty,
+                    Guid.NewGuid(),
+                    null,
+                    null,
+                    principal.UserId));
+                solveArtifact = batch.Add(
+                    "planar2dSolveBundle",
+                    "calibration-solve-provenance.v1",
+                    "$.Planar2D.SolveProvenance",
+                    "application/json",
+                    JsonSerializer.SerializeToUtf8Bytes(provenance, _jsonOptions));
+                batch.Commit();
+            }
 
-            // 发送结果回前端
-            SendProgressMessage("planar2d:solve:result", result);
+            SendBoundProgressMessage("planar2d:solve:result", new
+            {
+                result.Success,
+                result.Accepted,
+                result.Message,
+                result.OriginX,
+                result.OriginY,
+                result.ScaleX,
+                result.ScaleY,
+                result.MeanErrorX,
+                result.MeanErrorY,
+                result.Rmse,
+                result.PointCount,
+                solveArtifact,
+                canFormalSave = solveArtifact != null
+            }, binding);
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "处理二维平面比例偏移标定解算失败");
-            SendProgressMessage("planar2d:solve:result", new { success = false, message = ex.Message });
+            SendBoundProgressMessage("planar2d:solve:result", new
+            {
+                success = false,
+                code = WebMessageErrorCodes.Validation,
+                message = "Calibration solve request is invalid."
+            }, binding);
         }
     }
 
     /// <summary>
     /// 处理二维平面比例偏移标定保存请求
     /// </summary>
-    private async Task HandlePlanarScaleOffsetSaveCommand(string messageJson)
+    private async Task HandlePlanarScaleOffsetSaveCommand(
+        string messageJson,
+        AuthenticatedWebMessagePrincipal principal,
+        WebMessageDeliveryBinding binding)
     {
         try
         {
             using var doc = JsonDocument.Parse(messageJson);
             var payload = doc.RootElement.GetProperty("payload");
-            var resultElement = payload.GetProperty("result");
-            var fileName = payload.GetProperty("fileName").GetString() ?? "planar_scale_offset_calib.json";
-
-            var result = new PlanarScaleOffsetCalibrationResult
+            var request = payload.Deserialize<PlanarScaleOffsetFormalSaveRequest>(_jsonOptions);
+            if (request == null || request.ProjectId == Guid.Empty)
             {
-                Success = resultElement.GetProperty("success").GetBoolean(),
-                Accepted = resultElement.TryGetProperty("accepted", out var acceptedElement) && acceptedElement.GetBoolean(),
-                Message = resultElement.TryGetProperty("message", out var messageElement) ? messageElement.GetString() ?? string.Empty : string.Empty,
-                OriginX = resultElement.GetProperty("originX").GetDouble(),
-                OriginY = resultElement.GetProperty("originY").GetDouble(),
-                ScaleX = resultElement.GetProperty("scaleX").GetDouble(),
-                ScaleY = resultElement.GetProperty("scaleY").GetDouble(),
-                MeanErrorX = resultElement.TryGetProperty("meanErrorX", out var meanErrorXElement) ? meanErrorXElement.GetDouble() : 0.0,
-                MeanErrorY = resultElement.TryGetProperty("meanErrorY", out var meanErrorYElement) ? meanErrorYElement.GetDouble() : 0.0,
-                Rmse = resultElement.TryGetProperty("rmse", out var rmseElement) ? rmseElement.GetDouble() : 0.0,
-                PointCount = resultElement.TryGetProperty("pointCount", out var pointCountElement) ? pointCountElement.GetInt32() : 0
-            };
+                SendPlanarSaveFailure(binding, WebMessageErrorCodes.Validation, "Project context is required.");
+                return;
+            }
+
+            if (request.ExpectedPersistenceRevision is null)
+            {
+                SendPlanarSaveFailure(
+                    binding,
+                    WebMessageErrorCodes.Validation,
+                    "expectedPersistenceRevision is required.");
+                return;
+            }
 
             using var scope = _scopeFactory.CreateScope();
-            var calibService = scope.ServiceProvider.GetRequiredService<IPlanarScaleOffsetCalibrationService>();
-            var isSaved = await calibService.SaveCalibrationAsync(result, fileName);
-
-            // 发送结果回前端
-            SendProgressMessage("planar2d:save:result", new
+            var artifactStore = scope.ServiceProvider.GetRequiredService<PreviewArtifactStore>();
+            if (!artifactStore.TryReadScoped(
+                    request.SolveArtifactId,
+                    principal.UserId,
+                    request.ProjectId,
+                    "planar2dSolveBundle",
+                    out var artifact) ||
+                artifact == null)
             {
-                success = isSaved,
-                message = isSaved ? "Calibration saved." : "Calibration result did not pass acceptance criteria."
-            });
+                SendPlanarSaveFailure(binding, WebMessageErrorCodes.NotFound, "Solve artifact not found.");
+                return;
+            }
+
+            PlanarScaleOffsetSolveArtifactV1? provenance;
+            try
+            {
+                provenance = JsonSerializer.Deserialize<PlanarScaleOffsetSolveArtifactV1>(
+                    artifact.Bytes,
+                    _jsonOptions);
+            }
+            catch (JsonException)
+            {
+                SendPlanarSaveFailure(binding, WebMessageErrorCodes.Validation, "Solve artifact is invalid.");
+                return;
+            }
+
+            if (provenance?.Bundle == null ||
+                !string.Equals(
+                    artifact.Reference.Role,
+                    "calibration-solve-provenance.v1",
+                    StringComparison.Ordinal) ||
+                !string.Equals(provenance.SchemaVersion, "calibration-solve-provenance.v1", StringComparison.Ordinal) ||
+                !string.Equals(provenance.SolveKind, "planar2d", StringComparison.Ordinal) ||
+                provenance.ProjectId != request.ProjectId ||
+                !string.Equals(request.SessionId?.Trim() ?? string.Empty, provenance.SessionId, StringComparison.Ordinal) ||
+                !string.Equals(request.AssetId?.Trim() ?? string.Empty, provenance.AssetId, StringComparison.Ordinal) ||
+                !string.Equals(request.CameraBindingId?.Trim() ?? string.Empty, provenance.CameraBindingId, StringComparison.Ordinal))
+            {
+                SendPlanarSaveFailure(binding, WebMessageErrorCodes.NotFound, "Solve artifact not found.");
+                return;
+            }
+
+            if (!CalibrationBundleV2Json.TryRequireAccepted(provenance.Bundle, out _))
+            {
+                SendPlanarSaveFailure(
+                    binding,
+                    WebMessageErrorCodes.Validation,
+                    "Calibration solve artifact did not pass validation.");
+                return;
+            }
+
+            var runtimeCoordinator = scope.ServiceProvider.GetRequiredService<IInspectionRuntimeCoordinator>();
+            await using var mutationLease = await runtimeCoordinator.TryAcquireMutationLeaseAsync(
+                request.ProjectId,
+                "calibration-asset-save",
+                CancellationToken.None);
+            if (mutationLease == null)
+            {
+                SendPlanarSaveFailure(binding, WebMessageErrorCodes.Conflict, "Project is currently running.");
+                return;
+            }
+
+            var projectService = scope.ServiceProvider.GetRequiredService<ProjectService>();
+            var bundlePayload = JsonSerializer.SerializeToElement(
+                provenance.Bundle,
+                CalibrationBundleV2Json.DefaultOptions);
+            var response = await projectService.SaveCalibrationAssetAsync(
+                request.ProjectId,
+                new ProjectCalibrationAssetSaveRequest
+                {
+                    ExpectedPersistenceRevision = request.ExpectedPersistenceRevision,
+                    AssetId = string.IsNullOrWhiteSpace(request.AssetId)
+                        ? provenance.AssetId
+                        : request.AssetId,
+                    Version = provenance.Bundle.CalibrationVersion,
+                    Producer = nameof(PlanarScaleOffsetCalibrationService),
+                    SourceDraftSessionId = provenance.SessionId,
+                    ImageIdentity = provenance.CameraBindingId,
+                    ExpectedContentHash = ProjectAssetJson.ComputePayloadHash(bundlePayload),
+                    Payload = bundlePayload
+                });
+
+            SendBoundProgressMessage("planar2d:save:result", new
+            {
+                success = true,
+                message = "Calibration project asset saved.",
+                projectId = response.ProjectId,
+                persistenceRevision = response.PersistenceRevision,
+                asset = response.Asset
+            }, binding);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "保存二维平面比例偏移标定文件失败");
-            SendProgressMessage("planar2d:save:result", new { success = false, message = ex.Message });
+            _logger.LogError(ex, "保存二维平面比例偏移标定 project asset 失败");
+            var code = ex.Message.StartsWith("PSV011:", StringComparison.Ordinal)
+                ? WebMessageErrorCodes.Conflict
+                : WebMessageErrorCodes.Validation;
+            SendPlanarSaveFailure(binding, code, code == WebMessageErrorCodes.Conflict
+                ? "Project revision conflict."
+                : "Calibration asset validation failed.");
         }
     }
 
-    private void HandleCancelGenerateFlowCommand(string messageJson)
+    private void SendPlanarSaveFailure(
+        WebMessageDeliveryBinding binding,
+        string code,
+        string message)
+    {
+        SendBoundProgressMessage("planar2d:save:result", new
+        {
+            success = false,
+            code,
+            message
+        }, binding);
+    }
+
+    private void HandleCancelGenerateFlowCommand(
+        string messageJson,
+        AuthenticatedWebMessagePrincipal principal,
+        WebMessageDeliveryBinding binding)
     {
         try
         {
@@ -726,7 +1015,11 @@ public class WebMessageHandler : IWebMessageClient, IDisposable
             var sessionId = TryGetMessageString(payload, "sessionId") ??
                             TryGetMessageString(doc.RootElement, "sessionId");
 
-            if (!TryResolveGenerateFlowRequest(requestId, sessionId, out var activeRequest))
+            if (!TryResolveGenerateFlowRequest(
+                    principal.OwnerHash,
+                    requestId,
+                    sessionId,
+                    out var activeRequest))
             {
                 _logger.LogInformation(
                     "收到取消 AI 生成请求，但未找到活动任务。RequestId={RequestId}, SessionId={SessionId}",
@@ -736,10 +1029,11 @@ public class WebMessageHandler : IWebMessageClient, IDisposable
                 {
                     Success = false,
                     Status = "not_found",
+                    Code = WebMessageErrorCodes.NotFound,
                     SessionId = sessionId,
                     RequestId = requestId,
                     ErrorMessage = "未找到可取消的生成任务。"
-                }, _jsonOptions));
+                }, _jsonOptions), binding);
                 return;
             }
 
@@ -762,15 +1056,15 @@ public class WebMessageHandler : IWebMessageClient, IDisposable
                 SessionId = activeRequest.SessionId,
                 RequestId = activeRequest.RequestId,
                 Message = "已发送取消请求。"
-            }, _jsonOptions));
+            }, _jsonOptions), binding);
 
-            SendProgressMessage("GenerateFlowProgress", new
+            SendBoundProgressMessage("GenerateFlowProgress", new
             {
                 message = "正在取消本次生成...",
                 phase = "cancelling",
                 requestId = activeRequest.RequestId,
                 sessionId = activeRequest.SessionId
-            });
+            }, binding);
         }
         catch (Exception ex)
         {
@@ -779,10 +1073,11 @@ public class WebMessageHandler : IWebMessageClient, IDisposable
             {
                 Success = false,
                 Status = "failed",
+                Code = WebMessageErrorCodes.Conflict,
                 SessionId = null,
                 RequestId = null,
-                ErrorMessage = ex.Message
-            }, _jsonOptions));
+                ErrorMessage = "Cancellation could not be completed."
+            }, _jsonOptions), binding);
         }
     }
 
@@ -797,7 +1092,10 @@ public class WebMessageHandler : IWebMessageClient, IDisposable
         {
             using var scope = _scopeFactory.CreateScope();
             var streamService = scope.ServiceProvider.GetService<IAgentRunEventStreamService>();
-            streamService?.Cancel(activeRequest.AgentRunId);
+            if (streamService?.IsRunOwner(activeRequest.AgentRunId, activeRequest.OwnerHash) == true)
+            {
+                streamService.Cancel(activeRequest.AgentRunId);
+            }
         }
         catch (Exception ex)
         {
@@ -809,55 +1107,98 @@ public class WebMessageHandler : IWebMessageClient, IDisposable
         }
     }
 
-    private ActiveGenerateFlowRequest RegisterGenerateFlowRequest(string requestId, string? sessionId)
+    private bool TryRegisterGenerateFlowRequest(
+        string requestId,
+        string? sessionId,
+        string ownerHash,
+        WebMessageDeliveryBinding binding,
+        out ActiveGenerateFlowRequest activeRequest)
     {
-        var activeRequest = new ActiveGenerateFlowRequest(requestId, sessionId, new CancellationTokenSource());
-        _activeGenerateFlowRequests[requestId] = activeRequest;
-        if (!string.IsNullOrWhiteSpace(sessionId))
+        var candidate = new ActiveGenerateFlowRequest(
+            requestId,
+            sessionId,
+            ownerHash,
+            binding,
+            new CancellationTokenSource());
+
+        lock (_bindingGate)
         {
-            _activeGenerateFlowRequestIdsBySessionId[sessionId] = requestId;
+            if (_currentDeliveryBinding != binding)
+            {
+                candidate.Dispose();
+                activeRequest = null!;
+                return false;
+            }
+
+            lock (_activeGenerateFlowGate)
+            {
+                if (_activeGenerateFlowRequests.ContainsKey(requestId) ||
+                    (!string.IsNullOrWhiteSpace(candidate.SessionKey) &&
+                     _activeGenerateFlowRequestIdsBySessionId.ContainsKey(candidate.SessionKey)))
+                {
+                    candidate.Dispose();
+                    activeRequest = null!;
+                    return false;
+                }
+
+                _activeGenerateFlowRequests[requestId] = candidate;
+                if (!string.IsNullOrWhiteSpace(candidate.SessionKey))
+                {
+                    _activeGenerateFlowRequestIdsBySessionId[candidate.SessionKey] = requestId;
+                }
+            }
         }
 
-        _latestGenerateFlowRequestId = requestId;
-        return activeRequest;
+        activeRequest = candidate;
+        return true;
     }
 
     private void UnregisterGenerateFlowRequest(ActiveGenerateFlowRequest activeRequest)
     {
-        _activeGenerateFlowRequests.TryRemove(activeRequest.RequestId, out _);
-        if (!string.IsNullOrWhiteSpace(activeRequest.SessionId))
-        {
-            _activeGenerateFlowRequestIdsBySessionId.TryRemove(activeRequest.SessionId, out _);
-        }
-
-        if (string.Equals(_latestGenerateFlowRequestId, activeRequest.RequestId, StringComparison.OrdinalIgnoreCase))
-        {
-            _latestGenerateFlowRequestId = _activeGenerateFlowRequests.Keys.LastOrDefault();
-        }
-
+        TryRemoveActiveGenerateFlowRequest(activeRequest);
         activeRequest.Dispose();
     }
 
+    private bool TryRemoveActiveGenerateFlowRequest(ActiveGenerateFlowRequest activeRequest)
+    {
+        lock (_activeGenerateFlowGate)
+        {
+            if (!_activeGenerateFlowRequests.TryGetValue(activeRequest.RequestId, out var registeredRequest) ||
+                !ReferenceEquals(registeredRequest, activeRequest))
+            {
+                return false;
+            }
+
+            _activeGenerateFlowRequests.TryRemove(activeRequest.RequestId, out _);
+            if (!string.IsNullOrWhiteSpace(activeRequest.SessionKey) &&
+                _activeGenerateFlowRequestIdsBySessionId.TryGetValue(activeRequest.SessionKey, out var mappedRequestId) &&
+                string.Equals(mappedRequestId, activeRequest.RequestId, StringComparison.OrdinalIgnoreCase))
+            {
+                _activeGenerateFlowRequestIdsBySessionId.TryRemove(activeRequest.SessionKey, out _);
+            }
+
+            return true;
+        }
+    }
+
     private bool TryResolveGenerateFlowRequest(
+        string ownerHash,
         string? requestId,
         string? sessionId,
         out ActiveGenerateFlowRequest activeRequest)
     {
         if (!string.IsNullOrWhiteSpace(requestId) &&
-            _activeGenerateFlowRequests.TryGetValue(requestId, out activeRequest!))
+            _activeGenerateFlowRequests.TryGetValue(requestId, out activeRequest!) &&
+            string.Equals(activeRequest.OwnerHash, ownerHash, StringComparison.Ordinal))
         {
             return true;
         }
 
+        var sessionKey = BuildSessionKey(ownerHash, sessionId);
         if (!string.IsNullOrWhiteSpace(sessionId) &&
-            _activeGenerateFlowRequestIdsBySessionId.TryGetValue(sessionId, out var mappedRequestId) &&
-            _activeGenerateFlowRequests.TryGetValue(mappedRequestId, out activeRequest!))
-        {
-            return true;
-        }
-
-        if (!string.IsNullOrWhiteSpace(_latestGenerateFlowRequestId) &&
-            _activeGenerateFlowRequests.TryGetValue(_latestGenerateFlowRequestId, out activeRequest!))
+            _activeGenerateFlowRequestIdsBySessionId.TryGetValue(sessionKey, out var mappedRequestId) &&
+            _activeGenerateFlowRequests.TryGetValue(mappedRequestId, out activeRequest!) &&
+            string.Equals(activeRequest.OwnerHash, ownerHash, StringComparison.Ordinal))
         {
             return true;
         }
@@ -865,6 +1206,11 @@ public class WebMessageHandler : IWebMessageClient, IDisposable
         activeRequest = null!;
         return false;
     }
+
+    private static string BuildSessionKey(string ownerHash, string? sessionId) =>
+        string.IsNullOrWhiteSpace(sessionId)
+            ? string.Empty
+            : $"{ownerHash}:{sessionId.Trim()}";
 
     private static string? TryGetMessageString(JsonElement element, string propertyName)
     {
@@ -900,6 +1246,12 @@ public class WebMessageHandler : IWebMessageClient, IDisposable
             JsonValueKind.String when bool.TryParse(property.GetString(), out var parsed) => parsed,
             _ => null
         };
+    }
+
+    private static Guid? TryGetGuid(JsonElement element, string propertyName)
+    {
+        var value = TryGetMessageString(element, propertyName);
+        return Guid.TryParse(value, out var parsed) ? parsed : null;
     }
 
     private void PublishRealtimeMessages(IInspectionEvent evt)
@@ -998,6 +1350,12 @@ public class WebMessageHandler : IWebMessageClient, IDisposable
         }
     }
 
+    internal void SendBoundEvent<T>(T eventData, WebMessageDeliveryBinding binding)
+    {
+        var json = JsonSerializer.Serialize(eventData, _jsonOptions);
+        PostWebMessageJson(json, binding);
+    }
+
     public void SendProgressMessage(string type, object payload)
     {
         var json = JsonSerializer.Serialize(new
@@ -1009,13 +1367,41 @@ public class WebMessageHandler : IWebMessageClient, IDisposable
         PostWebMessageJson(json);
     }
 
-    private void PostWebMessageJson(string json)
+    internal void SendBoundProgressMessage(
+        string type,
+        object payload,
+        WebMessageDeliveryBinding binding)
     {
+        var json = JsonSerializer.Serialize(new
+        {
+            messageType = type,
+            payload
+        }, _jsonOptions);
+
+        PostWebMessageJson(json, binding);
+    }
+
+    void IWebMessageClient.SendBoundEvent<T>(T eventData, WebMessageDeliveryBinding binding) =>
+        SendBoundEvent(eventData, binding);
+
+    void IWebMessageClient.SendBoundProgressMessage(
+        string type,
+        object payload,
+        WebMessageDeliveryBinding binding) =>
+        SendBoundProgressMessage(type, payload, binding);
+
+    private void PostWebMessageJson(string json, WebMessageDeliveryBinding? binding = null)
+    {
+        if (binding != null && !MatchesCurrentBinding(binding))
+        {
+            return;
+        }
+
         var webViewControl = _webViewControl;
         var webView = _webView;
         if (webViewControl == null || webView == null)
         {
-            TryEnqueuePendingWebMessage(json);
+            TryEnqueuePendingWebMessage(json, binding);
             return;
         }
 
@@ -1026,7 +1412,7 @@ public class WebMessageHandler : IWebMessageClient, IDisposable
 
         if (webViewControl.InvokeRequired)
         {
-            if (TryEnqueuePendingWebMessage(json))
+            if (TryEnqueuePendingWebMessage(json, binding))
             {
                 SchedulePendingWebMessageDrain(webViewControl);
                 return;
@@ -1039,7 +1425,10 @@ public class WebMessageHandler : IWebMessageClient, IDisposable
 
                 try
                 {
-                    webView.PostWebMessageAsJson(json);
+                    if (binding == null || MatchesCurrentBinding(binding))
+                    {
+                        webView.PostWebMessageAsJson(json);
+                    }
                 }
                 catch (Exception ex)
                 {
@@ -1049,10 +1438,15 @@ public class WebMessageHandler : IWebMessageClient, IDisposable
             return;
         }
 
-        webView.PostWebMessageAsJson(json);
+        if (binding == null || MatchesCurrentBinding(binding))
+        {
+            webView.PostWebMessageAsJson(json);
+        }
     }
 
-    private bool TryEnqueuePendingWebMessage(string json)
+    private bool TryEnqueuePendingWebMessage(
+        string json,
+        WebMessageDeliveryBinding? binding = null)
     {
         while (Volatile.Read(ref _pendingWebMessageCount) >= MaxPendingWebMessages)
         {
@@ -1065,7 +1459,7 @@ public class WebMessageHandler : IWebMessageClient, IDisposable
             Interlocked.Increment(ref _droppedWebMessageCount);
         }
 
-        _pendingWebMessages.Enqueue(json);
+        _pendingWebMessages.Enqueue(new PendingWebMessage(json, binding));
         Interlocked.Increment(ref _pendingWebMessageCount);
         return true;
     }
@@ -1101,7 +1495,7 @@ public class WebMessageHandler : IWebMessageClient, IDisposable
                 return;
             }
 
-            while (_pendingWebMessages.TryDequeue(out var json))
+            while (_pendingWebMessages.TryDequeue(out var pending))
             {
                 Interlocked.Decrement(ref _pendingWebMessageCount);
                 if (webViewControl.IsDisposed)
@@ -1112,7 +1506,10 @@ public class WebMessageHandler : IWebMessageClient, IDisposable
 
                 try
                 {
-                    webView.PostWebMessageAsJson(json);
+                    if (pending.Binding == null || MatchesCurrentBinding(pending.Binding))
+                    {
+                        webView.PostWebMessageAsJson(pending.Json);
+                    }
                 }
                 catch (Exception ex)
                 {
@@ -1145,6 +1542,25 @@ public class WebMessageHandler : IWebMessageClient, IDisposable
         }
 
         Interlocked.Exchange(ref _pendingWebMessageCount, 0);
+    }
+
+    private void ClearPendingBoundWebMessages()
+    {
+        var unbound = new List<PendingWebMessage>();
+        while (_pendingWebMessages.TryDequeue(out var pending))
+        {
+            Interlocked.Decrement(ref _pendingWebMessageCount);
+            if (pending.Binding == null)
+            {
+                unbound.Add(pending);
+            }
+        }
+
+        foreach (var pending in unbound)
+        {
+            _pendingWebMessages.Enqueue(pending);
+            Interlocked.Increment(ref _pendingWebMessageCount);
+        }
     }
 
     public void Dispose()
@@ -1223,6 +1639,7 @@ public class WebMessageHandler : IWebMessageClient, IDisposable
         try
         {
             webView.WebMessageReceived -= OnWebMessageReceived;
+            webView.NavigationStarting -= OnNavigationStarting;
         }
         catch (InvalidOperationException ex)
         {
@@ -1243,16 +1660,27 @@ public class WebMessageHandler : IWebMessageClient, IDisposable
         public ActiveGenerateFlowRequest(
             string requestId,
             string? sessionId,
+            string ownerHash,
+            WebMessageDeliveryBinding binding,
             CancellationTokenSource cancellationTokenSource)
         {
             RequestId = requestId;
             SessionId = sessionId;
+            OwnerHash = ownerHash;
+            Binding = binding;
+            SessionKey = BuildSessionKey(ownerHash, sessionId);
             CancellationTokenSource = cancellationTokenSource;
         }
 
         public string RequestId { get; }
 
         public string? SessionId { get; }
+
+        public string OwnerHash { get; }
+
+        public string SessionKey { get; }
+
+        public WebMessageDeliveryBinding Binding { get; }
 
         public string? AgentRunId { get; set; }
 
@@ -1262,5 +1690,26 @@ public class WebMessageHandler : IWebMessageClient, IDisposable
         {
             CancellationTokenSource.Dispose();
         }
+    }
+
+    private sealed class PlanarScaleOffsetSolveArtifactV1
+    {
+        public string SchemaVersion { get; init; } = "calibration-solve-provenance.v1";
+        public string SolveKind { get; init; } = "planar2d";
+        public Guid ProjectId { get; init; }
+        public string SessionId { get; init; } = string.Empty;
+        public string AssetId { get; init; } = string.Empty;
+        public string CameraBindingId { get; init; } = string.Empty;
+        public CalibrationBundleV2? Bundle { get; init; }
+    }
+
+    private sealed class PlanarScaleOffsetFormalSaveRequest
+    {
+        public string? SolveArtifactId { get; init; }
+        public Guid ProjectId { get; init; }
+        public long? ExpectedPersistenceRevision { get; init; }
+        public string? AssetId { get; init; }
+        public string? SessionId { get; init; }
+        public string? CameraBindingId { get; init; }
     }
 }
