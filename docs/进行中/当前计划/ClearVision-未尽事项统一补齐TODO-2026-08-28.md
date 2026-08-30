@@ -4,8 +4,8 @@ doc_type: "plan"
 status: "active"
 topic: "跨计划闭环治理"
 created: "2026-08-28"
-updated: "2026-08-30"
-code_baseline: "5372fd011694b51a6e31fdeb323030efe67f0b3b"
+updated: "2026-08-31"
+code_baseline: "431ab324afbe081f50c6738e749b6de9a10436a2"
 review_input_revision: "78d693fb4"
 ---
 
@@ -27,7 +27,7 @@ review_input_revision: "78d693fb4"
 >
 > Wave 2B 的 AppConfig mutation authority、相机 persist/apply/lifecycle 及最终 implementation/integration evidence SHA 为 `5372fd011694b51a6e31fdeb323030efe67f0b3b`。`CV-AUDIT-009/021/029/042/083/084` 已按 degraded/last-good、revision CAS、candidate replace、persist/apply rollback/fence、reset 同步与 provider retirement 故障矩阵关闭；U09 与 U11 仍为 `OPEN_RESCOPED`，Station 双配置、AI persistence、database maintenance、legacy AI plan CAS 及其它资源治理未进入本轮。
 >
-> Wave 2C 的 AI model/secret、prompt/flow-version/metrics persistence 与 workspace PlanRun CAS 最终 implementation/integration evidence SHA 为 `7ad57cc2adebbe04dcc735f53d0fdc205ad1cac3`。`CV-AUDIT-041/069/070/080/082` 已按 generation candidate/commit/restart、完整 RMW authority、metrics fail-soft health、stale/duplicate mutation 与长请求零覆盖矩阵关闭；U09 因 `CV-AUDIT-040/079` 继续 `OPEN_RESCOPED`，Station 双配置与 database maintenance 未进入本轮。
+> Wave 2C 的 AI model/secret、prompt/flow-version/metrics persistence 与 workspace PlanRun CAS 先行 implementation SHA 为 `7ad57cc2adebbe04dcc735f53d0fdc205ad1cac3`；Station 双配置、database maintenance、AI/PlanRun 补强及最终纯 implementation/integration evidence SHA 为 `431ab324afbe081f50c6738e749b6de9a10436a2`。`CV-AUDIT-040/041/069/070/079/080/082` 已按 generation transaction/recovery、完整串行 RMW、metrics fail-soft health、maintenance rollback/fence、stale/duplicate mutation 与长请求零覆盖矩阵全部关闭；U09 改为 `CLOSED`，U10/U11/G16 未改动。
 
 ## 1. 状态与证据口径
 
@@ -73,7 +73,7 @@ review_input_revision: "78d693fb4"
 | [全面提升 TODO](./ClearVision-全面提升TODO-2026-05-09.md) | 按 46 个主题：35 个 `IMPLEMENTED_SYNC_PENDING`、10 个 `OPEN_RESCOPED`、P2-2 被本次前端架构决定取代。按 147 个 checkbox：原勾 3、实现待同步 106、实质残项 33、总关闭条件 5。 | U01-U06、U14 |
 | [T01 测试与覆盖率治理总体计划](./测试治理/ClearVision_T01_测试与覆盖率治理总体计划_PROPOSED_AUDITED.md) | G01 阶段证据已归档，G01B-R3/G02 仍需当前 SHA；G03-G06 原方案有重复建设，G07 引用了非当前分支架构，G08 仍应 report-only，G09 按 SKU 外部验收。 | U05-U07 |
 | [Studio2](../Studio2/README.md) | G00-G15 Goal 卡已完成或历史回填，但 G16 不能通过直接打开不具产品 parity 的 `/v2` 关闭；当前 release root 决定改为 legacy root + capability owners。 | U05 |
-| [持续问题排查记录](../待复核/持续问题排查记录-2026-07-06.md) | 102 个源 ID：31 个 `IMPLEMENTED_SYNC_PENDING`、39 个仍开放、32 个已关闭；Wave 2C 新关闭 `CV-AUDIT-041/069/070/080/082`，U09 因 `CV-AUDIT-040/079` 继续 `OPEN_RESCOPED`，U11 状态不变。`CV-AUDIT-086` 保持 `OPEN_RESCOPED / P0_SUBRANGE_CLOSED`。 | U09-U14 |
+| [持续问题排查记录](../待复核/持续问题排查记录-2026-07-06.md) | 102 个源 ID：31 个 `IMPLEMENTED_SYNC_PENDING`、37 个仍开放、34 个已关闭；Wave 2C 关闭 `CV-AUDIT-040/041/069/070/079/080/082`，U09 改为 `CLOSED`，U11 状态不变。`CV-AUDIT-086` 保持 `OPEN_RESCOPED / P0_SUBRANGE_CLOSED`。 | U09-U14 |
 | [0407 Qwen 排查](../未闭环事项/0407-Qwen排查未闭环.md) | #1-#26 已由当前实现、文件移除或等价契约覆盖，原状态未同步。 | U14 回填 |
 | [0418 临时问题记录](../未闭环事项/0418-临时问题记录.md) | 主体实现已落地；工业证据尾项去重并入 U01/U03/U13。 | U01、U03、U13、U14 |
 | [深度学习算子问题](../未闭环事项/深度学习算子问题.md) | 灰度/16-bit、NMS、异步加载和工程化契约已改造；旧 tensor-copy 阻断是死代码误判。真实残项是证据声明、模型身份、交付 profile 性能和现场签核。 | U01、U07、U14 |
@@ -171,25 +171,25 @@ Wave 1B1 已独立关闭 `CV-AUDIT-011/014/015/018/028/034/091`；Wave 1B2 已�
 
 ### U09 分 authority 的持久化、运行态 apply 与恢复
 
-优先级：P0/P1 数据一致性。状态：`OPEN_RESCOPED`。Owner：持久化/设置/AI。
+优先级：P0/P1 数据一致性。状态：`CLOSED`。Owner：持久化/设置/AI。
 
 - [x] ProjectMutationAuthority 在一次 project access 中加载 authoritative project/flow/global variables/assets/revision，按 absent-preserving patch 计算 candidate 与实际 diff，再决定 runtime mutation lease 并执行客户端 revision CAS；metadata-only 不迁移或重写 flow，global-variable schema 使用专用 patch且不复制旧 name/description/flow。该子范围关闭 `CV-AUDIT-006/012`。
 - [x] AppConfigMutationAndApply authority 用一把 async gate 覆盖 authoritative reload、revision CAS、absent-preserving patch、validation、candidate replace 与可选 runtime apply；仅文件不存在可初始化默认，损坏/空内容/权限/锁定/I/O 错误保留 active bytes 和 last-good，并通过稳定 degraded/503 契约拒绝 mutation。该子范围关闭 `CV-AUDIT-021/029/042`。
 - [x] 相机 binding save/reset 固定 camera operation gate → AppConfig gate，执行 validate/conflict → persist → apply；persist 失败运行态零变化，apply 失败恢复旧 durable snapshot/runtime 或进入 fence。删除/换 SerialNumber 会停止并 dispose 不再引用的 provider，共享 SerialNumber 保留；reset 同步清空 CameraManager 与串口光电触发配置。该子范围关闭 `CV-AUDIT-009/083/084`。
-- [ ] Station 双配置采用 operation lock、generationId、唯一 temp 与 commit/recovery marker，或收敛单一 authority；故障/重启后不得观察混合 generation，不承诺跨文件断电级绝对原子。
+- [x] Station 双配置按规范路径共享单一 process-wide operation gate；每次 mutation 生成 GUID generation、独立 transaction 目录、唯一 temp、previous snapshot 与 `CommitIntended/Committed` marker。candidate hash 校验后才发布，失败同步 rollback；进程中断后新 store 只 roll-forward 完整 intended generation 或 rollback 完整 previous generation，不观察 mixed generation，也不宣称跨文件断电级绝对原子。该子范围关闭 `CV-AUDIT-040`。
 - [x] AI model、role defaults、测试状态与 secret store 已进入按文件路径共享的串行 mutation authority；每次在锁内 reload authoritative generation，使用唯一 generation/candidate、DPAPI secret 目录与 previous recovery，durable commit 后才 swap memory，失败返回不含密钥的结构化 503。该子范围关闭 `CV-AUDIT-041/082`。
 - [x] Prompt/flow-version/scenario persistence 已使用单一串行 mutation authority 锁住 load → merge/increment/activate → durable candidate → commit；并发 metrics/version/scenario save/activate 不再丢增量、生成重复版本号或让旧 active 快照覆盖新状态。该子范围关闭 `CV-AUDIT-069`。
 - [x] AI 生成主结果与可选 metrics 已分离提交：metrics I/O 失败进入 bounded degraded health/retryable event，成功 LLM/flow 结果保持成功，失败路径保留原始异常；后续有效 metrics 写入才清除对应 degraded 状态。该子范围关闭 `CV-AUDIT-070`。
-- [ ] 数据库 repair/backup/restore/cleanup 通过同一 maintenance operation gate 串行；恢复期间不得让并发清理/备份命中不确定库，失败保留 safety backup 和明确 recovery state。
+- [x] 数据库 status/repair/backup/restore/cleanup 按规范数据库路径共享 maintenance gate；restore 先生成 safety backup、candidate DB/package 与 hash，再写 recovery marker 并分阶段发布。普通失败恢复精确旧 DB/package，rollback/recovery 中断保留 marker、safety backup 并 fence 当前实例；干净实例启动时继续恢复，恢复期间其它维护操作不能进入不确定库。该子范围关闭 `CV-AUDIT-079`。
 - [x] legacy `/api/ai/agent-plan` 与 production frontend fallback 已删除；正式 `/api/ai/agent-plan-runs` 强制 `workspaceExpectedRevision + clientMutationId`，初始与 terminal mutation 使用同一 CAS。runId/receipt 幂等，重复 mutation 只启动一次 planner；长请求期间的新保存会让旧 terminal 409 且零覆盖。该子范围关闭 `CV-AUDIT-080`。
 - [x] Project create 进入 ProjectSaveCoordinator 的 `Prepared -> CommitIntended -> Completed` staged commit/recovery；DB aggregate、flow body/metadata、variable state 与 assets 共用 create manifest。pre-intent 丢弃、post-intent 同步回滚，回滚中断则 fenced 并在启动恢复继续 rollback；API 失败后 list/detail/flow 均不可见。该子范围关闭 `CV-AUDIT-089`。
-- [x] `CV-AUDIT-044` 产品决定与实现已落地：`flow_templates.json` 是权威用户数据；GET pure，未初始化/损坏/空库/不可用统一返回稳定 degraded 503，不修改 active bytes 或生成 backup；built-in 初始化/升级只在显式 startup migration，修复只经 Admin maintenance endpoint。focused regression Product `24/24`、Desktop endpoint `9/9` PASS；该源 ID 已单独关闭，U09 其余 authority 项仍开放。
+- [x] `CV-AUDIT-044` 产品决定与实现已落地：`flow_templates.json` 是权威用户数据；GET pure，未初始化/损坏/空库/不可用统一返回稳定 degraded 503，不修改 active bytes 或生成 backup；built-in 初始化/升级只在显式 startup migration，修复只经 Admin maintenance endpoint。focused regression Product `24/24`、Desktop endpoint `9/9` PASS；该源 ID 已单独关闭。
 - [x] AppConfig/相机 authority 已注入并发、旧 revision、malformed/empty/permission/I/O、candidate replace、persist/apply/rollback、活动 preview/acquisition、reset/save 竞争与重启/no-op reconciliation，验证结构化响应、原数据保留及运行态收敛。
-- [ ] Station 双配置与 database maintenance 剩余 authority 仍需各自注入磁盘满、权限、进程中断、半写、并发与恢复故障；不得用 Wave 2B AppConfig/相机或 Wave 2C AI/CAS 矩阵代替。
+- [x] Station、AI、prompt/flow/scenario、database maintenance 与 PlanRun CAS 均有独立 barrier/fault-injection：覆盖并发、权限/I/O、candidate/replace、pre/post commit 中断、半发布、rollback 二次失败、损坏/缺失 safety backup、重启恢复、stale revision、同 mutation ID 异 payload及重复 terminal；各 authority 不互借矩阵。
 
-`CV-AUDIT-021` 的非 Admin 主题写入边界此前已关闭；Wave 2B 又关闭其剩余 stale read-modify-write/revision 子范围，因此该源 ID 现整体关闭。Wave 2C 已关闭 AI model/secret/prompt/flow-version/metrics 与 PlanRun CAS 子范围；metrics 继续是辅助证据，不参与主结果成败。
+`CV-AUDIT-021` 的非 Admin 主题写入边界此前已关闭；Wave 2B 又关闭其剩余 stale read-modify-write/revision 子范围，因此该源 ID 现整体关闭。Wave 2C 已关闭 Station、AI model/secret/prompt/flow-version/metrics、database maintenance 与 PlanRun CAS 子范围；metrics 继续是辅助证据，不参与主结果成败。
 
-Wave 2A 关闭 Project authority/create，Wave 2B 关闭 AppConfig mutation/apply 与相机 runtime/lifecycle，Wave 2C 关闭 AI persistence 与 PlanRun CAS；Station 双配置 `CV-AUDIT-040`、数据库 maintenance gate `CV-AUDIT-079` 仍开放，因此 U09 保持 `OPEN_RESCOPED`。
+Wave 2A 关闭 Project authority/create，Wave 2B 关闭 AppConfig mutation/apply 与相机 runtime/lifecycle，Wave 2C 最终关闭 Station 双配置、AI persistence、database maintenance 与 PlanRun CAS；U09 的全部映射 ID 已有独立故障矩阵与最终 evidence SHA，因此状态为 `CLOSED`。
 
 ### U10 执行来源、资源 capability、状态隔离与取消
 
@@ -274,11 +274,10 @@ Wave 2A 关闭 Project authority/create，Wave 2B 关闭 AppConfig mutation/appl
 
 这些 ID 只能在源文档补齐当前事实和证据后转 `CLOSED`。其中 `CV-AUDIT-094` 的关闭依据是全局 Profile/TcpDeviceManager 已实现真实 TCP Server；node-local UX 是派生项，不占用该 ID。
 
-### 5.2 仍开放（39）
+### 5.2 仍开放（37）
 
 | 唯一治理线 | ID |
 | --- | --- |
-| U09 持久化/apply/recovery | `CV-AUDIT-040, CV-AUDIT-079` |
 | U10 execution authority/state | `CV-AUDIT-032, CV-AUDIT-048, CV-AUDIT-049, CV-AUDIT-050, CV-AUDIT-051, CV-AUDIT-052, CV-AUDIT-053, CV-AUDIT-055, CV-AUDIT-056, CV-AUDIT-065, CV-AUDIT-072, CV-AUDIT-102` |
 | U11 长进程资源/保留 | `CV-AUDIT-057, CV-AUDIT-058, CV-AUDIT-059, CV-AUDIT-060, CV-AUDIT-063, CV-AUDIT-066, CV-AUDIT-067, CV-AUDIT-068, CV-AUDIT-071, CV-AUDIT-081, CV-AUDIT-086, CV-AUDIT-087, CV-AUDIT-090, CV-AUDIT-093` |
 | U12 查询/发布/导出 | `CV-AUDIT-001, CV-AUDIT-003, CV-AUDIT-074, CV-AUDIT-075, CV-AUDIT-076, CV-AUDIT-078, CV-AUDIT-088` |
@@ -286,7 +285,7 @@ Wave 2A 关闭 Project authority/create，Wave 2B 关闭 AppConfig mutation/appl
 
 部分已关闭子范围不得回退：`057` OnnxPatch cache、`071` 原时间 TTL 诉求、`086` replay fail-soft P0、`102` Studio formal/realtime/node preview admission。剩余动作仍按对应源 ID 独立验收；`021` 已在 Wave 2B 连同 stale RMW/revision 子范围整体关闭。
 
-### 5.3 已关闭（32）
+### 5.3 已关闭（34）
 
 | ID | 关闭证据 |
 | --- | --- |
@@ -299,11 +298,13 @@ Wave 2A 关闭 Project authority/create，Wave 2B 关闭 AppConfig mutation/appl
 | `CV-AUDIT-042` | Wave 2B implementation/integration/evidence SHA `5372fd011694b51a6e31fdeb323030efe67f0b3b`；仅 missing 初始化，malformed/empty/权限/锁定/I/O 保留 active bytes/cache/revision，last-good/unavailable 均结构化 503；Product focused `25/25` 覆盖 candidate/replace failure。 |
 | `CV-AUDIT-083` | Wave 2B implementation/integration/evidence SHA `5372fd011694b51a6e31fdeb323030efe67f0b3b`；固定 camera gate → AppConfig gate 与 validate/prepare → persist → apply，覆盖 persist/apply/rollback/fence、活动流冲突、竞争与重启收敛；Desktop focused `96/96`。 |
 | `CV-AUDIT-084` | Wave 2B implementation/integration/evidence SHA `5372fd011694b51a6e31fdeb323030efe67f0b3b`；删除/换 SerialNumber 停止 idle stream 并 close/dispose 无引用 provider，共享 serial 保留，活动流冲突零副作用，reset 同路径；Desktop focused `96/96`、Desktop endpoints `403/403`。 |
-| `CV-AUDIT-041` | Wave 2C implementation/integration/evidence SHA `7ad57cc2adebbe04dcc735f53d0fdc205ad1cac3`；AI model/secret generation 先 candidate、durable commit 后切内存，secret/IO/commit 失败返回 secret-free 503 且旧 generation 保持；Product focused `79/79`、Desktop focused `104/104`。 |
-| `CV-AUDIT-069` | Wave 2C implementation/integration/evidence SHA 同上；prompt、flow version、scenario save/activate 的完整 load→mutate→candidate→commit 由 path-keyed authority 串行，barrier 并发证明 metrics 不丢、version 单调唯一且 active 不回退。 |
-| `CV-AUDIT-070` | Wave 2C implementation/integration/evidence SHA 同上；metrics persistence 失败记录 degraded/retryable health，成功生成不反向失败、失败生成保留原始 LLM 异常；成功/失败 fault injection 均通过。 |
-| `CV-AUDIT-080` | Wave 2C implementation/integration/evidence SHA 同上；旧 `/api/ai/agent-plan` 与前端 fallback 删除，PlanRun 强制 revision/mutation ID，初始/terminal 共用 CAS；stale、duplicate、延迟重复与并发 user save 均零覆盖。 |
-| `CV-AUDIT-082` | Wave 2C implementation/integration/evidence SHA 同上；所有 model mutation 在共享 authority 内重读最新 durable generation 后提交，跨 store 并发、candidate/commit 中断与重启只恢复完整旧或完整新 generation。 |
+| `CV-AUDIT-040` | Wave 2C 最终 implementation/integration/evidence SHA `431ab324afbe081f50c6738e749b6de9a10436a2`；Station 双文件共用 canonical-path gate、GUID transaction、candidate hash 与 intent/completed marker；并发、权限/I/O、半发布与 restart roll-forward/rollback 均只得到完整 generation。 |
+| `CV-AUDIT-041` | Wave 2C 最终 implementation/integration/evidence SHA 同上；AI model/secret generation 先 candidate、durable commit 后切内存，secret/IO/commit 失败返回 secret-free 503 且旧 generation 保持；最终 Product focused `104/104`、Desktop focused `171/171`。 |
+| `CV-AUDIT-069` | Wave 2C 最终 implementation/integration/evidence SHA 同上；prompt、flow version、scenario save/activate 的完整 load→mutate→candidate→commit 由 path-keyed authority 串行，barrier 并发证明 metrics 不丢、version 单调唯一且 active 不回退。 |
+| `CV-AUDIT-070` | Wave 2C 最终 implementation/integration/evidence SHA 同上；metrics persistence 失败按 durable order 记录 degraded/retryable health，成功生成不反向失败、失败生成保留原始 LLM 异常；成功/失败及跨实例 health race fault injection 均通过。 |
+| `CV-AUDIT-079` | Wave 2C 最终 implementation/integration/evidence SHA 同上；database status/repair/backup/restore/cleanup 共用 canonical-path maintenance gate，safety backup、candidate hash、marker、rollback/fence 与 clean-instance recovery 覆盖全部维护竞态。 |
+| `CV-AUDIT-080` | Wave 2C 最终 implementation/integration/evidence SHA 同上；旧 `/api/ai/agent-plan` 与前端 fallback 删除，PlanRun 强制 revision/mutation ID，初始/terminal 共用 CAS且 receipt 绑定完整 planning payload fingerprint；stale、重复及同 mutation ID 异 payload均零覆盖。 |
+| `CV-AUDIT-082` | Wave 2C 最终 implementation/integration/evidence SHA 同上；所有 model mutation 在共享 authority 内重读最新 durable generation 后提交，GenerationId 严格 GUID-N/目录 containment，跨 store 并发、candidate/commit 中断与重启只恢复完整旧或完整新 generation。 |
 | `CV-AUDIT-044` | Wave 0 implementation/evidence SHA `1e2342c3909cb1f157d902aef1338e92f1ac44a3`。 |
 | `CV-AUDIT-011` | capability implementation SHA `6a476939b143a62a104ebfd4e655979d117f15b2`；Wave 1B1 integration/evidence SHA `139e9a062102feab7e6d2a0fdef6085f5b078e34`；Station UI/handler capability gate 与非视觉零 mutation 请求验收通过。 |
 | `CV-AUDIT-014` | 同上；设置、PLC、相机 mutation 与实际 Admin/`CanOperateHardware` policy 对齐，缺失 capability 时 fail closed。 |
@@ -441,7 +442,7 @@ Wave 2A 关闭 Project authority/create，Wave 2B 关闭 AppConfig mutation/appl
 - 范围与残余原子边界：AI model reset 保持既有独立 store，未宣称与 AppConfig 跨 authority 原子；Station 双配置 generation/transaction、AI model/secret/prompt/metrics persistence、database maintenance gate、legacy AI plan CAS、U10/G16、FrontendV2、visual baseline、clean clone、真实 WebView2/目标机/LLM/PLC/相机和同 SHA GitHub CI 均未进入或未执行。未 push。
 - Disposition：`CV-AUDIT-009/021/029/042/083/084 = CLOSED`。102 个源 ID 重算为 31 个 `IMPLEMENTED_SYNC_PENDING`、44 个仍开放、27 个已关闭；U09 因 Station/AI/database/legacy plan 等剩余 authority 保持 `OPEN_RESCOPED`，U11 因 057/058/059/060/063/066/067/068/071/081/086-P1/087/090/093 等资源治理保持 `OPEN_RESCOPED`。U10、G16 与排除 ID 未改动。
 
-### 7.8 Wave 2C 验证证据（2026-08-31）
+### 7.8 Wave 2C AI 阶段验证证据（2026-08-31）
 
 - Code baseline HEAD：`50e18563afc7c87b825fe16c6b91477f150a0faa`；先行 Wave 2B docs-only 同步 SHA：`c9fe781eb33ee98acadff1f5bdc44e3add4930bc`；AI persistence/workspace CAS 最终纯 implementation/integration evidence SHA：`7ad57cc2adebbe04dcc735f53d0fdc205ad1cac3`（`fix: harden AI persistence and workspace CAS`）。本节所在的 docs-only 提交只引用该实现 SHA，不把文档提交自身写入 tracked evidence。
 - AI model/secret generation：按 `ai_models.json` 规范路径共享 process-wide mutation gate，每次 mutation 在 gate 内重读最新 durable generation；add/update/delete/activate/planner/shadow default/test status/reset 全部构造独立 generation。DPAPI secrets 先写唯一 candidate 目录，model schema-v2 document 再写唯一 durable candidate，secret generation 就位后才 atomic replace model document，durable commit 后才替换内存；active 与 `.previous` 最多保留两个完整 generation。candidate/commit 中断、active document/secret 损坏与 legacy backup recovery 在重启时只选择完整旧或完整新 generation。失败使用不含路径、key 或异常正文的 `AiConfigPersistenceException`/503，不返回假成功。
@@ -454,6 +455,22 @@ Wave 2A 关闭 Project authority/create，Wave 2B 关闭 AppConfig mutation/appl
 - UI：AI UI contract `388/388`，最终完整 `npm run test:unit` 为 48 files、`1019/1019` PASS。定向 AI Playwright 5 个 spec、Chromium 单 worker、排除标题含 `visual baseline` 的项目，最终 `47 passed / 12 failed / 1 skipped`；正式 PlanRun shell 与 Build-via-AgentRun 用例通过，12 个失败与 Wave 2B 既有 AI 集合完全一致。
 - 完整非视觉 lane：Chromium 单 worker 共 188 项，`166 passed / 21 failed / 1 skipped`，耗时 10.1 分钟；失败精确保持 AI 12、flow-editor-port 1、flow-layout 5、Station high-frequency 1、Quiet Precision 2。没有新增签名，不称 full Playwright PASS，也未更新 visual baseline。
 - 静态/残余/清理：changed JS/CJS/MJS `node --check` `3/3`、`git diff --check` PASS；production 旧 `/api/ai/agent-plan` route/fallback、锁外 model/prompt/flow 整文件 RMW、固定共享 AI temp 与无版本 PlanRun workspace mutation 扫描均为 0。仅 non-authoritative unique residue cleanup 允许 best-effort；权威 Save/commit 异常均传播或按 metrics auxiliary 契约记录 degraded。`.tmp/test_results`、Playwright `test-results`/`playwright-report` 已删除；未发现关联本仓库的 dotnet/testhost/node/Chromium/Playwright 残留进程。
-- 范围与 disposition：未 push，未执行 visual baseline 更新、clean clone、真实 WebView2/目标机、真实 LLM/PLC/相机或同 SHA GitHub CI；未进入 Station 双配置、database maintenance、U10/U11/G16。`CV-AUDIT-041/069/070/080/082 = CLOSED`；102 个源 ID 重算为 31 个 `IMPLEMENTED_SYNC_PENDING`、39 个仍开放、32 个已关闭。U09 因 `CV-AUDIT-040/079` 继续 `OPEN_RESCOPED`；U11 与 `CV-AUDIT-086` 状态不变。
+- 阶段范围与 disposition：未 push，未执行 visual baseline 更新、clean clone、真实 WebView2/目标机、真实 LLM/PLC/相机或同 SHA GitHub CI；该阶段尚未进入 Station 双配置、database maintenance、U10/U11/G16。`CV-AUDIT-041/069/070/080/082 = CLOSED`；当时 102 个源 ID 为 31 个 `IMPLEMENTED_SYNC_PENDING`、39 个仍开放、32 个已关闭，U09 因 `CV-AUDIT-040/079` 暂时 `OPEN_RESCOPED`。后续最终 disposition 见 7.9。
+
+### 7.9 Wave 2C authority completion 验证证据（2026-08-31）
+
+- 用户给定基线为 `50e18563afc7c87b825fe16c6b91477f150a0faa`；实际接手时工作树已干净地位于 `a9d011a3c381fa8cef428d1d0eb65ee4cba43732`（ahead 31），其中包含 Wave 2B docs-only `c9fe781eb33ee98acadff1f5bdc44e3add4930bc`、先行 AI persistence/workspace CAS 实现 `7ad57cc2adebbe04dcc735f53d0fdc205ad1cac3` 与其阶段文档。未 reset/checkout/stash/覆盖既有工作。Station/database/AI 补强及最终纯 implementation/integration evidence SHA 为 `431ab324afbe081f50c6738e749b6de9a10436a2`（`fix: close remaining U09 persistence authorities`）；该 SHA 的 18 个文件不含 canonical 文档。本节所在 docs-only 提交只引用已存在实现 SHA，不写入自身 SHA。
+- Station generation authority：Studio ingress 与 local Station Sync 两个文件按规范路径共享 process-wide gate；每次 save/token regeneration 先读取同一 authoritative generation，再写 GUID transaction 目录中的两个 candidate、previous snapshots 与 SHA-256，持久化 `CommitIntended` marker 后发布，最后写 `Committed`。同步失败 rollback；pre-intent residue 丢弃，半发布 restart 优先验证并 roll-forward 完整 intended generation，candidate 缺失/损坏则 rollback 完整 previous generation。所有 temp 唯一，响应使用稳定 503 errorCode/stage/retryable/recoveryRequired 且不暴露 token；该恢复协议保证收敛到完整 generation，不宣称跨文件断电绝对原子。
+- AI model/secret generation：`ai_models.json` 同路径 store 共用 mutation gate，每次 add/update/delete/activate/role default/test/reset 在 gate 内 reload durable generation并构造独立 candidate；DPAPI secret candidate、model schema-v2 candidate、secret final directory 与 model atomic replace 全部成功后才切内存。active/previous 顺序、previous unreadable fail-closed、candidate cleanup fail-soft、严格 GUID-N `GenerationId`、canonical containment 与 reparse-point 拒绝阻止恶意 generation 触发 secret pruning；失败只投影 secret-free 503，restart 只选择完整旧/新 generation。
+- Prompt/flow/scenario 与 metrics：`prompt_versions.json`、`ai_flow_versions.json` 各自用 path-keyed gate 覆盖 load/recover → create/delete/activate/metrics increment 或 version/scenario save/activate → unique durable candidate → atomic commit。并发 metrics 不丢增量，version 单调唯一且 active 不回退。metrics mutation 与 degraded/recovered health transition 在同一 durable order 内完成；I/O 失败记录 bounded retryable event，成功 LLM/flow 不反向失败，失败路径保留原始异常。
+- Database maintenance authority：status/repair/backup/restore/cleanup 按规范数据库路径共享 gate。restore 先生成 safety backup、DB/package candidate 与 hash，写 durable recovery marker 后才发布；candidate 在破坏性步骤前再次验证。普通 publish 失败精确恢复旧 DB/package；中断或二次 rollback 失败保留 safety backup、non-completed marker并 fence 当前实例，干净实例重启后继续 recovery。marker 的 operation/state/hash/root containment 均 fail closed，恢复中的库不会被并发维护命中；协议保证可恢复收敛，不宣称跨文件系统断电原子。
+- PlanRun CAS：production 精确旧 `/api/ai/agent-plan` route 与 ordinary frontend fallback 为 0，唯一正式入口为 `/api/ai/agent-plan-runs`。初始 planning 与 completed/failed/cancelled terminal mutation 均强制 `workspaceExpectedRevision + clientMutationId` 并使用同一 workspace CAS；receipt 绑定完整 planning request fingerprint。相同 mutation/payload 幂等重放且 planner 只启动一次，同 mutation ID 异 payload 返回 `409 workspace_mutation_id_conflict`；长请求期间 user save 推进 revision 后，旧 terminal conflict 且零覆盖。
+- 确定性故障矩阵：barrier 覆盖 Station save/token 跨实例、AI 同/跨 store mutation、metrics/health 顺序、flow version、scenario save/activate、database 五类维护并发与长 PlanRun/user save。fault injector 覆盖权限/I/O、secret write、candidate write/read/hash、marker/replace、pre/post commit、Station/DB 半发布、rollback 二次失败、缺失/损坏/out-of-root safety backup、restart recovery、metrics success/failure、missing/stale revision、duplicate/异 payload mutation ID及 terminal complete/fail/cancel 竞争。所有失败验证旧文件/内存不被假成功污染，公开响应不泄密。
+- .NET focused：Product 以 `run-dotnet-test-serial.ps1` 对同一 csproj 合并 AI model/prompt/flow/metrics 类，最终 `104/104` PASS；Desktop 合并 AgentRun、AI endpoint、Station store/endpoint 与 database maintenance 类，最终 `171/171` PASS。首次成功 build 后的复跑均使用 `-NoBuild -NoRestore`，同一 csproj 始终单进程串行。
+- 固定回归：services `596 passed / 1 failed / 597 total`；唯一失败仍为 `AuthenticatedContextProjectionServiceTests.Project_ShouldReturnExactCapabilitySetsForEverySupportedRole`，Engineer 比旧期望多 `inspection.results.read`。Phase 4.2 `143/143`、PLC `126/126`、Desktop endpoints `412/412`；相对阶段 SHA 的 `407/407` 仅测试人口增加 5，无新失败。
+- UI：Agent UI contract `389/389`，完整 `npm run test:unit` 为 48 files、`1020/1020` PASS。Station+AI 四个 spec 的 Chromium 单 worker定向执行共 61 项，`35 passed / 25 failed / 1 skipped`；Station `5/5` 全过，25 个失败由完整非视觉基线中的 12 个既有 AI 签名及额外 13 个显式视觉 baseline 差异组成，未更新快照、未称 targeted full PASS。
+- 完整非视觉 lane：`npx playwright test --project=chromium --workers=1 --grep-invert "visual baseline" --reporter=list` 共 188 项，`166 passed / 21 failed / 1 skipped`，耗时 9.9 分钟；失败精确保持 AI 12、flow-editor-port 1、flow-layout 5、Station high-frequency 1、Quiet Precision 2。相对给定基线无数量或签名变化，不称 full Playwright PASS，也未更新 visual baseline。
+- 静态/残余/清理：changed JS/MJS `node --check` `1/1`；changed PowerShell/JSON 均 0 文件且对应 AST/parse error 为 0；`git diff --check` PASS。production 精确旧 `/api/ai/agent-plan` route/fallback、锁外 model/prompt/flow 整文件 RMW、固定共享 temp、无版本 PlanRun workspace mutation 与吞掉权威 Save/commit 异常扫描均为 0；仅唯一 non-authoritative candidate/completed residue cleanup 允许 best-effort。`.tmp/test_results`、Playwright `test-results`/`playwright-report`、临时 DB/config/secret/recovery 及仓库关联测试进程均已清理。
+- 范围与 disposition：未 push，未执行 visual baseline 更新、clean clone、真实 WebView2/目标机、真实 LLM/PLC/相机或同 SHA GitHub CI；未进入 U10/U11/G16、FrontendV2 或 Wave 3。`CV-AUDIT-040/041/069/070/079/080/082 = CLOSED`；102 个源 ID 重算为 31 个 `IMPLEMENTED_SYNC_PENDING`、37 个仍开放、34 个已关闭，U09=`CLOSED`。U11 与 `CV-AUDIT-086`、U10、G16 状态不变。
 
 Wave 可以拆成小提交，但每个源 ID 必须保留独立验收行。只有在 required profiles、最终 Release SHA 和源文档回填全部关闭后，才归档本文及用户指定的七组文档。
