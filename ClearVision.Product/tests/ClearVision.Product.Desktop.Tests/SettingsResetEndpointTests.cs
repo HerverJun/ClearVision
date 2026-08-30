@@ -1,10 +1,12 @@
 using System.Linq;
 using System.Net;
+using System.Net.Http.Json;
 using System.Text.Json;
 using ClearVision.Product.Application.Services;
+using ClearVision.Product.Core.Cameras;
 using ClearVision.Product.Core.Entities;
-using ClearVision.Product.Core.Interfaces;
 using ClearVision.Product.Desktop.Endpoints;
+using ClearVision.Product.Desktop.Services;
 using ClearVision.Product.Infrastructure.AI;
 using FluentAssertions;
 using Microsoft.AspNetCore.Builder;
@@ -65,7 +67,7 @@ public class SettingsResetEndpointTests
     [Fact]
     public async Task ResetSettings_ShouldResetAppConfigAndAiModels()
     {
-        await using var host = await SettingsResetTestHost.CreateAsync();
+        await using var host = await SettingsResetTestHost.CreateAsync(initialConfig: CreateSensitiveConfig());
 
         var aiConfigStore = host.Services.GetRequiredService<AiConfigStore>();
         aiConfigStore.Add(new AiModelConfig
@@ -78,14 +80,25 @@ public class SettingsResetEndpointTests
         });
         aiConfigStore.SetActive("custom-model");
 
-        using var response = await host.Client.PostAsync("/api/settings/reset", content: null);
+        using var response = await host.Client.PostAsJsonAsync("/api/settings/reset", new SettingsResetRequest
+        {
+            ExpectedRevision = host.ConfigurationService.GetCurrent().Revision
+        });
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
-        await host.ConfigurationService.Received(1).SaveAsync(Arg.Is<AppConfig>(config =>
-            config.General != null &&
-            config.General.Theme == GeneralConfig.ThemeDark &&
-            config.Runtime != null &&
-            config.Security != null));
+        var committed = host.ConfigurationService.GetCurrent();
+        committed.General.Theme.Should().Be(GeneralConfig.ThemeDark);
+        committed.Runtime.Should().NotBeNull();
+        committed.Security.Should().NotBeNull();
+        committed.Cameras.Should().BeEmpty();
+        committed.ActiveCameraId.Should().BeEmpty();
+        committed.Revision.Should().Be(1);
+        host.ConfigurationService.MutationCount.Should().Be(1);
+        await host.CameraManager.Received(1).ApplyBindingsAsync(
+            Arg.Is<List<CameraBindingConfig>>(bindings => bindings.Count == 0),
+            string.Empty);
+        host.SerialTriggerService.Received(1).ConfigureBindings(
+            Arg.Is<IEnumerable<CameraBindingConfig>>(bindings => !bindings.Any()));
 
         var models = aiConfigStore.GetAll();
         models.Should().ContainSingle();
@@ -108,14 +121,82 @@ public class SettingsResetEndpointTests
         document.RootElement.GetProperty("config").GetProperty("general").GetProperty("theme").GetString().Should().Be(GeneralConfig.ThemeDark);
     }
 
+    [Fact]
+    public async Task ResetSettings_WhenAppConfigIsAlreadyDefault_ShouldReconcileRuntimeWithoutRevisionIncrement()
+    {
+        await using var host = await SettingsResetTestHost.CreateAsync(initialConfig: new AppConfig());
+
+        using var response = await host.Client.PostAsJsonAsync("/api/settings/reset", new SettingsResetRequest
+        {
+            ExpectedRevision = 0
+        });
+
+        var responseJson = await response.Content.ReadAsStringAsync();
+        response.StatusCode.Should().Be(HttpStatusCode.OK, responseJson);
+        host.ConfigurationService.GetCurrent().Revision.Should().Be(0);
+        host.ConfigurationService.MutationCount.Should().Be(0);
+        await host.CameraManager.Received(1).ApplyBindingsAsync(
+            Arg.Is<List<CameraBindingConfig>>(bindings => bindings.Count == 0),
+            string.Empty);
+        host.SerialTriggerService.Received(1).ConfigureBindings(
+            Arg.Is<IEnumerable<CameraBindingConfig>>(bindings => !bindings.Any()));
+    }
+
+    [Fact]
+    public async Task GetSettings_WhenReadIsDegraded_ShouldReturnStructuredServiceUnavailable()
+    {
+        var lastGood = CreateSensitiveConfig();
+        lastGood.Revision = 7;
+        await using var host = await SettingsResetTestHost.CreateAsync(initialConfig: lastGood);
+        host.ConfigurationService.ForcedReadResult = new(
+            ClearVision.Product.Core.Interfaces.AppConfigReadStatus.DegradedLastGood,
+            lastGood,
+            "APP_CONFIG_MALFORMED",
+            "Configuration JSON is malformed.");
+
+        using var response = await host.Client.GetAsync("/api/settings");
+
+        var responseJson = await response.Content.ReadAsStringAsync();
+        response.StatusCode.Should().Be(HttpStatusCode.ServiceUnavailable, responseJson);
+        using var document = JsonDocument.Parse(responseJson);
+        document.RootElement.GetProperty("success").GetBoolean().Should().BeFalse();
+        document.RootElement.GetProperty("errorCode").GetString().Should().Be("APP_CONFIG_MALFORMED");
+        document.RootElement.GetProperty("configStatus").GetString().Should().Be("DegradedLastGood");
+        document.RootElement.GetProperty("hasLastGood").GetBoolean().Should().BeTrue();
+        document.RootElement.GetProperty("revision").GetInt64().Should().Be(7);
+    }
+
+    [Fact]
+    public async Task ResetSettings_WithoutExpectedRevision_ShouldReturnValidationFailure()
+    {
+        await using var host = await SettingsResetTestHost.CreateAsync();
+
+        using var response = await host.Client.PostAsJsonAsync("/api/settings/reset", new SettingsResetRequest());
+
+        var responseJson = await response.Content.ReadAsStringAsync();
+        response.StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity, responseJson);
+        responseJson.Should().Contain("APP_CONFIG_EXPECTED_REVISION_REQUIRED");
+        host.ConfigurationService.MutationCount.Should().Be(0);
+        await host.CameraManager.DidNotReceive().ApplyBindingsAsync(
+            Arg.Any<List<CameraBindingConfig>>(),
+            Arg.Any<string>());
+        host.SerialTriggerService.DidNotReceive().ConfigureBindings(Arg.Any<IEnumerable<CameraBindingConfig>>());
+    }
+
     private sealed class SettingsResetTestHost : IAsyncDisposable
     {
         private readonly WebApplication _app;
 
-        private SettingsResetTestHost(WebApplication app, IConfigurationService configurationService)
+        private SettingsResetTestHost(
+            WebApplication app,
+            InMemoryAppConfigAuthority configurationService,
+            ICameraManager cameraManager,
+            ISerialPhotoelectricTriggerInputService serialTriggerService)
         {
             _app = app;
             ConfigurationService = configurationService;
+            CameraManager = cameraManager;
+            SerialTriggerService = serialTriggerService;
             Client = app.GetTestClient();
             Services = app.Services;
         }
@@ -124,7 +205,11 @@ public class SettingsResetEndpointTests
 
         public IServiceProvider Services { get; }
 
-        public IConfigurationService ConfigurationService { get; }
+        public InMemoryAppConfigAuthority ConfigurationService { get; }
+
+        public ICameraManager CameraManager { get; }
+
+        public ISerialPhotoelectricTriggerInputService SerialTriggerService { get; }
 
         public static async Task<SettingsResetTestHost> CreateAsync(string role = "Admin", AppConfig? initialConfig = null)
         {
@@ -135,13 +220,23 @@ public class SettingsResetEndpointTests
 
             builder.WebHost.UseTestServer();
 
-            var configService = Substitute.For<IConfigurationService>();
             var config = initialConfig ?? new AppConfig();
-            configService.LoadAsync().Returns(Task.FromResult(config));
-            configService.GetCurrent().Returns(config);
-            configService.SaveAsync(Arg.Any<AppConfig>()).Returns(Task.CompletedTask);
-            builder.Services.AddSingleton(configService);
-            builder.Services.AddSingleton(Substitute.For<ClearVision.Product.Core.Cameras.ICameraManager>());
+            config.Normalize();
+            var configService = new InMemoryAppConfigAuthority(config);
+            var cameraManager = Substitute.For<ICameraManager>();
+            cameraManager.ApplyBindingsAsync(
+                Arg.Any<List<CameraBindingConfig>>(),
+                Arg.Any<string>()).Returns(Task.CompletedTask);
+            var streamCoordinator = Substitute.For<ICameraFrameStreamCoordinator>();
+            streamCoordinator.ReleaseIdleStreamAsync(Arg.Any<string>()).Returns(Task.CompletedTask);
+            var serialTriggerService = Substitute.For<ISerialPhotoelectricTriggerInputService>();
+            builder.Services.AddSingleton<ClearVision.Product.Core.Interfaces.IConfigurationService>(configService);
+            builder.Services.AddSingleton(cameraManager);
+            builder.Services.AddSingleton(streamCoordinator);
+            builder.Services.AddSingleton(serialTriggerService);
+            builder.Services.AddSingleton<CameraConfigurationCoordinator>();
+            builder.Services.AddSingleton<Microsoft.Extensions.Logging.ILogger<CameraConfigurationCoordinator>>(
+                NullLogger<CameraConfigurationCoordinator>.Instance);
 
             var aiConfigStore = new AiConfigStore(
                 Options.Create(new AiGenerationOptions
@@ -170,7 +265,7 @@ public class SettingsResetEndpointTests
             });
             app.MapSettingsEndpoints();
             await app.StartAsync();
-            return new SettingsResetTestHost(app, configService);
+            return new SettingsResetTestHost(app, configService, cameraManager, serialTriggerService);
         }
 
         public async ValueTask DisposeAsync()

@@ -21,14 +21,30 @@ public class CameraManager : ICameraManager, IDisposable
     private readonly ConcurrentDictionary<string, SemaphoreSlim> _cameraLocks = new(StringComparer.OrdinalIgnoreCase);
     private readonly ILoggerFactory _loggerFactory;
     private readonly ILogger<CameraManager> _logger;
+    private readonly Func<string, string?, ICameraProvider?> _providerFactory;
+    private readonly Func<List<CameraDeviceInfo>> _deviceDiscovery;
+    private readonly object _bindingsSync = new();
     private List<CameraBindingConfig> _bindings = new();
     private string _activeCameraId = "";
     private bool _disposed;
 
     public CameraManager(ILoggerFactory loggerFactory)
+        : this(
+            loggerFactory,
+            (serialNumber, manufacturerHint) => CameraProviderFactory.AutoDetect(serialNumber, manufacturerHint),
+            CameraProviderFactory.DiscoverAll)
+    {
+    }
+
+    public CameraManager(
+        ILoggerFactory loggerFactory,
+        Func<string, string?, ICameraProvider?> providerFactory,
+        Func<List<CameraDeviceInfo>>? deviceDiscovery = null)
     {
         _loggerFactory = loggerFactory;
         _logger = loggerFactory.CreateLogger<CameraManager>();
+        _providerFactory = providerFactory ?? throw new ArgumentNullException(nameof(providerFactory));
+        _deviceDiscovery = deviceDiscovery ?? (() => new List<CameraDeviceInfo>());
     }
 
     /// <summary>
@@ -36,7 +52,7 @@ public class CameraManager : ICameraManager, IDisposable
     /// </summary>
     public Task<IEnumerable<CameraInfo>> EnumerateCamerasAsync()
     {
-        var allDevices = CameraProviderFactory.DiscoverAll();
+        var allDevices = _deviceDiscovery();
         var cameraInfos = allDevices.Select(d => new CameraInfo
         {
             CameraId = d.SerialNumber,
@@ -77,7 +93,7 @@ public class CameraManager : ICameraManager, IDisposable
             }
 
             // AutoDetect internally opens the camera and returns a connected provider.
-            var provider = CameraProviderFactory.AutoDetect(cameraKey, manufacturerHint);
+            var provider = _providerFactory(cameraKey, manufacturerHint);
             if (provider == null)
                 throw new InvalidOperationException($"Failed to detect camera: {cameraKey}. Check power, connection, and SDK installation.");
 
@@ -99,7 +115,11 @@ public class CameraManager : ICameraManager, IDisposable
     public async Task<ICamera> GetOrCreateByBindingAsync(string bindingId)
     {
         var bindingKey = NormalizeCameraKey(bindingId);
-        var binding = _bindings.FirstOrDefault(b => b.Id.Equals(bindingKey, StringComparison.OrdinalIgnoreCase));
+        CameraBindingConfig? binding;
+        lock (_bindingsSync)
+        {
+            binding = _bindings.FirstOrDefault(b => b.Id.Equals(bindingKey, StringComparison.OrdinalIgnoreCase));
+        }
         if (binding == null)
         {
             // 如果找不到绑定，尝试直接作为SN处理（向下兼容）
@@ -183,30 +203,78 @@ public class CameraManager : ICameraManager, IDisposable
 
     public void LoadBindings(List<CameraBindingConfig> bindings, string activeCameraId)
     {
-        _bindings = (bindings ?? new List<CameraBindingConfig>())
-            .Select(binding =>
-            {
-                binding.Normalize();
-                return binding;
-            })
-            .ToList();
-        _activeCameraId = activeCameraId ?? "";
-        _logger.LogDebug("[CameraManager] 已加载 {Count} 个相机绑定", _bindings.Count);
+        var normalized = NormalizeBindings(bindings);
+        lock (_bindingsSync)
+        {
+            _bindings = normalized;
+            _activeCameraId = activeCameraId ?? "";
+        }
+
+        _logger.LogDebug("[CameraManager] 已加载 {Count} 个相机绑定", normalized.Count);
     }
 
-    public List<CameraBindingConfig> GetBindings() => _bindings;
+    public List<CameraBindingConfig> GetBindings()
+    {
+        lock (_bindingsSync)
+        {
+            return NormalizeBindings(_bindings);
+        }
+    }
 
     public void UpdateBindings(List<CameraBindingConfig> bindings, string activeCameraId)
     {
-        _bindings = (bindings ?? new List<CameraBindingConfig>())
-            .Select(binding =>
-            {
-                binding.Normalize();
-                return binding;
-            })
-            .ToList();
-        _activeCameraId = activeCameraId ?? "";
+        var normalized = NormalizeBindings(bindings);
+        lock (_bindingsSync)
+        {
+            _bindings = normalized;
+            _activeCameraId = activeCameraId ?? "";
+        }
+
         _logger.LogDebug("[CameraManager] 已更新绑定，活动相机: {ActiveCameraId}", _activeCameraId);
+    }
+
+    public async Task ApplyBindingsAsync(List<CameraBindingConfig> bindings, string activeCameraId)
+    {
+        ThrowIfDisposed();
+        var normalized = NormalizeBindings(bindings);
+        HashSet<string> previousSerialNumbers;
+        lock (_bindingsSync)
+        {
+            previousSerialNumbers = _bindings
+                .Select(binding => binding.SerialNumber?.Trim() ?? string.Empty)
+                .Where(serialNumber => !string.IsNullOrWhiteSpace(serialNumber))
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        }
+
+        var retainedSerialNumbers = normalized
+            .Select(binding => binding.SerialNumber?.Trim() ?? string.Empty)
+            .Where(serialNumber => !string.IsNullOrWhiteSpace(serialNumber))
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var retiredSerialNumbers = previousSerialNumbers
+            .Where(serialNumber => !retainedSerialNumbers.Contains(serialNumber))
+            .ToArray();
+
+        foreach (var serialNumber in retiredSerialNumbers)
+        {
+            if (GetCamera(serialNumber) is { IsAcquiring: true } camera)
+            {
+                await camera.StopContinuousAcquisitionAsync();
+            }
+
+            await CloseCameraAsync(serialNumber);
+        }
+
+        lock (_bindingsSync)
+        {
+            _bindings = normalized;
+            _activeCameraId = activeCameraId ?? string.Empty;
+        }
+
+        _logger.LogInformation(
+            "[CameraManager] Applied {BindingCount} bindings and retired {RetiredCount} providers. ActiveCameraId={ActiveCameraId}",
+            normalized.Count,
+            retiredSerialNumbers.Length,
+            _activeCameraId);
     }
 
     public void Dispose()
@@ -229,6 +297,46 @@ public class CameraManager : ICameraManager, IDisposable
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(cameraId);
         return cameraId.Trim();
+    }
+
+    private static List<CameraBindingConfig> NormalizeBindings(IEnumerable<CameraBindingConfig>? bindings)
+    {
+        return (bindings ?? Enumerable.Empty<CameraBindingConfig>())
+            .Select(binding =>
+            {
+                var clone = new CameraBindingConfig
+                {
+                    Id = binding.Id,
+                    DisplayName = binding.DisplayName,
+                    SerialNumber = binding.SerialNumber,
+                    IpAddress = binding.IpAddress,
+                    Manufacturer = binding.Manufacturer,
+                    ModelName = binding.ModelName,
+                    InterfaceType = binding.InterfaceType,
+                    IsEnabled = binding.IsEnabled,
+                    ExposureTimeUs = binding.ExposureTimeUs,
+                    GainDb = binding.GainDb,
+                    PixelFormat = binding.PixelFormat,
+                    TriggerMode = binding.TriggerMode,
+                    HardwareTriggerSource = binding.HardwareTriggerSource,
+                    SoftwareTriggerSource = binding.SoftwareTriggerSource,
+                    EnterPhotoelectricDebounceMs = binding.EnterPhotoelectricDebounceMs,
+                    EnterPhotoelectricTimeoutMs = binding.EnterPhotoelectricTimeoutMs,
+                    IgnoreEnterTriggerWhileBusy = binding.IgnoreEnterTriggerWhileBusy,
+                    EnterPhotoelectricDeviceId = binding.EnterPhotoelectricDeviceId,
+                    SerialPhotoelectricPortName = binding.SerialPhotoelectricPortName,
+                    SerialPhotoelectricBaudRate = binding.SerialPhotoelectricBaudRate,
+                    SerialPhotoelectricDebounceMs = binding.SerialPhotoelectricDebounceMs,
+                    SerialPhotoelectricTimeoutMs = binding.SerialPhotoelectricTimeoutMs,
+                    IgnoreSerialPhotoelectricTriggerWhileBusy = binding.IgnoreSerialPhotoelectricTriggerWhileBusy,
+                    TargetFrameRateFps = binding.TargetFrameRateFps,
+                    ContinuousInspection = System.Text.Json.JsonSerializer.Deserialize<ClearVision.Product.Core.Continuous.ContinuousInspectionConfig>(
+                        System.Text.Json.JsonSerializer.Serialize(binding.ContinuousInspection)) ?? new ClearVision.Product.Core.Continuous.ContinuousInspectionConfig()
+                };
+                clone.Normalize();
+                return clone;
+            })
+            .ToList();
     }
 
     private void ThrowIfDisposed()

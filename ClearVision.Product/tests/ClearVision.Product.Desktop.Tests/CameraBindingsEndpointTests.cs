@@ -6,6 +6,7 @@ using ClearVision.Product.Core.Cameras;
 using ClearVision.Product.Core.Entities;
 using ClearVision.Product.Core.Interfaces;
 using ClearVision.Product.Desktop.Endpoints;
+using ClearVision.Product.Desktop.Services;
 using ClearVision.Product.Infrastructure.AI;
 using FluentAssertions;
 using Microsoft.AspNetCore.Builder;
@@ -13,6 +14,7 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using NSubstitute;
@@ -112,14 +114,16 @@ public class CameraBindingsEndpointTests
             CameraTriggerMode.Continuous,
             10));
 
-        var configService = Substitute.For<IConfigurationService>();
-        configService.LoadAsync().Returns(Task.FromResult(new AppConfig()));
-        configService.GetCurrent().Returns(new AppConfig());
-        configService.SaveAsync(Arg.Any<AppConfig>()).Returns(Task.CompletedTask);
+        var configService = new InMemoryAppConfigAuthority(new AppConfig
+        {
+            Cameras = [existingBinding],
+            ActiveCameraId = existingBinding.Id
+        });
 
         await using var host = await CameraBindingsTestHost.CreateAsync(cameraManager, streamCoordinator, configService);
         var response = await host.Client.PutAsJsonAsync("/api/cameras/bindings", new
         {
+            expectedRevision = configService.GetCurrent().Revision,
             activeCameraId = "cam-active",
             bindings = new[]
             {
@@ -135,9 +139,12 @@ public class CameraBindingsEndpointTests
         });
 
         response.StatusCode.Should().Be(HttpStatusCode.Conflict);
-        (await response.Content.ReadAsStringAsync()).Should().Contain("相机流正在运行");
+        (await response.Content.ReadAsStringAsync()).Should().Contain("CAMERA_RUNTIME_CONFLICT");
         cameraManager.DidNotReceive().UpdateBindings(Arg.Any<List<CameraBindingConfig>>(), Arg.Any<string>());
-        await configService.DidNotReceive().SaveAsync(Arg.Any<AppConfig>());
+        await cameraManager.DidNotReceive().ApplyBindingsAsync(
+            Arg.Any<List<CameraBindingConfig>>(),
+            Arg.Any<string>());
+        configService.MutationCount.Should().Be(0);
     }
 
     [Fact]
@@ -145,9 +152,7 @@ public class CameraBindingsEndpointTests
     {
         var cameraManager = Substitute.For<ICameraManager>();
         cameraManager.GetBindings().Returns(new List<CameraBindingConfig>());
-        var configService = Substitute.For<IConfigurationService>();
-        configService.LoadAsync().Returns(Task.FromResult(new AppConfig()));
-        configService.SaveAsync(Arg.Any<AppConfig>()).Returns(Task.CompletedTask);
+        var configService = new InMemoryAppConfigAuthority(new AppConfig());
 
         await using var host = await CameraBindingsTestHost.CreateAsync(
             cameraManager,
@@ -156,13 +161,17 @@ public class CameraBindingsEndpointTests
 
         var response = await host.Client.PutAsJsonAsync("/api/cameras/bindings", new
         {
+            expectedRevision = configService.GetCurrent().Revision,
             activeCameraId = "",
             bindings = Array.Empty<CameraBindingConfig>()
         });
 
         response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
         cameraManager.DidNotReceive().UpdateBindings(Arg.Any<List<CameraBindingConfig>>(), Arg.Any<string>());
-        await configService.DidNotReceive().SaveAsync(Arg.Any<AppConfig>());
+        await cameraManager.DidNotReceive().ApplyBindingsAsync(
+            Arg.Any<List<CameraBindingConfig>>(),
+            Arg.Any<string>());
+        configService.MutationCount.Should().Be(0);
     }
 
     [Fact]
@@ -213,13 +222,16 @@ public class CameraBindingsEndpointTests
             CameraTriggerMode.Continuous,
             10));
 
-        var configService = Substitute.For<IConfigurationService>();
-        configService.LoadAsync().Returns(Task.FromResult(new AppConfig()));
-        configService.SaveAsync(Arg.Any<AppConfig>()).Returns(Task.CompletedTask);
+        var configService = new InMemoryAppConfigAuthority(new AppConfig
+        {
+            Cameras = existingBindings,
+            ActiveCameraId = "cam-active"
+        });
 
         await using var host = await CameraBindingsTestHost.CreateAsync(cameraManager, streamCoordinator, configService);
         var response = await host.Client.PutAsJsonAsync("/api/cameras/bindings", new
         {
+            expectedRevision = configService.GetCurrent().Revision,
             activeCameraId = "cam-kept",
             bindings = new[]
             {
@@ -234,9 +246,12 @@ public class CameraBindingsEndpointTests
         });
 
         response.StatusCode.Should().Be(HttpStatusCode.Conflict);
-        (await response.Content.ReadAsStringAsync()).Should().Contain("相机流正在运行");
+        (await response.Content.ReadAsStringAsync()).Should().Contain("CAMERA_RUNTIME_CONFLICT");
         cameraManager.DidNotReceive().UpdateBindings(Arg.Any<List<CameraBindingConfig>>(), Arg.Any<string>());
-        await configService.DidNotReceive().SaveAsync(Arg.Any<AppConfig>());
+        await cameraManager.DidNotReceive().ApplyBindingsAsync(
+            Arg.Any<List<CameraBindingConfig>>(),
+            Arg.Any<string>());
+        configService.MutationCount.Should().Be(0);
     }
 
     [Fact]
@@ -273,13 +288,16 @@ public class CameraBindingsEndpointTests
             CameraTriggerMode.Continuous,
             10));
 
-        var configService = Substitute.For<IConfigurationService>();
-        configService.LoadAsync().Returns(Task.FromResult(new AppConfig()));
-        configService.SaveAsync(Arg.Any<AppConfig>()).Returns(Task.CompletedTask);
+        var configService = new InMemoryAppConfigAuthority(new AppConfig
+        {
+            Cameras = existingBindings,
+            ActiveCameraId = "cam-removed"
+        });
 
         await using var host = await CameraBindingsTestHost.CreateAsync(cameraManager, streamCoordinator, configService);
         var response = await host.Client.PutAsJsonAsync("/api/cameras/bindings", new
         {
+            expectedRevision = configService.GetCurrent().Revision,
             activeCameraId = "cam-kept",
             bindings = new[]
             {
@@ -294,15 +312,123 @@ public class CameraBindingsEndpointTests
         });
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
-        cameraManager.Received(1).UpdateBindings(
+        await cameraManager.Received(1).ApplyBindingsAsync(
             Arg.Is<List<CameraBindingConfig>>(bindings =>
                 bindings.Count == 1 &&
                 bindings[0].Id == "cam-kept"),
             "cam-kept");
-        await configService.Received(1).SaveAsync(Arg.Is<AppConfig>(config =>
-            config.ActiveCameraId == "cam-kept" &&
-            config.Cameras.Count == 1 &&
-            config.Cameras[0].Id == "cam-kept"));
+        await streamCoordinator.Received(1).ReleaseIdleStreamAsync("cam-removed");
+        host.SerialTriggerService.Received(1).ConfigureBindings(
+            Arg.Is<IEnumerable<CameraBindingConfig>>(bindings =>
+                bindings.Count() == 1 && bindings.Single().Id == "cam-kept"));
+        var committed = configService.GetCurrent();
+        committed.ActiveCameraId.Should().Be("cam-kept");
+        committed.Cameras.Should().ContainSingle(binding => binding.Id == "cam-kept");
+        committed.Revision.Should().Be(1);
+    }
+
+    [Fact]
+    public async Task UpdateCameraBindings_WhenPersistFails_ShouldReturnStructuredServiceUnavailableWithoutRuntimeApply()
+    {
+        var existing = new CameraBindingConfig
+        {
+            Id = "cam-main",
+            DisplayName = "Main",
+            SerialNumber = "SN-OLD",
+            ExposureTimeUs = 5000
+        };
+        var authority = new InMemoryAppConfigAuthority(new AppConfig
+        {
+            Cameras = [existing],
+            ActiveCameraId = existing.Id
+        })
+        {
+            FailPersist = true
+        };
+        var cameraManager = Substitute.For<ICameraManager>();
+        await using var host = await CameraBindingsTestHost.CreateAsync(
+            cameraManager,
+            configService: authority);
+
+        using var response = await host.Client.PutAsJsonAsync("/api/cameras/bindings", new
+        {
+            expectedRevision = 0,
+            activeCameraId = "cam-main",
+            bindings = new[]
+            {
+                new CameraBindingConfig
+                {
+                    Id = "cam-main",
+                    DisplayName = "Main",
+                    SerialNumber = "SN-NEW",
+                    ExposureTimeUs = 5000
+                }
+            }
+        });
+
+        var responseJson = await response.Content.ReadAsStringAsync();
+        response.StatusCode.Should().Be(HttpStatusCode.ServiceUnavailable, responseJson);
+        responseJson.Should().Contain("APP_CONFIG_PERSIST_FAILED");
+        responseJson.Should().Contain("\"configStatus\":\"StorageFailure\"");
+        responseJson.Should().Contain("\"hasLastGood\":true");
+        authority.GetCurrent().Cameras.Should().ContainSingle(binding => binding.SerialNumber == "SN-OLD");
+        await cameraManager.DidNotReceive().ApplyBindingsAsync(
+            Arg.Any<List<CameraBindingConfig>>(),
+            Arg.Any<string>());
+    }
+
+    [Fact]
+    public async Task UpdateCameraBindings_WhenRuntimeApplyFails_ShouldReturn500AndRestorePersistedSnapshot()
+    {
+        var existing = new CameraBindingConfig
+        {
+            Id = "cam-main",
+            DisplayName = "Main",
+            SerialNumber = "SN-OLD",
+            ExposureTimeUs = 5000
+        };
+        var authority = new InMemoryAppConfigAuthority(new AppConfig
+        {
+            Cameras = [existing],
+            ActiveCameraId = existing.Id
+        });
+        var cameraManager = Substitute.For<ICameraManager>();
+        cameraManager.ApplyBindingsAsync(
+                Arg.Any<List<CameraBindingConfig>>(),
+                Arg.Any<string>())
+            .Returns(
+                Task.FromException(new InvalidOperationException("injected apply failure")),
+                Task.CompletedTask);
+        await using var host = await CameraBindingsTestHost.CreateAsync(
+            cameraManager,
+            configService: authority,
+            configureDefaultApply: false);
+
+        using var response = await host.Client.PutAsJsonAsync("/api/cameras/bindings", new
+        {
+            expectedRevision = 0,
+            activeCameraId = "cam-main",
+            bindings = new[]
+            {
+                new CameraBindingConfig
+                {
+                    Id = "cam-main",
+                    DisplayName = "Main",
+                    SerialNumber = "SN-NEW",
+                    ExposureTimeUs = 5000
+                }
+            }
+        });
+
+        var responseJson = await response.Content.ReadAsStringAsync();
+        response.StatusCode.Should().Be(HttpStatusCode.InternalServerError, responseJson);
+        responseJson.Should().Contain("APP_CONFIG_RUNTIME_APPLY_FAILED");
+        responseJson.Should().Contain("\"configStatus\":\"ApplyFailed\"");
+        authority.GetCurrent().Revision.Should().Be(0);
+        authority.GetCurrent().Cameras.Should().ContainSingle(binding => binding.SerialNumber == "SN-OLD");
+        await cameraManager.Received(2).ApplyBindingsAsync(
+            Arg.Any<List<CameraBindingConfig>>(),
+            Arg.Any<string>());
     }
 
     [Fact]
@@ -325,17 +451,17 @@ public class CameraBindingsEndpointTests
         var cameraManager = Substitute.For<ICameraManager>();
         cameraManager.GetBindings().Returns(new List<CameraBindingConfig>());
 
-        var configService = Substitute.For<IConfigurationService>();
-        configService.LoadAsync().Returns(Task.FromResult(currentConfig));
-        configService.SaveAsync(Arg.Any<AppConfig>()).Returns(Task.CompletedTask);
+        var configService = new InMemoryAppConfigAuthority(currentConfig);
 
         await using var host = await CameraBindingsTestHost.CreateAsync(
             cameraManager,
             configService: configService);
-        var response = await host.Client.PutAsJsonAsync("/api/settings", new AppConfig
+        var response = await host.Client.PutAsJsonAsync("/api/settings", new
         {
-            General = new GeneralConfig { SoftwareTitle = "Updated Title" },
-            Cameras = new List<CameraBindingConfig>
+            expectedRevision = currentConfig.Revision,
+            saveScope = "general",
+            general = new GeneralConfig { SoftwareTitle = "Updated Title" },
+            cameras = new List<CameraBindingConfig>
             {
                 new()
                 {
@@ -345,16 +471,15 @@ public class CameraBindingsEndpointTests
                     TriggerMode = "Software"
                 }
             },
-            ActiveCameraId = "cam-request"
+            activeCameraId = "cam-request"
         });
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
-        await configService.Received(1).SaveAsync(Arg.Is<AppConfig>(config =>
-            config.General.SoftwareTitle == "Updated Title" &&
-            config.ActiveCameraId == "cam-current" &&
-            config.Cameras.Count == 1 &&
-            config.Cameras[0].Id == "cam-current" &&
-            config.Cameras[0].HardwareTriggerSource == "Line2"));
+        var committed = configService.GetCurrent();
+        committed.General.SoftwareTitle.Should().Be("Updated Title");
+        committed.ActiveCameraId.Should().Be("cam-current");
+        committed.Cameras.Should().ContainSingle(binding =>
+            binding.Id == "cam-current" && binding.HardwareTriggerSource == "Line2");
     }
 
     private static JsonElement FindById(List<JsonElement> items, string id)
@@ -379,19 +504,29 @@ public class CameraBindingsEndpointTests
     {
         private readonly WebApplication _app;
 
-        private CameraBindingsTestHost(WebApplication app)
+        private CameraBindingsTestHost(
+            WebApplication app,
+            InMemoryAppConfigAuthority configurationService,
+            ISerialPhotoelectricTriggerInputService serialTriggerService)
         {
             _app = app;
+            ConfigurationService = configurationService;
+            SerialTriggerService = serialTriggerService;
             Client = app.GetTestClient();
         }
 
         public HttpClient Client { get; }
 
+        public InMemoryAppConfigAuthority ConfigurationService { get; }
+
+        public ISerialPhotoelectricTriggerInputService SerialTriggerService { get; }
+
         public static async Task<CameraBindingsTestHost> CreateAsync(
             ICameraManager cameraManager,
             ICameraFrameStreamCoordinator? streamCoordinator = null,
-            IConfigurationService? configService = null,
-            string role = "Admin")
+            InMemoryAppConfigAuthority? configService = null,
+            string role = "Admin",
+            bool configureDefaultApply = true)
         {
             var builder = WebApplication.CreateBuilder(new WebApplicationOptions
             {
@@ -399,20 +534,25 @@ public class CameraBindingsEndpointTests
             });
 
             builder.WebHost.UseTestServer();
-            builder.Services.AddSingleton(cameraManager);
-            builder.Services.AddSingleton(streamCoordinator ?? Substitute.For<ICameraFrameStreamCoordinator>());
-            builder.Services.AddSingleton(Substitute.For<ITriggerInputService>());
-            builder.Services.AddSingleton(Substitute.For<ISerialPhotoelectricTriggerInputService>());
-
-            if (configService == null)
+            if (configureDefaultApply)
             {
-                configService = Substitute.For<IConfigurationService>();
-                configService.LoadAsync().Returns(Task.FromResult(new AppConfig()));
-                configService.GetCurrent().Returns(new AppConfig());
-                configService.SaveAsync(Arg.Any<AppConfig>()).Returns(Task.CompletedTask);
+                cameraManager.ApplyBindingsAsync(
+                    Arg.Any<List<CameraBindingConfig>>(),
+                    Arg.Any<string>()).Returns(Task.CompletedTask);
             }
+            streamCoordinator ??= Substitute.For<ICameraFrameStreamCoordinator>();
+            streamCoordinator.ReleaseIdleStreamAsync(Arg.Any<string>()).Returns(Task.CompletedTask);
+            var serialTriggerService = Substitute.For<ISerialPhotoelectricTriggerInputService>();
+            builder.Services.AddSingleton(cameraManager);
+            builder.Services.AddSingleton(streamCoordinator);
+            builder.Services.AddSingleton(Substitute.For<ITriggerInputService>());
+            builder.Services.AddSingleton(serialTriggerService);
 
-            builder.Services.AddSingleton(configService);
+            configService ??= new InMemoryAppConfigAuthority(new AppConfig());
+            builder.Services.AddSingleton<IConfigurationService>(configService);
+            builder.Services.AddSingleton<CameraConfigurationCoordinator>();
+            builder.Services.AddSingleton<Microsoft.Extensions.Logging.ILogger<CameraConfigurationCoordinator>>(
+                NullLogger<CameraConfigurationCoordinator>.Instance);
 
             var aiConfigStore = new AiConfigStore(
                 Options.Create(new AiGenerationOptions
@@ -438,7 +578,7 @@ public class CameraBindingsEndpointTests
             });
             app.MapSettingsEndpoints();
             await app.StartAsync();
-            return new CameraBindingsTestHost(app);
+            return new CameraBindingsTestHost(app, configService, serialTriggerService);
         }
 
         public async ValueTask DisposeAsync()

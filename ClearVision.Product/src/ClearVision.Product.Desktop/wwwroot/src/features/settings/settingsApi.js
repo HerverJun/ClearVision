@@ -6,7 +6,7 @@ const settingsApi = {
         const result = await httpClient.put('/settings', config);
         return result?.config || result?.Config || result;
     },
-    resetSettings: () => httpClient.post('/settings/reset'),
+    resetSettings: expectedRevision => httpClient.post('/settings/reset', { expectedRevision }),
     getDiskUsage: path => httpClient.get(`/settings/disk-usage?path=${encodeURIComponent(path || '')}`),
     getDatabaseStatus: () => httpClient.get('/settings/database/status'),
     repairDatabase: () => httpClient.post('/settings/database/repair', {}),
@@ -62,7 +62,7 @@ const settingsApi = {
     testPlcConnection: payload => httpClient.post('/plc/test-connection', payload),
 
     listTcpProfiles: () => httpClient.get('/tcp/profiles'),
-    saveTcpProfiles: profiles => httpClient.put('/tcp/profiles', profiles),
+    saveTcpProfiles: (profiles, expectedRevision) => httpClient.put('/tcp/profiles', { profiles, expectedRevision }),
     connectTcpProfile: id => httpClient.post(`/tcp/profiles/${encodeURIComponent(id)}/connect`, {}),
     disconnectTcpProfile: id => httpClient.post(`/tcp/profiles/${encodeURIComponent(id)}/disconnect`, {}),
     sendTcpProfile: (id, payload) => httpClient.post(`/tcp/profiles/${encodeURIComponent(id)}/send`, payload),

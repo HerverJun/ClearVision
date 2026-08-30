@@ -6,8 +6,9 @@ public interface ITcpDeviceManager : IAsyncDisposable
 {
     Task<TcpCommunicationConfig> GetConfigAsync(CancellationToken cancellationToken = default);
 
-    Task<TcpCommunicationConfig> SaveConfigAsync(
+    Task<AppConfigMutationResult> SaveConfigAsync(
         TcpCommunicationConfig config,
+        long expectedRevision,
         CancellationToken cancellationToken = default);
 
     Task<TcpDeviceOperationResult> ConnectAsync(

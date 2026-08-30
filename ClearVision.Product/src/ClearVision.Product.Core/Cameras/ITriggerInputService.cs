@@ -19,6 +19,8 @@ public interface ISerialPhotoelectricTriggerInputService
 {
     bool IsAvailable { get; }
 
+    void ConfigureBindings(IEnumerable<ClearVision.Product.Core.Entities.CameraBindingConfig>? bindings);
+
     Task<TriggerInputEvent> WaitForSerialPhotoelectricAsync(
         SerialPhotoelectricTriggerOptions options,
         CancellationToken cancellationToken = default);

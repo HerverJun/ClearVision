@@ -3,6 +3,7 @@ import { bootAuthenticatedApp } from './authHelper';
 
 function buildSettingsPayload() {
     return {
+        revision: 1,
         general: {
             softwareTitle: 'ClearVision',
             theme: 'dark',
@@ -56,13 +57,20 @@ async function mockThemeApis(page: Page, options: { settingsGetDelayMs?: number 
     const requestStats = {
         settingsPutCount: 0,
         themePutCount: 0,
+        settingsPayloads: [] as any[],
+        themePayloads: [] as any[],
     };
 
     await page.route('**/api/settings/theme', async route => {
         requestStats.themePutCount += 1;
         const payload = JSON.parse(route.request().postData() || '{}');
+        requestStats.themePayloads.push(payload);
         const requestedTheme = `${payload.theme || ''}`.trim().toLowerCase();
-        settingsPayload.general.theme = requestedTheme === 'light' ? 'light' : 'dark';
+        const nextTheme = requestedTheme === 'light' ? 'light' : 'dark';
+        if (settingsPayload.general.theme !== nextTheme) {
+            settingsPayload.revision += 1;
+        }
+        settingsPayload.general.theme = nextTheme;
 
         await route.fulfill({
             status: 200,
@@ -70,6 +78,7 @@ async function mockThemeApis(page: Page, options: { settingsGetDelayMs?: number 
             body: JSON.stringify({
                 message: '主题已保存',
                 theme: settingsPayload.general.theme,
+                revision: settingsPayload.revision,
             }),
         });
     });
@@ -90,7 +99,9 @@ async function mockThemeApis(page: Page, options: { settingsGetDelayMs?: number 
 
         requestStats.settingsPutCount += 1;
         const payload = JSON.parse(route.request().postData() || '{}');
-        Object.assign(settingsPayload, payload);
+        requestStats.settingsPayloads.push(payload);
+        const { expectedRevision: _, ...patch } = payload;
+        Object.assign(settingsPayload, patch);
         if (payload.general) {
             settingsPayload.general = { ...settingsPayload.general, ...payload.general };
         }
@@ -109,11 +120,15 @@ async function mockThemeApis(page: Page, options: { settingsGetDelayMs?: number 
         if (payload.activeCameraId !== undefined) {
             settingsPayload.activeCameraId = payload.activeCameraId;
         }
+        settingsPayload.revision += 1;
 
         await route.fulfill({
             status: 200,
             contentType: 'application/json',
-            body: JSON.stringify(settingsPayload),
+            body: JSON.stringify({
+                config: settingsPayload,
+                revision: settingsPayload.revision,
+            }),
         });
     });
 
@@ -138,19 +153,23 @@ async function mockThemeApis(page: Page, options: { settingsGetDelayMs?: number 
                 body: JSON.stringify({
                     success: true,
                     settings: settingsPayload.communication,
+                    revision: settingsPayload.revision,
                 }),
             });
             return;
         }
 
         const payload = JSON.parse(route.request().postData() || '{}');
-        settingsPayload.communication = payload;
+        const { expectedRevision: _, ...communication } = payload;
+        settingsPayload.communication = communication;
+        settingsPayload.revision += 1;
         await route.fulfill({
             status: 200,
             contentType: 'application/json',
             body: JSON.stringify({
                 success: true,
                 settings: settingsPayload.communication,
+                revision: settingsPayload.revision,
                 errors: [],
             }),
         });
@@ -167,11 +186,12 @@ async function mockThemeApis(page: Page, options: { settingsGetDelayMs?: number 
         }
 
         const payload = JSON.parse(route.request().postData() || '[]');
-        settingsPayload.cameras = Array.isArray(payload) ? payload : settingsPayload.cameras;
+        settingsPayload.cameras = Array.isArray(payload?.bindings) ? payload.bindings : settingsPayload.cameras;
+        settingsPayload.revision += 1;
         await route.fulfill({
             status: 200,
             contentType: 'application/json',
-            body: JSON.stringify({ success: true }),
+            body: JSON.stringify({ success: true, revision: settingsPayload.revision }),
         });
     });
 
@@ -212,6 +232,7 @@ test('theme cache is corrected by backend settings and persists across toolbar +
     await expect.poll(() => settingsPayload.general.theme).toBe('light');
     await expect.poll(() => requestStats.themePutCount).toBe(1);
     await expect.poll(() => requestStats.settingsPutCount).toBe(0);
+    expect(requestStats.themePayloads[0]).toMatchObject({ theme: 'light', expectedRevision: 1 });
 
     await page.reload();
     await waitForAppReady(page);
@@ -226,6 +247,7 @@ test('theme cache is corrected by backend settings and persists across toolbar +
     await expect(root).toHaveAttribute('data-theme', 'dark');
     await expect.poll(() => settingsPayload.general.theme).toBe('dark');
     await expect.poll(() => requestStats.settingsPutCount).toBe(1);
+    expect(requestStats.settingsPayloads[0].expectedRevision).toBe(2);
 
     await page.reload();
     await waitForAppReady(page);

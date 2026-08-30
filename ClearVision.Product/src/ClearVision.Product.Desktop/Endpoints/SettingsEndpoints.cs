@@ -17,6 +17,7 @@ using ClearVision.Product.Core.Entities;
 using ClearVision.Product.Core.Enums;
 using ClearVision.Product.Core.Interfaces;
 using ClearVision.Product.Desktop.Data;
+using ClearVision.Product.Desktop.Services;
 using ClearVision.Product.Desktop.Triggers;
 using ClearVision.Product.Infrastructure.AI;
 using ClearVision.Product.Infrastructure.AI.Tools;
@@ -44,7 +45,15 @@ public static class SettingsEndpoints
         // 获取当前配置
         app.MapGet("/api/settings", async (IConfigurationService configService, HttpContext context) =>
         {
-            var config = await configService.LoadAsync();
+            var read = await configService.ReadAsync(context.RequestAborted);
+            if (!read.IsHealthy || read.Config == null)
+            {
+                return AppConfigEndpointResults.ReadFailure(
+                    read,
+                    IsAdmin(context) ? null : ToSafeSettingsResponse);
+            }
+
+            var config = read.Config;
             if (IsAdmin(context))
             {
                 return Results.Ok(config);
@@ -61,17 +70,34 @@ public static class SettingsEndpoints
                 return Results.Forbid();
             }
 
+            if (!TryGetExpectedRevision(request, out var expectedRevision))
+            {
+                return AppConfigEndpointResults.ExpectedRevisionFailure();
+            }
+
             try
             {
-                var currentConfig = await configService.LoadAsync();
-                var config = MergeSettingsUpdate(currentConfig, request);
+                var mutation = await configService.MutateAsync(
+                    expectedRevision,
+                    candidate => MergeSettingsUpdate(candidate, request),
+                    candidate => ValidateSettingsCandidate(request, candidate),
+                    context.RequestAborted);
+                if (!mutation.IsSuccess)
+                {
+                    return AppConfigEndpointResults.MutationFailure(mutation);
+                }
 
-                await configService.SaveAsync(config);
-                return Results.Ok(new { Message = "设置已保存", Config = config });
+                return Results.Ok(new
+                {
+                    Message = mutation.IsNoOp ? "设置未发生变化" : "设置已保存",
+                    Config = mutation.Config,
+                    revision = mutation.ActualRevision,
+                    noOp = mutation.IsNoOp
+                });
             }
-            catch (Exception ex)
+            catch (JsonException ex)
             {
-                return Results.BadRequest(new { Error = ex.Message });
+                return Results.UnprocessableEntity(new { errorCode = "APP_CONFIG_PATCH_INVALID", Error = ex.Message });
             }
         })
         .RequireClearVisionPermission(ClearVisionPermissionPolicies.RequireAdmin);
@@ -79,42 +105,58 @@ public static class SettingsEndpoints
         // 更新主题配置（避免回写整份配置造成并发覆盖）
         app.MapPut("/api/settings/theme", async (ThemeUpdateRequest request, IConfigurationService configService) =>
         {
-            try
+            if (!request.ExpectedRevision.HasValue)
             {
-                var config = await configService.LoadAsync();
-                config.General ??= new GeneralConfig();
-                config.General.Theme = GeneralConfig.NormalizeTheme(request.Theme);
+                return AppConfigEndpointResults.ExpectedRevisionFailure();
+            }
 
-                await configService.SaveAsync(config);
-
-                return Results.Ok(new
+            var mutation = await configService.MutateAsync(
+                request.ExpectedRevision.Value,
+                candidate =>
                 {
-                    Message = "主题已保存",
-                    theme = config.General.Theme
+                    candidate.General ??= new GeneralConfig();
+                    candidate.General.Theme = GeneralConfig.NormalizeTheme(request.Theme);
                 });
-            }
-            catch (Exception ex)
+            if (!mutation.IsSuccess)
             {
-                return Results.BadRequest(new { Error = ex.Message });
+                return AppConfigEndpointResults.MutationFailure(mutation);
             }
+
+            return Results.Ok(new
+            {
+                Message = mutation.IsNoOp ? "主题未发生变化" : "主题已保存",
+                theme = mutation.Config!.General.Theme,
+                revision = mutation.ActualRevision,
+                noOp = mutation.IsNoOp
+            });
         })
         .RequireClearVisionPermission(ClearVisionPermissionPolicies.RequireAdmin);
 
         // 重置配置为默认值
-        app.MapPost("/api/settings/reset", async (IConfigurationService configService, AiConfigStore aiConfigStore, HttpContext context) =>
+        app.MapPost("/api/settings/reset", async (
+            SettingsResetRequest request,
+            [FromServices] CameraConfigurationCoordinator cameraConfigurationCoordinator,
+            AiConfigStore aiConfigStore,
+            HttpContext context) =>
         {
             if (!IsAdmin(context))
             {
                 return Results.Forbid();
             }
 
-            var defaultConfig = new AppConfig();
-            await configService.SaveAsync(defaultConfig);
+            var reset = await cameraConfigurationCoordinator.ResetAsync(request.ExpectedRevision, context.RequestAborted);
+            if (!reset.IsSuccess)
+            {
+                return AppConfigEndpointResults.CameraFailure(reset);
+            }
+
+            var defaultConfig = reset.Mutation!.Config!;
             var defaultModels = aiConfigStore.ResetToDefaults();
             return Results.Ok(new
             {
                 message = "系统配置和 AI 模型配置已恢复默认值",
                 config = defaultConfig,
+                revision = defaultConfig.Revision,
                 aiModels = defaultModels.Select(ToAiModelResponse),
                 resetScope = new[] { "appConfig", "aiModels" }
             });
@@ -490,11 +532,22 @@ public static class SettingsEndpoints
         // 搜索在线相机设备
         app.MapGet("/api/settings/runtime-preview-pilot/config", async (IConfigurationService configService) =>
         {
-            var config = await configService.LoadAsync();
+            var read = await configService.ReadAsync();
+            if (!read.IsHealthy || read.Config == null)
+            {
+                return AppConfigEndpointResults.ReadFailure(read, config => new
+                {
+                    config = config.Runtime.RuntimePreviewPilot.CloneNormalized(),
+                    revision = config.Revision
+                });
+            }
+
+            var config = read.Config;
             var pilot = config.Runtime.RuntimePreviewPilot.CloneNormalized();
             return Results.Ok(new
             {
                 config = pilot,
+                revision = config.Revision,
                 validation = RuntimePreviewPilotConfigValidator.Validate(pilot),
                 metadataOnly = true,
                 realResourcesTouched = false
@@ -502,7 +555,7 @@ public static class SettingsEndpoints
         });
 
         app.MapPut("/api/settings/runtime-preview-pilot/config", async (
-            RuntimePreviewPilotConfig request,
+            JsonElement request,
             IConfigurationService configService,
             HttpContext context) =>
         {
@@ -511,25 +564,47 @@ public static class SettingsEndpoints
                 return Results.Forbid();
             }
 
-            var failures = RuntimePreviewPilotConfigValidator.Validate(request);
-            if (failures.Count > 0)
+            if (!TryGetExpectedRevision(request, out var expectedRevision))
             {
-                return Results.BadRequest(new
-                {
-                    error = "RuntimePreview Pilot config validation failed.",
-                    failures
-                });
+                return AppConfigEndpointResults.ExpectedRevisionFailure();
             }
 
-            var normalized = request.CloneNormalized();
-            var config = await configService.LoadAsync();
-            config.Runtime ??= new RuntimeConfig();
-            config.Runtime.RuntimePreviewPilot = normalized;
-            await configService.SaveAsync(config);
+            var pilotRequest = JsonSerializer.Deserialize<RuntimePreviewPilotConfig>(request.GetRawText(), SettingsJsonOptions)
+                ?? new RuntimePreviewPilotConfig();
+            var failures = RuntimePreviewPilotConfigValidator.Validate(pilotRequest);
+            if (failures.Count > 0)
+            {
+                return Results.Json(new
+                {
+                    errorCode = "APP_CONFIG_VALIDATION_FAILED",
+                    error = "RuntimePreview Pilot config validation failed.",
+                    failures
+                }, statusCode: StatusCodes.Status422UnprocessableEntity);
+            }
+
+            var normalized = pilotRequest.CloneNormalized();
+            var mutation = await configService.MutateAsync(
+                expectedRevision,
+                candidate =>
+                {
+                    candidate.Runtime ??= new RuntimeConfig();
+                    candidate.Runtime.RuntimePreviewPilot = normalized;
+                },
+                candidate => RuntimePreviewPilotConfigValidator.Validate(candidate.Runtime.RuntimePreviewPilot)
+                    .Select(message => new AppConfigValidationError("runtime.runtimePreviewPilot", message))
+                    .ToArray(),
+                context.RequestAborted);
+            if (!mutation.IsSuccess)
+            {
+                return AppConfigEndpointResults.MutationFailure(mutation);
+            }
+
             return Results.Ok(new
             {
-                message = "RuntimePreview Pilot config saved.",
-                config = normalized,
+                message = mutation.IsNoOp ? "RuntimePreview Pilot config unchanged." : "RuntimePreview Pilot config saved.",
+                config = mutation.Config!.Runtime.RuntimePreviewPilot,
+                revision = mutation.ActualRevision,
+                noOp = mutation.IsNoOp,
                 validation = Array.Empty<string>(),
                 metadataOnly = true,
                 realResourcesTouched = false
@@ -542,7 +617,13 @@ public static class SettingsEndpoints
             [FromServices] AiConfigStore aiConfigStore,
             [FromServices] RuntimePreviewPilotResourceCatalog catalogBuilder) =>
         {
-            var config = await configService.LoadAsync();
+            var configRead = await configService.ReadAsync();
+            if (!configRead.IsHealthy || configRead.Config == null)
+            {
+                return AppConfigEndpointResults.ReadFailure(configRead);
+            }
+
+            var config = configRead.Config;
             var pilot = config.Runtime.RuntimePreviewPilot.CloneNormalized();
             var catalog = catalogBuilder.Build(pilot, config, aiConfigStore);
             return Results.Ok(catalog);
@@ -572,7 +653,13 @@ public static class SettingsEndpoints
                 }, statusCode: StatusCodes.Status403Forbidden);
             }
 
-            var appConfig = await configService.LoadAsync();
+            var configRead = await configService.ReadAsync();
+            if (!configRead.IsHealthy || configRead.Config == null)
+            {
+                return AppConfigEndpointResults.ReadFailure(configRead);
+            }
+
+            var appConfig = configRead.Config;
             var pilot = request.Config ?? appConfig.Runtime.RuntimePreviewPilot.CloneNormalized();
             var failures = RuntimePreviewPilotConfigValidator.Validate(pilot);
             if (failures.Count > 0)
@@ -664,7 +751,13 @@ public static class SettingsEndpoints
                 }, statusCode: StatusCodes.Status403Forbidden);
             }
 
-            var appConfig = await configService.LoadAsync();
+            var configRead = await configService.ReadAsync();
+            if (!configRead.IsHealthy || configRead.Config == null)
+            {
+                return AppConfigEndpointResults.ReadFailure(configRead);
+            }
+
+            var appConfig = configRead.Config;
             var session = harness.CreateMetadataSession(request, appConfig, aiConfigStore);
             return Results.Ok(new
             {
@@ -698,7 +791,13 @@ public static class SettingsEndpoints
                 }, statusCode: StatusCodes.Status403Forbidden);
             }
 
-            var appConfig = await configService.LoadAsync();
+            var configRead = await configService.ReadAsync();
+            if (!configRead.IsHealthy || configRead.Config == null)
+            {
+                return AppConfigEndpointResults.ReadFailure(configRead);
+            }
+
+            var appConfig = configRead.Config;
             var report = harness.RunEndToEnd(
                 request,
                 appConfig,
@@ -879,7 +978,13 @@ public static class SettingsEndpoints
                 }, statusCode: StatusCodes.Status403Forbidden);
             }
 
-            var appConfig = await configService.LoadAsync();
+            var configRead = await configService.ReadAsync();
+            if (!configRead.IsHealthy || configRead.Config == null)
+            {
+                return AppConfigEndpointResults.ReadFailure(configRead);
+            }
+
+            var appConfig = configRead.Config;
             var report = await deployReadinessService.GenerateAsync(
                 request,
                 appConfig,
@@ -922,7 +1027,13 @@ public static class SettingsEndpoints
                 }, statusCode: StatusCodes.Status403Forbidden);
             }
 
-            var appConfig = await configService.LoadAsync();
+            var configRead = await configService.ReadAsync();
+            if (!configRead.IsHealthy || configRead.Config == null)
+            {
+                return AppConfigEndpointResults.ReadFailure(configRead);
+            }
+
+            var appConfig = configRead.Config;
             var report = await packageReadinessBridge.GenerateAsync(
                 request,
                 appConfig,
@@ -967,7 +1078,13 @@ public static class SettingsEndpoints
                 }, statusCode: StatusCodes.Status403Forbidden);
             }
 
-            var appConfig = await configService.LoadAsync();
+            var configRead = await configService.ReadAsync();
+            if (!configRead.IsHealthy || configRead.Config == null)
+            {
+                return AppConfigEndpointResults.ReadFailure(configRead);
+            }
+
+            var appConfig = configRead.Config;
             var packageReport = await packageReadinessBridge.GenerateAsync(
                 new RuntimePreviewPackageReadinessRequest
                 {
@@ -1024,7 +1141,13 @@ public static class SettingsEndpoints
                 }, statusCode: StatusCodes.Status403Forbidden);
             }
 
-            var appConfig = await configService.LoadAsync();
+            var configRead = await configService.ReadAsync();
+            if (!configRead.IsHealthy || configRead.Config == null)
+            {
+                return AppConfigEndpointResults.ReadFailure(configRead);
+            }
+
+            var appConfig = configRead.Config;
             var report = await preReleaseReviewService.GenerateAsync(
                 request,
                 appConfig,
@@ -1168,7 +1291,13 @@ public static class SettingsEndpoints
                 }, statusCode: StatusCodes.Status403Forbidden);
             }
 
-            var appConfig = await configService.LoadAsync();
+            var configRead = await configService.ReadAsync();
+            if (!configRead.IsHealthy || configRead.Config == null)
+            {
+                return AppConfigEndpointResults.ReadFailure(configRead);
+            }
+
+            var appConfig = configRead.Config;
             var evidence = await scenarioEvidenceService.RunAsync(appConfig, aiConfigStore, cancellationToken);
             return Results.Ok(new
             {
@@ -1509,10 +1638,7 @@ public static class SettingsEndpoints
         // 更新相机绑定配置
         app.MapPut("/api/cameras/bindings", async (
             ClearVision.Product.Application.DTOs.UpdateCameraBindingsRequest request,
-            ClearVision.Product.Core.Cameras.ICameraManager cameraManager,
-            [FromServices] ICameraFrameStreamCoordinator streamCoordinator,
-            [FromServices] ISerialPhotoelectricTriggerInputService serialPhotoelectricTriggerInputService,
-            IConfigurationService configService,
+            [FromServices] CameraConfigurationCoordinator cameraConfigurationCoordinator,
             HttpContext context) =>
         {
             if (!ClearVisionPermissionPolicies.IsEngineerOrAdmin(context))
@@ -1520,85 +1646,20 @@ public static class SettingsEndpoints
                 return Results.Json(new { error = "HardwareOperationPermissionRequired" }, statusCode: StatusCodes.Status403Forbidden);
             }
 
-            try
+            var result = await cameraConfigurationCoordinator.SaveAsync(request, context.RequestAborted);
+            if (!result.IsSuccess)
             {
-                // 1. 更新 CameraManager 内存状态
-                var existingBindings = NormalizeBindings(CloneBindings(cameraManager.GetBindings()));
-                var normalizedBindings = NormalizeBindings(request.Bindings);
-                var changedActiveConflicts = normalizedBindings
-                    .Select(binding =>
-                    {
-                        var existing = existingBindings.FirstOrDefault(item =>
-                            item.Id.Equals(binding.Id, StringComparison.OrdinalIgnoreCase));
-                        var usage = SnapshotStreamUsageOrDefault(streamCoordinator, binding.Id);
-                        return new { binding, existing, usage };
-                    })
-                    .Where(item =>
-                        item.existing != null &&
-                        item.usage.IsRunning &&
-                        HasRuntimeCameraSettingsChanged(item.existing, item.binding))
-                    .Select(item => new
-                    {
-                        CameraBindingId = item.binding.Id,
-                        item.binding.DisplayName,
-                        item.usage.LeaseCount,
-                        item.usage.PreviewSessionCount,
-                        item.usage.PendingFrameWaiters,
-                        TriggerMode = item.usage.TriggerMode.ToConfigValue()
-                    })
-                    .ToList();
-
-                var removedActiveConflicts = existingBindings
-                    .Where(existing => !normalizedBindings.Any(binding =>
-                        binding.Id.Equals(existing.Id, StringComparison.OrdinalIgnoreCase)))
-                    .Select(existing => new
-                    {
-                        binding = existing,
-                        usage = SnapshotStreamUsageOrDefault(streamCoordinator, existing.Id)
-                    })
-                    .Where(item => item.usage.IsRunning)
-                    .Select(item => new
-                    {
-                        CameraBindingId = item.binding.Id,
-                        item.binding.DisplayName,
-                        item.usage.LeaseCount,
-                        item.usage.PreviewSessionCount,
-                        item.usage.PendingFrameWaiters,
-                        TriggerMode = item.usage.TriggerMode.ToConfigValue()
-                    })
-                    .ToList();
-
-                var activeConflicts = changedActiveConflicts
-                    .Concat(removedActiveConflicts)
-                    .ToList();
-
-                if (activeConflicts.Count > 0)
-                {
-                    return Results.Conflict(new
-                    {
-                        Error = "相机流正在运行，不能直接保存会影响采集的相机参数。请先停止预览或检测，再保存。",
-                        ActiveStreams = activeConflicts
-                    });
-                }
-
-                cameraManager.UpdateBindings(normalizedBindings, request.ActiveCameraId);
-
-                // 2. 持久化到 AppConfig
-                var config = await configService.LoadAsync();
-                config.Cameras = normalizedBindings;
-                config.ActiveCameraId = request.ActiveCameraId;
-                await configService.SaveAsync(config);
-                if (serialPhotoelectricTriggerInputService is SerialPhotoelectricTriggerInputService serialPhotoelectricTriggerInput)
-                {
-                    serialPhotoelectricTriggerInput.ConfigureBindings(normalizedBindings);
-                }
-
-                return Results.Ok(new { Message = "相机配置已保存" });
+                return AppConfigEndpointResults.CameraFailure(result);
             }
-            catch (Exception ex)
+
+            return Results.Ok(new
             {
-                return Results.BadRequest(new { Error = ex.Message });
-            }
+                Message = result.Mutation!.IsNoOp ? "相机配置未发生变化" : "相机配置已保存",
+                revision = result.Revision,
+                noOp = result.Mutation.IsNoOp,
+                bindings = result.Mutation.Config!.Cameras,
+                activeCameraId = result.Mutation.Config.ActiveCameraId
+            });
         })
         .RequireClearVisionPermission(ClearVisionPermissionPolicies.CanOperateHardware);
 
@@ -2042,6 +2103,95 @@ public static class SettingsEndpoints
 
         value = default;
         return false;
+    }
+
+    private static bool TryGetExpectedRevision(JsonElement request, out long expectedRevision)
+    {
+        expectedRevision = default;
+        return TryGetJsonProperty(request, "expectedRevision", out var revisionElement) &&
+               revisionElement.ValueKind == JsonValueKind.Number &&
+               revisionElement.TryGetInt64(out expectedRevision) &&
+               expectedRevision >= 0;
+    }
+
+    private static IReadOnlyList<AppConfigValidationError> ValidateSettingsCandidate(
+        JsonElement request,
+        AppConfig candidate)
+    {
+        var errors = new List<AppConfigValidationError>();
+        if (TryGetJsonProperty(request, "general", out _))
+        {
+            if (string.IsNullOrWhiteSpace(candidate.General.SoftwareTitle))
+            {
+                errors.Add(new AppConfigValidationError("general.softwareTitle", "Software title is required."));
+            }
+            else if (candidate.General.SoftwareTitle.Length > 80)
+            {
+                errors.Add(new AppConfigValidationError("general.softwareTitle", "Software title cannot exceed 80 characters."));
+            }
+        }
+
+        if (TryGetJsonProperty(request, "storage", out _))
+        {
+            if (string.IsNullOrWhiteSpace(candidate.Storage.ImageSavePath))
+            {
+                errors.Add(new AppConfigValidationError("storage.imageSavePath", "Image save path is required."));
+            }
+
+            if (candidate.Storage.RetentionDays is < 0 or > 3650)
+            {
+                errors.Add(new AppConfigValidationError("storage.retentionDays", "Retention days must be between 0 and 3650."));
+            }
+
+            if (candidate.Storage.SavePolicy is not ("All" or "NgOnly" or "None"))
+            {
+                errors.Add(new AppConfigValidationError("storage.savePolicy", "Save policy must be All, NgOnly, or None."));
+            }
+        }
+
+        if (TryGetJsonProperty(request, "runtime", out _))
+        {
+            if (candidate.Runtime.StopOnConsecutiveNg is < 0 or > 100000)
+            {
+                errors.Add(new AppConfigValidationError("runtime.stopOnConsecutiveNg", "Stop-on-NG must be between 0 and 100000."));
+            }
+
+            if (candidate.Runtime.MissingMaterialTimeoutSeconds is < 0 or > 86400)
+            {
+                errors.Add(new AppConfigValidationError("runtime.missingMaterialTimeoutSeconds", "Missing-material timeout must be between 0 and 86400."));
+            }
+        }
+
+        if (TryGetJsonProperty(request, "security", out _))
+        {
+            if (candidate.Security.PasswordMinLength is < 6 or > 128)
+            {
+                errors.Add(new AppConfigValidationError("security.passwordMinLength", "Password minimum length must be between 6 and 128."));
+            }
+
+            if (candidate.Security.LoginFailureLockoutCount is < 1 or > 100)
+            {
+                errors.Add(new AppConfigValidationError("security.loginFailureLockoutCount", "Login failure lockout count must be between 1 and 100."));
+            }
+        }
+
+        if (TryGetJsonProperty(request, "communication", out _))
+        {
+            errors.AddRange(PlcSettingsValidator.Validate(candidate.Communication).Errors.Select(issue =>
+                new AppConfigValidationError(
+                    $"communication.{issue.Protocol}.{issue.Section}.{issue.Field}",
+                    issue.Message)));
+        }
+
+        if (TryGetJsonProperty(request, "tcpCommunication", out _))
+        {
+            errors.AddRange(TcpCommunicationConfigValidator.Validate(candidate.TcpCommunication).Errors.Select(issue =>
+                new AppConfigValidationError(
+                    $"tcpCommunication.{issue.ProfileId}.{issue.Section}.{issue.Field}",
+                    issue.Message)));
+        }
+
+        return errors;
     }
 
     private static bool IsAdmin(HttpContext context) => ClearVisionPermissionPolicies.IsAdmin(context);
@@ -3260,5 +3410,11 @@ internal sealed record SerialPhotoelectricPortCandidate(
 
 public sealed class ThemeUpdateRequest
 {
+    public long? ExpectedRevision { get; set; }
     public string? Theme { get; set; }
+}
+
+public sealed class SettingsResetRequest
+{
+    public long? ExpectedRevision { get; set; }
 }

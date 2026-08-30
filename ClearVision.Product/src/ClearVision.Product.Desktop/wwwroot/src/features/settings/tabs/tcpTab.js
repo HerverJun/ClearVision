@@ -127,6 +127,7 @@ export function installTcpTab(SettingsView) {
 
             try {
                 const result = await settingsApi.listTcpProfiles();
+                this.applyMutationRevision(result);
                 const profiles = Array.isArray(result?.profiles) ? result.profiles : [];
                 this.tcpProfiles = profiles.map(profile => this.normalizeTcpProfile(profile));
                 this.selectedTcpProfileId = this.tcpProfiles[0]?.id || null;
@@ -245,7 +246,12 @@ export function installTcpTab(SettingsView) {
             }
 
             try {
-                const result = await settingsApi.saveTcpProfiles(payload);
+                const expectedRevision = this.requireAppConfigRevision('TCP Profile');
+                if (expectedRevision === null) {
+                    return { success: false, profiles: null, unavailable: true };
+                }
+                const result = await settingsApi.saveTcpProfiles(payload, expectedRevision);
+                this.applyMutationRevision(result);
                 const success = !!result?.success;
                 const profiles = Array.isArray(result?.profiles) ? result.profiles : payload;
                 this.tcpProfiles = profiles.map(profile => this.normalizeTcpProfile(profile));
@@ -270,6 +276,9 @@ export function installTcpTab(SettingsView) {
                 return { success: true, profiles: this.tcpProfiles };
             } catch (error) {
                 console.error('[SettingsView] Failed to save TCP profiles:', error);
+                if (await this.handleAppConfigRevisionConflict(error, 'TCP Profile')) {
+                    return { success: false, profiles: null, conflict: true };
+                }
                 if (!silent) {
                     showToast('保存 TCP Profile 失败: ' + error.message, 'error');
                 }

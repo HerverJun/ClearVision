@@ -10,6 +10,7 @@ public sealed class HardwareSettingsDialog : Form
     private readonly List<CameraBindingConfig> _cameraBindings = [];
     private CommunicationConfig _communication = new();
     private string _activeCameraId = string.Empty;
+    private long _revision;
     private int _selectedCameraIndex = -1;
     private bool _loadingCameraForm;
     private bool _loadingPlcForm;
@@ -249,6 +250,7 @@ public sealed class HardwareSettingsDialog : Form
             _cameraBindings.AddRange(snapshot.Cameras);
             _activeCameraId = snapshot.ActiveCameraId;
             _communication = snapshot.Communication;
+            _revision = snapshot.Revision;
 
             RefreshCameraList();
             LoadPlcForm();
@@ -584,10 +586,11 @@ public sealed class HardwareSettingsDialog : Form
         CommitCameraForm(_selectedCameraIndex);
         try
         {
-            var snapshot = await _settingsService.SaveCameraBindingsAsync(_cameraBindings, _activeCameraId);
+            var snapshot = await _settingsService.SaveCameraBindingsAsync(_cameraBindings, _activeCameraId, _revision);
             _cameraBindings.Clear();
             _cameraBindings.AddRange(snapshot.Cameras);
             _activeCameraId = snapshot.ActiveCameraId;
+            _revision = snapshot.Revision;
             _cameraStatusLabel.ForeColor = Color.SeaGreen;
             _cameraStatusLabel.Text = "相机配置已保存并应用到当前 Station。";
             RefreshCameraList();
@@ -743,8 +746,9 @@ public sealed class HardwareSettingsDialog : Form
         CommitActivePlcProfile();
         try
         {
-            var snapshot = await _settingsService.SavePlcSettingsAsync(_communication);
+            var snapshot = await _settingsService.SavePlcSettingsAsync(_communication, _revision);
             _communication = snapshot.Communication;
+            _revision = snapshot.Revision;
             _plcStatusLabel.ForeColor = Color.SeaGreen;
             _plcStatusLabel.Text = "PLC 配置已保存，旧连接状态已清理。";
             LoadPlcForm();

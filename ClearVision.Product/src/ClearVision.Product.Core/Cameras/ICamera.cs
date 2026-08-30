@@ -70,5 +70,6 @@ public interface ICameraManager
     void LoadBindings(List<CameraBindingConfig> bindings, string activeCameraId);
     List<CameraBindingConfig> GetBindings();
     void UpdateBindings(List<CameraBindingConfig> bindings, string activeCameraId);
+    Task ApplyBindingsAsync(List<CameraBindingConfig> bindings, string activeCameraId);
     Task<ICamera> GetOrCreateByBindingAsync(string bindingId);
 }

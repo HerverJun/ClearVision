@@ -53,8 +53,9 @@ public sealed class TcpDeviceManager : ITcpDeviceManager
         return CloneConfig(config.TcpCommunication);
     }
 
-    public async Task<TcpCommunicationConfig> SaveConfigAsync(
+    public async Task<AppConfigMutationResult> SaveConfigAsync(
         TcpCommunicationConfig config,
+        long expectedRevision,
         CancellationToken cancellationToken = default)
     {
         if (_configurationService == null)
@@ -70,14 +71,15 @@ public sealed class TcpDeviceManager : ITcpDeviceManager
             throw new InvalidOperationException("TCP configuration is invalid.");
         }
 
-        var appConfig = await _configurationService.LoadAsync();
-        cancellationToken.ThrowIfCancellationRequested();
-        appConfig.Normalize();
-        appConfig.TcpCommunication = CloneConfig(config);
-        appConfig.Normalize();
-        await _configurationService.SaveAsync(appConfig);
-
-        return CloneConfig(appConfig.TcpCommunication);
+        return await _configurationService.MutateAsync(
+            expectedRevision,
+            candidate => candidate.TcpCommunication = CloneConfig(config),
+            candidate => TcpCommunicationConfigValidator.Validate(candidate.TcpCommunication).Errors
+                .Select(issue => new AppConfigValidationError(
+                    $"tcpCommunication.{issue.ProfileId}.{issue.Section}.{issue.Field}",
+                    issue.Message))
+                .ToArray(),
+            cancellationToken);
     }
 
     public async Task<TcpDeviceOperationResult> ConnectAsync(

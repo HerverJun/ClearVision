@@ -11,6 +11,8 @@ namespace ClearVision.Product.Application.DTOs;
 /// </summary>
 public class UpdateCameraBindingsRequest
 {
+    public long? ExpectedRevision { get; set; }
+
     /// <summary>
     /// 相机绑定配置列表
     /// </summary>

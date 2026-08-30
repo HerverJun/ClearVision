@@ -14,9 +14,14 @@ export function installSystemTabs(SettingsView) {
                 : null;
             const passwordPolicyLabel = passwordMinimumLength ? `${passwordMinimumLength} 位` : '策略尚未加载';
             const passwordPolicyDisabled = passwordMinimumLength ? '' : 'disabled aria-disabled="true"';
-            const settingsResetDisabled = this.hasCapability(Capabilities.SETTINGS_RESET) ? '' : 'disabled aria-disabled="true"';
             const runtimeTheme = normalizeTheme(general.theme, getAppliedTheme());
             const settingsResetFeature = getFeatureMeta('settings.reset');
+            const settingsResetAvailable = this.hasCapability(Capabilities.SETTINGS_RESET)
+                && this.isAppConfigMutationAvailable();
+            const settingsResetDisabled = settingsResetAvailable ? '' : 'disabled aria-disabled="true"';
+            const settingsResetTitle = this.appConfigAuthorityHealthy === false
+                ? '权威配置不可用，恢复默认设置已禁用。'
+                : settingsResetFeature.title;
             return `
                 <div class="settings-section-title">
                     <h2>常规设置</h2>
@@ -85,7 +90,7 @@ export function installSystemTabs(SettingsView) {
                         <div style="display:flex; justify-content:space-between; align-items:center; gap:16px; margin-top:20px; flex-wrap:wrap;">
                             <span class="settings-field-hint">当前密码策略：${passwordPolicyLabel}。</span>
                             <div style="display:flex; gap:12px; flex-wrap:wrap;">
-                                <button class="cv-btn settings-btn-light" id="btn-reset-settings" ${settingsResetDisabled} title="${settingsResetFeature.title}">${getFeatureButtonLabel('settings.reset', '恢复默认设置')}</button>
+                                <button class="cv-btn settings-btn-light" id="btn-reset-settings" ${settingsResetDisabled} title="${settingsResetTitle}">${getFeatureButtonLabel('settings.reset', '恢复默认设置')}</button>
                                 <button class="cv-btn settings-btn-danger" id="btn-change-password" ${passwordPolicyDisabled}>修改密码</button>
                             </div>
                         </div>
@@ -968,7 +973,10 @@ export function installSystemTabs(SettingsView) {
             }
 
             try {
-                const result = await settingsApi.resetSettings();
+                const expectedRevision = this.requireAppConfigRevision('恢复默认设置');
+                if (expectedRevision === null) return;
+                const result = await settingsApi.resetSettings(expectedRevision);
+                this.applyMutationRevision(result);
                 const message = result?.message
                     || result?.Message
                     || `${resetLabel}已执行`;
@@ -979,6 +987,9 @@ export function installSystemTabs(SettingsView) {
                 showToast(message, 'success');
                 await this.refresh();
             } catch (error) {
+                if (await this.handleAppConfigRevisionConflict(error, '恢复默认设置')) {
+                    return;
+                }
                 showToast(`恢复默认设置失败: ${error.message}`, 'error');
             }
         }
@@ -1089,8 +1100,12 @@ export function installSystemTabs(SettingsView) {
             }
 
             try {
-                await settingsApi.saveSettings(config);
-                this.config = this.normalizeAppConfig(config);
+                const expectedRevision = this.requireAppConfigRevision('系统设置');
+                if (expectedRevision === null) return;
+                config.expectedRevision = expectedRevision;
+                const savedConfig = await settingsApi.saveSettings(config);
+                this.config = this.normalizeAppConfig(savedConfig);
+                this.applyMutationRevision(savedConfig);
                 this.savedCommunicationConfig = this.cloneCommunicationConfig(this.config.communication);
                 this.syncPlcMappingsFromActiveProfile();
 
@@ -1110,6 +1125,9 @@ export function installSystemTabs(SettingsView) {
                 showToast(`${this.getSaveScopeMeta(activeTabName).button}已完成。`, 'success');
             } catch (error) {
                 console.error('[SettingsView] Failed to save app config:', error);
+                if (await this.handleAppConfigRevisionConflict(error, '系统设置')) {
+                    return;
+                }
                 showToast('保存设置失败: ' + error.message, 'error');
             }
         }

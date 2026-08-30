@@ -12,20 +12,30 @@ public static class TcpEndpoints
     public static IEndpointRouteBuilder MapTcpEndpoints(this IEndpointRouteBuilder app)
     {
         app.MapGet("/api/tcp/profiles", async (
-            ITcpDeviceManager tcpDeviceManager,
+            IConfigurationService configService,
             CancellationToken cancellationToken) =>
         {
-            var config = await tcpDeviceManager.GetConfigAsync(cancellationToken);
+            var read = await configService.ReadAsync(cancellationToken);
+            if (!read.IsHealthy || read.Config == null)
+            {
+                return AppConfigEndpointResults.ReadFailure(read, config => new
+                {
+                    profiles = config.TcpCommunication.Profiles,
+                    revision = config.Revision
+                });
+            }
+
             return Results.Ok(new
             {
                 success = true,
-                profiles = config.Profiles
+                profiles = read.Config.TcpCommunication.Profiles,
+                revision = read.Config.Revision
             });
         })
         .RequireClearVisionPermission(ClearVisionPermissionPolicies.CanOperateHardware);
 
         app.MapPut("/api/tcp/profiles", async (
-            [FromBody] TcpCommunicationProfile[]? profiles,
+            [FromBody] TcpProfilesUpdateRequest request,
             ITcpDeviceManager tcpDeviceManager,
             HttpContext context,
             CancellationToken cancellationToken) =>
@@ -35,30 +45,43 @@ public static class TcpEndpoints
                 return Results.Json(new { error = "AdminRequired" }, statusCode: StatusCodes.Status403Forbidden);
             }
 
+            if (!request.ExpectedRevision.HasValue)
+            {
+                return AppConfigEndpointResults.ExpectedRevisionFailure();
+            }
+
             var config = new TcpCommunicationConfig
             {
-                Profiles = profiles?.ToList() ?? new List<TcpCommunicationProfile>()
+                Profiles = request.Profiles?.ToList() ?? new List<TcpCommunicationProfile>()
             };
             config.Normalize();
 
             var validation = TcpCommunicationConfigValidator.Validate(config);
             if (!validation.IsValid)
             {
-                return Results.Ok(new
+                return Results.Json(new
                 {
                     success = false,
+                    errorCode = "APP_CONFIG_VALIDATION_FAILED",
                     message = "TCP Profile 校验失败。",
                     profiles = config.Profiles,
                     errors = validation.Errors
-                });
+                }, statusCode: StatusCodes.Status422UnprocessableEntity);
             }
 
-            var saved = await tcpDeviceManager.SaveConfigAsync(config, cancellationToken);
+            var mutation = await tcpDeviceManager.SaveConfigAsync(config, request.ExpectedRevision.Value, cancellationToken);
+            if (!mutation.IsSuccess)
+            {
+                return AppConfigEndpointResults.MutationFailure(mutation);
+            }
+
             return Results.Ok(new
             {
                 success = true,
-                message = "TCP Profile 已保存。",
-                profiles = saved.Profiles,
+                message = mutation.IsNoOp ? "TCP Profile 未发生变化。" : "TCP Profile 已保存。",
+                profiles = mutation.Config!.TcpCommunication.Profiles,
+                revision = mutation.ActualRevision,
+                noOp = mutation.IsNoOp,
                 errors = Array.Empty<TcpCommunicationValidationIssue>()
             });
         })
@@ -188,6 +211,12 @@ public static class TcpEndpoints
             ? Results.Ok(payload)
             : Results.BadRequest(payload);
     }
+}
+
+public sealed class TcpProfilesUpdateRequest
+{
+    public long? ExpectedRevision { get; set; }
+    public TcpCommunicationProfile[]? Profiles { get; set; }
 }
 
 public sealed class TcpSendEndpointRequest

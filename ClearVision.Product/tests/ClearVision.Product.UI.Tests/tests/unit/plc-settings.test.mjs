@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 
 function createClassList() {
   const values = new Set();
@@ -126,6 +127,7 @@ const dom = installDom();
 const { SettingsView } = await import('../../../../src/ClearVision.Product.Desktop/wwwroot/src/features/settings/settingsView.js');
 const { Capabilities } = await import('../../../../src/ClearVision.Product.Desktop/wwwroot/src/features/auth/auth.js');
 const settingsApi = (await import('../../../../src/ClearVision.Product.Desktop/wwwroot/src/features/settings/settingsApi.js')).default;
+const httpClient = (await import('../../../../src/ClearVision.Product.Desktop/wwwroot/src/core/messaging/httpClient.js')).default;
 
 function createField(value = '') {
   return { value: String(value) };
@@ -214,6 +216,7 @@ function createView(communication = baseCommunication()) {
   dom.register('settings-view', root);
   const view = new SettingsView('settings-view');
   view.config = view.normalizeAppConfig({ communication });
+  view.config.revision = 0;
   view.savedCommunicationConfig = view.cloneCommunicationConfig(view.config.communication);
   view.plcProfileDrafts = {};
   view.plcValidationErrors = [];
@@ -504,4 +507,223 @@ test('PLC save failure normalizes backend validation errors without marking draf
 
   assert.equal(view.plcDraftDirty, true);
   assert.deepEqual(view.getPlcFieldErrors('mapping', 'address', 0).map(error => error.message), ['PLC 地址格式无效。']);
+});
+
+test('PLC save sends expected AppConfig revision, advances it once, and never performs a full settings write', async () => {
+  const view = createView();
+  view.config.revision = 17;
+  view.container = createContainer({
+    fields: {
+      ipAddress: createField('192.168.0.22'),
+      port: createField('102'),
+      cpuType: createField('S7-1200'),
+      rack: createField('0'),
+      slot: createField('1')
+    }
+  });
+  const originalSavePlc = settingsApi.savePlcSettings;
+  const originalSaveSettings = settingsApi.saveSettings;
+  let fullSettingsWrites = 0;
+  let capturedPayload = null;
+  settingsApi.saveSettings = async () => {
+    fullSettingsWrites += 1;
+    return {};
+  };
+  settingsApi.savePlcSettings = async payload => {
+    capturedPayload = payload;
+    return { success: true, settings: payload, revision: 18, errors: [] };
+  };
+
+  try {
+    const result = await view.savePlcSettings({ silent: true });
+    assert.equal(result.success, true);
+  } finally {
+    settingsApi.savePlcSettings = originalSavePlc;
+    settingsApi.saveSettings = originalSaveSettings;
+  }
+
+  assert.equal(capturedPayload.expectedRevision, 17);
+  assert.equal(view.config.revision, 18);
+  assert.equal(fullSettingsWrites, 0);
+});
+
+test('PLC 409 refreshes only authoritative revision and preserves the active draft for retry', async () => {
+  const view = createView();
+  view.config.revision = 4;
+  view.plcDraftDirty = true;
+  const draftIp = createField('10.66.77.88');
+  view.container = createContainer({
+    fields: {
+      ipAddress: draftIp,
+      port: createField('102'),
+      cpuType: createField('S7-1200'),
+      rack: createField('0'),
+      slot: createField('1')
+    }
+  });
+  const originalSave = settingsApi.savePlcSettings;
+  const originalLoad = settingsApi.loadSettings;
+  settingsApi.savePlcSettings = async () => {
+    const error = new Error('revision conflict');
+    error.status = 409;
+    throw error;
+  };
+  settingsApi.loadSettings = async () => ({ revision: 9, general: { softwareTitle: 'Other writer' } });
+
+  let result;
+  try {
+    result = await view.savePlcSettings({ silent: true });
+  } finally {
+    settingsApi.savePlcSettings = originalSave;
+    settingsApi.loadSettings = originalLoad;
+  }
+
+  assert.equal(result.conflict, true);
+  assert.equal(view.config.revision, 9);
+  assert.equal(view.plcDraftDirty, true);
+  assert.equal(draftIp.value, '10.66.77.88');
+  assert.equal(view.config.general.softwareTitle, 'ClearVision');
+});
+
+test('camera and TCP saves propagate AppConfig revision and refresh the local token', async () => {
+  const view = createView();
+  view.config.revision = 23;
+  view.cameraBindings = [{
+    id: 'cam-a',
+    displayName: 'Camera A',
+    serialNumber: 'SN-A',
+    exposureTimeUs: 5000,
+    gainDb: 0,
+    triggerMode: 'Software'
+  }];
+  view.config.activeCameraId = 'cam-a';
+  view.syncActiveCameraSelection = () => {};
+  view.buildTcpProfilesPayload = () => [{
+    id: 'robot',
+    name: 'Robot',
+    enabled: true,
+    mode: 'Client',
+    remoteHost: '127.0.0.1',
+    remotePort: 9000,
+    localHost: '127.0.0.1',
+    localPort: 9001,
+    encoding: 'UTF8',
+    frameMode: 'Raw',
+    lineEnding: 'None',
+    timeoutMs: 5000,
+    reconnect: true
+  }];
+  view.refreshTcpPanel = () => {};
+  const originalCameraSave = settingsApi.saveCameraBindings;
+  const originalTcpSave = settingsApi.saveTcpProfiles;
+  let cameraPayload = null;
+  let tcpRevision = null;
+  settingsApi.saveCameraBindings = async payload => {
+    cameraPayload = payload;
+    return { revision: 24, bindings: payload.bindings, activeCameraId: payload.activeCameraId };
+  };
+  settingsApi.saveTcpProfiles = async (profiles, expectedRevision) => {
+    tcpRevision = expectedRevision;
+    return { success: true, profiles, revision: 25 };
+  };
+
+  try {
+    assert.equal(await view.saveCameraBindings({ silent: true }), true);
+    assert.equal(cameraPayload.expectedRevision, 23);
+    assert.equal(view.config.revision, 24);
+    const tcpResult = await view.saveTcpSettings({ silent: true });
+    assert.equal(tcpResult.success, true);
+  } finally {
+    settingsApi.saveCameraBindings = originalCameraSave;
+    settingsApi.saveTcpProfiles = originalTcpSave;
+  }
+
+  assert.equal(tcpRevision, 24);
+  assert.equal(view.config.revision, 25);
+});
+
+test('settings API reset and TCP wrappers preserve the expected revision in request bodies', async () => {
+  const originalPost = httpClient.post;
+  const originalPut = httpClient.put;
+  const calls = [];
+  httpClient.post = async (url, payload) => {
+    calls.push({ method: 'POST', url, payload });
+    return { revision: 31 };
+  };
+  httpClient.put = async (url, payload) => {
+    calls.push({ method: 'PUT', url, payload });
+    return { success: true, profiles: payload.profiles, revision: 32 };
+  };
+
+  try {
+    await settingsApi.resetSettings(30);
+    await settingsApi.saveTcpProfiles([{ id: 'robot' }], 31);
+  } finally {
+    httpClient.post = originalPost;
+    httpClient.put = originalPut;
+  }
+
+  assert.deepEqual(calls, [
+    { method: 'POST', url: '/settings/reset', payload: { expectedRevision: 30 } },
+    { method: 'PUT', url: '/tcp/profiles', payload: { profiles: [{ id: 'robot' }], expectedRevision: 31 } }
+  ]);
+});
+
+test('all AppConfig UI mutation sources carry revision CAS and expose 409 retry handling', () => {
+  const source = relativePath => readFileSync(new URL(relativePath, import.meta.url), 'utf8');
+  const settingsView = source('../../../../src/ClearVision.Product.Desktop/wwwroot/src/features/settings/settingsView.js');
+  const systemTabs = source('../../../../src/ClearVision.Product.Desktop/wwwroot/src/features/settings/tabs/systemTabs.js');
+  const plcTab = source('../../../../src/ClearVision.Product.Desktop/wwwroot/src/features/settings/tabs/plcTab.js');
+  const cameraTab = source('../../../../src/ClearVision.Product.Desktop/wwwroot/src/features/settings/tabs/cameraTab.js');
+  const tcpTab = source('../../../../src/ClearVision.Product.Desktop/wwwroot/src/features/settings/tabs/tcpTab.js');
+  const aiTab = source('../../../../src/ClearVision.Product.Desktop/wwwroot/src/features/settings/tabs/aiTab.js');
+  const pilotConsole = source('../../../../src/ClearVision.Product.Desktop/wwwroot/src/features/settings/tabs/runtimePreviewPilotConsole.js');
+  const app = source('../../../../src/ClearVision.Product.Desktop/wwwroot/src/app.js');
+
+  assert.match(systemTabs, /config\.expectedRevision\s*=\s*expectedRevision/);
+  assert.match(systemTabs, /resetSettings\(expectedRevision\)/);
+  assert.match(systemTabs, /requireAppConfigRevision\('系统设置'\)/);
+  assert.match(plcTab, /expectedRevision\s*\n?\s*\}/);
+  assert.match(plcTab, /requireAppConfigRevision\('PLC 配置'\)/);
+  assert.doesNotMatch(plcTab, /settingsApi\.saveSettings\(/);
+  assert.match(cameraTab, /requireAppConfigRevision\('相机配置'\)/);
+  assert.match(cameraTab, /expectedRevision\s*\n?\s*\}/);
+  assert.match(tcpTab, /saveTcpProfiles\(payload,\s*expectedRevision\)/);
+  assert.match(aiTab, /payload\.expectedRevision\s*=\s*expectedRevision/);
+  assert.match(pilotConsole, /payload\.expectedRevision\s*=\s*expectedRevision/);
+  assert.match(app, /expectedRevision:\s*appConfigRevision/);
+  assert.match(settingsView, /Number\(error\?\.status\s*\?\?\s*error\?\.statusCode\)\s*!==\s*409/);
+  assert.match(settingsView, /Current tab fields\/state remain the user's draft/);
+});
+
+test('degraded AppConfig state blocks mutation before any API request', async () => {
+  const view = createView();
+  view.config.revision = 12;
+  view.appConfigAuthorityHealthy = false;
+  view.container = createContainer({
+    fields: {
+      ipAddress: createField('192.168.0.22'),
+      port: createField('102'),
+      cpuType: createField('S7-1200'),
+      rack: createField('0'),
+      slot: createField('1')
+    }
+  });
+  const originalSave = settingsApi.savePlcSettings;
+  let requests = 0;
+  settingsApi.savePlcSettings = async () => {
+    requests += 1;
+    return { success: true };
+  };
+
+  let result;
+  try {
+    result = await view.savePlcSettings({ silent: true });
+  } finally {
+    settingsApi.savePlcSettings = originalSave;
+  }
+
+  assert.equal(result.unavailable, true);
+  assert.equal(requests, 0);
+  assert.equal(view.config.revision, 12);
 });

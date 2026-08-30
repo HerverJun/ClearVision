@@ -1,4 +1,5 @@
 using ClearVision.Product.Core.Cameras;
+using ClearVision.Product.Desktop.Services;
 using ClearVision.Product.Desktop.Triggers;
 using ClearVision.Product.Infrastructure.DependencyInjection;
 using Microsoft.Extensions.Configuration;
@@ -20,6 +21,7 @@ public static class DependencyInjection
         services.AddSingleton<SerialPhotoelectricTriggerInputService>();
         services.AddSingleton<ISerialPhotoelectricTriggerInputService>(sp =>
             sp.GetRequiredService<SerialPhotoelectricTriggerInputService>());
+        services.AddSingleton<CameraConfigurationCoordinator>();
 
         return services.AddVisionRuntimeServices(configuration);
     }

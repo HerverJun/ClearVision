@@ -550,18 +550,20 @@ public class AiModelEndpointsTests
             "/api/settings/runtime-preview-pilot/config",
             JsonContent(new
             {
+                expectedRevision = appConfig.Revision,
                 enabled = true,
                 mode = "metadata_only",
                 allowedCameraBindingIds = new[] { "redacted-ip-token" },
                 denyExternalPath = true,
                 denyImageBytes = true
             }));
-        invalidPutResponse.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        invalidPutResponse.StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity);
 
         using var validPutResponse = await host.Client.PutAsync(
             "/api/settings/runtime-preview-pilot/config",
             JsonContent(new
             {
+                expectedRevision = appConfig.Revision,
                 enabled = true,
                 mode = "metadata_only",
                 allowedCameraBindingIds = new[] { "cam-a" },
@@ -1513,7 +1515,7 @@ public class AiModelEndpointsTests
 
         public AiConfigStore AiConfigStore { get; }
 
-        public IConfigurationService ConfigurationService { get; private init; } = null!;
+        public InMemoryAppConfigAuthority ConfigurationService { get; private init; } = null!;
 
         public AiConfigStore CreateReloadedStore()
         {
@@ -1543,11 +1545,9 @@ public class AiModelEndpointsTests
 
             var storageDirectory = Path.Combine(Path.GetTempPath(), $"cv-ai-model-endpoints-{Guid.NewGuid():N}");
             var effectiveConfig = appConfig ?? new AppConfig();
-            var configService = Substitute.For<IConfigurationService>();
-            configService.LoadAsync().Returns(_ => Task.FromResult(effectiveConfig));
-            configService.GetCurrent().Returns(_ => effectiveConfig);
-            configService.SaveAsync(Arg.Any<AppConfig>()).Returns(Task.CompletedTask);
-            builder.Services.AddSingleton(configService);
+            effectiveConfig.Normalize();
+            var configService = new InMemoryAppConfigAuthority(effectiveConfig);
+            builder.Services.AddSingleton<IConfigurationService>(configService);
             builder.Services.AddSingleton(Substitute.For<ClearVision.Product.Core.Cameras.ICameraManager>());
             builder.Services.AddSingleton(new RuntimePreviewGovernanceStore(Path.Combine(storageDirectory, "runtime-preview-governance")));
             builder.Services.AddSingleton<RuntimePreviewPilotResourceCatalog>();

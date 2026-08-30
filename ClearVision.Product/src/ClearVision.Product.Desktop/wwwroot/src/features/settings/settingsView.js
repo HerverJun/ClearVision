@@ -18,6 +18,8 @@ export class SettingsView {
         this.container = document.getElementById(containerId);
         
         this.config = null;
+        this.appConfigAuthorityHealthy = true;
+        this.appConfigLoadError = null;
         this.users = [];
         this.cameraBindings = [];
         this.selectedCameraBindingId = null;
@@ -165,6 +167,8 @@ export class SettingsView {
         // 获取配置信息
         try {
             this.config = this.normalizeAppConfig(await settingsApi.loadSettings());
+            this.appConfigAuthorityHealthy = true;
+            this.appConfigLoadError = null;
             if (refreshRequestId !== this._refreshRequestId) return;
             this.cameraBindings = this.config.cameras || [];
             this.syncActiveCameraSelection();
@@ -187,6 +191,8 @@ export class SettingsView {
         } catch (error) {
             console.error('[SettingsView] Failed to load data:', error);
             showToast('加载系统配置失败: ' + error.message, 'error');
+            this.appConfigAuthorityHealthy = false;
+            this.appConfigLoadError = error;
             this.config = this.normalizeAppConfig(this.getDefaultConfig());
             this.syncActiveCameraSelection();
             this.savedCommunicationConfig = this.cloneCommunicationConfig(this.config.communication);
@@ -328,9 +334,12 @@ export class SettingsView {
             saveBtn.textContent = meta.button;
             saveBtn.title = meta.body;
             const capability = this.getSaveCapability(tabName);
-            saveBtn.disabled = !!capability && !this.hasCapability(capability);
+            const configUnavailable = this.isAppConfigBackedTab(tabName) && !this.isAppConfigMutationAvailable();
+            saveBtn.disabled = (!!capability && !this.hasCapability(capability)) || configUnavailable;
             saveBtn.setAttribute('aria-disabled', saveBtn.disabled ? 'true' : 'false');
-            if (saveBtn.disabled) {
+            if (configUnavailable) {
+                saveBtn.title = `${meta.body} 权威配置不可用，保存已禁用。`;
+            } else if (saveBtn.disabled) {
                 saveBtn.title = `${meta.body} 当前账户没有此操作权限。`;
             }
         }
@@ -405,6 +414,12 @@ export class SettingsView {
                             <button class="cv-btn cv-btn-primary" id="btn-save-settings">保存当前页</button>
                         </div>
                     </div>
+                    ${this.appConfigAuthorityHealthy === false ? `
+                        <div class="settings-scope-notice" role="alert" data-app-config-status="degraded">
+                            <strong>权威配置当前不可用</strong>
+                            <span>页面仅显示只读默认占位值；AppConfig 保存、PLC、TCP、相机绑定与恢复默认设置已禁用，避免覆盖磁盘中的真实配置。</span>
+                        </div>
+                    ` : ''}
                     <div class="settings-tab-panels">
                         <div class="settings-panel settings-panel--standard active" data-section="general">${this.renderGeneralTab()}</div>
                         <div class="settings-panel settings-panel--wide" data-section="communication">${this.renderCommunicationTab()}</div>
@@ -546,6 +561,65 @@ export class SettingsView {
 
         const activePanel = this.container?.querySelector('.settings-panel.active');
         return activePanel?.dataset.section || null;
+    }
+
+    getAppConfigRevision() {
+        const revision = Number(this.config?.revision ?? this.config?.Revision);
+        return Number.isSafeInteger(revision) && revision >= 0 ? revision : null;
+    }
+
+    requireAppConfigRevision(operationLabel = '配置') {
+        const revision = this.getAppConfigRevision();
+        if (this.appConfigAuthorityHealthy === false || revision === null) {
+            showToast(`${operationLabel}当前不可保存：权威配置未成功加载，请恢复配置文件可用性后刷新页面。`, 'warning');
+            return null;
+        }
+
+        return revision;
+    }
+
+    isAppConfigBackedTab(tabName) {
+        return ['general', 'communication', 'tcp', 'storage', 'runtime', 'cameras', 'users']
+            .includes(String(tabName || '').toLowerCase());
+    }
+
+    isAppConfigMutationAvailable() {
+        return this.appConfigAuthorityHealthy !== false && this.getAppConfigRevision() !== null;
+    }
+
+    applyMutationRevision(result) {
+        const revision = Number(
+            result?.revision ?? result?.Revision ?? result?.actualRevision ?? result?.ActualRevision
+            ?? result?.config?.revision ?? result?.Config?.revision
+        );
+        if (Number.isSafeInteger(revision) && revision >= 0 && this.config) {
+            this.config.revision = revision;
+            this.appConfigAuthorityHealthy = true;
+            this.appConfigLoadError = null;
+        }
+        return Number.isSafeInteger(revision) && revision >= 0 ? revision : null;
+    }
+
+    async handleAppConfigRevisionConflict(error, operationLabel = '配置') {
+        if (Number(error?.status ?? error?.statusCode) !== 409) {
+            return false;
+        }
+
+        try {
+            const authoritative = await settingsApi.loadSettings();
+            const revision = Number(authoritative?.revision ?? authoritative?.Revision);
+            if (Number.isSafeInteger(revision) && revision >= 0 && this.config) {
+                // Deliberately refresh only the CAS token. Current tab fields/state remain the user's draft.
+                this.config.revision = revision;
+                this.appConfigAuthorityHealthy = true;
+                this.appConfigLoadError = null;
+            }
+        } catch (refreshError) {
+            console.warn('[SettingsView] Failed to refresh AppConfig revision after conflict:', refreshError);
+        }
+
+        showToast(`${operationLabel}已被其他修改更新；当前页草稿已保留，请重试保存。`, 'warning');
+        return true;
     }
 
     async save() {

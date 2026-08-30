@@ -2,7 +2,6 @@ using System.Net;
 using System.Text;
 using System.Text.Json;
 using ClearVision.Product.Core.Entities;
-using ClearVision.Product.Core.Interfaces;
 using ClearVision.Product.Desktop.Endpoints;
 using FluentAssertions;
 using Microsoft.AspNetCore.Builder;
@@ -55,6 +54,7 @@ public class PlcSettingsEndpointTests
         await using var host = await PlcSettingsTestHost.CreateAsync(new AppConfig());
         var payload = new
         {
+            expectedRevision = host.ConfigurationService.GetCurrent().Revision,
             activeProtocol = "S7",
             heartbeatIntervalMs = 1000,
             s7 = new
@@ -88,12 +88,12 @@ public class PlcSettingsEndpointTests
             "/api/plc/settings",
             new StringContent(JsonSerializer.Serialize(payload), Encoding.UTF8, "application/json"));
 
-        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        response.StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity);
 
         using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
         document.RootElement.GetProperty("success").GetBoolean().Should().BeFalse();
         document.RootElement.GetProperty("errors").GetArrayLength().Should().BeGreaterThanOrEqualTo(2);
-        await host.ConfigurationService.DidNotReceive().SaveAsync(Arg.Any<AppConfig>());
+        host.ConfigurationService.MutationCount.Should().Be(0);
     }
 
     [Fact]
@@ -103,10 +103,10 @@ public class PlcSettingsEndpointTests
 
         using var response = await host.Client.PutAsync(
             "/api/plc/settings",
-            new StringContent("{}", Encoding.UTF8, "application/json"));
+            new StringContent("{\"expectedRevision\":0}", Encoding.UTF8, "application/json"));
 
         response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
-        await host.ConfigurationService.DidNotReceive().SaveAsync(Arg.Any<AppConfig>());
+        host.ConfigurationService.MutationCount.Should().Be(0);
     }
 
     [Fact]
@@ -115,6 +115,7 @@ public class PlcSettingsEndpointTests
         await using var host = await PlcSettingsTestHost.CreateAsync(new AppConfig());
         var payload = new
         {
+            expectedRevision = host.ConfigurationService.GetCurrent().Revision,
             activeProtocol = "FINS",
             heartbeatIntervalMs = 1200,
             s7 = new
@@ -154,11 +155,11 @@ public class PlcSettingsEndpointTests
         document.RootElement.GetProperty("settings").GetProperty("activeProtocol").GetString().Should().Be("FINS");
         document.RootElement.GetProperty("settings").GetProperty("fins").GetProperty("ipAddress").GetString().Should().Be("192.168.250.99");
 
-        await host.ConfigurationService.Received(1).SaveAsync(Arg.Is<AppConfig>(config =>
-            config.Communication.ActiveProtocol == "FINS"
-            && config.Communication.Fins.IpAddress == "192.168.250.99"
-            && config.Communication.Fins.Mappings.Count == 1
-            && config.Communication.Fins.Mappings[0].Address == "DM100"));
+        var committed = host.ConfigurationService.GetCurrent();
+        committed.Communication.ActiveProtocol.Should().Be("FINS");
+        committed.Communication.Fins.IpAddress.Should().Be("192.168.250.99");
+        committed.Communication.Fins.Mappings.Should().ContainSingle(mapping => mapping.Address == "DM100");
+        committed.Revision.Should().Be(1);
     }
 
     [Fact]
@@ -206,6 +207,7 @@ public class PlcSettingsEndpointTests
         await using var host = await PlcSettingsTestHost.CreateAsync(initialConfig);
         var payload = new
         {
+            expectedRevision = initialConfig.Revision,
             activeProtocol = "MC",
             heartbeatIntervalMs = 1500,
             s7 = new
@@ -236,17 +238,15 @@ public class PlcSettingsEndpointTests
             new StringContent(JsonSerializer.Serialize(payload), Encoding.UTF8, "application/json"));
 
         response.StatusCode.Should().Be(HttpStatusCode.OK, await response.Content.ReadAsStringAsync());
-        await host.ConfigurationService.Received(1).SaveAsync(Arg.Is<AppConfig>(config =>
-            config.Communication.ActiveProtocol == CommunicationConfig.ProtocolMc &&
-            config.Communication.Mc.IpAddress == "192.168.3.10" &&
-            config.General.SoftwareTitle == initialConfig.General.SoftwareTitle &&
-            config.General.AutoStart == initialConfig.General.AutoStart &&
-            config.Storage.MinFreeSpaceGb == initialConfig.Storage.MinFreeSpaceGb &&
-            config.TcpCommunication.Profiles.Count == 1 &&
-            config.TcpCommunication.Profiles[0].Id == "robot" &&
-            config.Cameras.Count == 1 &&
-            config.Cameras[0].Id == "cam-main" &&
-            config.ActiveCameraId == "cam-main"));
+        var committed = host.ConfigurationService.GetCurrent();
+        committed.Communication.ActiveProtocol.Should().Be(CommunicationConfig.ProtocolMc);
+        committed.Communication.Mc.IpAddress.Should().Be("192.168.3.10");
+        committed.General.SoftwareTitle.Should().Be(initialConfig.General.SoftwareTitle);
+        committed.General.AutoStart.Should().Be(initialConfig.General.AutoStart);
+        committed.Storage.MinFreeSpaceGb.Should().Be(initialConfig.Storage.MinFreeSpaceGb);
+        committed.TcpCommunication.Profiles.Should().ContainSingle(profile => profile.Id == "robot");
+        committed.Cameras.Should().ContainSingle(binding => binding.Id == "cam-main");
+        committed.ActiveCameraId.Should().Be("cam-main");
     }
 
     [Fact]
@@ -256,10 +256,10 @@ public class PlcSettingsEndpointTests
 
         using var response = await host.Client.PutAsync(
             "/api/plc/mappings",
-            new StringContent("[]", Encoding.UTF8, "application/json"));
+            new StringContent("{\"expectedRevision\":0,\"mappings\":[]}", Encoding.UTF8, "application/json"));
 
         response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
-        await host.ConfigurationService.DidNotReceive().SaveAsync(Arg.Any<AppConfig>());
+        host.ConfigurationService.MutationCount.Should().Be(0);
     }
 
     [Fact]
@@ -314,7 +314,7 @@ public class PlcSettingsEndpointTests
     {
         private readonly WebApplication _app;
 
-        private PlcSettingsTestHost(WebApplication app, IConfigurationService configurationService)
+        private PlcSettingsTestHost(WebApplication app, InMemoryAppConfigAuthority configurationService)
         {
             _app = app;
             ConfigurationService = configurationService;
@@ -323,7 +323,7 @@ public class PlcSettingsEndpointTests
 
         public HttpClient Client { get; }
 
-        public IConfigurationService ConfigurationService { get; }
+        public InMemoryAppConfigAuthority ConfigurationService { get; }
 
         public static async Task<PlcSettingsTestHost> CreateAsync(AppConfig initialConfig, string? role = "Admin")
         {
@@ -334,11 +334,9 @@ public class PlcSettingsEndpointTests
 
             builder.WebHost.UseTestServer();
 
-            var configService = Substitute.For<IConfigurationService>();
-            configService.LoadAsync().Returns(Task.FromResult(initialConfig));
-            configService.GetCurrent().Returns(initialConfig);
-            configService.SaveAsync(Arg.Any<AppConfig>()).Returns(Task.CompletedTask);
-            builder.Services.AddSingleton(configService);
+            initialConfig.Normalize();
+            var configService = new InMemoryAppConfigAuthority(initialConfig);
+            builder.Services.AddSingleton<ClearVision.Product.Core.Interfaces.IConfigurationService>(configService);
 
             var app = builder.Build();
             app.Use(async (context, next) =>

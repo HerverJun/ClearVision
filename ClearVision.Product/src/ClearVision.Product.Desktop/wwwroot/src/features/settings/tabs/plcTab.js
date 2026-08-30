@@ -196,6 +196,7 @@ export function installPlcTab(SettingsView) {
 
             try {
                 const result = await settingsApi.loadPlcSettings();
+                this.applyMutationRevision(result);
                 const settings = this.normalizeCommunicationConfig(result?.settings || result);
                 if (!force && this.plcDraftDirty) {
                     return;
@@ -402,8 +403,16 @@ export function installPlcTab(SettingsView) {
             }
 
             try {
-                const result = await settingsApi.savePlcSettings(payload);
+                const expectedRevision = this.requireAppConfigRevision('PLC 配置');
+                if (expectedRevision === null) {
+                    return { success: false, settings: null, unavailable: true };
+                }
+                const result = await settingsApi.savePlcSettings({
+                    ...payload,
+                    expectedRevision
+                });
                 const success = !!result?.success;
+                this.applyMutationRevision(result);
                 const normalizedSettings = this.normalizeCommunicationConfig(result?.settings || payload);
 
                 this.plcValidationErrors = this.normalizePlcValidationErrors(result?.errors);
@@ -434,6 +443,9 @@ export function installPlcTab(SettingsView) {
                 return { success: true, settings: normalizedSettings };
             } catch (error) {
                 console.error('[SettingsView] Failed to save PLC settings:', error);
+                if (await this.handleAppConfigRevisionConflict(error, 'PLC 配置')) {
+                    return { success: false, settings: null, conflict: true };
+                }
                 if (!silent) {
                     showToast('保存PLC配置失败: ' + error.message, 'error');
                 }

@@ -1843,10 +1843,14 @@ export function installCameraTab(SettingsView) {
             this.lastCameraBindingSaveError = null;
 
             try {
-                await settingsApi.saveCameraBindings({
+                const expectedRevision = this.requireAppConfigRevision('相机配置');
+                if (expectedRevision === null) return false;
+                const result = await settingsApi.saveCameraBindings({
                     bindings: bindingsPayload,
-                    activeCameraId: activeCameraId
+                    activeCameraId: activeCameraId,
+                    expectedRevision
                 });
+                this.applyMutationRevision(result);
 
                 if (this.config) {
                     this.config.cameras = [...bindingsPayload];
@@ -1859,6 +1863,9 @@ export function installCameraTab(SettingsView) {
             } catch (error) {
                 console.error('[SettingsView] Failed to save camera bindings:', error);
                 this.lastCameraBindingSaveError = error.message;
+                if (await this.handleAppConfigRevisionConflict(error, '相机配置')) {
+                    return false;
+                }
                 if (!silent) {
                     showToast('保存相机绑定失败: ' + error.message, 'error');
                 }

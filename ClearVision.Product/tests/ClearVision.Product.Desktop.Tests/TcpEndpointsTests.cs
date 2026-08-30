@@ -27,12 +27,12 @@ public class TcpEndpointsTests
     {
         await using var host = await TcpEndpointTestHost.CreateAsync(new AppConfig(), role: "Operator");
 
-        using var response = await host.Client.PutAsync(
+using var response = await host.Client.PutAsync(
             "/api/tcp/profiles",
-            new StringContent("[]", Encoding.UTF8, "application/json"));
+            JsonContent(new { expectedRevision = 0, profiles = Array.Empty<object>() }));
 
         response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
-        await host.ConfigurationService.DidNotReceive().SaveAsync(Arg.Any<AppConfig>());
+        host.ConfigurationService.MutationCount.Should().Be(0);
     }
 
     [Fact]
@@ -61,13 +61,17 @@ public class TcpEndpointsTests
 
         using var response = await host.Client.PutAsync(
             "/api/tcp/profiles",
-            JsonContent(payload));
+            JsonContent(new
+            {
+                expectedRevision = host.ConfigurationService.GetCurrent().Revision,
+                profiles = payload
+            }));
 
-        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        response.StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity);
         using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
         document.RootElement.GetProperty("success").GetBoolean().Should().BeFalse();
         document.RootElement.GetProperty("errors").GetArrayLength().Should().BeGreaterThan(0);
-        await host.ConfigurationService.DidNotReceive().SaveAsync(Arg.Any<AppConfig>());
+        host.ConfigurationService.MutationCount.Should().Be(0);
     }
 
     [Fact]
@@ -103,16 +107,20 @@ public class TcpEndpointsTests
 
         using var response = await host.Client.PutAsync(
             "/api/tcp/profiles",
-            JsonContent(payload));
+            JsonContent(new
+            {
+                expectedRevision = host.ConfigurationService.GetCurrent().Revision,
+                profiles = payload
+            }));
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
         document.RootElement.GetProperty("success").GetBoolean().Should().BeTrue();
 
-        await host.ConfigurationService.Received(1).SaveAsync(Arg.Is<AppConfig>(config =>
-            config.Communication.ActiveProtocol == CommunicationConfig.ProtocolMc
-            && config.TcpCommunication.Profiles.Count == 1
-            && config.TcpCommunication.Profiles[0].Id == "robot"));
+        var committed = host.ConfigurationService.GetCurrent();
+        committed.Communication.ActiveProtocol.Should().Be(CommunicationConfig.ProtocolMc);
+        committed.TcpCommunication.Profiles.Should().ContainSingle(profile => profile.Id == "robot");
+        committed.Revision.Should().Be(initialConfig.Revision + 1);
     }
 
     [Fact]
@@ -355,7 +363,7 @@ public class TcpEndpointsTests
     {
         private readonly WebApplication _app;
 
-        private TcpEndpointTestHost(WebApplication app, IConfigurationService configurationService)
+        private TcpEndpointTestHost(WebApplication app, InMemoryAppConfigAuthority configurationService)
         {
             _app = app;
             ConfigurationService = configurationService;
@@ -364,7 +372,7 @@ public class TcpEndpointsTests
 
         public HttpClient Client { get; }
 
-        public IConfigurationService ConfigurationService { get; }
+        public InMemoryAppConfigAuthority ConfigurationService { get; }
 
         public static async Task<TcpEndpointTestHost> CreateAsync(AppConfig initialConfig, string? role = "Admin")
         {
@@ -376,19 +384,8 @@ public class TcpEndpointsTests
 
             builder.WebHost.UseTestServer();
 
-            var currentConfig = initialConfig;
-            var configService = Substitute.For<IConfigurationService>();
-            configService.LoadAsync().Returns(_ => Task.FromResult(currentConfig));
-            configService.GetCurrent().Returns(_ => currentConfig);
-            configService
-                .When(service => service.SaveAsync(Arg.Any<AppConfig>()))
-                .Do(call =>
-                {
-                    currentConfig = call.Arg<AppConfig>();
-                    currentConfig.Normalize();
-                });
-            configService.SaveAsync(Arg.Any<AppConfig>()).Returns(Task.CompletedTask);
-            builder.Services.AddSingleton(configService);
+            var configService = new InMemoryAppConfigAuthority(initialConfig);
+            builder.Services.AddSingleton<IConfigurationService>(configService);
             builder.Services.AddSingleton<ITcpDeviceManager>(sp =>
                 new TcpDeviceManager(
                     sp.GetRequiredService<IConfigurationService>(),

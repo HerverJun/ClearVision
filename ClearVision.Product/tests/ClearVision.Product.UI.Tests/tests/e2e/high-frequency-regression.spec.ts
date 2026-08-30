@@ -40,6 +40,7 @@ const cameraBinding = {
 
 function buildSettingsPayload() {
     return {
+        revision: 1,
         general: {
             language: 'zh-CN',
             autoStart: false,
@@ -122,15 +123,20 @@ async function mockSettingsApis(
 
         const payload = JSON.parse(route.request().postData() || '{}');
         options.onSettingsPut?.(payload);
-        Object.assign(settingsPayload, payload);
+        const { expectedRevision: _, ...patch } = payload;
+        Object.assign(settingsPayload, patch);
         if (payload.communication) {
             settingsPayload.communication = payload.communication;
         }
+        settingsPayload.revision += 1;
 
         await route.fulfill({
             status: 200,
             contentType: 'application/json',
-            body: JSON.stringify(settingsPayload),
+            body: JSON.stringify({
+                config: settingsPayload,
+                revision: settingsPayload.revision,
+            }),
         });
     });
 
@@ -181,11 +187,17 @@ async function mockSettingsApis(
         if (typeof payload?.activeCameraId === 'string') {
             settingsPayload.activeCameraId = payload.activeCameraId;
         }
+        settingsPayload.revision += 1;
 
         await route.fulfill({
             status: 200,
             contentType: 'application/json',
-            body: JSON.stringify({ success: true }),
+            body: JSON.stringify({
+                success: true,
+                revision: settingsPayload.revision,
+                bindings: settingsPayload.cameras,
+                activeCameraId: settingsPayload.activeCameraId || '',
+            }),
         });
     });
 
@@ -207,7 +219,9 @@ async function mockSettingsApis(
         if (route.request().method() !== 'GET') {
             const payload = JSON.parse(route.request().postData() || '{}');
             options.onPlcSettingsPut?.(payload);
-            settingsPayload.communication = payload;
+            const { expectedRevision: _, ...communication } = payload;
+            settingsPayload.communication = communication;
+            settingsPayload.revision += 1;
 
             await route.fulfill({
                 status: 200,
@@ -215,6 +229,7 @@ async function mockSettingsApis(
                 body: JSON.stringify({
                     success: true,
                     settings: settingsPayload.communication,
+                    revision: settingsPayload.revision,
                     errors: [],
                 }),
             });
@@ -227,6 +242,7 @@ async function mockSettingsApis(
             body: JSON.stringify({
                 success: true,
                 settings: settingsPayload.communication,
+                revision: settingsPayload.revision,
             }),
         });
     });
@@ -736,9 +752,9 @@ test.describe('High Frequency Regression', () => {
 
         await expect.poll(() => cameraBindingPuts.length).toBe(1);
         expect(cameraBindingPuts[0].bindings[0].exposureTimeUs).toBe(16000);
+        expect(cameraBindingPuts[0].expectedRevision).toBe(1);
 
-        await expect.poll(() => settingsPuts.length).toBe(1);
-        expect(settingsPuts[0].cameras[0].exposureTimeUs).toBe(16000);
+        expect(settingsPuts).toHaveLength(0);
         expect(plcSettingsPuts).toHaveLength(0);
     });
 
@@ -774,12 +790,9 @@ test.describe('High Frequency Regression', () => {
         expect(plcSettingsPuts[0].s7.port).toBe(1102);
         expect(plcSettingsPuts[0].mc.ipAddress).toBe('10.10.10.22');
         expect(plcSettingsPuts[0].mc.port).toBe(5003);
+        expect(plcSettingsPuts[0].expectedRevision).toBe(1);
 
-        await expect.poll(() => settingsPuts.length).toBe(1);
-        expect(settingsPuts[0].communication.s7.ipAddress).toBe('10.10.10.11');
-        expect(settingsPuts[0].communication.s7.port).toBe(1102);
-        expect(settingsPuts[0].communication.mc.ipAddress).toBe('10.10.10.22');
-        expect(settingsPuts[0].communication.mc.port).toBe(5003);
+        expect(settingsPuts).toHaveLength(0);
     });
 
     test('continuous run regression: protection guidance is visible before and after continuous run', async ({ page }) => {

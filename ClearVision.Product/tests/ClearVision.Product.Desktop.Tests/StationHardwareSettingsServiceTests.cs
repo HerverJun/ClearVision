@@ -14,8 +14,7 @@ public sealed class StationHardwareSettingsServiceTests
     [Fact]
     public async Task ApplyCurrentAsync_ShouldLoadLocalCameraBindingsIntoRuntimeManager()
     {
-        var configService = Substitute.For<IConfigurationService>();
-        configService.LoadAsync().Returns(Task.FromResult(new AppConfig
+        var configService = new InMemoryAppConfigAuthority(new AppConfig
         {
             Cameras =
             [
@@ -38,7 +37,7 @@ public sealed class StationHardwareSettingsServiceTests
                     Port = 9600
                 }
             }
-        }));
+        });
 
         var cameraManager = Substitute.For<ICameraManager>();
         var sut = CreateService(configService, cameraManager);
@@ -52,7 +51,7 @@ public sealed class StationHardwareSettingsServiceTests
                 bindings[0].SerialNumber == "SN-A" &&
                 Math.Abs(bindings[0].ExposureTimeUs - 8200) < 0.01),
             "cam-line-a");
-        await configService.DidNotReceive().SaveAsync(Arg.Any<AppConfig>());
+        configService.MutationCount.Should().Be(0);
     }
 
     [Fact]
@@ -72,10 +71,7 @@ public sealed class StationHardwareSettingsServiceTests
                 }
             }
         };
-        var savedConfig = default(AppConfig);
-        var configService = Substitute.For<IConfigurationService>();
-        configService.LoadAsync().Returns(Task.FromResult(currentConfig));
-        configService.SaveAsync(Arg.Do<AppConfig>(config => savedConfig = config)).Returns(Task.CompletedTask);
+        var configService = new InMemoryAppConfigAuthority(currentConfig);
 
         var cameraManager = Substitute.For<ICameraManager>();
         var sut = CreateService(configService, cameraManager);
@@ -107,10 +103,10 @@ public sealed class StationHardwareSettingsServiceTests
             }
         };
 
-        var snapshot = await sut.SaveCameraBindingsAsync(inputBindings, "missing-active");
+        var snapshot = await sut.SaveCameraBindingsAsync(inputBindings, "missing-active", 0);
+        var savedConfig = configService.GetCurrent();
 
-        savedConfig.Should().NotBeNull();
-        savedConfig!.ActiveCameraId.Should().Be("cam-enabled");
+        savedConfig.ActiveCameraId.Should().Be("cam-enabled");
         savedConfig.Cameras.Should().HaveCount(2);
         savedConfig.Cameras[0].Id.Should().Be("cam-disabled");
         savedConfig.Cameras[0].DisplayName.Should().Be("Disabled Camera");
@@ -130,7 +126,7 @@ public sealed class StationHardwareSettingsServiceTests
         snapshot.ActiveCameraId.Should().Be("cam-enabled");
         snapshot.Cameras.Should().HaveCount(2);
 
-        cameraManager.Received(1).UpdateBindings(
+        await cameraManager.Received(1).ApplyBindingsAsync(
             Arg.Is<List<CameraBindingConfig>>(bindings =>
                 bindings.Count == 2 &&
                 bindings[0].Id == "cam-disabled" &&
@@ -141,9 +137,7 @@ public sealed class StationHardwareSettingsServiceTests
     [Fact]
     public async Task SaveCameraBindingsAsync_WhenCameraIdsDuplicate_ShouldReject()
     {
-        var configService = Substitute.For<IConfigurationService>();
-        configService.LoadAsync().Returns(Task.FromResult(new AppConfig()));
-        configService.SaveAsync(Arg.Any<AppConfig>()).Returns(Task.CompletedTask);
+        var configService = new InMemoryAppConfigAuthority();
 
         var cameraManager = Substitute.For<ICameraManager>();
         var sut = CreateService(configService, cameraManager);
@@ -153,20 +147,18 @@ public sealed class StationHardwareSettingsServiceTests
             new() { Id = " CAM-MAIN ", SerialNumber = "SN-2" }
         };
 
-        var act = async () => await sut.SaveCameraBindingsAsync(inputBindings, "cam-main");
+        var act = async () => await sut.SaveCameraBindingsAsync(inputBindings, "cam-main", 0);
 
         await act.Should().ThrowAsync<InvalidOperationException>()
             .WithMessage("*相机绑定 ID 重复*");
-        await configService.DidNotReceive().SaveAsync(Arg.Any<AppConfig>());
-        cameraManager.DidNotReceive().UpdateBindings(Arg.Any<List<CameraBindingConfig>>(), Arg.Any<string>());
+        configService.MutationCount.Should().Be(0);
+        await cameraManager.DidNotReceive().ApplyBindingsAsync(Arg.Any<List<CameraBindingConfig>>(), Arg.Any<string>());
     }
 
     [Fact]
     public async Task SaveCameraBindingsAsync_WhenFrameDrivenCameraFrameRateIsOutOfRange_ShouldReject()
     {
-        var configService = Substitute.For<IConfigurationService>();
-        configService.LoadAsync().Returns(Task.FromResult(new AppConfig()));
-        configService.SaveAsync(Arg.Any<AppConfig>()).Returns(Task.CompletedTask);
+        var configService = new InMemoryAppConfigAuthority();
 
         var cameraManager = Substitute.For<ICameraManager>();
         var sut = CreateService(configService, cameraManager);
@@ -181,20 +173,18 @@ public sealed class StationHardwareSettingsServiceTests
             }
         };
 
-        var act = async () => await sut.SaveCameraBindingsAsync(inputBindings, "cam-external");
+        var act = async () => await sut.SaveCameraBindingsAsync(inputBindings, "cam-external", 0);
 
         await act.Should().ThrowAsync<InvalidOperationException>()
             .WithMessage("*采集帧率必须在 1 - 120 fps 范围内*");
-        await configService.DidNotReceive().SaveAsync(Arg.Any<AppConfig>());
-        cameraManager.DidNotReceive().UpdateBindings(Arg.Any<List<CameraBindingConfig>>(), Arg.Any<string>());
+        configService.MutationCount.Should().Be(0);
+        await cameraManager.DidNotReceive().ApplyBindingsAsync(Arg.Any<List<CameraBindingConfig>>(), Arg.Any<string>());
     }
 
     [Fact]
     public async Task SaveCameraBindingsAsync_WhenSerialPhotoelectricPortIsMissing_ShouldReject()
     {
-        var configService = Substitute.For<IConfigurationService>();
-        configService.LoadAsync().Returns(Task.FromResult(new AppConfig()));
-        configService.SaveAsync(Arg.Any<AppConfig>()).Returns(Task.CompletedTask);
+        var configService = new InMemoryAppConfigAuthority();
 
         var cameraManager = Substitute.For<ICameraManager>();
         var sut = CreateService(configService, cameraManager);
@@ -211,12 +201,12 @@ public sealed class StationHardwareSettingsServiceTests
             }
         };
 
-        var act = async () => await sut.SaveCameraBindingsAsync(inputBindings, "cam-serial-trigger");
+        var act = async () => await sut.SaveCameraBindingsAsync(inputBindings, "cam-serial-trigger", 0);
 
         await act.Should().ThrowAsync<InvalidOperationException>()
             .WithMessage("*串口号必须类似 COM3*");
-        await configService.DidNotReceive().SaveAsync(Arg.Any<AppConfig>());
-        cameraManager.DidNotReceive().UpdateBindings(Arg.Any<List<CameraBindingConfig>>(), Arg.Any<string>());
+        configService.MutationCount.Should().Be(0);
+        await cameraManager.DidNotReceive().ApplyBindingsAsync(Arg.Any<List<CameraBindingConfig>>(), Arg.Any<string>());
     }
 
     [Fact]
@@ -242,10 +232,7 @@ public sealed class StationHardwareSettingsServiceTests
                 }
             }
         };
-        var savedConfig = default(AppConfig);
-        var configService = Substitute.For<IConfigurationService>();
-        configService.LoadAsync().Returns(Task.FromResult(currentConfig));
-        configService.SaveAsync(Arg.Do<AppConfig>(config => savedConfig = config)).Returns(Task.CompletedTask);
+        var configService = new InMemoryAppConfigAuthority(currentConfig);
 
         var cameraManager = Substitute.For<ICameraManager>();
         var sut = CreateService(configService, cameraManager);
@@ -276,10 +263,10 @@ public sealed class StationHardwareSettingsServiceTests
             }
         };
 
-        var snapshot = await sut.SavePlcSettingsAsync(communication);
+        var snapshot = await sut.SavePlcSettingsAsync(communication, 0);
+        var savedConfig = configService.GetCurrent();
 
-        savedConfig.Should().NotBeNull();
-        savedConfig!.ActiveCameraId.Should().Be("cam-main");
+        savedConfig.ActiveCameraId.Should().Be("cam-main");
         savedConfig.Cameras.Should().ContainSingle(camera => camera.Id == "cam-main");
         savedConfig.Communication.ActiveProtocol.Should().Be(CommunicationConfig.ProtocolMc);
         savedConfig.Communication.HeartbeatIntervalMs.Should().Be(2500);
@@ -290,7 +277,7 @@ public sealed class StationHardwareSettingsServiceTests
         snapshot.Communication.Mc.IpAddress.Should().Be("10.20.30.40");
         snapshot.Cameras.Should().ContainSingle(camera => camera.Id == "cam-main");
 
-        cameraManager.DidNotReceive().UpdateBindings(Arg.Any<List<CameraBindingConfig>>(), Arg.Any<string>());
+        await cameraManager.DidNotReceive().ApplyBindingsAsync(Arg.Any<List<CameraBindingConfig>>(), Arg.Any<string>());
         cameraManager.DidNotReceive().LoadBindings(Arg.Any<List<CameraBindingConfig>>(), Arg.Any<string>());
     }
 

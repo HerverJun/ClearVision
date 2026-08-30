@@ -34,6 +34,10 @@ public sealed class NoOpSerialPhotoelectricTriggerInputService : ISerialPhotoele
 
     public bool IsAvailable => false;
 
+    public void ConfigureBindings(IEnumerable<ClearVision.Product.Core.Entities.CameraBindingConfig>? bindings)
+    {
+    }
+
     private NoOpSerialPhotoelectricTriggerInputService()
     {
     }

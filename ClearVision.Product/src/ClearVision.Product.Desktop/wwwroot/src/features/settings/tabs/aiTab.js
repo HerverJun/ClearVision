@@ -84,6 +84,7 @@ export function installAiTab(SettingsView) {
                     settingsApi.loadRuntimePreviewPilotCatalog(),
                     settingsApi.listRuntimePreviewPilotSessions()
                 ]);
+                this.applyMutationRevision(configResult);
                 this.runtimePreviewPilotConfig = this.normalizeRuntimePreviewPilotConfig(configResult);
                 this.runtimePreviewPilotCatalog = catalog || { items: [] };
                 this.runtimePreviewPilotSessions = sessionsResult?.sessions || [];
@@ -433,12 +434,19 @@ export function installAiTab(SettingsView) {
                             ? window.confirm('Save metadata-only RuntimePreview Pilot allowlist changes?')
                             : true;
                         if (!confirmed) return;
+                        const expectedRevision = this.requireAppConfigRevision('RuntimePreview Pilot 配置');
+                        if (expectedRevision === null) return;
+                        payload.expectedRevision = expectedRevision;
                         const result = await settingsApi.saveRuntimePreviewPilotConfig(payload);
+                        this.applyMutationRevision(result);
                         this.runtimePreviewPilotConfig = this.normalizeRuntimePreviewPilotConfig(result);
                         await this.loadRuntimePreviewPilotState();
                         this.refreshRuntimePreviewPilotPanel();
                         showToast('RuntimePreview Pilot config saved.', 'success');
                     } catch (err) {
+                        if (await this.handleAppConfigRevisionConflict(err, 'RuntimePreview Pilot 配置')) {
+                            return;
+                        }
                         showToast('RuntimePreview Pilot config failed: ' + err.message, 'error');
                     }
                 } else if (btn.id === 'btn-runtime-preview-pilot-apply-catalog-allowlist') {

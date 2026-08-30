@@ -23,6 +23,7 @@ public sealed class StationHardwareSettingsService
     private readonly IConfigurationService _configurationService;
     private readonly ICameraManager _cameraManager;
     private readonly ILogger<StationHardwareSettingsService> _logger;
+    private readonly SemaphoreSlim _cameraOperationGate = new(1, 1);
 
     public StationHardwareSettingsService(
         IConfigurationService configurationService,
@@ -41,7 +42,8 @@ public sealed class StationHardwareSettingsService
         return new StationHardwareSettingsSnapshot(
             CloneCameraBindings(config.Cameras),
             config.ActiveCameraId,
-            CloneCommunication(config.Communication));
+            CloneCommunication(config.Communication),
+            config.Revision);
     }
 
     public async Task ApplyCurrentAsync()
@@ -58,7 +60,8 @@ public sealed class StationHardwareSettingsService
 
     public async Task<StationHardwareSettingsSnapshot> SaveCameraBindingsAsync(
         IEnumerable<CameraBindingConfig> cameraBindings,
-        string? activeCameraId)
+        string? activeCameraId,
+        long expectedRevision)
     {
         var normalizedBindings = NormalizeCameraBindings(cameraBindings).ToList();
         ValidateCameraBindings(normalizedBindings);
@@ -69,37 +72,66 @@ public sealed class StationHardwareSettingsService
 
         var normalizedActiveCameraId = NormalizeActiveCameraId(normalizedBindings, activeCameraId);
 
-        var config = await _configurationService.LoadAsync();
-        config.Normalize();
-        config.Cameras = normalizedBindings;
-        config.ActiveCameraId = normalizedActiveCameraId;
-        await _configurationService.SaveAsync(config);
+        await _cameraOperationGate.WaitAsync();
+        AppConfigMutationResult mutation;
+        try
+        {
+            mutation = await _configurationService.MutateAndApplyAsync(
+                expectedRevision,
+                candidate =>
+                {
+                    candidate.Cameras = CloneCameraBindings(normalizedBindings);
+                    candidate.ActiveCameraId = normalizedActiveCameraId;
+                },
+                validate: null,
+                async (candidate, _) =>
+                    await _cameraManager.ApplyBindingsAsync(CloneCameraBindings(candidate.Cameras), candidate.ActiveCameraId),
+                async (previous, _) =>
+                    await _cameraManager.ApplyBindingsAsync(CloneCameraBindings(previous.Cameras), previous.ActiveCameraId));
+        }
+        finally
+        {
+            _cameraOperationGate.Release();
+        }
 
-        _cameraManager.UpdateBindings(CloneCameraBindings(normalizedBindings), normalizedActiveCameraId);
+        EnsureMutationSucceeded(mutation);
+        var config = mutation.Config!;
         return new StationHardwareSettingsSnapshot(
-            CloneCameraBindings(normalizedBindings),
-            normalizedActiveCameraId,
-            CloneCommunication(config.Communication));
+            CloneCameraBindings(config.Cameras),
+            config.ActiveCameraId,
+            CloneCommunication(config.Communication),
+            config.Revision);
     }
 
-    public async Task<StationHardwareSettingsSnapshot> SavePlcSettingsAsync(CommunicationConfig communication)
+    public async Task<StationHardwareSettingsSnapshot> SavePlcSettingsAsync(
+        CommunicationConfig communication,
+        long expectedRevision)
     {
         ArgumentNullException.ThrowIfNull(communication);
         communication.Normalize();
 
-        var config = await _configurationService.LoadAsync();
-        config.Normalize();
-        config.Communication = CloneCommunication(communication);
-        config.Normalize();
-        await _configurationService.SaveAsync(config);
-
-        await PlcCommunicationOperatorBase.ResetRuntimeConfigurationAsync();
-        ModbusCommunicationOperator.ClearConnectionPool();
+        var mutation = await _configurationService.MutateAndApplyAsync(
+            expectedRevision,
+            candidate => candidate.Communication = CloneCommunication(communication),
+            validate: null,
+            async (_, _) =>
+            {
+                await PlcCommunicationOperatorBase.ResetRuntimeConfigurationAsync();
+                ModbusCommunicationOperator.ClearConnectionPool();
+            },
+            async (_, _) =>
+            {
+                await PlcCommunicationOperatorBase.ResetRuntimeConfigurationAsync();
+                ModbusCommunicationOperator.ClearConnectionPool();
+            });
+        EnsureMutationSucceeded(mutation);
+        var config = mutation.Config!;
 
         return new StationHardwareSettingsSnapshot(
             CloneCameraBindings(config.Cameras),
             config.ActiveCameraId,
-            CloneCommunication(config.Communication));
+            CloneCommunication(config.Communication),
+            config.Revision);
     }
 
     public Task<IEnumerable<CameraInfo>> DiscoverCamerasAsync()
@@ -327,12 +359,21 @@ public sealed class StationHardwareSettingsService
         clone.Normalize();
         return clone;
     }
+
+    private static void EnsureMutationSucceeded(AppConfigMutationResult mutation)
+    {
+        if (!mutation.IsSuccess)
+        {
+            throw new InvalidOperationException($"{mutation.ErrorCode}: {mutation.Message}");
+        }
+    }
 }
 
 public sealed record StationHardwareSettingsSnapshot(
     List<CameraBindingConfig> Cameras,
     string ActiveCameraId,
-    CommunicationConfig Communication);
+    CommunicationConfig Communication,
+    long Revision);
 
 public sealed record StationHardwareTestResult(bool Success, string Message)
 {

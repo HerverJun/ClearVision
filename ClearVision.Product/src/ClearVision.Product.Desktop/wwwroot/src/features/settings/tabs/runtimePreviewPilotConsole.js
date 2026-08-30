@@ -376,7 +376,11 @@ export function installRuntimePreviewPilotConsole(SettingsView) {
                         ? window.confirm('Save metadata-only RuntimePreview Pilot allowlist changes?')
                         : true;
                     if (!confirmed) return;
+                    const expectedRevision = this.requireAppConfigRevision('RuntimePreview Pilot 配置');
+                    if (expectedRevision === null) return;
+                    payload.expectedRevision = expectedRevision;
                     const result = await settingsApi.saveRuntimePreviewPilotConfig(payload);
+                    this.applyMutationRevision(result);
                     this.runtimePreviewPilotConfig = this.normalizeRuntimePreviewPilotConfig(result);
                     await this.loadRuntimePreviewPilotState();
                     showToast('RuntimePreview Pilot config saved.', 'success');
@@ -521,6 +525,9 @@ export function installRuntimePreviewPilotConsole(SettingsView) {
 
                 this.refreshRuntimePreviewPilotPanel();
             } catch (err) {
+                if (await this.handleAppConfigRevisionConflict(err, 'RuntimePreview Pilot 配置')) {
+                    return;
+                }
                 showToast('RuntimePreview Pilot Console failed: ' + this.sanitizeRuntimePreviewPilotValue(err?.message || String(err)), 'error');
             }
         }

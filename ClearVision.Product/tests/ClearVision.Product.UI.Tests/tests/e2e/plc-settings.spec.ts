@@ -15,6 +15,7 @@ function screenshotPath(name: string) {
 
 function buildSettingsPayload() {
   return {
+    revision: 1,
     general: {
       softwareTitle: 'ClearVision',
       language: 'zh-CN',
@@ -118,7 +119,11 @@ async function installApiRoutes(page: Page, state: ReturnType<typeof createApiSt
 
     if (pathname === '/api/plc/settings') {
       if (request.method() === 'GET') {
-        await fulfillJson({ success: true, settings: state.settingsPayload.communication });
+        await fulfillJson({
+          success: true,
+          settings: state.settingsPayload.communication,
+          revision: state.settingsPayload.revision,
+        });
         return;
       }
 
@@ -129,6 +134,7 @@ async function installApiRoutes(page: Page, state: ReturnType<typeof createApiSt
           success: false,
           message: 'PLC 配置校验失败。',
           settings: payload,
+          revision: state.settingsPayload.revision,
           errors: [
             {
               protocol: payload.activeProtocol || 'S7',
@@ -142,11 +148,14 @@ async function installApiRoutes(page: Page, state: ReturnType<typeof createApiSt
         return;
       }
 
-      state.settingsPayload.communication = payload;
+      const { expectedRevision: _, ...communication } = payload;
+      state.settingsPayload.communication = communication;
+      state.settingsPayload.revision += 1;
       await fulfillJson({
         success: true,
         message: 'PLC 配置已保存。',
         settings: state.settingsPayload.communication,
+        revision: state.settingsPayload.revision,
         errors: [],
       });
       return;
@@ -175,12 +184,17 @@ async function installApiRoutes(page: Page, state: ReturnType<typeof createApiSt
 
       const payload = JSON.parse(request.postData() || '{}');
       state.settingsPuts.push(payload);
+      const { expectedRevision: _, ...patch } = payload;
       state.settingsPayload = {
         ...state.settingsPayload,
-        ...payload,
+        ...patch,
         communication: payload.communication || state.settingsPayload.communication,
+        revision: state.settingsPayload.revision + 1,
       };
-      await fulfillJson(state.settingsPayload);
+      await fulfillJson({
+        config: state.settingsPayload,
+        revision: state.settingsPayload.revision,
+      });
       return;
     }
 
@@ -389,6 +403,7 @@ test('PLC communication settings payloads, errors, connection test states, and r
   await capture(page, 'f-field-validation-error.png', { requireActionBarVisible: true });
 
   const validationPayload = state.plcPuts.at(-1);
+  expect(validationPayload.expectedRevision).toBe(1);
   expect(validationPayload.activeProtocol).toBe('FINS');
   expect(validationPayload.fins.ipAddress).toBe('10.10.10.33');
   expect(validationPayload.fins.mappings[0].address).toBe('BAD');
@@ -421,6 +436,7 @@ test('PLC communication settings payloads, errors, connection test states, and r
   await page.locator('tr.plc-mapping-row').nth(0).locator('[data-field="address"]').fill('DM100');
   await page.locator('#btn-save-plc').click();
   await expect.poll(() => state.plcPuts.length).toBeGreaterThanOrEqual(2);
+  expect(state.plcPuts.at(-1).expectedRevision).toBe(1);
   expect(state.settingsPuts).toHaveLength(0);
   await expect(page.locator('.cv-toast', { hasText: 'PLC 配置已保存' }).last()).toBeVisible();
   await capture(page, 'i-save-success.png', { requireActionBarVisible: true });

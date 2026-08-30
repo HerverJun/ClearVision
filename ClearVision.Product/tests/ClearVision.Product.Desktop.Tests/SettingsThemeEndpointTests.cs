@@ -2,7 +2,6 @@ using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
 using ClearVision.Product.Core.Entities;
-using ClearVision.Product.Core.Interfaces;
 using ClearVision.Product.Desktop.Endpoints;
 using ClearVision.Product.Infrastructure.AI;
 using FluentAssertions;
@@ -65,26 +64,23 @@ public class SettingsThemeEndpointTests
 
         using var response = await host.Client.PutAsJsonAsync("/api/settings/theme", new ThemeUpdateRequest
         {
-            Theme = " LIGHT "
+            Theme = " LIGHT ",
+            ExpectedRevision = initialConfig.Revision
         });
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
-        await host.ConfigurationService.Received(1).SaveAsync(Arg.Is<AppConfig>(config =>
-            config.General != null &&
-            config.General.Theme == GeneralConfig.ThemeLight &&
-            config.General.SoftwareTitle == initialConfig.General.SoftwareTitle &&
-            config.General.AutoStart == initialConfig.General.AutoStart &&
-            config.Communication != null &&
-            config.Communication.ActiveProtocol == initialConfig.Communication.ActiveProtocol &&
-            config.Communication.HeartbeatIntervalMs == initialConfig.Communication.HeartbeatIntervalMs &&
-            config.Storage != null &&
-            config.Storage.RetentionDays == initialConfig.Storage.RetentionDays &&
-            config.Storage.MinFreeSpaceGb == initialConfig.Storage.MinFreeSpaceGb &&
-            config.Runtime != null &&
-            config.Runtime.MissingMaterialTimeoutSeconds == initialConfig.Runtime.MissingMaterialTimeoutSeconds &&
-            config.Security != null &&
-            config.Security.PasswordMinLength == initialConfig.Security.PasswordMinLength &&
-            config.ActiveCameraId == initialConfig.ActiveCameraId));
+        var committed = host.ConfigurationService.GetCurrent();
+        committed.General.Theme.Should().Be(GeneralConfig.ThemeLight);
+        committed.General.SoftwareTitle.Should().Be(initialConfig.General.SoftwareTitle);
+        committed.General.AutoStart.Should().Be(initialConfig.General.AutoStart);
+        committed.Communication.ActiveProtocol.Should().Be(initialConfig.Communication.ActiveProtocol);
+        committed.Communication.HeartbeatIntervalMs.Should().Be(initialConfig.Communication.HeartbeatIntervalMs);
+        committed.Storage.RetentionDays.Should().Be(initialConfig.Storage.RetentionDays);
+        committed.Storage.MinFreeSpaceGb.Should().Be(initialConfig.Storage.MinFreeSpaceGb);
+        committed.Runtime.MissingMaterialTimeoutSeconds.Should().Be(initialConfig.Runtime.MissingMaterialTimeoutSeconds);
+        committed.Security.PasswordMinLength.Should().Be(initialConfig.Security.PasswordMinLength);
+        committed.ActiveCameraId.Should().Be(initialConfig.ActiveCameraId);
+        committed.Revision.Should().Be(initialConfig.Revision + 1);
 
         using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
         document.RootElement.GetProperty("theme").GetString().Should().Be(GeneralConfig.ThemeLight);
@@ -98,11 +94,12 @@ public class SettingsThemeEndpointTests
 
         using var response = await host.Client.PutAsJsonAsync("/api/settings/theme", new ThemeUpdateRequest
         {
-            Theme = GeneralConfig.ThemeDark
+            Theme = GeneralConfig.ThemeDark,
+            ExpectedRevision = initialConfig.Revision
         });
 
         response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
-        await host.ConfigurationService.DidNotReceive().SaveAsync(Arg.Any<AppConfig>());
+        host.ConfigurationService.MutationCount.Should().Be(0);
     }
 
     [Fact]
@@ -113,6 +110,7 @@ public class SettingsThemeEndpointTests
 
         using var response = await host.Client.PutAsJsonAsync("/api/settings", new
         {
+            expectedRevision = initialConfig.Revision,
             saveScope = "general",
             general = new
             {
@@ -122,19 +120,17 @@ public class SettingsThemeEndpointTests
         });
 
         response.StatusCode.Should().Be(HttpStatusCode.OK, await response.Content.ReadAsStringAsync());
-        await host.ConfigurationService.Received(1).SaveAsync(Arg.Is<AppConfig>(config =>
-            config.General.SoftwareTitle == "Updated Station" &&
-            config.General.Theme == GeneralConfig.ThemeLight &&
-            config.General.AutoStart == initialConfig.General.AutoStart &&
-            config.Communication.ActiveProtocol == initialConfig.Communication.ActiveProtocol &&
-            config.TcpCommunication.Profiles.Count == 1 &&
-            config.TcpCommunication.Profiles[0].Id == "robot" &&
-            config.Cameras.Count == 1 &&
-            config.Cameras[0].Id == "cam-001" &&
-            config.Runtime.RuntimePreviewPilot.Enabled == initialConfig.Runtime.RuntimePreviewPilot.Enabled &&
-            config.Security.SessionTimeoutMinutes == initialConfig.Security.SessionTimeoutMinutes &&
-            config.Storage.MinFreeSpaceGb == initialConfig.Storage.MinFreeSpaceGb &&
-            config.ActiveCameraId == initialConfig.ActiveCameraId));
+        var committed = host.ConfigurationService.GetCurrent();
+        committed.General.SoftwareTitle.Should().Be("Updated Station");
+        committed.General.Theme.Should().Be(GeneralConfig.ThemeLight);
+        committed.General.AutoStart.Should().Be(initialConfig.General.AutoStart);
+        committed.Communication.ActiveProtocol.Should().Be(initialConfig.Communication.ActiveProtocol);
+        committed.TcpCommunication.Profiles.Should().ContainSingle(profile => profile.Id == "robot");
+        committed.Cameras.Should().ContainSingle(binding => binding.Id == "cam-001");
+        committed.Runtime.RuntimePreviewPilot.Enabled.Should().Be(initialConfig.Runtime.RuntimePreviewPilot.Enabled);
+        committed.Security.SessionTimeoutMinutes.Should().Be(initialConfig.Security.SessionTimeoutMinutes);
+        committed.Storage.MinFreeSpaceGb.Should().Be(initialConfig.Storage.MinFreeSpaceGb);
+        committed.ActiveCameraId.Should().Be(initialConfig.ActiveCameraId);
     }
 
     [Fact]
@@ -145,6 +141,7 @@ public class SettingsThemeEndpointTests
 
         using var response = await host.Client.PutAsJsonAsync("/api/settings", new
         {
+            expectedRevision = initialConfig.Revision,
             saveScope = "storage",
             storage = new
             {
@@ -154,23 +151,44 @@ public class SettingsThemeEndpointTests
         });
 
         response.StatusCode.Should().Be(HttpStatusCode.OK, await response.Content.ReadAsStringAsync());
-        await host.ConfigurationService.Received(1).SaveAsync(Arg.Is<AppConfig>(config =>
-            config.Storage.ImageSavePath == @"E:\VisionData" &&
-            config.Storage.RetentionDays == 90 &&
-            config.Storage.SavePolicy == initialConfig.Storage.SavePolicy &&
-            config.Storage.MinFreeSpaceGb == initialConfig.Storage.MinFreeSpaceGb &&
-            config.General.SoftwareTitle == initialConfig.General.SoftwareTitle &&
-            config.Communication.ActiveProtocol == initialConfig.Communication.ActiveProtocol &&
-            config.TcpCommunication.Profiles.Count == 1 &&
-            config.Cameras.Count == 1 &&
-            config.Security.PasswordMinLength == initialConfig.Security.PasswordMinLength));
+        var committed = host.ConfigurationService.GetCurrent();
+        committed.Storage.ImageSavePath.Should().Be(@"E:\VisionData");
+        committed.Storage.RetentionDays.Should().Be(90);
+        committed.Storage.SavePolicy.Should().Be(initialConfig.Storage.SavePolicy);
+        committed.Storage.MinFreeSpaceGb.Should().Be(initialConfig.Storage.MinFreeSpaceGb);
+        committed.General.SoftwareTitle.Should().Be(initialConfig.General.SoftwareTitle);
+        committed.Communication.ActiveProtocol.Should().Be(initialConfig.Communication.ActiveProtocol);
+        committed.TcpCommunication.Profiles.Should().HaveCount(1);
+        committed.Cameras.Should().HaveCount(1);
+        committed.Security.PasswordMinLength.Should().Be(initialConfig.Security.PasswordMinLength);
+    }
+
+    [Fact]
+    public async Task UpdateTheme_WithStaleRevision_ShouldReturnConflictWithoutMutation()
+    {
+        var initialConfig = CreateRichSettingsConfig();
+        initialConfig.Revision = 4;
+        await using var host = await SettingsThemeTestHost.CreateAsync(initialConfig);
+
+        using var response = await host.Client.PutAsJsonAsync("/api/settings/theme", new ThemeUpdateRequest
+        {
+            Theme = GeneralConfig.ThemeLight,
+            ExpectedRevision = 3
+        });
+
+        var responseJson = await response.Content.ReadAsStringAsync();
+        response.StatusCode.Should().Be(HttpStatusCode.Conflict, responseJson);
+        responseJson.Should().Contain("APP_CONFIG_REVISION_CONFLICT");
+        host.ConfigurationService.GetCurrent().Revision.Should().Be(4);
+        host.ConfigurationService.GetCurrent().General.Theme.Should().Be(GeneralConfig.ThemeDark);
+        host.ConfigurationService.MutationCount.Should().Be(0);
     }
 
     private sealed class SettingsThemeTestHost : IAsyncDisposable
     {
         private readonly WebApplication _app;
 
-        private SettingsThemeTestHost(WebApplication app, IConfigurationService configurationService)
+        private SettingsThemeTestHost(WebApplication app, InMemoryAppConfigAuthority configurationService)
         {
             _app = app;
             ConfigurationService = configurationService;
@@ -179,7 +197,7 @@ public class SettingsThemeEndpointTests
 
         public HttpClient Client { get; }
 
-        public IConfigurationService ConfigurationService { get; }
+        public InMemoryAppConfigAuthority ConfigurationService { get; }
 
         public static async Task<SettingsThemeTestHost> CreateAsync(AppConfig initialConfig, string role = "Admin")
         {
@@ -190,11 +208,8 @@ public class SettingsThemeEndpointTests
 
             builder.WebHost.UseTestServer();
 
-            var configService = Substitute.For<IConfigurationService>();
-            configService.LoadAsync().Returns(_ => Task.FromResult(CloneConfig(initialConfig)));
-            configService.GetCurrent().Returns(CloneConfig(initialConfig));
-            configService.SaveAsync(Arg.Any<AppConfig>()).Returns(Task.CompletedTask);
-            builder.Services.AddSingleton(configService);
+            var configService = new InMemoryAppConfigAuthority(initialConfig);
+            builder.Services.AddSingleton<ClearVision.Product.Core.Interfaces.IConfigurationService>(configService);
             builder.Services.AddSingleton(Substitute.For<ClearVision.Product.Core.Cameras.ICameraManager>());
 
             var aiConfigStore = new AiConfigStore(
@@ -234,11 +249,6 @@ public class SettingsThemeEndpointTests
             await _app.DisposeAsync();
         }
 
-        private static AppConfig CloneConfig(AppConfig source)
-        {
-            return JsonSerializer.Deserialize<AppConfig>(JsonSerializer.Serialize(source))
-                ?? new AppConfig();
-        }
     }
 
     private static AppConfig CreateRichSettingsConfig()

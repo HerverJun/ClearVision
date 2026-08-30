@@ -222,6 +222,7 @@ let appInitialized = false;
 let appBootstrapPromise = null;
 let statusBarStarted = false;
 let themeUpdateInFlight = false;
+let appConfigRevision = null;
 let projectFlowSyncSuppressionDepth = 0;
 let studioPerformanceGuardsInitialized = false;
 let activeSubgraphNodeId = null;
@@ -2234,7 +2235,12 @@ function initializeTheme() {
     bindThemeToggle(themeToggle, handleThemeChanged);
 
     void syncThemeWithSettings(
-        () => httpClient.get('/settings'),
+        async () => {
+            const settings = await httpClient.get('/settings');
+            const revision = Number(settings?.revision ?? settings?.Revision);
+            appConfigRevision = Number.isSafeInteger(revision) && revision >= 0 ? revision : null;
+            return settings;
+        },
         { expectedTheme: initialTheme }
     );
 }
@@ -2244,7 +2250,20 @@ async function persistThemePreference(theme) {
         return theme;
     }
 
-    const result = await httpClient.put('/settings/theme', { theme });
+    if (!Number.isSafeInteger(appConfigRevision)) {
+        const settings = await httpClient.get('/settings');
+        const revision = Number(settings?.revision ?? settings?.Revision);
+        appConfigRevision = Number.isSafeInteger(revision) && revision >= 0 ? revision : null;
+    }
+
+    const result = await httpClient.put('/settings/theme', {
+        theme,
+        expectedRevision: appConfigRevision
+    });
+    const revision = Number(result?.revision ?? result?.Revision);
+    if (Number.isSafeInteger(revision) && revision >= 0) {
+        appConfigRevision = revision;
+    }
     return result?.theme || theme;
 }
 
@@ -2267,7 +2286,18 @@ async function handleThemeChanged({ previousTheme, nextTheme }) {
         applyTheme(persistedTheme, { persist: true });
     } catch (error) {
         applyTheme(previousTheme, { persist: true });
-        showToast(`主题保存失败: ${error.message}`, 'error');
+        if (Number(error?.status ?? error?.statusCode) === 409) {
+            try {
+                const settings = await httpClient.get('/settings');
+                const revision = Number(settings?.revision ?? settings?.Revision);
+                appConfigRevision = Number.isSafeInteger(revision) && revision >= 0 ? revision : appConfigRevision;
+            } catch {
+                // Keep the last known revision; the next attempt reloads if needed.
+            }
+            showToast('主题配置已被其他修改更新，请重试切换。', 'warning');
+        } else {
+            showToast(`主题保存失败: ${error.message}`, 'error');
+        }
         themeUpdateInFlight = false;
         if (themeToggle) {
             themeToggle.disabled = false;

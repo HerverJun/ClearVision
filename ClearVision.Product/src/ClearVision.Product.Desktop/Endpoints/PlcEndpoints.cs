@@ -17,18 +17,29 @@ public static class PlcEndpoints
     {
         app.MapGet("/api/plc/settings", async (IConfigurationService configService) =>
         {
-            var config = await configService.LoadAsync();
+            var read = await configService.ReadAsync();
+            if (!read.IsHealthy || read.Config == null)
+            {
+                return AppConfigEndpointResults.ReadFailure(read, config => new
+                {
+                    settings = config.Communication,
+                    revision = config.Revision
+                });
+            }
+
+            var config = read.Config;
             config.Normalize();
             return Results.Ok(new
             {
                 success = true,
-                settings = config.Communication
+                settings = config.Communication,
+                revision = config.Revision
             });
         })
         .RequireClearVisionPermission(ClearVisionPermissionPolicies.CanOperateHardware);
 
         app.MapPut("/api/plc/settings", async (
-            CommunicationConfig? settings,
+            PlcSettingsUpdateRequest? settings,
             IConfigurationService configService,
             HttpContext context) =>
         {
@@ -37,32 +48,49 @@ public static class PlcEndpoints
                 return Results.Json(new { error = "AdminRequired" }, statusCode: StatusCodes.Status403Forbidden);
             }
 
-            settings ??= new CommunicationConfig();
+            settings ??= new PlcSettingsUpdateRequest();
+            if (!settings.ExpectedRevision.HasValue)
+            {
+                return AppConfigEndpointResults.ExpectedRevisionFailure();
+            }
+
             settings.Normalize();
 
             var validation = PlcSettingsValidator.Validate(settings);
             if (!validation.IsValid)
             {
-                return Results.Ok(new
+                return Results.Json(new
                 {
                     success = false,
+                    errorCode = "APP_CONFIG_VALIDATION_FAILED",
                     message = "PLC 配置校验失败。",
                     settings,
                     errors = validation.Errors
-                });
+                }, statusCode: StatusCodes.Status422UnprocessableEntity);
             }
 
-            var config = await configService.LoadAsync();
-            config.Normalize();
-            config.Communication = settings;
-            config.Normalize();
-            await configService.SaveAsync(config);
+            var communication = CloneCommunication(settings);
+            var mutation = await configService.MutateAsync(
+                settings.ExpectedRevision.Value,
+                candidate => candidate.Communication = CloneCommunication(communication),
+                candidate => PlcSettingsValidator.Validate(candidate.Communication).Errors
+                    .Select(issue => new AppConfigValidationError(
+                        $"communication.{issue.Protocol}.{issue.Section}.{issue.Field}",
+                        issue.Message))
+                    .ToArray(),
+                context.RequestAborted);
+            if (!mutation.IsSuccess)
+            {
+                return AppConfigEndpointResults.MutationFailure(mutation);
+            }
 
             return Results.Ok(new
             {
                 success = true,
-                message = "PLC 配置已保存。",
-                settings = config.Communication,
+                message = mutation.IsNoOp ? "PLC 配置未发生变化。" : "PLC 配置已保存。",
+                settings = mutation.Config!.Communication,
+                revision = mutation.ActualRevision,
+                noOp = mutation.IsNoOp,
                 errors = Array.Empty<PlcValidationIssue>()
             });
         })
@@ -152,14 +180,20 @@ public static class PlcEndpoints
 
         app.MapGet("/api/plc/mappings", async (IConfigurationService configService) =>
         {
-            var config = await configService.LoadAsync();
+            var read = await configService.ReadAsync();
+            if (!read.IsHealthy || read.Config == null)
+            {
+                return AppConfigEndpointResults.ReadFailure(read);
+            }
+
+            var config = read.Config;
             config.Normalize();
             return Results.Ok(config.Communication.GetMappings(config.Communication.ActiveProtocol));
         })
         .RequireClearVisionPermission(ClearVisionPermissionPolicies.CanOperateHardware);
 
         app.MapPut("/api/plc/mappings", async (
-            List<PlcAddressMapping>? mappings,
+            PlcMappingsUpdateRequest request,
             IConfigurationService configService,
             HttpContext context) =>
         {
@@ -168,32 +202,34 @@ public static class PlcEndpoints
                 return Results.Json(new { error = "AdminRequired" }, statusCode: StatusCodes.Status403Forbidden);
             }
 
-            var config = await configService.LoadAsync();
-            config.Normalize();
-            var communication = config.Communication ?? new CommunicationConfig();
-            communication.SetMappings(communication.ActiveProtocol, mappings);
-
-            var validation = PlcSettingsValidator.Validate(communication);
-            if (!validation.IsValid)
+            if (!request.ExpectedRevision.HasValue)
             {
-                return Results.Ok(new
-                {
-                    success = false,
-                    message = "PLC 映射校验失败。",
-                    mappings = communication.GetMappings(communication.ActiveProtocol),
-                    errors = validation.Errors
-                });
+                return AppConfigEndpointResults.ExpectedRevisionFailure();
             }
 
-            config.Communication = communication;
-            config.Normalize();
-            await configService.SaveAsync(config);
+            var mutation = await configService.MutateAsync(
+                request.ExpectedRevision.Value,
+                candidate => candidate.Communication.SetMappings(
+                    candidate.Communication.ActiveProtocol,
+                    request.Mappings),
+                candidate => PlcSettingsValidator.Validate(candidate.Communication).Errors
+                    .Select(issue => new AppConfigValidationError(
+                        $"communication.{issue.Protocol}.{issue.Section}.{issue.Field}",
+                        issue.Message))
+                    .ToArray(),
+                context.RequestAborted);
+            if (!mutation.IsSuccess)
+            {
+                return AppConfigEndpointResults.MutationFailure(mutation);
+            }
 
             return Results.Ok(new
             {
                 success = true,
-                message = "PLC 映射已保存。",
-                mappings = config.Communication.GetMappings(config.Communication.ActiveProtocol),
+                message = mutation.IsNoOp ? "PLC 映射未发生变化。" : "PLC 映射已保存。",
+                mappings = mutation.Config!.Communication.GetMappings(mutation.Config.Communication.ActiveProtocol),
+                revision = mutation.ActualRevision,
+                noOp = mutation.IsNoOp,
                 errors = Array.Empty<PlcValidationIssue>()
             });
         })
@@ -215,6 +251,14 @@ public static class PlcEndpoints
     }
 
     private static bool IsAdmin(HttpContext context) => ClearVisionPermissionPolicies.IsAdmin(context);
+
+    private static CommunicationConfig CloneCommunication(CommunicationConfig source)
+    {
+        var json = System.Text.Json.JsonSerializer.Serialize(source);
+        var clone = System.Text.Json.JsonSerializer.Deserialize<CommunicationConfig>(json) ?? new CommunicationConfig();
+        clone.Normalize();
+        return clone;
+    }
 
     private static bool TryBuildPlcCommConnectionString(
         string protocol,
@@ -286,4 +330,15 @@ public class PlcTestConnectionRequest
     public string? CpuType { get; set; }
     public int? Rack { get; set; }
     public int? Slot { get; set; }
+}
+
+public sealed class PlcSettingsUpdateRequest : CommunicationConfig
+{
+    public long? ExpectedRevision { get; set; }
+}
+
+public sealed class PlcMappingsUpdateRequest
+{
+    public long? ExpectedRevision { get; set; }
+    public List<PlcAddressMapping>? Mappings { get; set; }
 }
