@@ -14,6 +14,29 @@ namespace ClearVision.Product.Tests.AI;
 [TestClassification(TestDomain.Ai, TestPurpose.Regression, TestLane.Nightly, TestEvidenceType.Contract, TestOracleType.Contract, TestResourceRequirement.None, TestExpectedDuration.Medium, TestFlakyPolicy.Blocking, "vision-agent")]
 public class GenerateFlowMessageHandlerTests
 {
+    [Fact(DisplayName = "GenerateFlowMessageHandler should reject a missing owner before generation")]
+    public async Task HandleAsync_WithoutOwner_ShouldReturnAuthRequiredWithoutCallingGeneration()
+    {
+        var generationService = Substitute.For<IAiFlowGenerationService>();
+        var logger = Substitute.For<Microsoft.Extensions.Logging.ILogger<GenerateFlowMessageHandler>>();
+        var handler = new GenerateFlowMessageHandler(generationService, logger);
+
+        var resultJson = await handler.HandleAsync(
+            description: "must not execute",
+            ownerHash: null);
+
+        using var document = JsonDocument.Parse(resultJson);
+        document.RootElement.GetProperty("success").GetBoolean().Should().BeFalse();
+        document.RootElement.GetProperty("code").GetString().Should().Be("auth-required");
+
+        await generationService.DidNotReceive().GenerateFlowAsync(
+            Arg.Any<AiFlowGenerationRequest>(),
+            Arg.Any<Action<string>>(),
+            Arg.Any<Action<ClearVision.Product.Contracts.Messages.AiStreamChunk>>(),
+            Arg.Any<CancellationToken>(),
+            Arg.Any<Action<ClearVision.Product.Contracts.Messages.GenerateFlowAttachmentReport>>());
+    }
+
     [Fact(DisplayName = "GenerateFlowMessageHandler should pass attachments to generation request")]
     public async Task HandleAsync_ShouldForwardAttachments()
     {
@@ -45,7 +68,7 @@ public class GenerateFlowMessageHandlerTests
             }));
 
         // Act
-        var resultJson = await handler.HandleAsync(
+        var resultJson = await handler.HandleAsTestOwnerAsync(
             description: "tune template matching parameters",
             sessionId: "session-1",
             existingFlowJson: """{"operators":[]}""",
@@ -98,7 +121,7 @@ public class GenerateFlowMessageHandlerTests
                 Flow = new { operators = Array.Empty<object>(), connections = Array.Empty<object>() }
             }));
 
-        await handler.HandleAsync(
+        await handler.HandleAsTestOwnerAsync(
             description: "review pending parameters",
             mode: GenerateFlowMode.ReviewPendingParameters,
             debugPrompt: true,
@@ -166,7 +189,7 @@ public class GenerateFlowMessageHandlerTests
             });
 
         // Act
-        _ = await handler.HandleAsync(
+        _ = await handler.HandleAsTestOwnerAsync(
             description: "demo",
             attachments: [@"C:\temp\template.png", @"C:\temp\bad.txt"],
             requestId: "req-attachment-1",
@@ -214,7 +237,7 @@ public class GenerateFlowMessageHandlerTests
             });
 
         // Act
-        _ = await handler.HandleAsync(
+        _ = await handler.HandleAsTestOwnerAsync(
             description: "demo",
             requestId: "req-stream-1",
             onMessage: (type, payload) => receivedMessages.Add((type, payload)));
@@ -264,7 +287,7 @@ public class GenerateFlowMessageHandlerTests
                 ]
             }));
 
-        var resultJson = await handler.HandleAsync("demo");
+        var resultJson = await handler.HandleAsTestOwnerAsync("demo");
 
         using var doc = JsonDocument.Parse(resultJson);
         var budget = doc.RootElement.GetProperty("performanceBudget");
@@ -312,7 +335,7 @@ public class GenerateFlowMessageHandlerTests
             }));
 
         // Act
-        var resultJson = await handler.HandleAsync("用华睿相机做缺陷检测");
+        var resultJson = await handler.HandleAsTestOwnerAsync("用华睿相机做缺陷检测");
 
         // Assert
         using var doc = JsonDocument.Parse(resultJson);
@@ -398,7 +421,7 @@ public class GenerateFlowMessageHandlerTests
             }));
 
         // Act
-        var resultJson = await handler.HandleAsync("线序检测");
+        var resultJson = await handler.HandleAsTestOwnerAsync("线序检测");
 
         // Assert
         using var doc = JsonDocument.Parse(resultJson);
@@ -451,7 +474,7 @@ public class GenerateFlowMessageHandlerTests
                 }
             }));
 
-        var resultJson = await handler.HandleAsync("trace");
+        var resultJson = await handler.HandleAsTestOwnerAsync("trace");
 
         using var doc = JsonDocument.Parse(resultJson);
         var promptTrace = doc.RootElement.GetProperty("promptTrace");
@@ -511,7 +534,7 @@ public class GenerateFlowMessageHandlerTests
                 }
             }));
 
-        var resultJson = await handler.HandleAsync("clarification");
+        var resultJson = await handler.HandleAsTestOwnerAsync("clarification");
 
         using var doc = JsonDocument.Parse(resultJson);
         var root = doc.RootElement;
@@ -584,7 +607,7 @@ public class GenerateFlowMessageHandlerTests
             }));
 
         // Act
-        var resultJson = await handler.HandleAsync("取消测试", requestId: "req-cancel-1");
+        var resultJson = await handler.HandleAsTestOwnerAsync("取消测试", requestId: "req-cancel-1");
 
         // Assert
         using var doc = JsonDocument.Parse(resultJson);
@@ -660,7 +683,7 @@ public class GenerateFlowMessageHandlerTests
                 }
             }));
 
-        var resultJson = await handler.HandleAsync("修复参数", requestId: "req-manual-retry-1");
+        var resultJson = await handler.HandleAsTestOwnerAsync("修复参数", requestId: "req-manual-retry-1");
 
         using var doc = JsonDocument.Parse(resultJson);
         var root = doc.RootElement;
@@ -692,7 +715,7 @@ public class GenerateFlowMessageHandlerTests
         string? createdRunId = null;
 
         var plan = LegacyBlockedBuildFromPlanSnapshot();
-        var resultJson = await handler.HandleAsync(
+        var resultJson = await handler.HandleAsTestOwnerAsync(
             description: "start build from confirmed plan",
             mode: GenerateFlowMode.New,
             requirementMode: AiRequirementModes.Strict,
@@ -781,7 +804,7 @@ public class GenerateFlowMessageHandlerTests
         string? createdRunId = null;
 
         var plan = LegacyBlockedBuildFromPlanSnapshot();
-        var resultJson = await handler.HandleAsync(
+        var resultJson = await handler.HandleAsTestOwnerAsync(
             description: "start build from confirmed plan",
             mode: GenerateFlowMode.New,
             requirementMode: AiRequirementModes.Strict,

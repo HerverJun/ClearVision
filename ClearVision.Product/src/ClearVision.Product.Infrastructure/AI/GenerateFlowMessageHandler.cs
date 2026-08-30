@@ -62,6 +62,14 @@ public class GenerateFlowMessageHandler
 
         try
         {
+            if (string.IsNullOrWhiteSpace(ownerHash))
+            {
+                return SerializeResponse(
+                    BuildAuthRequiredResult(sessionId, requestId),
+                    AiFlowGenerationResult.FailureTypeSystemError);
+            }
+
+            var normalizedOwnerHash = ConversationOwnerAuthority.Require(ownerHash);
             onMessage?.Invoke(
                 "GenerateFlowProgress",
                 JsonSerializer.Serialize(new
@@ -91,9 +99,7 @@ public class GenerateFlowMessageHandler
                 DebugPrompt: debugPrompt,
                 TemplateSelection: templateSelection)
             {
-                OwnerHash = string.IsNullOrWhiteSpace(ownerHash)
-                    ? ConversationalFlowService.LegacyTrustedOwnerHash
-                    : ownerHash.Trim(),
+                OwnerHash = normalizedOwnerHash,
                 RequirementMode = requirementMode ?? AiRequirementModes.Strict,
                 UseVisionAgentGenerateFlow = useVisionAgentGenerateFlow,
                 AgentGenerateFlowMode = modeDecision.EffectiveMode,
@@ -362,6 +368,25 @@ public class GenerateFlowMessageHandler
                     OutputSummary = decision.FailureMessage
                 }
             }
+        };
+    }
+
+    private static GenerateFlowResponse BuildAuthRequiredResult(
+        string? sessionId,
+        string? requestId)
+    {
+        return new GenerateFlowResponse
+        {
+            Success = false,
+            Status = AiFlowGenerationResult.CompletionStatusFailed,
+            Code = "auth-required",
+            ErrorMessage = "Authentication is required.",
+            FailureSummary = "Authentication is required.",
+            SessionId = sessionId,
+            RequestId = requestId,
+            CompletionStatus = AiFlowGenerationResult.CompletionStatusFailed,
+            InteractionState = AiInteractionStates.Failed,
+            LastAttemptDiagnostics = Array.Empty<AiAttemptDiagnostic>()
         };
     }
 

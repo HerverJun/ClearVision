@@ -20,7 +20,7 @@ namespace ClearVision.Product.Tests.AI;
 [TestClassification(TestDomain.Ai, TestPurpose.Regression, TestLane.Nightly, TestEvidenceType.Contract, TestOracleType.Contract, TestResourceRequirement.None, TestExpectedDuration.Medium, TestFlakyPolicy.Blocking, "vision-agent")]
 public sealed class BuildFromPlanEntryParityTests : IDisposable
 {
-    private const string TestOwnerHash = ConversationalFlowService.LegacyTrustedOwnerHash;
+    private static readonly string TestOwnerHash = ConversationTestCompatibilityExtensions.OwnerHash;
 
     private readonly string _tempRoot = Path.Combine(
         Path.GetTempPath(),
@@ -1650,6 +1650,9 @@ public sealed class BuildFromPlanEntryParityTests : IDisposable
         public ConversationContext PrepareContext(AiFlowGenerationRequest request) =>
             _inner.PrepareContext(request);
 
+        public ConversationContext PrepareContext(string ownerHash, AiFlowGenerationRequest request) =>
+            _inner.PrepareContext(ownerHash, request);
+
         public void RecordAssistantResponse(
             string sessionId,
             string assistantMessage,
@@ -1837,6 +1840,9 @@ public sealed class BuildFromPlanEntryParityTests : IDisposable
 
         public ConversationContext PrepareContext(AiFlowGenerationRequest request) =>
             _inner.PrepareContext(request);
+
+        public ConversationContext PrepareContext(string ownerHash, AiFlowGenerationRequest request) =>
+            _inner.PrepareContext(ownerHash, request);
 
         public void RecordAssistantResponse(
             string sessionId,

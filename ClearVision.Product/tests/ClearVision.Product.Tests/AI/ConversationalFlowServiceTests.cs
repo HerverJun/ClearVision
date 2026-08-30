@@ -19,6 +19,60 @@ public class ConversationalFlowServiceTests : IDisposable
     }
 
     [Fact]
+    public void PublicConversationContract_ShouldRequireOwnerForEveryUserScopedOperation()
+    {
+        var ownerScopedMethods = new HashSet<string>(StringComparer.Ordinal)
+        {
+            nameof(IConversationalFlowService.GetOrCreateSession),
+            nameof(IConversationalFlowService.PrepareContext),
+            nameof(IConversationalFlowService.RecordAssistantResponseWithPersistence),
+            nameof(IConversationalFlowService.ListSessions),
+            nameof(IConversationalFlowService.GetSession),
+            nameof(IConversationalFlowService.TryBackfillCanvasFlowJson),
+            nameof(IConversationalFlowService.TryBackfillCanvasFlowJsonWithResult),
+            nameof(IConversationalFlowService.TryUpdateWorkspaceSnapshot),
+            nameof(IConversationalFlowService.TryInitializeWorkspaceSnapshot),
+            nameof(IConversationalFlowService.TryBeginAgentRun),
+            nameof(IConversationalFlowService.ProjectBuildTerminal),
+            nameof(IConversationalFlowService.DeleteSessionWithResult)
+        };
+
+        var exposed = typeof(IConversationalFlowService)
+            .GetMethods()
+            .Where(method => ownerScopedMethods.Contains(method.Name))
+            .ToArray();
+
+        exposed.Should().NotBeEmpty();
+        exposed.All(method =>
+            method.GetParameters().FirstOrDefault() is { } parameter &&
+            parameter.Name == "ownerHash" &&
+            parameter.ParameterType == typeof(string))
+            .Should()
+            .BeTrue();
+        typeof(ConversationalFlowService)
+            .GetField("LegacyTrustedOwnerHash", System.Reflection.BindingFlags.Public |
+                                                  System.Reflection.BindingFlags.Static)
+            .Should()
+            .BeNull();
+    }
+
+    [Fact]
+    public void PrepareContext_WithoutOwnerAuthority_ShouldFailBeforeCreatingSession()
+    {
+        var service = new ConversationalFlowService(_tempRoot);
+
+        service.Invoking(current => current.PrepareContext(
+                string.Empty,
+                new AiFlowGenerationRequest("must fail", SessionId: "ownerless-session")))
+            .Should()
+            .Throw<ArgumentException>()
+            .WithMessage("*Authenticated owner authority is required*");
+
+        service.GetSessionForRecovery("ownerless-session").Should().BeNull();
+        service.ListSessionsForRecovery().Should().BeEmpty();
+    }
+
+    [Fact]
     public void ListSessions_ReturnsOrderedSummaries()
     {
         var service = new ConversationalFlowService(_tempRoot);

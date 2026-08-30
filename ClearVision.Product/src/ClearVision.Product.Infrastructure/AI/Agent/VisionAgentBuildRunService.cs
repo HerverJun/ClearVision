@@ -709,9 +709,7 @@ public sealed class VisionAgentBuildRunService : IVisionAgentBuildRunService
     }
 
     private static string ResolveOwnerHash(AiFlowGenerationRequest request) =>
-        string.IsNullOrWhiteSpace(request.OwnerHash)
-            ? ConversationalFlowService.LegacyTrustedOwnerHash
-            : request.OwnerHash.Trim();
+        ConversationOwnerAuthority.Require(request.OwnerHash);
 
     private static string FirstNonBlank(params string?[] values)
     {

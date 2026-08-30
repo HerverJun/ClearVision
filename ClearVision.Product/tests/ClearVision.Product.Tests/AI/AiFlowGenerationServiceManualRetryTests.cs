@@ -1614,7 +1614,7 @@ public class AiFlowGenerationServiceManualRetryTests : IDisposable
             Arg.Any<CancellationToken>());
     }
 
-    private static AiFlowGenerationService CreateService(
+    private static TestOwnedAiFlowGenerationService CreateService(
         IAiConnector connector,
         IAiFlowValidator validator,
         IConversationalFlowService conversationService,
@@ -1686,7 +1686,7 @@ public class AiFlowGenerationServiceManualRetryTests : IDisposable
             Content = "test prompt"
         }));
 
-        return new AiFlowGenerationService(
+        return new TestOwnedAiFlowGenerationService(new AiFlowGenerationService(
             new AiGenerationOrchestrator(modelSelector, connectorFactory),
             new PromptBuilder(operatorFactory),
             conversationService,
@@ -1707,7 +1707,30 @@ public class AiFlowGenerationServiceManualRetryTests : IDisposable
                 new ClearVision.Product.Infrastructure.AI.Agent.AgentGenerateFlowOptions
                 {
                     Enabled = false
-                }));
+                })));
+    }
+
+    private sealed class TestOwnedAiFlowGenerationService
+    {
+        private readonly IAiFlowGenerationService _inner;
+
+        public TestOwnedAiFlowGenerationService(IAiFlowGenerationService inner)
+        {
+            _inner = inner;
+        }
+
+        public Task<AiFlowGenerationResult> GenerateFlowAsync(
+            AiFlowGenerationRequest request,
+            Action<string>? onProgress = null,
+            Action<AiStreamChunk>? onStreamChunk = null,
+            CancellationToken cancellationToken = default,
+            Action<GenerateFlowAttachmentReport>? onAttachmentReport = null) =>
+            _inner.GenerateFlowAsync(
+                request.WithTestOwner(),
+                onProgress,
+                onStreamChunk,
+                cancellationToken,
+                onAttachmentReport);
     }
 
     private static void InitializeSession(
@@ -1718,7 +1741,7 @@ public class AiFlowGenerationServiceManualRetryTests : IDisposable
             "initialize test conversation",
             SessionId: sessionId)
         {
-            OwnerHash = ConversationalFlowService.LegacyTrustedOwnerHash
+            OwnerHash = ConversationTestCompatibilityExtensions.OwnerHash
         });
     }
 

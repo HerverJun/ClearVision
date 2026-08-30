@@ -51,9 +51,7 @@ public sealed class VisionAgentGenerateCompatibilityAdapter : IVisionAgentGenera
         ArgumentNullException.ThrowIfNull(request);
         cancellationToken.ThrowIfCancellationRequested();
 
-        var ownerHash = string.IsNullOrWhiteSpace(request.OwnerHash)
-            ? ConversationalFlowService.LegacyTrustedOwnerHash
-            : request.OwnerHash.Trim();
+        var ownerHash = ConversationOwnerAuthority.Require(request.OwnerHash);
         var session = _conversationService.GetOrCreateSession(ownerHash, request.SessionId);
         var planRequest = BuildPlanRequest(request, session);
         var initialPersistence = _conversationService.TryInitializeWorkspaceSnapshot(

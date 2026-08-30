@@ -941,7 +941,7 @@ public sealed class VisionAgentRequirementMaturityGateTests
             generationService,
             Substitute.For<Microsoft.Extensions.Logging.ILogger<GenerateFlowMessageHandler>>());
 
-        var json = await handler.HandleAsync(
+        var json = await handler.HandleAsTestOwnerAsync(
             "我想构建一个真正有野心的终极视觉检测方案。",
             mode: GenerateFlowMode.New,
             useVisionAgentGenerateFlow: true);

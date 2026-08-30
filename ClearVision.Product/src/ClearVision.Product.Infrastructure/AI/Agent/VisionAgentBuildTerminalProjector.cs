@@ -76,9 +76,7 @@ public sealed class VisionAgentBuildTerminalProjector : IVisionAgentBuildTermina
             projection.TerminalEvent.Sequence,
             projection.TerminalEvent.EventType,
             proposedSessionId);
-        var ownerHash = string.IsNullOrWhiteSpace(projection.Request.OwnerHash)
-            ? ConversationalFlowService.LegacyTrustedOwnerHash
-            : projection.Request.OwnerHash.Trim();
+        var ownerHash = ConversationOwnerAuthority.Require(projection.Request.OwnerHash);
         var session = projection.Recovered
             ? _conversationalFlowService.GetSession(ownerHash, sessionId)
             : _conversationalFlowService.GetOrCreateSession(ownerHash, sessionId);

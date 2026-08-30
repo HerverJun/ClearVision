@@ -689,11 +689,11 @@ public class WebMessageHandlerTests
             var conversations = new ConversationalFlowService(conversationRoot);
             var ownerA = AuthenticatedOwnerResolver.ResolveOwnerHash("user-a");
             var ownerB = AuthenticatedOwnerResolver.ResolveOwnerHash("user-b");
-            conversations.PrepareContext(new AiFlowGenerationRequest("owner A", SessionId: "session-a")
+            conversations.PrepareContext(ownerA, new AiFlowGenerationRequest("owner A", SessionId: "session-a")
             {
                 OwnerHash = ownerA
             });
-            conversations.PrepareContext(new AiFlowGenerationRequest("owner B", SessionId: "session-b")
+            conversations.PrepareContext(ownerB, new AiFlowGenerationRequest("owner B", SessionId: "session-b")
             {
                 OwnerHash = ownerB
             });

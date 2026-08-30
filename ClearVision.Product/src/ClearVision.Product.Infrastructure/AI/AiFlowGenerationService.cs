@@ -152,13 +152,11 @@ public class AiFlowGenerationService : IAiFlowGenerationService
 
         // 推送：构建提示词
         ReportProgress("正在分析需求并构建提示词...");
+        var requestOwnerHash = ConversationOwnerAuthority.Require(request.OwnerHash);
         var conversationContext = pipeline.Measure(
             "conversation",
-            () => _conversationalFlowService.PrepareContext(request),
+            () => _conversationalFlowService.PrepareContext(requestOwnerHash, request),
             context => $"session={context.SessionId}, mode={context.Mode.ToWireValue()}");
-        var requestOwnerHash = string.IsNullOrWhiteSpace(request.OwnerHash)
-            ? ConversationalFlowService.LegacyTrustedOwnerHash
-            : request.OwnerHash.Trim();
         var sessionSnapshot = _conversationalFlowService.GetSession(
             requestOwnerHash,
             conversationContext.SessionId);
@@ -1015,9 +1013,7 @@ public class AiFlowGenerationService : IAiFlowGenerationService
                     hasPlanSnapshot = request.BuildFromPlan?.PlanSnapshot != null,
                     metadataOnly = true
                 },
-                string.IsNullOrWhiteSpace(request.OwnerHash)
-                    ? ConversationalFlowService.LegacyTrustedOwnerHash
-                    : request.OwnerHash.Trim());
+                ConversationOwnerAuthority.Require(request.OwnerHash));
             runId = createResult.RunId;
         }
 
