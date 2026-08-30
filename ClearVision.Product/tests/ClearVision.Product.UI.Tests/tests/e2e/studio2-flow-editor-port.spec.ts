@@ -286,9 +286,11 @@ test('legacy page remains flag-off and does not mount the Studio 2.0 Vue root', 
     window.__API_BASE_URL__ = 'http://127.0.0.1:5000/api';
     window.sessionStorage.setItem('cv_auth_token', 'playwright-token');
     window.sessionStorage.setItem('cv_current_user', JSON.stringify({
+      userId: 'playwright-user',
       username: 'playwright',
       displayName: 'Playwright',
-      role: 'Admin'
+      role: 'Admin',
+      capabilities: ['project.edit']
     }));
   });
   await page.route('**/api/auth/me', async (route) => {
@@ -296,9 +298,12 @@ test('legacy page remains flag-off and does not mount the Studio 2.0 Vue root', 
       status: 200,
       contentType: 'application/json',
       body: JSON.stringify({
+        userId: 'playwright-user',
         username: 'playwright',
         displayName: 'Playwright',
-        role: 'Admin'
+        role: 'Admin',
+        capabilities: ['project.edit'],
+        passwordPolicy: { minimumLength: 12 }
       })
     });
   });

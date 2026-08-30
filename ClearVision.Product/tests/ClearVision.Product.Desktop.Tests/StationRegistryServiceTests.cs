@@ -314,7 +314,7 @@ public sealed class StationRegistryServiceTests
             delivered.Should().NotBeNull();
             delivered!.Status.Should().Be(StationCommandStatus.Delivered);
 
-            store.ReportCommandResult(new StationCommandResultDto
+            store.ReportCommandResult("station-deploy", new StationCommandResultDto
             {
                 CommandId = command.CommandId,
                 StationId = "station-deploy",
@@ -322,7 +322,7 @@ public sealed class StationRegistryServiceTests
                 ProgressPercent = 0,
                 Message = "Accepted"
             });
-            store.ReportCommandResult(new StationCommandResultDto
+            store.ReportCommandResult("station-deploy", new StationCommandResultDto
             {
                 CommandId = command.CommandId,
                 StationId = "station-deploy",
@@ -330,7 +330,7 @@ public sealed class StationRegistryServiceTests
                 ProgressPercent = 50,
                 Message = "Verifying package"
             });
-            var failed = store.ReportCommandResult(new StationCommandResultDto
+            var failed = store.ReportCommandResult("station-deploy", new StationCommandResultDto
             {
                 CommandId = command.CommandId,
                 StationId = "station-deploy",
@@ -404,7 +404,7 @@ public sealed class StationRegistryServiceTests
             deliveredStart!.CommandId.Should().Be(start.CommandId);
             deliveredStart.CommandType.Should().Be(StationCommandType.StartRuntime);
 
-            store.ReportCommandResult(new StationCommandResultDto
+            store.ReportCommandResult("station-command", new StationCommandResultDto
             {
                 CommandId = start.CommandId,
                 StationId = "station-command",
@@ -412,7 +412,7 @@ public sealed class StationRegistryServiceTests
                 ProgressPercent = 0,
                 Message = "Accepted"
             });
-            store.ReportCommandResult(new StationCommandResultDto
+            store.ReportCommandResult("station-command", new StationCommandResultDto
             {
                 CommandId = start.CommandId,
                 StationId = "station-command",
@@ -432,7 +432,7 @@ public sealed class StationRegistryServiceTests
             deliveredApply.Should().NotBeNull();
             deliveredApply!.CommandId.Should().Be(apply.CommandId);
             deliveredApply.CommandType.Should().Be(StationCommandType.ApplySiteProfile);
-            store.ReportCommandResult(new StationCommandResultDto
+            store.ReportCommandResult("station-command", new StationCommandResultDto
             {
                 CommandId = apply.CommandId,
                 StationId = "station-command",
@@ -440,7 +440,7 @@ public sealed class StationRegistryServiceTests
                 ProgressPercent = 0,
                 Message = "Accepted"
             });
-            store.ReportCommandResult(new StationCommandResultDto
+            store.ReportCommandResult("station-command", new StationCommandResultDto
             {
                 CommandId = apply.CommandId,
                 StationId = "station-command",
@@ -524,6 +524,146 @@ public sealed class StationRegistryServiceTests
             redelivered.Should().NotBeNull();
             redelivered!.CommandId.Should().Be(command.CommandId);
             redelivered.Status.Should().Be(StationCommandStatus.Delivered);
+        }
+        finally
+        {
+            await provider.DisposeAsync();
+            try
+            {
+                Directory.Delete(root, recursive: true);
+            }
+            catch (IOException)
+            {
+            }
+        }
+    }
+
+    [Fact]
+    public async Task CommandResultAuthority_ShouldAllowOnlyTheOwnerDuringConcurrentForgedAndLegitimateReports()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "ClearVisionStationCommandAuthorityTests", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        var provider = new ServiceCollection()
+            .AddDbContext<VisionDbContext>(options => options.UseSqlite($"Data Source={Path.Combine(root, "vision.db")}"))
+            .BuildServiceProvider();
+
+        try
+        {
+            await using (var scope = provider.CreateAsyncScope())
+            {
+                await scope.ServiceProvider.GetRequiredService<VisionDbContext>().Database.EnsureCreatedAsync();
+            }
+
+            var store = CreateCentralStore(provider);
+            var registry = CreateRegistry(store);
+            registry.UpsertRegistration("conn-a", new StationRegistrationDto
+            {
+                StationId = "station-a",
+                MachineName = "machine-a",
+                ClientVersion = "1.0.0"
+            });
+            registry.UpsertRegistration("conn-b", new StationRegistrationDto
+            {
+                StationId = "station-b",
+                MachineName = "machine-b",
+                ClientVersion = "1.0.0"
+            });
+
+            var command = store.CreateCommand(
+                "station-b",
+                StationCommandType.Ping,
+                "{}",
+                "unit-test",
+                TimeSpan.FromMinutes(5));
+            registry.PollCommand("station-b").Should().NotBeNull();
+            var checkpoint = registry.GetEventsAfter(0).Max(evt => evt.SequenceId);
+            var auditCountBefore = store.GetAudits(null, 100).Count;
+            var publishedEvents = new List<StoredStationRegistryEvent>();
+            using var subscription = registry.Subscribe(evt =>
+            {
+                lock (publishedEvents)
+                {
+                    publishedEvents.Add(evt);
+                }
+            });
+
+            var forgedResult = new StationCommandResultDto
+            {
+                CommandId = command.CommandId,
+                StationId = "station-a",
+                Status = StationCommandStatus.Failed,
+                ProgressPercent = 100,
+                Message = "forged failure",
+                ErrorCode = "FORGED",
+                ErrorDetail = "forged detail",
+                StartedAtUtc = DateTimeOffset.Parse("2030-01-01T00:00:00Z"),
+                CompletedAtUtc = DateTimeOffset.Parse("2030-01-01T00:01:00Z")
+            };
+            var ownerStartedAt = DateTimeOffset.UtcNow.AddSeconds(-1);
+            var legitimateResult = new StationCommandResultDto
+            {
+                CommandId = command.CommandId,
+                StationId = "station-b",
+                Status = StationCommandStatus.Running,
+                ProgressPercent = 61,
+                Message = "owner running",
+                StartedAtUtc = ownerStartedAt
+            };
+            using var startGate = new ManualResetEventSlim(initialState: false);
+            var forgedTask = Task.Run(() =>
+            {
+                startGate.Wait();
+                return registry.ReportCommandResult("station-a", forgedResult);
+            });
+            var legitimateTask = Task.Run(() =>
+            {
+                startGate.Wait();
+                return registry.ReportCommandResult("station-b", legitimateResult);
+            });
+
+            startGate.Set();
+            var outcomes = await Task.WhenAll(forgedTask, legitimateTask);
+
+            outcomes.Should().Equal(false, true);
+            store.ReportCommandResult("station-a", new StationCommandResultDto
+            {
+                CommandId = command.CommandId,
+                StationId = "station-b",
+                Status = StationCommandStatus.Failed
+            }).Should().BeNull("the persistence boundary must independently reject a DTO/authenticated identity mismatch");
+            store.ReportCommandResult("station-a", new StationCommandResultDto
+            {
+                CommandId = "cmd_missing",
+                StationId = "station-a",
+                Status = StationCommandStatus.Failed
+            }).Should().BeNull("missing and wrong-owner commands share the same opaque result");
+
+            await using var verifyScope = provider.CreateAsyncScope();
+            var db = verifyScope.ServiceProvider.GetRequiredService<VisionDbContext>();
+            var persisted = await db.StationCommandRecords.SingleAsync(item => item.CommandId == command.CommandId);
+            persisted.StationId.Should().Be("station-b");
+            persisted.Status.Should().Be(StationCommandStatus.Running.ToString());
+            persisted.ProgressPercent.Should().Be(61);
+            persisted.ResultMessage.Should().Be("owner running");
+            persisted.ErrorCode.Should().BeNull();
+            persisted.ErrorDetail.Should().BeNull();
+            persisted.StartedAtUtc.Should().Be(ownerStartedAt);
+            persisted.CompletedAtUtc.Should().BeNull();
+            (await db.StationAuditRecords.CountAsync()).Should().Be(auditCountBefore);
+
+            lock (publishedEvents)
+            {
+                publishedEvents.Should().ContainSingle(evt => evt.EventType == "stationCommandUpdated");
+                var publishedCommand = publishedEvents.Single(evt => evt.EventType == "stationCommandUpdated").Data
+                    .Should().BeOfType<StationCommandDto>().Subject;
+                publishedCommand.StationId.Should().Be("station-b");
+                publishedCommand.Status.Should().Be(StationCommandStatus.Running);
+                publishedCommand.ProgressPercent.Should().Be(61);
+            }
+
+            registry.GetEventsAfter(checkpoint)
+                .Should()
+                .ContainSingle(evt => evt.EventType == "stationCommandUpdated");
         }
         finally
         {

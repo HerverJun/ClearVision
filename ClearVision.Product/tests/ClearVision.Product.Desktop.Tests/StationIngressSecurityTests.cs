@@ -2,6 +2,7 @@ using System.Net;
 using ClearVision.Product.Desktop.Hubs;
 using ClearVision.Product.Desktop.Middleware;
 using ClearVision.Product.Desktop.Station;
+using ClearVision.Product.Infrastructure.Data;
 using ClearVision.Product.Runtime.Abstractions;
 using ClearVision.Product.Station.Sync;
 using FluentAssertions;
@@ -14,6 +15,7 @@ using Microsoft.AspNetCore.Http.Connections;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.AspNetCore.SignalR.Client;
 using Microsoft.AspNetCore.TestHost;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -152,6 +154,121 @@ public sealed class StationIngressSecurityTests
     }
 
     [Fact]
+    public async Task StationHub_ShouldOpaqueRejectCrossStationCommandResultsWithoutSideEffects()
+    {
+        var options = CreateEnabledIngressOptions();
+        await using var host = await StationHubTestHost.CreateAsync(options);
+        await using var stationA = host.CreateConnection("station-secret");
+        await using var stationB = host.CreateConnection("station-secret");
+
+        await stationA.StartAsync();
+        await stationB.StartAsync();
+        await stationA.InvokeAsync<StationReplayCursorDto>(
+            StationHubMethods.RegisterStationAsync,
+            BuildRegistration("station-a"));
+        await stationB.InvokeAsync<StationReplayCursorDto>(
+            StationHubMethods.RegisterStationAsync,
+            BuildRegistration("station-b"));
+
+        var command = host.Store.CreateCommand(
+            "station-b",
+            StationCommandType.Ping,
+            "{}",
+            "unit-test",
+            TimeSpan.FromMinutes(5));
+        var delivered = await stationB.InvokeAsync<StationCommandDto?>(
+            StationHubMethods.PollCommand,
+            "station-b");
+        delivered.Should().NotBeNull();
+        delivered!.Status.Should().Be(StationCommandStatus.Delivered);
+
+        var checkpoint = host.Registry.GetEventsAfter(0).Max(evt => evt.SequenceId);
+        var auditCountBefore = host.Store.GetAudits(null, 100).Count;
+        var attempts = new[]
+        {
+            new StationCommandResultDto
+            {
+                CommandId = command.CommandId,
+                StationId = "station-b",
+                Status = StationCommandStatus.Failed,
+                ProgressPercent = 100,
+                Message = "forged station id",
+                ErrorCode = "FORGED"
+            },
+            new StationCommandResultDto
+            {
+                CommandId = command.CommandId,
+                StationId = "station-a",
+                Status = StationCommandStatus.Failed,
+                ProgressPercent = 100,
+                Message = "forged command owner",
+                ErrorCode = "FORGED"
+            },
+            new StationCommandResultDto
+            {
+                CommandId = "cmd_missing",
+                StationId = "station-a",
+                Status = StationCommandStatus.Failed,
+                ProgressPercent = 100,
+                Message = "missing command",
+                ErrorCode = "MISSING"
+            }
+        };
+
+        var failures = new List<HubException>();
+        foreach (var attempt in attempts)
+        {
+            failures.Add(await Assert.ThrowsAsync<HubException>(() =>
+                stationA.InvokeAsync(StationHubMethods.ReportCommandResult, attempt)));
+        }
+
+        var opaqueMessages = failures.Select(failure => failure.Message).Distinct().ToList();
+        opaqueMessages.Should().ContainSingle();
+        opaqueMessages[0].Should().Contain("Station command result was not accepted.");
+        opaqueMessages[0].Should().NotContain(command.CommandId);
+        opaqueMessages[0].Should().NotContain("station-b");
+        host.Registry.GetEventsAfter(checkpoint).Should().BeEmpty();
+        host.Store.GetAudits(null, 100).Should().HaveCount(auditCountBefore);
+
+        var unchanged = host.Store.GetCommands("station-b", 10).Single(item => item.CommandId == command.CommandId);
+        unchanged.Status.Should().Be(StationCommandStatus.Delivered);
+        unchanged.ProgressPercent.Should().Be(0);
+        unchanged.ResultMessage.Should().BeNull();
+        unchanged.ErrorCode.Should().BeNull();
+        unchanged.AcceptedAtUtc.Should().BeNull();
+        unchanged.StartedAtUtc.Should().BeNull();
+        unchanged.CompletedAtUtc.Should().BeNull();
+
+        await stationB.InvokeAsync(
+            StationHubMethods.ReportCommandResult,
+            new StationCommandResultDto
+            {
+                CommandId = command.CommandId,
+                StationId = "station-b",
+                Status = StationCommandStatus.Accepted,
+                ProgressPercent = 10,
+                Message = "owner accepted"
+            });
+        await stationB.InvokeAsync(
+            StationHubMethods.ReportCommandResult,
+            new StationCommandResultDto
+            {
+                CommandId = command.CommandId,
+                StationId = "station-b",
+                Status = StationCommandStatus.Succeeded,
+                ProgressPercent = 100,
+                Message = "owner completed"
+            });
+
+        var completed = host.Store.GetCommands("station-b", 10).Single(item => item.CommandId == command.CommandId);
+        completed.Status.Should().Be(StationCommandStatus.Succeeded);
+        completed.ProgressPercent.Should().Be(100);
+        completed.ResultMessage.Should().Be("owner completed");
+        completed.ErrorCode.Should().BeNull();
+        completed.CompletedAtUtc.Should().NotBeNull();
+    }
+
+    [Fact]
     public async Task StationHub_ShouldRejectStationToken_WhenIngressDisabledByDefault()
     {
         var options = new StationIngressOptions
@@ -255,14 +372,25 @@ public sealed class StationIngressSecurityTests
     private sealed class StationHubTestHost : IAsyncDisposable
     {
         private readonly WebApplication _app;
+        private readonly string _tempRoot;
 
-        private StationHubTestHost(WebApplication app, StationRegistryService registry)
+        private StationHubTestHost(
+            WebApplication app,
+            StationRegistryService registry,
+            StationCentralStore store,
+            string tempRoot)
         {
             _app = app;
+            _tempRoot = tempRoot;
             Registry = registry;
+            Store = store;
         }
 
         public StationRegistryService Registry { get; }
+
+        public StationCentralStore Store { get; }
+
+        public IServiceProvider Services => _app.Services;
 
         public HubConnection CreateConnection(string? accessToken)
         {
@@ -284,6 +412,12 @@ public sealed class StationIngressSecurityTests
 
         public static async Task<StationHubTestHost> CreateAsync(StationIngressOptions options)
         {
+            var tempRoot = Path.Combine(
+                Path.GetTempPath(),
+                "ClearVisionStationHubSecurityTests",
+                Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(tempRoot);
+
             var builder = WebApplication.CreateBuilder(new WebApplicationOptions
             {
                 EnvironmentName = Environments.Development
@@ -291,27 +425,51 @@ public sealed class StationIngressSecurityTests
             builder.WebHost.UseTestServer();
 
             builder.Services.AddSignalR();
+            builder.Services.AddDbContext<VisionDbContext>(dbOptions =>
+                dbOptions.UseSqlite($"Data Source={Path.Combine(tempRoot, "vision.db")}"));
             builder.Services.AddSingleton(Options.Create(options));
             builder.Services.AddSingleton<StationIngressAuthService>(sp =>
                 new StationIngressAuthService(
                     sp.GetRequiredService<IOptions<StationIngressOptions>>(),
                     NullLogger<StationIngressAuthService>.Instance));
+            builder.Services.AddSingleton<StationCentralStore>(sp =>
+                new StationCentralStore(
+                    sp.GetRequiredService<IServiceScopeFactory>(),
+                    NullLogger<StationCentralStore>.Instance));
             builder.Services.AddSingleton<StationRegistryService>(sp =>
                 new StationRegistryService(
                     sp.GetRequiredService<IOptions<StationIngressOptions>>(),
-                    NullLogger<StationRegistryService>.Instance));
+                    NullLogger<StationRegistryService>.Instance,
+                    sp.GetRequiredService<StationCentralStore>()));
 
             var app = builder.Build();
+            await using (var scope = app.Services.CreateAsyncScope())
+            {
+                await scope.ServiceProvider.GetRequiredService<VisionDbContext>().Database.EnsureCreatedAsync();
+            }
+
             app.MapHub<StationHub>(StationSyncContractDefaults.HubPath);
             await app.StartAsync();
 
-            return new StationHubTestHost(app, app.Services.GetRequiredService<StationRegistryService>());
+            return new StationHubTestHost(
+                app,
+                app.Services.GetRequiredService<StationRegistryService>(),
+                app.Services.GetRequiredService<StationCentralStore>(),
+                tempRoot);
         }
 
         public async ValueTask DisposeAsync()
         {
             await _app.StopAsync();
             await _app.DisposeAsync();
+
+            try
+            {
+                Directory.Delete(_tempRoot, recursive: true);
+            }
+            catch (IOException)
+            {
+            }
         }
     }
 

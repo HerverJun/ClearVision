@@ -414,21 +414,36 @@ public sealed class StationRegistryService
         return command;
     }
 
-    public void ReportCommandResult(StationCommandResultDto result)
+    public bool ReportCommandResult(
+        string authenticatedStationId,
+        StationCommandResultDto result)
     {
-        var command = _centralStore?.ReportCommandResult(result);
-        var payload = command != null ? (object)command : result;
+        ArgumentNullException.ThrowIfNull(result);
 
-        if (command != null)
+        var normalizedStationId = authenticatedStationId?.Trim();
+        if (string.IsNullOrWhiteSpace(normalizedStationId) ||
+            !string.Equals(result.StationId?.Trim(), normalizedStationId, StringComparison.OrdinalIgnoreCase))
         {
-            lock (_syncRoot)
-            {
-                var entry = GetOrCreateEntryLocked(command.StationId);
-                UpsertCommandLocked(entry, command);
-            }
+            return false;
         }
 
-        PublishEvents([new StoredStationRegistryEvent(Interlocked.Increment(ref _nextEventSequenceId), "stationCommandUpdated", payload, DateTimeOffset.UtcNow)]);
+        var command = _centralStore?.ReportCommandResult(normalizedStationId, result);
+        if (command is null ||
+            !string.Equals(command.StationId, normalizedStationId, StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        StoredStationRegistryEvent storedEvent;
+        lock (_syncRoot)
+        {
+            var entry = GetOrCreateEntryLocked(normalizedStationId);
+            UpsertCommandLocked(entry, command);
+            storedEvent = CreateEventLocked("stationCommandUpdated", command);
+        }
+
+        PublishEvents([storedEvent]);
+        return true;
     }
 
     public bool TryGetRegisteredStationId(string connectionId, out string? stationId)

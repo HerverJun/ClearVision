@@ -6,6 +6,8 @@ namespace ClearVision.Product.Desktop.Hubs;
 
 public sealed class StationHub : Hub
 {
+    private const string CommandResultNotAccepted = "Station command result was not accepted.";
+
     private readonly StationRegistryService _registryService;
     private readonly StationIngressAuthService _authService;
 
@@ -135,8 +137,16 @@ public sealed class StationHub : Hub
 
     public Task ReportCommandResult(StationCommandResultDto result)
     {
-        EnsureAuthorizedForStation(result.StationId);
-        _registryService.ReportCommandResult(result);
+        EnsureAuthorized();
+        if (result is null ||
+            !_registryService.TryGetRegisteredStationId(Context.ConnectionId, out var authenticatedStationId) ||
+            string.IsNullOrWhiteSpace(authenticatedStationId) ||
+            !string.Equals(result.StationId?.Trim(), authenticatedStationId, StringComparison.OrdinalIgnoreCase) ||
+            !_registryService.ReportCommandResult(authenticatedStationId, result))
+        {
+            throw new HubException(CommandResultNotAccepted);
+        }
+
         return Task.CompletedTask;
     }
 

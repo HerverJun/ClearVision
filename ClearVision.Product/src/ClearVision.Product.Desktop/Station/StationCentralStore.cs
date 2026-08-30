@@ -25,6 +25,7 @@ public sealed class StationCentralStore
 
     private readonly IServiceScopeFactory _scopeFactory;
     private readonly ILogger<StationCentralStore> _logger;
+    private readonly object _commandResultSync = new();
 
     public StationCentralStore(
         IServiceScopeFactory scopeFactory,
@@ -605,12 +606,36 @@ public sealed class StationCentralStore
         return ToDto(command);
     }
 
-    public StationCommandDto? ReportCommandResult(StationCommandResultDto dto)
+    public StationCommandDto? ReportCommandResult(
+        string authenticatedStationId,
+        StationCommandResultDto dto)
+    {
+        ArgumentNullException.ThrowIfNull(dto);
+
+        var normalizedStationId = authenticatedStationId?.Trim();
+        if (string.IsNullOrWhiteSpace(normalizedStationId) ||
+            string.IsNullOrWhiteSpace(dto.CommandId) ||
+            !string.Equals(dto.StationId?.Trim(), normalizedStationId, StringComparison.OrdinalIgnoreCase))
+        {
+            return null;
+        }
+
+        lock (_commandResultSync)
+        {
+            return ReportCommandResultLocked(normalizedStationId, dto);
+        }
+    }
+
+    private StationCommandDto? ReportCommandResultLocked(
+        string authenticatedStationId,
+        StationCommandResultDto dto)
     {
         using var scope = _scopeFactory.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<VisionDbContext>();
         var now = DateTimeOffset.UtcNow;
-        var command = db.StationCommandRecords.FirstOrDefault(item => item.CommandId == dto.CommandId);
+        var command = db.StationCommandRecords.FirstOrDefault(item =>
+            item.CommandId == dto.CommandId &&
+            item.StationId == authenticatedStationId);
         if (command == null)
         {
             return null;
