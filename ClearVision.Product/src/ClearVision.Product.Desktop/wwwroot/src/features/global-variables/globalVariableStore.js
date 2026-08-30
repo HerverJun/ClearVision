@@ -93,14 +93,29 @@ export async function loadGlobalVariableValues(projectId) {
     return normalizeArray(values).map(normalizeGlobalVariableValue);
 }
 
-export async function saveGlobalVariableSchema(projectId, schema) {
+export async function saveGlobalVariableSchema(projectId, schema, expectedPersistenceRevision) {
     if (!projectId) {
         throw new Error('工程 ID 不能为空。');
     }
 
-    return normalizeGlobalVariableSchema(
-        await httpClient.put(`/projects/${projectId}/global-variables`, normalizeGlobalVariableSchema(schema))
-    );
+    if (!Number.isInteger(expectedPersistenceRevision) || expectedPersistenceRevision < 0) {
+        throw new Error('expectedPersistenceRevision is required for global-variable schema saves.');
+    }
+    const revision = expectedPersistenceRevision;
+
+    const response = await httpClient.put(`/projects/${projectId}/global-variables`, {
+        expectedPersistenceRevision: revision,
+        schema: normalizeGlobalVariableSchema(schema)
+    });
+    const savedRevision = Number(response?.persistenceRevision ?? response?.PersistenceRevision);
+    return {
+        globalVariables: normalizeGlobalVariableSchema(
+            response?.globalVariables ?? response?.GlobalVariables ?? response?.schema ?? response?.Schema
+        ),
+        persistenceRevision: Number.isInteger(savedRevision) && savedRevision >= 0
+            ? savedRevision
+            : revision
+    };
 }
 
 export async function writeGlobalVariableValue(projectId, variableId, value, expectedVersion = null) {

@@ -96,10 +96,20 @@ function jsonResponse(payload, status = 200) {
   });
 }
 
+function schemaPatchResponse(patch, schema = patch?.schema, status = 200) {
+  const expectedRevision = Number(patch?.expectedPersistenceRevision);
+  return jsonResponse({
+    projectId: '11111111-1111-1111-1111-111111111111',
+    persistenceRevision: Number.isInteger(expectedRevision) ? expectedRevision + 1 : 0,
+    globalVariables: schema
+  }, status);
+}
+
 function createProject() {
   return {
     id: '11111111-1111-1111-1111-111111111111',
     name: 'Project',
+    persistenceRevision: 0,
     flow: {
       operators: [
         {
@@ -193,6 +203,40 @@ test('global variable drafts validate type, range, duplicate names and serialize
   assert.equal(store.coerceGlobalVariableValue('Int64', '9223372036854775808').ok, false);
   assert.match(store.coerceGlobalVariableValue('Int64', '9.007199254740992e15').error, /请输入整数/);
   assert.equal(store.coerceGlobalVariableValue('Double', '9.007199254740992e15').value, 9007199254740992);
+});
+
+test('global variable schema store requires and advances the project persistence revision', async () => {
+  installDom();
+  const store = await import('../../../../src/ClearVision.Product.Desktop/wwwroot/src/features/global-variables/globalVariableStore.js');
+  const schema = createProject().globalVariables;
+  let requestBody = null;
+  global.fetch = async (url, options = {}) => {
+    assert.match(String(url), /\/projects\/project-revision\/global-variables$/);
+    requestBody = JSON.parse(options.body);
+    return jsonResponse({
+      projectId: 'project-revision',
+      persistenceRevision: 8,
+      globalVariables: requestBody.schema
+    });
+  };
+
+  const saved = await store.saveGlobalVariableSchema('project-revision', schema, 7);
+
+  assert.equal(requestBody.expectedPersistenceRevision, 7);
+  assert.equal(requestBody.schema.variables[0].id, 'var-count');
+  assert.equal(Object.hasOwn(requestBody.schema, 'name'), false);
+  assert.equal(Object.hasOwn(requestBody.schema, 'description'), false);
+  assert.equal(Object.hasOwn(requestBody.schema, 'flow'), false);
+  assert.equal(saved.persistenceRevision, 8);
+  assert.equal(saved.globalVariables.variables[0].id, 'var-count');
+  await assert.rejects(
+    store.saveGlobalVariableSchema('project-revision', schema),
+    /expectedPersistenceRevision/
+  );
+  await assert.rejects(
+    store.saveGlobalVariableSchema('project-revision', schema, null),
+    /expectedPersistenceRevision/
+  );
 });
 
 test('global variable panel disables reset controls when manual writes are forbidden', async () => {
@@ -332,6 +376,79 @@ test('global variable panel refreshes values after stale expected-version confli
   assert.equal(panel.isRuntimeLocked(), false);
 });
 
+test('global variable schema PSV011 refreshes authoritative revision and keeps retryable draft', async () => {
+  installDom();
+  const { default: projectManager } = await import('../../../../src/ClearVision.Product.Desktop/wwwroot/src/features/project/projectManager.js');
+  const { default: GlobalVariablePanel } = await import('../../../../src/ClearVision.Product.Desktop/wwwroot/src/features/global-variables/globalVariablePanel.js');
+  const project = createProject();
+  project.persistenceRevision = 2;
+  let projectRefreshCount = 0;
+  let valueRefreshCount = 0;
+  const toasts = [];
+  projectManager.currentProject = project;
+  global.fetch = async (url, options = {}) => {
+    const pathname = new URL(String(url)).pathname;
+    if (pathname.endsWith('/global-variables') && options.method === 'PUT') {
+      const patch = JSON.parse(options.body);
+      assert.equal(patch.expectedPersistenceRevision, 2);
+      assert.equal(patch.schema.variables[0].displayName, 'Retry Draft');
+      return jsonResponse({ code: 'PSV011', error: 'Project was updated by another save.' }, 409);
+    }
+    if (/\/api\/projects\/[^/]+$/.test(pathname) && (!options.method || options.method === 'GET')) {
+      projectRefreshCount += 1;
+      return jsonResponse({
+        ...project,
+        name: 'Authoritative Project',
+        persistenceRevision: 3,
+        flow: { name: 'Server Flow', operators: [], connections: [] },
+        globalVariables: {
+          ...project.globalVariables,
+          variables: [{ ...project.globalVariables.variables[0], displayName: 'Server Value' }]
+        }
+      });
+    }
+    if (pathname.endsWith('/global-variable-values')) {
+      valueRefreshCount += 1;
+      return jsonResponse([{ variableId: 'var-count', value: 9, version: 4 }]);
+    }
+    throw new Error(`Unexpected request ${options.method || 'GET'} ${pathname}`);
+  };
+
+  try {
+    const panel = new GlobalVariablePanel('global-variables-root', {
+      showToast(message, type) { toasts.push({ message, type }); }
+    });
+    panel.project = project;
+    panel.schema = project.globalVariables;
+    panel.selectedVariableId = 'var-count';
+    panel.draft = {
+      ...project.globalVariables.variables[0],
+      displayName: 'Retry Draft',
+      initialValueText: '4',
+      minText: '0',
+      maxText: '10'
+    };
+    panel.dirty = true;
+    panel.render = () => {};
+    panel.renderDialog = () => {};
+
+    const saved = await panel.save();
+
+    assert.equal(saved, false);
+    assert.equal(projectRefreshCount, 1);
+    assert.equal(valueRefreshCount, 1);
+    assert.equal(projectManager.currentProject.persistenceRevision, 3);
+    assert.equal(projectManager.currentProject.name, 'Authoritative Project');
+    assert.equal(projectManager.currentProject.flow.name, 'Server Flow');
+    assert.equal(panel.draft.displayName, 'Retry Draft');
+    assert.equal(panel.dirty, true);
+    assert.match(panel.errorMessage, /已刷新工程版本并保留当前变量草稿/);
+    assert.equal(toasts.some(item => item.type === 'success'), false);
+  } finally {
+    projectManager.currentProject = null;
+  }
+});
+
 test('global variable schema preserves conversion expressions and matches backend compatibility rules', async () => {
   installDom();
   const store = await import('../../../../src/ClearVision.Product.Desktop/wwwroot/src/features/global-variables/globalVariableStore.js');
@@ -454,8 +571,8 @@ test('global variable panel saves edited schema, keeps id and preserves dirty dr
   global.fetch = async (url, options = {}) => {
     if (String(url).match(/\/projects\/[^/]+\/global-variables$/) && options.method === 'PUT') {
       const body = JSON.parse(options.body);
-      savedBodies.push(body);
-      return jsonResponse(body);
+      savedBodies.push(body.schema);
+      return schemaPatchResponse(body);
     }
     if (String(url).includes('/global-variable-values')) {
       return jsonResponse([]);
@@ -854,8 +971,8 @@ test('preview field binding saves canonical ResultPath through the panel transac
   global.fetch = async (url, options = {}) => {
     if (String(url).match(/\/projects\/[^/]+\/global-variables$/) && options.method === 'PUT') {
       const body = JSON.parse(options.body);
-      savedBodies.push(body);
-      return jsonResponse(body);
+      savedBodies.push(body.schema);
+      return schemaPatchResponse(body);
     }
     if (String(url).includes('/global-variable-values')) {
       return jsonResponse([]);
@@ -977,9 +1094,10 @@ test('preview field binding drops delayed save response after project switch', a
   global.fetch = async (url, options = {}) => {
     if (String(url).match(/\/projects\/[^/]+\/global-variables$/) && options.method === 'PUT') {
       putUrl = String(url);
-      putBody = JSON.parse(options.body);
+      const patch = JSON.parse(options.body);
+      putBody = patch.schema;
       return new Promise(resolve => {
-        resolvePut = (payload = putBody) => resolve(jsonResponse(payload));
+        resolvePut = (payload = putBody) => resolve(schemaPatchResponse(patch, payload));
       });
     }
     if (String(url).includes('/global-variable-values')) {
@@ -1184,7 +1302,8 @@ test('preview field binding revalidates after delayed variable chooser before se
   global.fetch = async (url, options = {}) => {
     if (String(url).match(/\/projects\/[^/]+\/global-variables$/) && options.method === 'PUT') {
       putCount += 1;
-      return jsonResponse(JSON.parse(options.body));
+      const patch = JSON.parse(options.body);
+      return schemaPatchResponse(patch);
     }
     if (String(url).includes('/global-variable-values')) {
       return jsonResponse([]);
@@ -1249,7 +1368,8 @@ test('preview field binding drops delayed chooser results after project, flow, r
     global.fetch = async (url, options = {}) => {
       if (String(url).match(/\/projects\/[^/]+\/global-variables$/) && options.method === 'PUT') {
         putCount += 1;
-        return jsonResponse(JSON.parse(options.body));
+        const patch = JSON.parse(options.body);
+        return schemaPatchResponse(patch);
       }
       if (String(url).includes('/global-variable-values')) {
         return jsonResponse([]);
@@ -1613,6 +1733,11 @@ async function startBrowserHarness(initialState = {}) {
   const state = {
     values: [{ variableId: 'var-count', value: 4, version: 1 }],
     savedSchemas: [],
+    schemaPatches: [],
+    persistenceRevision: 0,
+    persistenceConflictSave: false,
+    authoritativeProject: null,
+    projectReadCalls: 0,
     failSave: false,
     failValues: false,
     failWrite: false,
@@ -1667,14 +1792,40 @@ async function startBrowserHarness(initialState = {}) {
         return state.failValues ? sendJson(response, 500, { error: 'values failed' }) : sendJson(response, 200, state.values);
       }
       if (url.pathname.endsWith('/global-variables') && request.method === 'PUT') {
-        const schema = await readBody(request);
+        const patch = await readBody(request);
+        const schema = patch?.schema ?? patch?.Schema;
+        state.schemaPatches.push(patch);
         state.savedSchemas.push(schema);
-        if (state.conflictSave) {
-          return sendJson(response, 409, { error: 'Project is currently running.' });
+        if (state.persistenceConflictSave) {
+          return sendJson(response, 409, {
+            code: 'PSV011',
+            error: 'Project was updated by another save. Refresh and retry.'
+          });
         }
+        if (state.conflictSave) {
+          return sendJson(response, 409, { code: 'GV031', error: 'Project is currently running.' });
+        }
+        const expectedRevision = Number(patch?.expectedPersistenceRevision ?? patch?.ExpectedPersistenceRevision);
+        state.persistenceRevision = Number.isInteger(expectedRevision)
+          ? Math.max(state.persistenceRevision, expectedRevision) + 1
+          : state.persistenceRevision + 1;
         return state.failSave
           ? sendJson(response, 500, { error: 'save failed' })
-          : sendJson(response, 200, schema);
+          : sendJson(response, 200, {
+              projectId: url.pathname.split('/').at(-2),
+              persistenceRevision: state.persistenceRevision,
+              globalVariables: schema
+            });
+      }
+      if (/\/api\/projects\/[^/]+$/.test(url.pathname) && request.method === 'GET') {
+        state.projectReadCalls += 1;
+        const projectId = url.pathname.split('/').at(-1);
+        return sendJson(response, 200, state.authoritativeProject ?? {
+          id: projectId,
+          name: 'Authoritative Project',
+          persistenceRevision: state.persistenceRevision,
+          globalVariables: state.savedSchemas.at(-1) ?? { variables: [], sourceBindings: [], targetBindings: [] }
+        });
       }
       if (/\/api\/projects\/[^/]+$/.test(url.pathname) && request.method === 'PUT') {
         const body = await readBody(request);
@@ -1813,6 +1964,9 @@ async function getBrowserPanelState(page) {
     locked: window.__panel.isRuntimeLocked(),
     projectSchema: structuredClone(window.__projectManager.currentProject.globalVariables),
     activeId: document.activeElement?.id || '',
+    errorMessage: window.__panel.errorMessage,
+    managerPersistenceRevision: window.__projectManager.currentProject.persistenceRevision,
+    managerProjectName: window.__projectManager.currentProject.name,
     searchValue: document.querySelector('#gv-search')?.value || '',
     searchSelectionStart: document.querySelector('#gv-search')?.selectionStart ?? -1
   }));
@@ -2207,6 +2361,46 @@ test('browser interaction recovers from a 409 using real runtime state polling w
     assert.equal(state.values[0].version, 9);
     assert.equal(state.locked, false);
     assert.equal(harness.state.runtimeStateCalls, 3);
+  } finally {
+    await harness.close();
+  }
+});
+
+test('browser interaction refreshes authoritative project on PSV011 and keeps schema draft retryable', async () => {
+  const project = createInteractiveProject({ single: true });
+  const harness = await startBrowserHarness({
+    persistenceConflictSave: true,
+    values: [{ variableId: 'var-count', value: 12, version: 5 }],
+    authoritativeProject: {
+      ...project,
+      name: 'Server Project',
+      persistenceRevision: 4,
+      flow: { name: 'Server Flow', operators: [], connections: [] },
+      globalVariables: {
+        ...project.globalVariables,
+        variables: [{ ...project.globalVariables.variables[0], displayName: 'Server Value' }]
+      }
+    }
+  });
+  try {
+    await setupGlobalVariablePanel(harness.page, project);
+
+    await harness.page.fill('input[data-field="displayName"]', 'PSV011 Draft');
+    await harness.page.click('[data-action="save"]');
+    await harness.page.waitForFunction(() => window.__panel.errorMessage.includes('已刷新工程版本'));
+
+    const state = await getBrowserPanelState(harness.page);
+    assert.equal(harness.state.schemaPatches.length, 1);
+    assert.equal(harness.state.schemaPatches[0].expectedPersistenceRevision, 0);
+    assert.equal(harness.state.schemaPatches[0].schema.variables[0].displayName, 'PSV011 Draft');
+    assert.equal(harness.state.projectReadCalls, 1);
+    assert.equal(state.managerPersistenceRevision, 4);
+    assert.equal(state.managerProjectName, 'Server Project');
+    assert.equal(state.draft.displayName, 'PSV011 Draft');
+    assert.equal(state.values[0].version, 5);
+    assert.equal(state.dirty, true);
+    assert.equal(state.locked, false);
+    assert.match(state.errorMessage, /保留当前变量草稿/);
   } finally {
     await harness.close();
   }

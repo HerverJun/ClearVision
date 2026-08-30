@@ -254,10 +254,6 @@ class ProjectManager {
                 updatePayload.expectedPersistenceRevision = expectedRevision;
             }
 
-            if (globalVariablesChanged) {
-                updatePayload.globalVariables = globalVariables;
-            }
-
             const saved = await httpClient.put(`/projects/${targetProjectId}`, updatePayload);
             const savedProject = isProjectPayload(saved) ? saved : {};
             let flowExpectedRevision = readPersistenceRevision(savedProject);
@@ -275,6 +271,17 @@ class ProjectManager {
                     savedProject.persistenceRevision = flowRevision;
                     savedProject.PersistenceRevision = flowRevision;
                 }
+            }
+
+            if (globalVariablesChanged) {
+                const schemaExpectedRevision = readPersistenceRevision(savedProject);
+                const schemaSave = await saveGlobalVariableSchema(
+                    targetProjectId,
+                    globalVariables,
+                    schemaExpectedRevision);
+                savedProject.globalVariables = schemaSave.globalVariables;
+                savedProject.persistenceRevision = schemaSave.persistenceRevision;
+                savedProject.PersistenceRevision = schemaSave.persistenceRevision;
             }
 
             if (!this.currentProject || this.currentProject.id !== targetProjectId) {
@@ -301,6 +308,20 @@ class ProjectManager {
             console.log('[ProjectManager] 工程保存成功:', targetProjectId);
             return true;
         } catch (error) {
+            if (globalVariablesChanged && isProjectPersistenceConflict(error)) {
+                try {
+                    await this.refreshAuthoritativeProject(targetProjectId);
+                    if (this.currentProject && sameProjectId(this.currentProject.id, targetProjectId)) {
+                        this.currentProject.globalVariables = globalVariables;
+                        this.unsavedChanges = true;
+                        setCurrentProject(this.currentProject);
+                    }
+                    error.authoritativeProjectRefreshed = true;
+                } catch (refreshError) {
+                    error.authoritativeProjectRefreshed = false;
+                    error.authoritativeRefreshError = refreshError;
+                }
+            }
             console.error('[ProjectManager] 保存工程失败:', error);
             throw error;
         }
@@ -416,14 +437,41 @@ class ProjectManager {
             sourceBindings: [],
             targetBindings: []
         };
-        const saved = await saveGlobalVariableSchema(targetProjectId, schema);
+        const expectedRevision = readPersistenceRevision(targetProject);
+        if (!Number.isInteger(expectedRevision) || expectedRevision < 0) {
+            throw new Error('expectedPersistenceRevision is required for global-variable schema saves.');
+        }
+
+        let saveResult;
+        try {
+            saveResult = await saveGlobalVariableSchema(targetProjectId, schema, expectedRevision);
+        } catch (error) {
+            if (isProjectPersistenceConflict(error)) {
+                try {
+                    await this.refreshAuthoritativeProject(targetProjectId);
+                    if (this.currentProject && sameProjectId(this.currentProject.id, targetProjectId)) {
+                        this.currentProject.globalVariables = schema;
+                        this.unsavedChanges = true;
+                        setCurrentProject(this.currentProject);
+                    }
+                    error.authoritativeProjectRefreshed = true;
+                } catch (refreshError) {
+                    error.authoritativeProjectRefreshed = false;
+                    error.authoritativeRefreshError = refreshError;
+                }
+            }
+            throw error;
+        }
+        const saved = saveResult.globalVariables;
         if (!this.currentProject || !sameProjectId(this.currentProject.id, targetProjectId)) {
             return saved;
         }
 
         this.currentProject = {
             ...this.currentProject,
-            globalVariables: saved
+            globalVariables: saved,
+            persistenceRevision: saveResult.persistenceRevision,
+            PersistenceRevision: saveResult.persistenceRevision
         };
         this.rememberGlobalVariableBaseline(this.currentProject);
         setCurrentProject(this.currentProject);
@@ -431,6 +479,19 @@ class ProjectManager {
         this.rememberProjectInCaches(this.currentProject);
         this.updateTitle();
         return saved;
+    }
+
+    async refreshAuthoritativeProject(projectId) {
+        const authoritative = await httpClient.get(`/projects/${projectId}`);
+        if (!this.currentProject || !sameProjectId(this.currentProject.id, projectId)) {
+            return authoritative;
+        }
+
+        Object.assign(this.currentProject, authoritative);
+        setCurrentProject(this.currentProject);
+        this.rememberProjectInCaches(this.currentProject);
+        this.updateStatusBar(this.currentProject);
+        return this.currentProject;
     }
     /**
      * 检查是否有未保存的更改
@@ -570,6 +631,12 @@ function readPersistenceRevision(source) {
     const value = source?.persistenceRevision ?? source?.PersistenceRevision;
     const revision = Number(value);
     return Number.isFinite(revision) ? revision : null;
+}
+
+function isProjectPersistenceConflict(error) {
+    const status = Number(error?.status ?? error?.statusCode);
+    const code = String(error?.payload?.code ?? error?.payload?.Code ?? '').toUpperCase();
+    return status === 409 && code === 'PSV011';
 }
 
 function getGlobalVariablesSignature(globalVariables) {

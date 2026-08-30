@@ -667,7 +667,7 @@ test.describe('Node Preview Inspector flag', () => {
 
   test('binds an inspector scalar field to an existing global variable through the existing save endpoint', async ({ page }) => {
     let outputPortId = '';
-    let savedGlobalVariables: any = null;
+    let savedGlobalVariableRequest: any = null;
 
     await page.route('**/api/projects/e2e-project/global-variable-values', async route => {
       await route.fulfill({
@@ -682,11 +682,15 @@ test.describe('Node Preview Inspector flag', () => {
         return;
       }
 
-      savedGlobalVariables = route.request().postDataJSON();
+      savedGlobalVariableRequest = route.request().postDataJSON();
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
-        body: JSON.stringify(savedGlobalVariables),
+        body: JSON.stringify({
+          projectId: 'e2e-project',
+          persistenceRevision: 8,
+          globalVariables: savedGlobalVariableRequest.schema,
+        }),
       });
     });
     await page.route('**/api/flows/preview-node', async route => {
@@ -742,6 +746,7 @@ test.describe('Node Preview Inspector flag', () => {
         id: 'e2e-project',
         name: 'E2E Project',
         description: '',
+        persistenceRevision: 7,
         flow: flowCanvas.serialize(),
         globalVariables: {
           schemaVersion: '1.0',
@@ -776,9 +781,10 @@ test.describe('Node Preview Inspector flag', () => {
     await expect(page.locator('.gv-choice-overlay')).toContainText('Score Variable');
     await page.locator('.gv-source-option', { hasText: 'Score Variable' }).click();
 
-    await expect.poll(() => savedGlobalVariables).not.toBeNull();
-    expect(savedGlobalVariables.sourceBindings).toHaveLength(1);
-    expect(savedGlobalVariables.sourceBindings[0]).toMatchObject({
+    await expect.poll(() => savedGlobalVariableRequest).not.toBeNull();
+    expect(savedGlobalVariableRequest.expectedPersistenceRevision).toBe(7);
+    expect(savedGlobalVariableRequest.schema.sourceBindings).toHaveLength(1);
+    expect(savedGlobalVariableRequest.schema.sourceBindings[0]).toMatchObject({
       variableId: 'var-score',
       operatorId: nodeId.toLowerCase(),
       outputPortId,

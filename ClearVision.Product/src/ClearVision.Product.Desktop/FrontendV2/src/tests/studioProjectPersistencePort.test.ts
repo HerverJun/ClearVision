@@ -78,7 +78,7 @@ describe('StudioProjectPersistencePort', () => {
     expect(fixture.persistencePort.getSnapshot().error).toBe('');
   });
 
-  it('saves project metadata, flow and global variables through one project PUT with expected persistence revision', async () => {
+  it('saves project metadata and flow without resubmitting authoritative global variables', async () => {
     const fixture = createPersistenceFixture();
     await openProject(fixture, createProjectDto('project-a', 5));
     patchThreshold(fixture.flowPort, 'project-a', 'node-a', 21);
@@ -94,10 +94,10 @@ describe('StudioProjectPersistencePort', () => {
     expect(payload.name).toBe('Project project-a');
     expect(payload.description).toBe('Description project-a');
     expect(payload.expectedPersistenceRevision).toBe(5);
-    expect(payload.globalVariables).toEqual(createGlobalVariablesFixture());
+    expect(payload).not.toHaveProperty('globalVariables');
     expect(getParameterValue(payload.flow, 'node-a', 'Threshold')).toBe(21);
 
-    put.deferred.resolve(createProjectDto('project-a', 6, payload.flow, payload.globalVariables));
+    put.deferred.resolve(createProjectDto('project-a', 6, payload.flow));
     const saved = await saveTask;
 
     expect(saved.disposition).toBe('accepted');
@@ -146,7 +146,7 @@ describe('StudioProjectPersistencePort', () => {
     const saveTask = fixture.persistencePort.save();
     const payload = putCall(fixture.http, 0).data as ProjectSavePayloadFixture;
     patchThreshold(fixture.flowPort, 'project-a', 'node-a', 22);
-    putCall(fixture.http, 0).deferred.resolve(createProjectDto('project-a', 6, payload.flow, payload.globalVariables));
+    putCall(fixture.http, 0).deferred.resolve(createProjectDto('project-a', 6, payload.flow));
     const result = await saveTask;
 
     expect(result.disposition).toBe('accepted');
@@ -227,7 +227,6 @@ interface ProjectSavePayloadFixture {
   readonly name: string;
   readonly description: string | null;
   readonly flow: unknown;
-  readonly globalVariables: unknown;
   readonly expectedPersistenceRevision: number;
 }
 

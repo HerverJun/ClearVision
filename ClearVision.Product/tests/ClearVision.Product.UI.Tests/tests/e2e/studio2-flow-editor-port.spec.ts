@@ -151,7 +151,7 @@ test('Studio 2.0 Flow Editor Port commits a real node parameter draft and reject
   await expect(thresholdInput).toHaveValue('21');
 });
 
-test('Studio 2.0 Project Persistence Port saves through one project PUT with backend revision', async ({ page }) => {
+test('Studio 2.0 Project Persistence Port saves metadata and flow without resubmitting schema', async ({ page }) => {
   const apiCalls: ProjectApiCall[] = [];
   await page.route('**/api/projects/project-a', async (route) => {
     const request = route.request();
@@ -176,8 +176,7 @@ test('Studio 2.0 Project Persistence Port saves through one project PUT with bac
         contentType: 'application/json',
         body: JSON.stringify({
           ...createProjectApiFixture(2),
-          flow: body.flow,
-          globalVariables: body.globalVariables
+          flow: body.flow
         })
       });
       return;
@@ -277,8 +276,8 @@ test('Studio 2.0 Project Persistence Port saves through one project PUT with bac
   }
 
   expect(projectPut.body.expectedPersistenceRevision).toBe(1);
+  expect(projectPut.body).not.toHaveProperty('globalVariables');
   expect(getParameterValueFromFlow(projectPut.body.flow, 'node-a', 'Threshold')).toBe(21);
-  expect(projectPut.body.globalVariables).toEqual(createGlobalVariablesFixture());
 });
 
 test('legacy page remains flag-off and does not mount the Studio 2.0 Vue root', async ({ page }) => {
@@ -561,7 +560,6 @@ interface ProjectSavePayload {
   readonly description: string | null;
   readonly expectedPersistenceRevision: number;
   readonly flow: ProjectFlowFixture;
-  readonly globalVariables: ProjectGlobalVariablesFixture;
 }
 
 interface ProjectFlowFixture {

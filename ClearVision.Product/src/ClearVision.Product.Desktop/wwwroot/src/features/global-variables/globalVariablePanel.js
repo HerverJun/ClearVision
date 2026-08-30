@@ -1175,7 +1175,16 @@ export default class GlobalVariablePanel {
             }
             return result;
         } catch (error) {
-            if (this.isVersionConflict(error)) {
+            if (this.isPersistenceConflict(error)) {
+                this.syncSchemaToProject();
+                const refreshSucceeded = error?.authoritativeProjectRefreshed === true;
+                this.errorMessage = refreshSucceeded
+                    ? '工程已被其他保存更新。已刷新工程版本并保留当前变量草稿，请检查后重试。'
+                    : '工程已被其他保存更新。工程刷新失败，当前变量草稿仍保留，请稍后重试。';
+                await Promise.allSettled([
+                    this.refreshValues({ requestId: this.requestSerial, render: false })
+                ]);
+            } else if (this.isVersionConflict(error)) {
                 this.errorMessage = '当前变量值已被其他操作更新。正在重新获取当前值。';
                 const valuesResult = await Promise.allSettled([
                     this.refreshValues({ requestId: this.requestSerial, render: false })
@@ -1808,6 +1817,12 @@ export default class GlobalVariablePanel {
             message.includes('conflict') ||
             message.includes('currently running') ||
             message.includes('正在运行');
+    }
+
+    isPersistenceConflict(error) {
+        const status = Number(error?.status ?? error?.statusCode);
+        const code = String(error?.payload?.code ?? error?.payload?.Code ?? '').toUpperCase();
+        return status === 409 && code === 'PSV011';
     }
 
     isVersionConflict(error) {

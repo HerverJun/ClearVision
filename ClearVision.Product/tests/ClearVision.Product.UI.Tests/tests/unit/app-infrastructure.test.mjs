@@ -578,7 +578,7 @@ test('project manager sends persistence revision and flow name through legacy fl
   assert.equal(getCurrentProject().persistenceRevision, 6);
 });
 
-test('project manager includes changed global variables in aggregate save payload', async (t) => {
+test('project manager saves changed global variables through a dedicated revisioned patch', async (t) => {
   const originalPut = httpClient.put;
   const previousDocument = globalThis.document;
   const schema = {
@@ -595,6 +595,7 @@ test('project manager includes changed global variables in aggregate save payloa
     id: 'project-schema-save',
     name: 'Schema Save',
     description: '',
+    persistenceRevision: 4,
     flow: { operators: [], connections: [] },
     globalVariables: schema
   };
@@ -623,14 +624,33 @@ test('project manager includes changed global variables in aggregate save payloa
   setCurrentProject(project);
   httpClient.put = async (url, body) => {
     puts.push({ url, body });
-    return { ...project, globalVariables: changedSchema };
+    if (url.endsWith('/global-variables')) {
+      return { projectId: project.id, persistenceRevision: 7, globalVariables: changedSchema };
+    }
+    if (url.endsWith('/flow')) {
+      return { persistenceRevision: 6, flow: project.flow };
+    }
+
+    return { ...project, persistenceRevision: 5 };
   };
 
   await projectManager.saveProject({ ...project, globalVariables: changedSchema });
 
-  assert.equal(puts[0].url, '/projects/project-schema-save');
-  assert.equal(puts[0].body.globalVariables, changedSchema);
-  assert.equal(getCurrentProject().globalVariables, changedSchema);
+  assert.deepEqual(puts.map(call => call.url), [
+    '/projects/project-schema-save',
+    '/projects/project-schema-save/flow',
+    '/projects/project-schema-save/global-variables'
+  ]);
+  assert.equal(Object.hasOwn(puts[0].body, 'globalVariables'), false);
+  assert.equal(puts[0].body.expectedPersistenceRevision, 4);
+  assert.equal(puts[1].body.expectedPersistenceRevision, 5);
+  assert.equal(puts[2].body.expectedPersistenceRevision, 6);
+  assert.equal(puts[2].body.schema.targetBindings[0].id, 'bind-target');
+  assert.equal(Object.hasOwn(puts[2].body.schema, 'name'), false);
+  assert.equal(Object.hasOwn(puts[2].body.schema, 'description'), false);
+  assert.equal(Object.hasOwn(puts[2].body.schema, 'flow'), false);
+  assert.equal(getCurrentProject().globalVariables.targetBindings[0].id, 'bind-target');
+  assert.equal(getCurrentProject().persistenceRevision, 7);
 });
 
 test('project manager global variable save uses schema endpoint without flow payload', async (t) => {
@@ -640,6 +660,7 @@ test('project manager global variable save uses schema endpoint without flow pay
     id: 'project-schema-only',
     name: 'Schema Only',
     description: '',
+    persistenceRevision: 7,
     flow: { operators: [{ id: 'node-1' }], connections: [] },
     globalVariables: {
       schemaVersion: '1.0',
@@ -677,7 +698,7 @@ test('project manager global variable save uses schema endpoint without flow pay
   setCurrentProject(project);
   httpClient.put = async (url, body) => {
     puts.push({ url, body });
-    return body;
+    return { projectId: project.id, persistenceRevision: 8, globalVariables: body.schema };
   };
 
   const saved = await projectManager.saveGlobalVariables(changedSchema);
@@ -685,13 +706,87 @@ test('project manager global variable save uses schema endpoint without flow pay
   assert.equal(puts.length, 1);
   assert.equal(puts[0].url, '/projects/project-schema-only/global-variables');
   assert.equal(Object.hasOwn(puts[0].body, 'flow'), false);
-  assert.equal(puts[0].body.variables[0].id, 'var-count');
-  assert.equal(puts[0].body.targetBindings[0].id, 'bind-target');
+  assert.equal(puts[0].body.expectedPersistenceRevision, 7);
+  assert.equal(puts[0].body.schema.variables[0].id, 'var-count');
+  assert.equal(puts[0].body.schema.targetBindings[0].id, 'bind-target');
   assert.equal(saved.targetBindings[0].id, 'bind-target');
   assert.equal(getCurrentProject().flow, project.flow);
   assert.equal(getCurrentProject().globalVariables.targetBindings[0].id, 'bind-target');
   assert.equal(getProjectList().find(item => item.id === project.id).globalVariables.targetBindings[0].id, 'bind-target');
   assert.equal(projectManager.savedGlobalVariablesSignature, JSON.stringify(saved));
+  assert.equal(getCurrentProject().persistenceRevision, 8);
+});
+
+test('project manager refreshes authoritative revision and retains schema draft after PSV011', async (t) => {
+  const originalPut = httpClient.put;
+  const originalGet = httpClient.get;
+  const previousDocument = globalThis.document;
+  const project = {
+    id: 'project-schema-conflict',
+    name: 'Before Conflict',
+    description: 'before',
+    persistenceRevision: 3,
+    flow: { operators: [{ id: 'node-before' }], connections: [] },
+    globalVariables: {
+      schemaVersion: '1.0',
+      variables: [{ id: 'var-count', name: 'judge.count', valueType: 'Int64', initialValue: '1' }],
+      sourceBindings: [],
+      targetBindings: []
+    }
+  };
+  const draftSchema = {
+    ...project.globalVariables,
+    targetBindings: [{ id: 'draft-binding', variableId: 'var-count', operatorId: 'node-before', parameterId: 'p-1' }]
+  };
+  const authoritativeSchema = {
+    ...project.globalVariables,
+    variables: [{ ...project.globalVariables.variables[0], displayName: 'Server Value' }]
+  };
+  const conflict = Object.assign(new Error('stale project save'), {
+    status: 409,
+    payload: { code: 'PSV011', error: 'Refresh and retry.' }
+  });
+
+  t.after(() => {
+    httpClient.put = originalPut;
+    httpClient.get = originalGet;
+    projectManager.currentProject = null;
+    projectManager.unsavedChanges = false;
+    projectManager.savedGlobalVariablesSignature = '';
+    projectManager.forgetProjectFromCaches(project.id);
+    setCurrentProject(null);
+    if (previousDocument === undefined) {
+      delete globalThis.document;
+    } else {
+      globalThis.document = previousDocument;
+    }
+  });
+
+  globalThis.document = { title: '', getElementById() { return null; } };
+  projectManager.currentProject = project;
+  projectManager.rememberGlobalVariableBaseline(project);
+  setCurrentProject(project);
+  httpClient.put = async () => { throw conflict; };
+  httpClient.get = async (url) => {
+    assert.equal(url, '/projects/project-schema-conflict');
+    return {
+      id: project.id,
+      name: 'Authoritative Name',
+      description: 'authoritative',
+      persistenceRevision: 4,
+      flow: { operators: [{ id: 'server-node' }], connections: [] },
+      globalVariables: authoritativeSchema
+    };
+  };
+
+  await assert.rejects(projectManager.saveGlobalVariables(draftSchema), error => error === conflict);
+
+  assert.equal(conflict.authoritativeProjectRefreshed, true);
+  assert.equal(projectManager.currentProject.persistenceRevision, 4);
+  assert.equal(projectManager.currentProject.name, 'Authoritative Name');
+  assert.equal(projectManager.currentProject.flow.operators[0].id, 'server-node');
+  assert.equal(projectManager.currentProject.globalVariables.targetBindings[0].id, 'draft-binding');
+  assert.equal(projectManager.unsavedChanges, true);
 });
 
 test('project manager drops delayed global variable save application after project switch', async (t) => {
@@ -700,6 +795,7 @@ test('project manager drops delayed global variable save application after proje
   const projectA = {
     id: 'project-save-a',
     name: 'Project A',
+    persistenceRevision: 2,
     flow: { operators: [{ id: 'node-a' }], connections: [] },
     globalVariables: {
       schemaVersion: '1.0',
@@ -711,6 +807,7 @@ test('project manager drops delayed global variable save application after proje
   const projectB = {
     id: 'project-save-b',
     name: 'Project B',
+    persistenceRevision: 9,
     flow: { operators: [{ id: 'node-b' }], connections: [] },
     globalVariables: {
       schemaVersion: '1.0',
@@ -766,14 +863,15 @@ test('project manager drops delayed global variable save application after proje
   await Promise.resolve();
   assert.equal(puts.length, 1);
   assert.equal(puts[0].url, '/projects/project-save-a/global-variables');
-  assert.equal(puts[0].body.sourceBindings[0].id, 'source-a');
+  assert.equal(puts[0].body.expectedPersistenceRevision, 2);
+  assert.equal(puts[0].body.schema.sourceBindings[0].id, 'source-a');
 
   projectManager.currentProject = projectB;
   projectManager.unsavedChanges = true;
   projectManager.rememberGlobalVariableBaseline(projectB);
   projectManager.rememberProjectInCaches(projectB);
   setCurrentProject(projectB);
-  resolvePut(savedSchemaA);
+  resolvePut({ projectId: projectA.id, persistenceRevision: 3, globalVariables: savedSchemaA });
 
   const saved = await savePromise;
   const cachedProjectB = getProjectList().find(project => project.id === projectB.id);

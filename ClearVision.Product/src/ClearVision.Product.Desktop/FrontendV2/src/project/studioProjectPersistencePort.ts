@@ -186,8 +186,7 @@ class StudioProjectPersistencePortAdapter implements StudioProjectPersistencePor
       flowRevision: flowSnapshot.flowRevision,
       flow: deepClone(flowSnapshot.flow),
       name: current.name,
-      description: current.description,
-      globalVariables: deepClone(current.globalVariables)
+      description: current.description
     };
     const controller = new AbortController();
     this.saveControllersByProject.set(capture.projectId, controller);
@@ -206,7 +205,6 @@ class StudioProjectPersistencePortAdapter implements StudioProjectPersistencePor
           name: capture.name,
           description: capture.description,
           flow: capture.flow,
-          globalVariables: capture.globalVariables,
           expectedPersistenceRevision: capture.persistenceRevision
         },
         { signal: controller.signal }
