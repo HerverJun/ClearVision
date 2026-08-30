@@ -57,6 +57,15 @@ public sealed class VisionAgentRunRecoveryReconciliationService : IHostedService
             return;
         }
 
+        if (string.IsNullOrWhiteSpace(replay.Summary.OwnerHash))
+        {
+            Microsoft.Extensions.Logging.LoggerExtensions.LogWarning(
+                _logger,
+                "Skipped ownerless AgentRun recovery. RunId={RunId}",
+                runId);
+            return;
+        }
+
         var terminal = replay.Events
             .OrderBy(evt => evt.Sequence)
             .LastOrDefault(IsRunTerminalEvent);
@@ -71,10 +80,24 @@ public sealed class VisionAgentRunRecoveryReconciliationService : IHostedService
         var sessionId = FirstNonBlank(
             intent?.SessionId,
             ResolveSessionIdFromEvents(replay),
-            ResolveSessionIdFromWorkspace(runId, runType));
+            ResolveSessionIdFromWorkspace(runId, runType, replay.Summary.OwnerHash));
+        var recoverySession = string.IsNullOrWhiteSpace(sessionId)
+            ? null
+            : _conversationService.GetSessionForRecovery(sessionId);
+        if (recoverySession != null &&
+            !string.Equals(recoverySession.OwnerHash, replay.Summary.OwnerHash, StringComparison.Ordinal))
+        {
+            Microsoft.Extensions.Logging.LoggerExtensions.LogWarning(
+                _logger,
+                "Skipped AgentRun recovery with a mismatched conversation owner. RunId={RunId}, SessionId={SessionId}",
+                runId,
+                sessionId);
+            return;
+        }
+
         var session = string.IsNullOrWhiteSpace(sessionId)
             ? null
-            : _conversationService.GetSession(sessionId);
+            : _conversationService.GetSession(replay.Summary.OwnerHash, sessionId);
         var workspace = session?.WorkspaceSnapshot;
 
         if (terminal != null)
@@ -150,7 +173,7 @@ public sealed class VisionAgentRunRecoveryReconciliationService : IHostedService
             return false;
         }
 
-        var projected = _conversationService.TryUpdateWorkspaceSnapshot(intent.SessionId, update);
+        var projected = TryUpdateOwnedRecovery(intent.SessionId, update);
         if (!projected.Success)
         {
             ThrowIfPrimaryStoreFailed(projected, "plan terminal intent recovery", replay.Summary.RunId, intent.SessionId);
@@ -227,14 +250,14 @@ public sealed class VisionAgentRunRecoveryReconciliationService : IHostedService
             CreatedAt = terminal.Timestamp,
             MetadataOnly = true
         };
-        var workspace = _conversationService.GetSession(sessionId)?.WorkspaceSnapshot;
+        var workspace = _conversationService.GetSessionForRecovery(sessionId)?.WorkspaceSnapshot;
         var update = BuildPlanWorkspaceUpdate(terminal.RunId, terminalStatus, updateIntent, planEvent, workspace);
         if (update == null)
         {
             return;
         }
 
-        var projected = _conversationService.TryUpdateWorkspaceSnapshot(sessionId, update);
+        var projected = TryUpdateOwnedRecovery(sessionId, update);
         if (projected.Success)
         {
             ThrowIfPrimaryStoreFailed(projected, "plan terminal recovery", terminal.RunId, sessionId);
@@ -311,7 +334,7 @@ public sealed class VisionAgentRunRecoveryReconciliationService : IHostedService
             return false;
         }
 
-        var session = _conversationService.GetSession(sessionId);
+        var session = _conversationService.GetSessionForRecovery(sessionId);
         return session?.MutationReceipts.Any(receipt =>
             string.Equals(receipt.MutationId, mutationId, StringComparison.OrdinalIgnoreCase) &&
             string.Equals(receipt.PayloadFingerprint, payloadFingerprint, StringComparison.Ordinal)) == true;
@@ -323,7 +346,7 @@ public sealed class VisionAgentRunRecoveryReconciliationService : IHostedService
             intent.TargetStatus,
             intent.SessionId,
             runId,
-            _conversationService.GetSession(intent.SessionId)?.WorkspaceSnapshot,
+            _conversationService.GetSessionForRecovery(intent.SessionId)?.WorkspaceSnapshot,
             "durable_terminal_intent_recovered"));
     }
 
@@ -364,7 +387,7 @@ public sealed class VisionAgentRunRecoveryReconciliationService : IHostedService
             return;
         }
 
-        var latest = _conversationService.GetSession(sessionId);
+        var latest = _conversationService.GetSessionForRecovery(sessionId);
         if (latest?.WorkspaceSnapshot == null)
         {
             return;
@@ -386,7 +409,7 @@ public sealed class VisionAgentRunRecoveryReconciliationService : IHostedService
             BuildRunId = string.Equals(runType, "build", StringComparison.OrdinalIgnoreCase) ? runId : null,
             BuildRunStatus = string.Equals(runType, "build", StringComparison.OrdinalIgnoreCase) ? status : null
         };
-        var result = _conversationService.TryUpdateWorkspaceSnapshot(sessionId, update);
+        var result = TryUpdateOwnedRecovery(sessionId, update);
         if (result.Success)
         {
             ThrowIfPrimaryStoreFailed(result, "recovery conflict", runId, sessionId);
@@ -395,7 +418,7 @@ public sealed class VisionAgentRunRecoveryReconciliationService : IHostedService
         }
 
         ThrowIfPrimaryStoreFailed(result, "recovery conflict", runId, sessionId);
-        var reread = _conversationService.GetSession(sessionId);
+        var reread = _conversationService.GetSessionForRecovery(sessionId);
         if (HasAppliedRecoveryConflict(reread, runId, runType, status))
         {
             LogRecoveryConflict(runId, sessionId, runType, status, "already_applied");
@@ -425,7 +448,7 @@ public sealed class VisionAgentRunRecoveryReconciliationService : IHostedService
             string.Equals(workspace.PlanRunId, runId, StringComparison.OrdinalIgnoreCase) &&
             !IsTerminalStatus(workspace.PlanRunStatus))
         {
-            var latest = _conversationService.GetSession(sessionId);
+            var latest = _conversationService.GetSessionForRecovery(sessionId);
             var latestWorkspace = latest?.WorkspaceSnapshot;
             if (latestWorkspace == null ||
                 !string.Equals(latestWorkspace.PlanRunId, runId, StringComparison.OrdinalIgnoreCase) ||
@@ -434,7 +457,7 @@ public sealed class VisionAgentRunRecoveryReconciliationService : IHostedService
                 return;
             }
 
-            var result = _conversationService.TryUpdateWorkspaceSnapshot(sessionId, new VisionAgentWorkspaceSnapshotUpdate
+            var result = TryUpdateOwnedRecovery(sessionId, new VisionAgentWorkspaceSnapshotUpdate
             {
                 ExpectedRevision = latestWorkspace.Revision,
                 ClientMutationId = $"plan-host-interrupted:{runId}",
@@ -449,7 +472,7 @@ public sealed class VisionAgentRunRecoveryReconciliationService : IHostedService
             string.Equals(workspace.BuildRunId, runId, StringComparison.OrdinalIgnoreCase) &&
             !IsTerminalStatus(workspace.BuildRunStatus))
         {
-            var latest = _conversationService.GetSession(sessionId);
+            var latest = _conversationService.GetSessionForRecovery(sessionId);
             var latestWorkspace = latest?.WorkspaceSnapshot;
             if (latestWorkspace == null ||
                 !string.Equals(latestWorkspace.BuildRunId, runId, StringComparison.OrdinalIgnoreCase) ||
@@ -458,7 +481,7 @@ public sealed class VisionAgentRunRecoveryReconciliationService : IHostedService
                 return;
             }
 
-            var result = _conversationService.TryUpdateWorkspaceSnapshot(sessionId, new VisionAgentWorkspaceSnapshotUpdate
+            var result = TryUpdateOwnedRecovery(sessionId, new VisionAgentWorkspaceSnapshotUpdate
             {
                 ExpectedRevision = latestWorkspace.Revision,
                 ClientMutationId = $"build-host-interrupted:{runId}",
@@ -483,7 +506,7 @@ public sealed class VisionAgentRunRecoveryReconciliationService : IHostedService
         }
 
         ThrowIfPrimaryStoreFailed(result, $"{runType} host interrupted recovery", runId, sessionId);
-        var latest = _conversationService.GetSession(sessionId)?.WorkspaceSnapshot;
+        var latest = _conversationService.GetSessionForRecovery(sessionId)?.WorkspaceSnapshot;
         if (string.Equals(runType, "plan", StringComparison.OrdinalIgnoreCase) &&
             latest != null &&
             string.Equals(latest.PlanRunId, runId, StringComparison.OrdinalIgnoreCase) &&
@@ -658,11 +681,17 @@ public sealed class VisionAgentRunRecoveryReconciliationService : IHostedService
                string.Equals(workspace.BuildRunStatus, terminalStatus, StringComparison.OrdinalIgnoreCase);
     }
 
-    private string ResolveSessionIdFromWorkspace(string runId, string runType)
+    private string ResolveSessionIdFromWorkspace(string runId, string runType, string ownerHash)
     {
-        foreach (var summary in _conversationService.ListSessions())
+        foreach (var summary in _conversationService.ListSessionsForRecovery())
         {
-            var session = _conversationService.GetSession(summary.SessionId);
+            var session = _conversationService.GetSessionForRecovery(summary.SessionId);
+            if (session == null ||
+                !string.Equals(session.OwnerHash, ownerHash, StringComparison.Ordinal))
+            {
+                continue;
+            }
+
             var workspace = session?.WorkspaceSnapshot;
             if (workspace == null)
             {
@@ -888,6 +917,27 @@ public sealed class VisionAgentRunRecoveryReconciliationService : IHostedService
         }
 
         return string.Empty;
+    }
+
+    private VisionAgentWorkspaceSnapshotMutationResult TryUpdateOwnedRecovery(
+        string sessionId,
+        VisionAgentWorkspaceSnapshotUpdate update)
+    {
+        var session = _conversationService.GetSessionForRecovery(sessionId);
+        if (session == null || string.IsNullOrWhiteSpace(session.OwnerHash))
+        {
+            return new VisionAgentWorkspaceSnapshotMutationResult
+            {
+                Success = false,
+                ErrorCode = "session_not_found",
+                PublicMessage = "Conversation session was not found."
+            };
+        }
+
+        return _conversationService.TryUpdateWorkspaceSnapshotForRecovery(
+            session.OwnerHash,
+            session.SessionId,
+            update);
     }
 
     private static string FirstNonBlank(params string?[] values)

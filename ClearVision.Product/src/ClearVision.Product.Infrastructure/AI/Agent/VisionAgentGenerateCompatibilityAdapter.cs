@@ -51,9 +51,13 @@ public sealed class VisionAgentGenerateCompatibilityAdapter : IVisionAgentGenera
         ArgumentNullException.ThrowIfNull(request);
         cancellationToken.ThrowIfCancellationRequested();
 
-        var session = _conversationService.GetOrCreateSession(request.SessionId);
+        var ownerHash = string.IsNullOrWhiteSpace(request.OwnerHash)
+            ? ConversationalFlowService.LegacyTrustedOwnerHash
+            : request.OwnerHash.Trim();
+        var session = _conversationService.GetOrCreateSession(ownerHash, request.SessionId);
         var planRequest = BuildPlanRequest(request, session);
-        var initialPersistence = _conversationService.TryUpdateWorkspaceSnapshot(
+        var initialPersistence = _conversationService.TryInitializeWorkspaceSnapshot(
+            ownerHash,
             session.SessionId,
             new VisionAgentWorkspaceSnapshotUpdate
             {
@@ -117,6 +121,7 @@ public sealed class VisionAgentGenerateCompatibilityAdapter : IVisionAgentGenera
 
         var canonicalPlan = NormalizePlanHash(plan);
         var planPersistence = _conversationService.TryUpdateWorkspaceSnapshot(
+            ownerHash,
             session.SessionId,
             new VisionAgentWorkspaceSnapshotUpdate
             {
@@ -156,6 +161,7 @@ public sealed class VisionAgentGenerateCompatibilityAdapter : IVisionAgentGenera
         // same user action continues directly into BuildRun.  The association must
         // use the revision created by this write, never the earlier Plan revision.
         var readinessPersistence = _conversationService.TryUpdateWorkspaceSnapshot(
+            ownerHash,
             session.SessionId,
             new VisionAgentWorkspaceSnapshotUpdate
             {
@@ -200,7 +206,8 @@ public sealed class VisionAgentGenerateCompatibilityAdapter : IVisionAgentGenera
                 planId = canonicalPlan.PlanId,
                 planHash = canonicalPlan.PlanHash,
                 metadataOnly = true
-            });
+            },
+            ownerHash);
         var runRequest = request with
         {
             AgentRunId = createResult.RunId,

@@ -55,7 +55,18 @@ public sealed class VisionAgentBuildRunService : IVisionAgentBuildRunService
             return new VisionAgentWorkspaceSnapshotMutationResult { Success = true };
         }
 
-        return _conversationService.TryUpdateWorkspaceSnapshot(sessionId, new VisionAgentWorkspaceSnapshotUpdate
+        var ownerHash = ResolveOwnerHash(request);
+        if (!_streamService.IsRunOwner(runId, ownerHash))
+        {
+            return new VisionAgentWorkspaceSnapshotMutationResult
+            {
+                Success = false,
+                ErrorCode = "session_not_found",
+                PublicMessage = "Conversation session was not found."
+            };
+        }
+
+        return _conversationService.TryUpdateWorkspaceSnapshot(ownerHash, sessionId, new VisionAgentWorkspaceSnapshotUpdate
         {
             ExpectedRevision = build.WorkspaceExpectedRevision,
             RequireExpectedRevisionWhenWorkspaceExists = true,
@@ -449,7 +460,9 @@ public sealed class VisionAgentBuildRunService : IVisionAgentBuildRunService
             return BuildAssociationProjectionBasis.Empty;
         }
 
-        var workspace = _conversationService.GetSession(sessionId)?.WorkspaceSnapshot;
+        var workspace = _conversationService.GetSession(
+            ResolveOwnerHash(request),
+            sessionId)?.WorkspaceSnapshot;
         if (workspace == null ||
             !string.Equals(workspace.BuildRunId, runId, StringComparison.OrdinalIgnoreCase))
         {
@@ -694,6 +707,11 @@ public sealed class VisionAgentBuildRunService : IVisionAgentBuildRunService
             buildFromPlan?.PlanSnapshot?.PlanHash,
             buildFromPlan?.PlanHash);
     }
+
+    private static string ResolveOwnerHash(AiFlowGenerationRequest request) =>
+        string.IsNullOrWhiteSpace(request.OwnerHash)
+            ? ConversationalFlowService.LegacyTrustedOwnerHash
+            : request.OwnerHash.Trim();
 
     private static string FirstNonBlank(params string?[] values)
     {

@@ -2,7 +2,9 @@ using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
+using ClearVision.Product.Application.Security;
 using ClearVision.Product.Core.DTOs;
 using ClearVision.Product.Core.Services;
 using ClearVision.Product.Infrastructure.AI;
@@ -118,6 +120,7 @@ public static class AgentRunEndpoints
 
     private static async Task<IResult> HandleCreatePlanAsync(
         VisionAgentPlanModeRequest request,
+        HttpContext context,
         IConversationalFlowService conversationService,
         IVisionAgentOrchestrator orchestrator,
         CancellationToken ct)
@@ -130,9 +133,18 @@ public static class AgentRunEndpoints
             });
         }
 
-        var session = conversationService.GetOrCreateSession(request.SessionId);
+        var ownerHash = ResolveCurrentOwnerHash(context);
+        ConversationSession session;
+        try
+        {
+            session = conversationService.GetOrCreateSession(ownerHash, request.SessionId);
+        }
+        catch (ConversationSessionAccessException)
+        {
+            return Results.NotFound(new { errorCode = "not_found", publicMessage = "Session not found." });
+        }
         request = request with { SessionId = session.SessionId };
-        var initialPersistence = conversationService.TryUpdateWorkspaceSnapshot(session.SessionId, new VisionAgentWorkspaceSnapshotUpdate
+        var initialPersistence = conversationService.TryInitializeWorkspaceSnapshot(ownerHash, session.SessionId, new VisionAgentWorkspaceSnapshotUpdate
         {
             LifecycleState = "planning",
             RequirementMode = request.RequirementMode,
@@ -166,7 +178,7 @@ public static class AgentRunEndpoints
         {
             return PlanningDeadlineExceeded(error);
         }
-        var terminalPersistence = conversationService.TryUpdateWorkspaceSnapshot(session.SessionId, new VisionAgentWorkspaceSnapshotUpdate
+        var terminalPersistence = conversationService.TryUpdateWorkspaceSnapshot(ownerHash, session.SessionId, new VisionAgentWorkspaceSnapshotUpdate
         {
             LifecycleState = result.CanBuild ? "plan_ready" : "plan_blocked",
             PendingPlanSnapshot = BuildReplaySafePlanResult(result),
@@ -204,6 +216,7 @@ public static class AgentRunEndpoints
     private static IResult HandleUpdateWorkspaceSnapshot(
         string sessionId,
         VisionAgentWorkspaceSnapshotDeltaRequest request,
+        HttpContext context,
         IConversationalFlowService conversationService)
     {
         if (string.IsNullOrWhiteSpace(sessionId))
@@ -211,7 +224,10 @@ public static class AgentRunEndpoints
             return Results.BadRequest(new { error = "sessionId is required." });
         }
 
-        var result = conversationService.TryUpdateWorkspaceSnapshot(sessionId, new VisionAgentWorkspaceSnapshotUpdate
+        var result = conversationService.TryUpdateWorkspaceSnapshot(
+            ResolveCurrentOwnerHash(context),
+            sessionId,
+            new VisionAgentWorkspaceSnapshotUpdate
         {
             ExpectedRevision = request.ExpectedRevision,
             ClientMutationId = request.ClientMutationId,
@@ -230,6 +246,11 @@ public static class AgentRunEndpoints
             PlanAcceptedRecommendedDefaults = request.PlanAcceptedRecommendedDefaults,
             SubmittedBuildFingerprint = request.SubmittedBuildFingerprint
         });
+
+        if (string.Equals(result.ErrorCode, "session_not_found", StringComparison.Ordinal))
+        {
+            return Results.NotFound(new { errorCode = "not_found", publicMessage = "Session not found." });
+        }
 
         if (result.Conflict)
         {
@@ -258,15 +279,27 @@ public static class AgentRunEndpoints
             }));
         }
 
-        var session = conversationService.GetOrCreateSession(request.SessionId);
+        var ownerHash = ResolveCurrentOwnerHash(context);
+        ConversationSession session;
+        try
+        {
+            session = conversationService.GetOrCreateSession(ownerHash, request.SessionId);
+        }
+        catch (ConversationSessionAccessException)
+        {
+            return Task.FromResult<IResult>(Results.NotFound(new
+            {
+                errorCode = "not_found",
+                publicMessage = "Session not found."
+            }));
+        }
         request = request with { SessionId = session.SessionId };
 
-        var ownerHash = ResolveCurrentOwnerHash(context);
         var createResult = streamService.CreateRun(
             request.Description,
             BuildPlanCreatePayload(request),
             ownerHash);
-        var initialPersistence = conversationService.TryUpdateWorkspaceSnapshot(session.SessionId, new VisionAgentWorkspaceSnapshotUpdate
+        var initialPersistence = conversationService.TryInitializeWorkspaceSnapshot(ownerHash, session.SessionId, new VisionAgentWorkspaceSnapshotUpdate
         {
             ClientMutationId = $"plan-start:{createResult.RunId}",
             LifecycleState = "planning",
@@ -331,6 +364,7 @@ public static class AgentRunEndpoints
             await RunCreatePlanAsync(
                 createResult.RunId,
                 request,
+                ownerHash,
                 scopeFactory,
                 loggerFactory.CreateLogger("AgentRunPlanMode"));
         });
@@ -379,12 +413,38 @@ public static class AgentRunEndpoints
             }, statusCode: StatusCodes.Status400BadRequest));
         }
 
-        var sessionId = request.BuildFromPlan == null
-            ? conversationService.GetOrCreateSession(request.SessionId).SessionId
-            : NormalizeAgentRunSessionId(request.SessionId);
-        request = request with { SessionId = sessionId };
-
         var ownerHash = ResolveCurrentOwnerHash(context);
+        string sessionId;
+        try
+        {
+            if (request.BuildFromPlan == null)
+            {
+                sessionId = conversationService.GetOrCreateSession(ownerHash, request.SessionId).SessionId;
+            }
+            else
+            {
+                sessionId = NormalizeAgentRunSessionId(request.SessionId);
+                if (conversationService.GetSession(ownerHash, sessionId) == null)
+                {
+                    return Task.FromResult<IResult>(Results.NotFound(new
+                    {
+                        errorCode = "not_found",
+                        publicMessage = "Session not found."
+                    }));
+                }
+            }
+        }
+        catch (ConversationSessionAccessException)
+        {
+            return Task.FromResult<IResult>(Results.NotFound(new
+            {
+                errorCode = "not_found",
+                publicMessage = "Session not found."
+            }));
+        }
+
+        request = request with { SessionId = sessionId, OwnerHash = ownerHash };
+
         var createResult = streamService.CreateRun(
             request.Description,
             BuildCreatePayload(request),
@@ -451,6 +511,7 @@ public static class AgentRunEndpoints
         else
         {
             var beginResult = conversationService.TryBeginAgentRun(
+                ownerHash,
                 sessionId,
                 createResult.RunId,
                 VisionAgentRunKindResolver.Build,
@@ -537,7 +598,7 @@ public static class AgentRunEndpoints
         }
 
         return streamService.IsRunOwner(runId, ResolveCurrentOwnerHash(context))
-            ? Results.Ok(replay)
+            ? Results.Ok(ProjectPublicReplay(replay))
             : Results.StatusCode(StatusCodes.Status403Forbidden);
     }
 
@@ -548,7 +609,43 @@ public static class AgentRunEndpoints
         var replay = streamService.ReplayLatest(ResolveCurrentOwnerHash(context));
         return replay == null
             ? Results.NotFound(new { error = "No Agent run replay is available." })
-            : Results.Ok(replay);
+            : Results.Ok(ProjectPublicReplay(replay));
+    }
+
+    private static object ProjectPublicReplay(AgentRunReplayResult replay) => new
+    {
+        summary = ProjectPublicSummary(replay.Summary),
+        replay.Events,
+        replay.Snapshot,
+        replay.Diagnostics
+    };
+
+    private static object? ProjectPublicSummary(AgentRunSummary? summary)
+    {
+        if (summary == null)
+        {
+            return null;
+        }
+
+        return new
+        {
+            summary.RunId,
+            summary.CreatedAt,
+            summary.UpdatedAt,
+            summary.Status,
+            summary.Title,
+            summary.Summary,
+            summary.FirstFixRecommendation,
+            summary.LastSequence,
+            summary.EventCount,
+            summary.DuplicateEventCount,
+            summary.DroppedEventCount,
+            summary.StaleEventCount,
+            summary.TerminalIntent,
+            summary.MetadataOnly,
+            summary.RedactionPass,
+            summary.Payload
+        };
     }
 
     private static IResult HandleCancelRun(
@@ -563,7 +660,8 @@ public static class AgentRunEndpoints
             return Results.NotFound(new { error = "Agent run not found." });
         }
 
-        if (!streamService.IsRunOwner(runId, ResolveCurrentOwnerHash(context)))
+        var ownerHash = ResolveCurrentOwnerHash(context);
+        if (!streamService.IsRunOwner(runId, ownerHash))
         {
             return Results.StatusCode(StatusCodes.Status403Forbidden);
         }
@@ -589,7 +687,7 @@ public static class AgentRunEndpoints
             {
                 var terminalUpdate = new VisionAgentWorkspaceSnapshotUpdate
                 {
-                    ExpectedRevision = conversationService.GetSession(sessionId)?.WorkspaceSnapshot?.Revision,
+                    ExpectedRevision = conversationService.GetSession(ownerHash, sessionId)?.WorkspaceSnapshot?.Revision,
                     ClientMutationId = BuildPlanTerminalMutationId(runId, AgentRunEventStatuses.Cancelled),
                     LifecycleState = "plan_cancelled",
                     PlanRunId = runId,
@@ -605,7 +703,7 @@ public static class AgentRunEndpoints
                     terminalUpdate,
                     "plan_cancelled",
                     reservation);
-                var terminalPersistence = conversationService.TryUpdateWorkspaceSnapshot(sessionId, terminalUpdate);
+                var terminalPersistence = conversationService.TryUpdateWorkspaceSnapshot(ownerHash, sessionId, terminalUpdate);
                 finalWorkspaceSnapshot = terminalPersistence.Snapshot;
                 finalPersistenceStatus = terminalPersistence.PersistenceStatus;
                 if (!terminalPersistence.Success)
@@ -632,7 +730,7 @@ public static class AgentRunEndpoints
             {
                 runId,
                 cancelled = planCancelled != null,
-                summary = planReplay?.Summary
+                summary = ProjectPublicSummary(planReplay?.Summary)
             });
         }
 
@@ -648,7 +746,7 @@ public static class AgentRunEndpoints
         {
             runId,
             cancelled = cancelled != null,
-            summary = replay?.Summary
+            summary = ProjectPublicSummary(replay?.Summary)
         });
     }
 
@@ -671,7 +769,7 @@ public static class AgentRunEndpoints
                 runId,
                 cancelled = true,
                 cancellationStatus = AgentRunEventStatuses.Cancelled,
-                summary = replay?.Summary,
+                summary = ProjectPublicSummary(replay?.Summary),
                 metadataOnly = true
             });
         }
@@ -685,7 +783,7 @@ public static class AgentRunEndpoints
                 cancelled = false,
                 cancellationStatus = reservation.CurrentStatus,
                 publicMessage = "Cancellation is already being committed.",
-                summary = replay?.Summary,
+                summary = ProjectPublicSummary(replay?.Summary),
                 metadataOnly = true
             });
         }
@@ -697,7 +795,7 @@ public static class AgentRunEndpoints
             terminalStatus,
             currentStatus = reservation.CurrentStatus,
             publicMessage = BuildCancelRejectedPublicMessage(terminalStatus),
-            summary = replay?.Summary,
+            summary = ProjectPublicSummary(replay?.Summary),
             metadataOnly = true
         }, statusCode: StatusCodes.Status409Conflict);
     }
@@ -825,6 +923,7 @@ public static class AgentRunEndpoints
     private static async Task RunCreatePlanAsync(
         string runId,
         VisionAgentPlanModeRequest request,
+        string ownerHash,
         IServiceScopeFactory scopeFactory,
         ILogger logger)
     {
@@ -879,7 +978,7 @@ public static class AgentRunEndpoints
                 {
                     var terminalUpdate = new VisionAgentWorkspaceSnapshotUpdate
                     {
-                        ExpectedRevision = ResolveWorkspaceRevision(conversationService, request.SessionId),
+                        ExpectedRevision = ResolveWorkspaceRevision(conversationService, ownerHash, request.SessionId),
                         ClientMutationId = BuildPlanTerminalMutationId(runId, AgentRunEventStatuses.Cancelled),
                         LifecycleState = "plan_cancelled",
                         PlanRunId = runId,
@@ -895,7 +994,7 @@ public static class AgentRunEndpoints
                         terminalUpdate,
                         "plan_cancelled",
                         cancelReservation);
-                    var terminalPersistence = conversationService.TryUpdateWorkspaceSnapshot(request.SessionId, terminalUpdate);
+                    var terminalPersistence = conversationService.TryUpdateWorkspaceSnapshot(ownerHash, request.SessionId, terminalUpdate);
                     cancelWorkspaceSnapshot = terminalPersistence.Snapshot;
                     cancelPersistenceStatus = terminalPersistence.PersistenceStatus;
                     if (!terminalPersistence.Success)
@@ -938,7 +1037,7 @@ public static class AgentRunEndpoints
             {
                 var terminalUpdate = new VisionAgentWorkspaceSnapshotUpdate
                 {
-                    ExpectedRevision = ResolveWorkspaceRevision(conversationService, request.SessionId),
+                    ExpectedRevision = ResolveWorkspaceRevision(conversationService, ownerHash, request.SessionId),
                     ClientMutationId = BuildPlanTerminalMutationId(runId, AgentRunEventStatuses.Completed),
                     LifecycleState = result.CanBuild ? "plan_ready" : "plan_blocked",
                     PendingPlanSnapshot = BuildReplaySafePlanResult(result),
@@ -958,7 +1057,7 @@ public static class AgentRunEndpoints
                     terminalUpdate,
                     BuildPlanTerminalIdentity(result),
                     completeReservation);
-                var terminalPersistence = conversationService.TryUpdateWorkspaceSnapshot(request.SessionId, terminalUpdate);
+                var terminalPersistence = conversationService.TryUpdateWorkspaceSnapshot(ownerHash, request.SessionId, terminalUpdate);
                 finalWorkspaceSnapshot = terminalPersistence.Snapshot;
                 finalPersistenceStatus = terminalPersistence.PersistenceStatus;
                 if (!terminalPersistence.Success)
@@ -1001,7 +1100,7 @@ public static class AgentRunEndpoints
             {
                 var terminalUpdate = new VisionAgentWorkspaceSnapshotUpdate
                 {
-                    ExpectedRevision = ResolveWorkspaceRevision(conversationService, request.SessionId),
+                    ExpectedRevision = ResolveWorkspaceRevision(conversationService, ownerHash, request.SessionId),
                     ClientMutationId = BuildPlanTerminalMutationId(runId, AgentRunEventStatuses.Cancelled),
                     LifecycleState = "plan_cancelled",
                     PlanRunId = runId,
@@ -1017,7 +1116,7 @@ public static class AgentRunEndpoints
                     terminalUpdate,
                     "plan_cancelled",
                     cancelReservation);
-                var terminalPersistence = conversationService.TryUpdateWorkspaceSnapshot(request.SessionId, terminalUpdate);
+                var terminalPersistence = conversationService.TryUpdateWorkspaceSnapshot(ownerHash, request.SessionId, terminalUpdate);
                 finalWorkspaceSnapshot = terminalPersistence.Snapshot;
                 finalPersistenceStatus = terminalPersistence.PersistenceStatus;
                 if (!terminalPersistence.Success)
@@ -1067,7 +1166,7 @@ public static class AgentRunEndpoints
             {
                 var terminalUpdate = new VisionAgentWorkspaceSnapshotUpdate
                 {
-                    ExpectedRevision = ResolveWorkspaceRevision(conversationService, request.SessionId),
+                    ExpectedRevision = ResolveWorkspaceRevision(conversationService, ownerHash, request.SessionId),
                     ClientMutationId = BuildPlanTerminalMutationId(runId, AgentRunEventStatuses.Failed),
                     LifecycleState = "plan_failed",
                     PlanRunId = runId,
@@ -1083,7 +1182,7 @@ public static class AgentRunEndpoints
                     terminalUpdate,
                     "plan_failed",
                     failReservation);
-                var terminalPersistence = conversationService.TryUpdateWorkspaceSnapshot(request.SessionId, terminalUpdate);
+                var terminalPersistence = conversationService.TryUpdateWorkspaceSnapshot(ownerHash, request.SessionId, terminalUpdate);
                 finalWorkspaceSnapshot = terminalPersistence.Snapshot;
                 finalPersistenceStatus = terminalPersistence.PersistenceStatus;
                 if (!terminalPersistence.Success)
@@ -1764,6 +1863,7 @@ public static class AgentRunEndpoints
 
     private static long? ResolveWorkspaceRevision(
         IConversationalFlowService conversationService,
+        string ownerHash,
         string? sessionId)
     {
         if (string.IsNullOrWhiteSpace(sessionId))
@@ -1771,7 +1871,7 @@ public static class AgentRunEndpoints
             return null;
         }
 
-        return conversationService.GetSession(sessionId)?.WorkspaceSnapshot?.Revision;
+        return conversationService.GetSession(ownerHash, sessionId)?.WorkspaceSnapshot?.Revision;
     }
 
     private static AgentRunTerminalIntentRecord? PreparePlanTerminalIntent(
@@ -1926,13 +2026,7 @@ public static class AgentRunEndpoints
     private static string ResolveCurrentOwnerHash(HttpContext context)
     {
         var userId = context.User.FindFirstValue(ClaimTypes.NameIdentifier);
-        if (string.IsNullOrWhiteSpace(userId))
-        {
-            return string.Empty;
-        }
-
-        var bytes = SHA256.HashData(Encoding.UTF8.GetBytes($"agent-run-owner:{userId.Trim()}"));
-        return "usr_" + Convert.ToHexString(bytes).ToLowerInvariant();
+        return AuthenticatedOwnerResolver.ResolveOwnerHash(userId);
     }
 
     private static string NormalizeAgentRunSessionId(string? sessionId) =>
@@ -1971,6 +2065,9 @@ public sealed record AgentRunCreateRequest
     public string? AgentGenerateFlowMode { get; init; }
     public bool RuntimePreviewConsent { get; init; }
 
+    [JsonIgnore]
+    public string OwnerHash { get; init; } = string.Empty;
+
     public AiFlowGenerationRequest ToGenerationRequest(string runId)
     {
         var buildIntent = string.IsNullOrWhiteSpace(BuildFromPlan?.BuildIntent)
@@ -1991,6 +2088,7 @@ public sealed record AgentRunCreateRequest
             DebugPrompt,
             templateSelection)
         {
+            OwnerHash = OwnerHash,
             RequirementMode = string.IsNullOrWhiteSpace(RequirementMode)
                 ? AiRequirementModes.Strict
                 : RequirementMode!,

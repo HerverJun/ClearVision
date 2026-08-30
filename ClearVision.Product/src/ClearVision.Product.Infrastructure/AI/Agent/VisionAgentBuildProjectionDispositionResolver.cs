@@ -123,7 +123,14 @@ public sealed class VisionAgentBuildProjectionDispositionResolver
             return false;
         }
 
-        var workspace = conversationService.GetSession(sessionId)?.WorkspaceSnapshot;
+        if (string.IsNullOrWhiteSpace(replay.Summary.OwnerHash))
+        {
+            return false;
+        }
+
+        var workspace = conversationService.GetSession(
+            replay.Summary.OwnerHash,
+            sessionId)?.WorkspaceSnapshot;
         return workspace != null &&
                string.Equals(workspace.BuildRunId, terminal.RunId, StringComparison.OrdinalIgnoreCase);
     }

@@ -6,6 +6,7 @@ using System.Collections.Concurrent;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using ClearVision.Product.Application.Security;
 using ClearVision.Product.Core.DTOs;
 using ClearVision.Product.Core.Services;
 using ClearVision.Product.Infrastructure.AI.AgentRun;
@@ -65,6 +66,7 @@ public sealed class ConversationTurnFailurePayload
 public sealed class ConversationSession
 {
     public string SessionId { get; set; } = string.Empty;
+    public string OwnerHash { get; set; } = string.Empty;
     public string? CurrentFlowJson { get; set; }
     public string? CurrentCanvasFlowJson { get; set; }
     public VisionAgentWorkspaceSnapshot? WorkspaceSnapshot { get; set; }
@@ -160,6 +162,14 @@ public sealed class VisionAgentWorkspaceSnapshotMutationResult
     public ConversationPersistenceStatus PersistenceStatus { get; set; } = new();
 }
 
+public sealed class ConversationSessionAccessException : Exception
+{
+    public ConversationSessionAccessException()
+        : base("Conversation session was not found.")
+    {
+    }
+}
+
 public enum ConversationSessionDeleteStatus
 {
     Deleted,
@@ -225,10 +235,18 @@ public sealed class ConversationContext
 
 public interface IConversationalFlowService
 {
+    ConversationSession GetOrCreateSession(string ownerHash, string? sessionId);
     ConversationSession GetOrCreateSession(string? sessionId);
     ConversationIntent DetectIntent(string userDescription, bool hasExistingFlow);
     ConversationContext PrepareContext(AiFlowGenerationRequest request);
     void RecordAssistantResponse(
+        string sessionId,
+        string assistantMessage,
+        string? latestFlowJson,
+        string? latestCanvasFlowJson = null,
+        ConversationTurnPayload? payload = null);
+    ConversationSessionWriteResult RecordAssistantResponseWithPersistence(
+        string ownerHash,
         string sessionId,
         string assistantMessage,
         string? latestFlowJson,
@@ -240,32 +258,66 @@ public interface IConversationalFlowService
         string? latestFlowJson,
         string? latestCanvasFlowJson = null,
         ConversationTurnPayload? payload = null);
+    IReadOnlyList<ConversationSessionSummary> ListSessions(string ownerHash);
     IReadOnlyList<ConversationSessionSummary> ListSessions();
+    ConversationSession? GetSession(string ownerHash, string sessionId);
     ConversationSession? GetSession(string sessionId);
+    IReadOnlyList<ConversationSessionSummary> ListSessionsForRecovery();
+    ConversationSession? GetSessionForRecovery(string sessionId);
+    bool TryBackfillCanvasFlowJson(string ownerHash, string sessionId, string canvasFlowJson);
+    ConversationBackfillResult TryBackfillCanvasFlowJsonWithResult(
+        string ownerHash,
+        string sessionId,
+        string canvasFlowJson);
     bool TryBackfillCanvasFlowJson(string sessionId, string canvasFlowJson);
     ConversationBackfillResult TryBackfillCanvasFlowJsonWithResult(string sessionId, string canvasFlowJson);
     ConversationSession UpdateWorkspaceSnapshot(string sessionId, VisionAgentWorkspaceSnapshotUpdate update);
     VisionAgentWorkspaceSnapshotMutationResult TryUpdateWorkspaceSnapshot(
+        string ownerHash,
         string sessionId,
         VisionAgentWorkspaceSnapshotUpdate update);
+    VisionAgentWorkspaceSnapshotMutationResult TryInitializeWorkspaceSnapshot(
+        string ownerHash,
+        string sessionId,
+        VisionAgentWorkspaceSnapshotUpdate update);
+    VisionAgentWorkspaceSnapshotMutationResult TryUpdateWorkspaceSnapshotForRecovery(
+        string ownerHash,
+        string sessionId,
+        VisionAgentWorkspaceSnapshotUpdate update);
+    VisionAgentWorkspaceSnapshotMutationResult TryUpdateWorkspaceSnapshot(
+        string sessionId,
+        VisionAgentWorkspaceSnapshotUpdate update);
+    VisionAgentWorkspaceSnapshotMutationResult TryBeginAgentRun(
+        string ownerHash,
+        string sessionId,
+        string runId,
+        string kind,
+        string? clientMutationId = null);
     VisionAgentWorkspaceSnapshotMutationResult TryBeginAgentRun(
         string sessionId,
         string runId,
         string kind,
         string? clientMutationId = null);
+    VisionAgentWorkspaceSnapshotMutationResult ProjectBuildTerminal(
+        string ownerHash,
+        VisionAgentTerminalProjectionRequest request);
     VisionAgentWorkspaceSnapshotMutationResult ProjectBuildTerminal(VisionAgentTerminalProjectionRequest request);
     ConversationPersistenceStatus GetLastPersistenceStatus();
     bool DeleteSession(string sessionId);
+    ConversationSessionDeleteResult DeleteSessionWithResult(string ownerHash, string sessionId);
     ConversationSessionDeleteResult DeleteSessionWithResult(string sessionId);
 }
 
 internal sealed class ConversationStore
 {
+    public int SchemaVersion { get; set; }
     public List<ConversationSession> Sessions { get; set; } = new();
 }
 
 public class ConversationalFlowService : IConversationalFlowService
 {
+    public const int CurrentStoreSchemaVersion = 2;
+    public const string LegacyTrustedOwnerHash = "usr_internal_trusted_legacy";
     private const int MaxHistory = 20;
     private const int MaxPromptHistory = 5;
     private const int MaxPersistedSessions = 200;
@@ -331,21 +383,33 @@ public class ConversationalFlowService : IConversationalFlowService
     public static string ResolveStoragePath(string? storageRootPath = null) =>
         Path.Combine(ResolveStorageRootPath(storageRootPath), "conversation_sessions.json");
 
-    public ConversationSession GetOrCreateSession(string? sessionId)
+    public ConversationSession GetOrCreateSession(string ownerHash, string? sessionId)
     {
+        var normalizedOwnerHash = NormalizeOwnerHash(ownerHash);
         var normalizedSessionId = string.IsNullOrWhiteSpace(sessionId)
             ? Guid.NewGuid().ToString("N")
             : sessionId.Trim();
 
         if (_sessions.TryGetValue(normalizedSessionId, out var existing))
+        {
+            if (!IsOwnedBy(existing, normalizedOwnerHash))
+            {
+                throw new ConversationSessionAccessException();
+            }
+
             return CloneSession(existing);
+        }
 
         return new ConversationSession
         {
             SessionId = normalizedSessionId,
+            OwnerHash = normalizedOwnerHash,
             UpdatedAtUtc = DateTime.UtcNow
         };
     }
+
+    public ConversationSession GetOrCreateSession(string? sessionId) =>
+        GetOrCreateSession(LegacyTrustedOwnerHash, sessionId);
 
     public ConversationIntent DetectIntent(string userDescription, bool hasExistingFlow)
     {
@@ -374,8 +438,9 @@ public class ConversationalFlowService : IConversationalFlowService
         string? existingFlowJson = null;
         string sessionSummary = string.Empty;
         var normalizedSessionId = NormalizeSessionId(request.SessionId);
+        var ownerHash = ResolveRequestOwnerHash(request);
 
-        var commit = CommitSessionStateMutation(normalizedSessionId, session =>
+        var commit = CommitSessionStateMutation(ownerHash, normalizedSessionId, allowCreate: true, session =>
         {
             if (HasMeaningfulFlow(request.ExistingFlowJson))
             {
@@ -419,6 +484,14 @@ public class ConversationalFlowService : IConversationalFlowService
 
         if (!commit.Success || commit.Session == null)
         {
+            if (string.Equals(
+                    commit.PersistenceStatus.ErrorCode,
+                    "session_not_found",
+                    StringComparison.Ordinal))
+            {
+                throw new ConversationSessionAccessException();
+            }
+
             throw new IOException(commit.PersistenceStatus.PublicMessage);
         }
 
@@ -556,16 +629,23 @@ public class ConversationalFlowService : IConversationalFlowService
         string? latestCanvasFlowJson = null,
         ConversationTurnPayload? payload = null)
     {
-        RecordAssistantResponseWithPersistence(sessionId, assistantMessage, latestFlowJson, latestCanvasFlowJson, payload);
+        RecordAssistantResponseWithPersistence(
+            LegacyTrustedOwnerHash,
+            sessionId,
+            assistantMessage,
+            latestFlowJson,
+            latestCanvasFlowJson,
+            payload);
     }
 
     public ConversationSessionWriteResult RecordAssistantResponseWithPersistence(
+        string ownerHash,
         string sessionId,
         string assistantMessage,
         string? latestFlowJson,
         string? latestCanvasFlowJson = null,
         ConversationTurnPayload? payload = null) =>
-        CommitSessionStateMutation(sessionId, session =>
+        CommitSessionStateMutation(ownerHash, sessionId, allowCreate: false, session =>
         {
             if (!string.IsNullOrWhiteSpace(latestFlowJson))
                 session.CurrentFlowJson = latestFlowJson;
@@ -588,40 +668,104 @@ public class ConversationalFlowService : IConversationalFlowService
             session.UpdatedAtUtc = DateTime.UtcNow;
         });
 
-    public IReadOnlyList<ConversationSessionSummary> ListSessions()
+    public ConversationSessionWriteResult RecordAssistantResponseWithPersistence(
+        string sessionId,
+        string assistantMessage,
+        string? latestFlowJson,
+        string? latestCanvasFlowJson = null,
+        ConversationTurnPayload? payload = null) =>
+        RecordAssistantResponseWithPersistence(
+            LegacyTrustedOwnerHash,
+            sessionId,
+            assistantMessage,
+            latestFlowJson,
+            latestCanvasFlowJson,
+            payload);
+
+    public IReadOnlyList<ConversationSessionSummary> ListSessions(string ownerHash)
     {
+        var normalizedOwnerHash = NormalizeOwnerHash(ownerHash);
         return _sessions.Values
+            .Where(session => IsOwnedBy(session, normalizedOwnerHash))
             .Select(BuildSessionSummary)
             .OrderByDescending(summary => summary.UpdatedAtUtc)
             .ToList();
     }
 
-    public ConversationSession? GetSession(string sessionId)
+    public IReadOnlyList<ConversationSessionSummary> ListSessions() =>
+        ListSessions(LegacyTrustedOwnerHash);
+
+    public IReadOnlyList<ConversationSessionSummary> ListSessionsForRecovery()
+    {
+        return _sessions.Values
+            .Where(HasValidOwnerAssociation)
+            .Select(BuildSessionSummary)
+            .OrderByDescending(summary => summary.UpdatedAtUtc)
+            .ToList();
+    }
+
+    public ConversationSession? GetSession(string ownerHash, string sessionId)
     {
         if (string.IsNullOrWhiteSpace(sessionId))
             return null;
 
+        var normalizedOwnerHash = NormalizeOwnerHash(ownerHash);
         var normalizedSessionId = sessionId.Trim();
         if (!_sessions.TryGetValue(normalizedSessionId, out var session))
             return null;
+
+        return IsOwnedBy(session, normalizedOwnerHash) ? CloneSession(session) : null;
+    }
+
+    public ConversationSession? GetSession(string sessionId) =>
+        GetSession(LegacyTrustedOwnerHash, sessionId);
+
+    public ConversationSession? GetSessionForRecovery(string sessionId)
+    {
+        if (string.IsNullOrWhiteSpace(sessionId) ||
+            !_sessions.TryGetValue(sessionId.Trim(), out var session) ||
+            !HasValidOwnerAssociation(session))
+        {
+            return null;
+        }
 
         return CloneSession(session);
     }
 
     public bool TryBackfillCanvasFlowJson(string sessionId, string canvasFlowJson)
     {
-        return TryBackfillCanvasFlowJsonWithResult(sessionId, canvasFlowJson).Status == ConversationBackfillStatus.Applied;
+        return TryBackfillCanvasFlowJsonWithResult(
+            LegacyTrustedOwnerHash,
+            sessionId,
+            canvasFlowJson).Status == ConversationBackfillStatus.Applied;
     }
 
-    public ConversationBackfillResult TryBackfillCanvasFlowJsonWithResult(string sessionId, string canvasFlowJson)
+    public bool TryBackfillCanvasFlowJson(
+        string ownerHash,
+        string sessionId,
+        string canvasFlowJson) =>
+        TryBackfillCanvasFlowJsonWithResult(ownerHash, sessionId, canvasFlowJson).Status ==
+        ConversationBackfillStatus.Applied;
+
+    public ConversationBackfillResult TryBackfillCanvasFlowJsonWithResult(
+        string sessionId,
+        string canvasFlowJson) =>
+        TryBackfillCanvasFlowJsonWithResult(LegacyTrustedOwnerHash, sessionId, canvasFlowJson);
+
+    public ConversationBackfillResult TryBackfillCanvasFlowJsonWithResult(
+        string ownerHash,
+        string sessionId,
+        string canvasFlowJson)
     {
         if (string.IsNullOrWhiteSpace(sessionId) || string.IsNullOrWhiteSpace(canvasFlowJson))
             return new ConversationBackfillResult { Status = ConversationBackfillStatus.NotFound };
 
+        var normalizedOwnerHash = NormalizeOwnerHash(ownerHash);
         var normalizedSessionId = sessionId.Trim();
         lock (_persistLock)
         {
-            if (!_sessions.TryGetValue(normalizedSessionId, out var currentSession))
+            if (!_sessions.TryGetValue(normalizedSessionId, out var currentSession) ||
+                !IsOwnedBy(currentSession, normalizedOwnerHash))
                 return new ConversationBackfillResult { Status = ConversationBackfillStatus.NotFound };
 
             var current = CloneSession(currentSession);
@@ -656,20 +800,65 @@ public class ConversationalFlowService : IConversationalFlowService
         ArgumentNullException.ThrowIfNull(update);
 
         var result = CommitSessionMutation(
+            LegacyTrustedOwnerHash,
             sessionId,
             update.ExpectedRevision,
             update.ClientMutationId,
             ComputeWorkspaceMutationFingerprint(update),
             candidate => ApplyWorkspaceUpdateLocked(candidate, update),
-            update.RequireExpectedRevisionWhenWorkspaceExists);
+            update.RequireExpectedRevisionWhenWorkspaceExists,
+            allowCreate: true);
 
         return result.Session ?? new ConversationSession
         {
             SessionId = NormalizeSessionId(sessionId),
+            OwnerHash = LegacyTrustedOwnerHash,
             WorkspaceSnapshot = CloneWorkspaceSnapshot(result.Snapshot),
             UpdatedAtUtc = DateTime.UtcNow
         };
     }
+
+    public VisionAgentWorkspaceSnapshotMutationResult TryUpdateWorkspaceSnapshot(
+        string ownerHash,
+        string sessionId,
+        VisionAgentWorkspaceSnapshotUpdate update)
+    {
+        ArgumentNullException.ThrowIfNull(update);
+        return CommitSessionMutation(
+            ownerHash,
+            sessionId,
+            update.ExpectedRevision,
+            update.ClientMutationId,
+            ComputeWorkspaceMutationFingerprint(update),
+            candidate => ApplyWorkspaceUpdateLocked(candidate, update),
+            update.RequireExpectedRevisionWhenWorkspaceExists,
+            allowCreate: false)
+            .ToWorkspaceMutationResult();
+    }
+
+    public VisionAgentWorkspaceSnapshotMutationResult TryInitializeWorkspaceSnapshot(
+        string ownerHash,
+        string sessionId,
+        VisionAgentWorkspaceSnapshotUpdate update)
+    {
+        ArgumentNullException.ThrowIfNull(update);
+        return CommitSessionMutation(
+            ownerHash,
+            sessionId,
+            update.ExpectedRevision,
+            update.ClientMutationId,
+            ComputeWorkspaceMutationFingerprint(update),
+            candidate => ApplyWorkspaceUpdateLocked(candidate, update),
+            update.RequireExpectedRevisionWhenWorkspaceExists,
+            allowCreate: true)
+            .ToWorkspaceMutationResult();
+    }
+
+    public VisionAgentWorkspaceSnapshotMutationResult TryUpdateWorkspaceSnapshotForRecovery(
+        string ownerHash,
+        string sessionId,
+        VisionAgentWorkspaceSnapshotUpdate update) =>
+        TryUpdateWorkspaceSnapshot(ownerHash, sessionId, update);
 
     public VisionAgentWorkspaceSnapshotMutationResult TryUpdateWorkspaceSnapshot(
         string sessionId,
@@ -677,13 +866,25 @@ public class ConversationalFlowService : IConversationalFlowService
     {
         ArgumentNullException.ThrowIfNull(update);
         return CommitSessionMutation(
+            LegacyTrustedOwnerHash,
             sessionId,
             update.ExpectedRevision,
             update.ClientMutationId,
             ComputeWorkspaceMutationFingerprint(update),
             candidate => ApplyWorkspaceUpdateLocked(candidate, update),
-            update.RequireExpectedRevisionWhenWorkspaceExists)
+            update.RequireExpectedRevisionWhenWorkspaceExists,
+            allowCreate: true)
             .ToWorkspaceMutationResult();
+    }
+
+    public VisionAgentWorkspaceSnapshotMutationResult TryBeginAgentRun(
+        string ownerHash,
+        string sessionId,
+        string runId,
+        string kind,
+        string? clientMutationId = null)
+    {
+        return TryBeginAgentRunCore(ownerHash, sessionId, runId, kind, clientMutationId, allowCreate: true);
     }
 
     public VisionAgentWorkspaceSnapshotMutationResult TryBeginAgentRun(
@@ -692,6 +893,24 @@ public class ConversationalFlowService : IConversationalFlowService
         string kind,
         string? clientMutationId = null)
     {
+        return TryBeginAgentRunCore(
+            LegacyTrustedOwnerHash,
+            sessionId,
+            runId,
+            kind,
+            clientMutationId,
+            allowCreate: true);
+    }
+
+    private VisionAgentWorkspaceSnapshotMutationResult TryBeginAgentRunCore(
+        string ownerHash,
+        string sessionId,
+        string runId,
+        string kind,
+        string? clientMutationId,
+        bool allowCreate)
+    {
+        var normalizedOwnerHash = NormalizeOwnerHash(ownerHash);
         var normalizedSessionId = NormalizeSessionId(sessionId);
         var normalizedRunId = runId?.Trim() ?? string.Empty;
         if (string.IsNullOrWhiteSpace(normalizedRunId))
@@ -720,7 +939,15 @@ public class ConversationalFlowService : IConversationalFlowService
 
         lock (_persistLock)
         {
-            var current = GetCurrentSessionSnapshot(normalizedSessionId);
+            if (!TryGetCurrentSessionSnapshot(
+                    normalizedOwnerHash,
+                    normalizedSessionId,
+                    allowCreate,
+                    out var current))
+            {
+                return SessionMutationCommitResult.NotFound(_lastPersistenceStatus)
+                    .ToWorkspaceMutationResult();
+            }
             NormalizeSession(current);
 
             var receipt = current.MutationReceipts.FirstOrDefault(item =>
@@ -794,7 +1021,9 @@ public class ConversationalFlowService : IConversationalFlowService
         }
     }
 
-    public VisionAgentWorkspaceSnapshotMutationResult ProjectBuildTerminal(VisionAgentTerminalProjectionRequest request)
+    public VisionAgentWorkspaceSnapshotMutationResult ProjectBuildTerminal(
+        string ownerHash,
+        VisionAgentTerminalProjectionRequest request)
     {
         ArgumentNullException.ThrowIfNull(request);
         {
@@ -803,6 +1032,7 @@ public class ConversationalFlowService : IConversationalFlowService
                 : request.AssistantTurnId.Trim();
             var terminalProjectionFingerprint = ComputeTerminalProjectionFingerprint(request, committedAssistantTurnId);
             return CommitSessionMutation(
+                ownerHash,
                 request.SessionId,
                 request.WorkspaceUpdate.ExpectedRevision,
                 BuildTerminalProjectionMutationId(committedAssistantTurnId, terminalProjectionFingerprint),
@@ -831,22 +1061,42 @@ public class ConversationalFlowService : IConversationalFlowService
                     }
 
                     ApplyWorkspaceUpdateLocked(candidate, request.WorkspaceUpdate);
-                })
+                },
+                allowCreate: false)
                 .ToWorkspaceMutationResult();
         }
     }
+
+    public VisionAgentWorkspaceSnapshotMutationResult ProjectBuildTerminal(
+        VisionAgentTerminalProjectionRequest request) =>
+        ProjectBuildTerminal(LegacyTrustedOwnerHash, request);
 
     public ConversationPersistenceStatus GetLastPersistenceStatus() =>
         ClonePersistenceStatus(_lastPersistenceStatus);
 
     private ConversationSessionWriteResult CommitSessionStateMutation(
+        string ownerHash,
         string sessionId,
+        bool allowCreate,
         Action<ConversationSession> mutator)
     {
+        var normalizedOwnerHash = NormalizeOwnerHash(ownerHash);
         var normalizedSessionId = NormalizeSessionId(sessionId);
         lock (_persistLock)
         {
-            var current = GetCurrentSessionSnapshot(normalizedSessionId);
+            if (!TryGetCurrentSessionSnapshot(
+                    normalizedOwnerHash,
+                    normalizedSessionId,
+                    allowCreate,
+                    out var current))
+            {
+                return new ConversationSessionWriteResult
+                {
+                    Success = false,
+                    Session = null,
+                    PersistenceStatus = NotFoundPersistenceStatus()
+                };
+            }
             NormalizeSession(current);
             var candidate = CloneSession(current);
             mutator(candidate);
@@ -874,13 +1124,16 @@ public class ConversationalFlowService : IConversationalFlowService
     }
 
     private SessionMutationCommitResult CommitSessionMutation(
+        string ownerHash,
         string sessionId,
         long? expectedRevision,
         string? clientMutationId,
         string payloadFingerprint,
         Action<ConversationSession> mutator,
-        bool requireExpectedRevisionWhenWorkspaceExists = false)
+        bool requireExpectedRevisionWhenWorkspaceExists = false,
+        bool allowCreate = false)
     {
+        var normalizedOwnerHash = NormalizeOwnerHash(ownerHash);
         var normalizedSessionId = NormalizeSessionId(sessionId);
         var normalizedMutationId = clientMutationId?.Trim() ?? string.Empty;
         var normalizedFingerprint = string.IsNullOrWhiteSpace(payloadFingerprint)
@@ -889,7 +1142,14 @@ public class ConversationalFlowService : IConversationalFlowService
 
         lock (_persistLock)
         {
-            var current = GetCurrentSessionSnapshot(normalizedSessionId);
+            if (!TryGetCurrentSessionSnapshot(
+                    normalizedOwnerHash,
+                    normalizedSessionId,
+                    allowCreate,
+                    out var current))
+            {
+                return SessionMutationCommitResult.NotFound(_lastPersistenceStatus);
+            }
             NormalizeSession(current);
 
             if (!string.IsNullOrWhiteSpace(normalizedMutationId))
@@ -1013,6 +1273,17 @@ public class ConversationalFlowService : IConversationalFlowService
                 PersistenceStatus = ClonePersistenceStatus(persistenceStatus)
             };
 
+        public static SessionMutationCommitResult NotFound(
+            ConversationPersistenceStatus persistenceStatus) =>
+            new()
+            {
+                Success = false,
+                Conflict = false,
+                ErrorCode = "session_not_found",
+                PublicMessage = "Conversation session was not found.",
+                PersistenceStatus = ClonePersistenceStatus(persistenceStatus)
+            };
+
         public VisionAgentWorkspaceSnapshotMutationResult ToWorkspaceMutationResult() =>
             new()
             {
@@ -1066,17 +1337,68 @@ public class ConversationalFlowService : IConversationalFlowService
                string.Equals(lifecycleState, "building", StringComparison.OrdinalIgnoreCase);
     }
 
-    private ConversationSession GetCurrentSessionSnapshot(string sessionId)
+    private bool TryGetCurrentSessionSnapshot(
+        string ownerHash,
+        string sessionId,
+        bool allowCreate,
+        out ConversationSession session)
     {
         if (_sessions.TryGetValue(sessionId, out var current))
-            return CloneSession(current);
+        {
+            if (!IsOwnedBy(current, ownerHash))
+            {
+                session = null!;
+                return false;
+            }
 
-        return new ConversationSession
+            session = CloneSession(current);
+            return true;
+        }
+
+        if (!allowCreate)
+        {
+            session = null!;
+            return false;
+        }
+
+        session = new ConversationSession
         {
             SessionId = sessionId,
+            OwnerHash = ownerHash,
             UpdatedAtUtc = DateTime.UtcNow
         };
+        return true;
     }
+
+    private static string ResolveRequestOwnerHash(AiFlowGenerationRequest request) =>
+        string.IsNullOrWhiteSpace(request.OwnerHash)
+            ? LegacyTrustedOwnerHash
+            : NormalizeOwnerHash(request.OwnerHash);
+
+    private static string NormalizeOwnerHash(string? ownerHash)
+    {
+        if (string.IsNullOrWhiteSpace(ownerHash))
+        {
+            throw new ArgumentException("Authenticated owner authority is required.", nameof(ownerHash));
+        }
+
+        return ownerHash.Trim();
+    }
+
+    private static bool IsOwnedBy(ConversationSession session, string ownerHash) =>
+        HasValidOwnerAssociation(session) &&
+        string.Equals(session.OwnerHash, ownerHash, StringComparison.Ordinal);
+
+    private static bool HasValidOwnerAssociation(ConversationSession session) =>
+        !string.IsNullOrWhiteSpace(session.OwnerHash);
+
+    private static ConversationPersistenceStatus NotFoundPersistenceStatus() => new()
+    {
+        PrimaryStoreSaved = true,
+        RecoveryBackupSaved = true,
+        ErrorCode = "session_not_found",
+        PublicMessage = "Conversation session was not found."
+    };
 
     private IReadOnlyCollection<ConversationSession> BuildPersistedSnapshotWithCandidate(ConversationSession candidate)
     {
@@ -1220,7 +1542,22 @@ public class ConversationalFlowService : IConversationalFlowService
         return DeleteSessionWithResult(sessionId).Status == ConversationSessionDeleteStatus.Deleted;
     }
 
+    public ConversationSessionDeleteResult DeleteSessionWithResult(
+        string ownerHash,
+        string sessionId)
+    {
+        var normalizedOwnerHash = NormalizeOwnerHash(ownerHash);
+        return DeleteSessionWithResultCore(normalizedOwnerHash, sessionId);
+    }
+
     public ConversationSessionDeleteResult DeleteSessionWithResult(string sessionId)
+    {
+        return DeleteSessionWithResultCore(LegacyTrustedOwnerHash, sessionId);
+    }
+
+    private ConversationSessionDeleteResult DeleteSessionWithResultCore(
+        string ownerHash,
+        string sessionId)
     {
         if (string.IsNullOrWhiteSpace(sessionId))
             return new ConversationSessionDeleteResult { Status = ConversationSessionDeleteStatus.NotFound };
@@ -1228,7 +1565,8 @@ public class ConversationalFlowService : IConversationalFlowService
         var normalizedSessionId = sessionId.Trim();
         lock (_persistLock)
         {
-            if (!_sessions.ContainsKey(normalizedSessionId))
+            if (!_sessions.TryGetValue(normalizedSessionId, out var current) ||
+                !IsOwnedBy(current, ownerHash))
                 return new ConversationSessionDeleteResult { Status = ConversationSessionDeleteStatus.NotFound };
 
             var snapshot = _sessions.Values
@@ -1380,6 +1718,7 @@ public class ConversationalFlowService : IConversationalFlowService
 
             var json = JsonSerializer.Serialize(new ConversationStore
             {
+                SchemaVersion = CurrentStoreSchemaVersion,
                 Sessions = snapshot
             }, _jsonOptions);
 
@@ -1452,10 +1791,26 @@ public class ConversationalFlowService : IConversationalFlowService
         if (store?.Sessions == null || store.Sessions.Count == 0)
             return;
 
+        if (store.SchemaVersion < CurrentStoreSchemaVersion)
+        {
+            if (_logger != null)
+            {
+                LoggerExtensions.LogWarning(
+                    _logger,
+                    "Ignored ownerless conversation session store. SchemaVersion={SchemaVersion}, RequiredSchemaVersion={RequiredSchemaVersion}",
+                    store.SchemaVersion,
+                    CurrentStoreSchemaVersion);
+            }
+
+            return;
+        }
+
         var cutoff = DateTime.UtcNow - SessionRetention;
         foreach (var session in store.Sessions)
         {
-            if (session == null || string.IsNullOrWhiteSpace(session.SessionId))
+            if (session == null ||
+                string.IsNullOrWhiteSpace(session.SessionId) ||
+                !HasValidOwnerAssociation(session))
                 continue;
 
             NormalizeSession(session);
@@ -1538,6 +1893,7 @@ public class ConversationalFlowService : IConversationalFlowService
             return new ConversationSession
             {
                 SessionId = session.SessionId,
+                OwnerHash = session.OwnerHash,
                 CurrentFlowJson = session.CurrentFlowJson,
                 CurrentCanvasFlowJson = session.CurrentCanvasFlowJson,
                 WorkspaceSnapshot = CloneWorkspaceSnapshot(session.WorkspaceSnapshot),
@@ -1985,6 +2341,7 @@ public class ConversationalFlowService : IConversationalFlowService
 
         session.UpdatedAtUtc = session.UpdatedAtUtc == default ? DateTime.UtcNow : session.UpdatedAtUtc;
         session.SessionId = session.SessionId.Trim();
+        session.OwnerHash = session.OwnerHash?.Trim() ?? string.Empty;
     }
 
     private static bool IsCanvasFlowJson(string? flowJson)
@@ -2069,7 +2426,7 @@ public class ConversationalFlowService : IConversationalFlowService
         var cutoff = DateTime.UtcNow - SessionRetention;
         foreach (var kvp in _sessions.ToArray())
         {
-            if (kvp.Value.UpdatedAtUtc < cutoff)
+            if (!HasValidOwnerAssociation(kvp.Value) || kvp.Value.UpdatedAtUtc < cutoff)
                 _sessions.TryRemove(kvp.Key, out _);
         }
 

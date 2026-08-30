@@ -156,7 +156,12 @@ public class AiFlowGenerationService : IAiFlowGenerationService
             "conversation",
             () => _conversationalFlowService.PrepareContext(request),
             context => $"session={context.SessionId}, mode={context.Mode.ToWireValue()}");
-        var sessionSnapshot = _conversationalFlowService.GetSession(conversationContext.SessionId);
+        var requestOwnerHash = string.IsNullOrWhiteSpace(request.OwnerHash)
+            ? ConversationalFlowService.LegacyTrustedOwnerHash
+            : request.OwnerHash.Trim();
+        var sessionSnapshot = _conversationalFlowService.GetSession(
+            requestOwnerHash,
+            conversationContext.SessionId);
         var hasExistingFlow = !string.IsNullOrWhiteSpace(conversationContext.ExistingFlowJson);
         var turnRoute = pipeline.Measure(
             "turn_router",
@@ -177,6 +182,7 @@ public class AiFlowGenerationService : IAiFlowGenerationService
         if (turnRoute.ShouldShortCircuit)
         {
             return CreateInteractionMessageResult(
+                requestOwnerHash,
                 conversationContext.SessionId,
                 turnRoute,
                 progressMessages,
@@ -271,6 +277,7 @@ public class AiFlowGenerationService : IAiFlowGenerationService
                 });
 
             return CreateClarificationResult(
+                requestOwnerHash,
                 conversationContext.SessionId,
                 requirementBrief,
                 templatePriority,
@@ -524,6 +531,7 @@ public class AiFlowGenerationService : IAiFlowGenerationService
 
                     return CreateManualRetryResult(
                         stage: "parse",
+                        requestOwnerHash,
                         conversationContext.SessionId,
                         request.Description,
                         lastValidation,
@@ -634,6 +642,7 @@ public class AiFlowGenerationService : IAiFlowGenerationService
                     };
 
                     var persistenceWarning = RecordAssistantResponseWithPersistenceWarning(
+                        requestOwnerHash,
                         conversationContext.SessionId,
                         assistantReply,
                         JsonSerializer.Serialize(generatedFlow, _jsonOptions),
@@ -685,6 +694,7 @@ public class AiFlowGenerationService : IAiFlowGenerationService
 
                 return CreateManualRetryResult(
                     stage: "validation",
+                    requestOwnerHash,
                     conversationContext.SessionId,
                     request.Description,
                     lastValidation,
@@ -739,6 +749,7 @@ public class AiFlowGenerationService : IAiFlowGenerationService
                     fallbackCode: wasUserCancelled ? "user_cancelled" : "generation_timeout",
                     fallbackCategory: "execution");
                 RecordFailureResponse(
+                    requestOwnerHash,
                     conversationContext.SessionId,
                     errorMessage,
                     lastRawResponse,
@@ -816,6 +827,7 @@ public class AiFlowGenerationService : IAiFlowGenerationService
                     fallbackCode: "service_call_failed",
                     fallbackCategory: "execution");
                 RecordFailureResponse(
+                    requestOwnerHash,
                     conversationContext.SessionId,
                     errorMessage,
                     lastRawResponse,
@@ -860,6 +872,7 @@ public class AiFlowGenerationService : IAiFlowGenerationService
             fallbackCode: "validation_failed",
             fallbackCategory: "validation");
         RecordFailureResponse(
+            requestOwnerHash,
             conversationContext.SessionId,
             finalErrorMessage,
             lastRawResponse,
@@ -1001,7 +1014,10 @@ public class AiFlowGenerationService : IAiFlowGenerationService
                     planHash = request.BuildFromPlan?.PlanHash ?? request.BuildFromPlan?.PlanSnapshot?.PlanHash ?? string.Empty,
                     hasPlanSnapshot = request.BuildFromPlan?.PlanSnapshot != null,
                     metadataOnly = true
-                });
+                },
+                string.IsNullOrWhiteSpace(request.OwnerHash)
+                    ? ConversationalFlowService.LegacyTrustedOwnerHash
+                    : request.OwnerHash.Trim());
             runId = createResult.RunId;
         }
 
@@ -1019,6 +1035,7 @@ public class AiFlowGenerationService : IAiFlowGenerationService
         return runResult.Outcome.Result;
     }
     private AiPersistenceWarning? RecordAssistantResponseWithPersistenceWarning(
+        string ownerHash,
         string sessionId,
         string assistantMessage,
         string? latestFlowJson,
@@ -1026,6 +1043,7 @@ public class AiFlowGenerationService : IAiFlowGenerationService
         ConversationTurnPayload? payload = null)
     {
         var writeResult = _conversationalFlowService.RecordAssistantResponseWithPersistence(
+            ownerHash,
             sessionId,
             assistantMessage,
             latestFlowJson,
@@ -1126,6 +1144,7 @@ public class AiFlowGenerationService : IAiFlowGenerationService
     }
 
     private AiFlowGenerationResult CreateInteractionMessageResult(
+        string ownerHash,
         string sessionId,
         AiTurnRoute turnRoute,
         IReadOnlyList<string> progressMessages,
@@ -1147,6 +1166,7 @@ public class AiFlowGenerationService : IAiFlowGenerationService
         };
 
         var persistenceWarning = RecordAssistantResponseWithPersistenceWarning(
+            ownerHash,
             sessionId,
             reply,
             null,
@@ -3334,6 +3354,7 @@ public class AiFlowGenerationService : IAiFlowGenerationService
     }
 
     private AiFlowGenerationResult CreateClarificationResult(
+        string ownerHash,
         string sessionId,
         AiRequirementBrief requirementBrief,
         TemplatePriorityContext templatePriority,
@@ -3370,6 +3391,7 @@ public class AiFlowGenerationService : IAiFlowGenerationService
         };
 
         var persistenceWarning = RecordAssistantResponseWithPersistenceWarning(
+            ownerHash,
             sessionId,
             summary,
             null,
@@ -3456,6 +3478,7 @@ public class AiFlowGenerationService : IAiFlowGenerationService
 
     private AiFlowGenerationResult CreateManualRetryResult(
         string stage,
+        string ownerHash,
         string sessionId,
         string originalMessage,
         AiValidationResult validation,
@@ -3490,6 +3513,7 @@ public class AiFlowGenerationService : IAiFlowGenerationService
         };
         var persistedMessage = $"本轮生成未通过{(stage == "parse" ? "JSON 解析" : "结构校验")}，已生成纠错草稿，请确认后手动发送。";
         RecordFailureResponse(
+            ownerHash,
             sessionId,
             persistedMessage,
             lastRawResponse,
@@ -3834,6 +3858,7 @@ public class AiFlowGenerationService : IAiFlowGenerationService
     }
 
     private void RecordFailureResponse(
+        string ownerHash,
         string sessionId,
         string errorMessage,
         string? lastRawResponse,
@@ -3853,6 +3878,7 @@ public class AiFlowGenerationService : IAiFlowGenerationService
         }
 
         RecordAssistantResponseWithPersistenceWarning(
+            ownerHash,
             sessionId,
             summary.ToString().Trim(),
             null,

@@ -2,6 +2,7 @@
 // AI 生成 DTO 定义
 // 定义 AI 流程生成请求与结果传输结构
 // 作者：蘅芜君
+using System.Text.Json.Serialization;
 using ClearVision.Product.Core.Services;
 
 namespace ClearVision.Product.Core.DTOs;
@@ -20,6 +21,14 @@ public record AiFlowGenerationRequest(
     AiTemplateSelectionInfo? TemplateSelection = null
 )
 {
+    /// <summary>
+    /// Server-derived conversation/AgentRun owner authority. This value is
+    /// deliberately excluded from transport JSON and must never be accepted
+    /// from a browser request body.
+    /// </summary>
+    [JsonIgnore]
+    public string OwnerHash { get; init; } = string.Empty;
+
     public string RequirementMode { get; init; } = AiRequirementModes.Strict;
 
     public bool UseVisionAgentGenerateFlow { get; init; }

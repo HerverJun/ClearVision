@@ -100,7 +100,7 @@ public class AiFlowGenerationServiceManualRetryTests : IDisposable
             "Generate a basic inspection flow.",
             SessionId: "parse-auto-repair"));
 
-        result.Success.Should().BeTrue();
+        result.Success.Should().BeTrue("generation should succeed: {0}", result.ErrorMessage);
         result.RetryCount.Should().Be(1);
         result.ManualRetry.Should().BeNull();
 
@@ -634,7 +634,7 @@ public class AiFlowGenerationServiceManualRetryTests : IDisposable
         var connector = Substitute.For<IAiConnector>();
         var validator = Substitute.For<IAiFlowValidator>();
         var conversationService = new ConversationalFlowService(_tempRoot);
-        _ = conversationService.GetOrCreateSession("clarification-chat-lifecycle");
+        InitializeSession(conversationService, "clarification-chat-lifecycle");
         conversationService.RecordAssistantResponse(
             "clarification-chat-lifecycle",
             "please clarify object and defect",
@@ -706,7 +706,7 @@ public class AiFlowGenerationServiceManualRetryTests : IDisposable
         var connector = Substitute.For<IAiConnector>();
         var validator = Substitute.For<IAiFlowValidator>();
         var conversationService = new ConversationalFlowService(_tempRoot);
-        _ = conversationService.GetOrCreateSession("vague-new-request-after-clarification");
+        InitializeSession(conversationService, "vague-new-request-after-clarification");
         conversationService.RecordAssistantResponse(
             "vague-new-request-after-clarification",
             "please clarify scene and object",
@@ -801,7 +801,7 @@ public class AiFlowGenerationServiceManualRetryTests : IDisposable
         var validator = Substitute.For<IAiFlowValidator>();
         validator.Validate(Arg.Any<AiGeneratedFlowJson>()).Returns(new AiValidationResult());
         var conversationService = new ConversationalFlowService(_tempRoot);
-        _ = conversationService.GetOrCreateSession("clarification-new-with-existing-flow");
+        InitializeSession(conversationService, "clarification-new-with-existing-flow");
         conversationService.RecordAssistantResponse(
             "clarification-new-with-existing-flow",
             "please clarify object",
@@ -1023,7 +1023,7 @@ public class AiFlowGenerationServiceManualRetryTests : IDisposable
         var connector = Substitute.For<IAiConnector>();
         var validator = Substitute.For<IAiFlowValidator>();
         var conversationService = new ConversationalFlowService(_tempRoot);
-        _ = conversationService.GetOrCreateSession("generic-workflow-stale-clarification");
+        InitializeSession(conversationService, "generic-workflow-stale-clarification");
         conversationService.RecordAssistantResponse(
             "generic-workflow-stale-clarification",
             "please clarify scene and object",
@@ -1112,7 +1112,7 @@ public class AiFlowGenerationServiceManualRetryTests : IDisposable
         validator.Validate(Arg.Any<AiGeneratedFlowJson>()).Returns(new AiValidationResult());
 
         var conversationService = new ConversationalFlowService(_tempRoot);
-        _ = conversationService.GetOrCreateSession("clarification-max-rounds");
+        InitializeSession(conversationService, "clarification-max-rounds");
         conversationService.RecordAssistantResponse(
             "clarification-max-rounds",
             "please clarify object",
@@ -1237,7 +1237,7 @@ public class AiFlowGenerationServiceManualRetryTests : IDisposable
         var validator = Substitute.For<IAiFlowValidator>();
         validator.Validate(Arg.Any<AiGeneratedFlowJson>()).Returns(new AiValidationResult());
         var conversationService = new ConversationalFlowService(_tempRoot);
-        _ = conversationService.GetOrCreateSession("clarification-new-request");
+        InitializeSession(conversationService, "clarification-new-request");
         conversationService.RecordAssistantResponse(
             "clarification-new-request",
             "please clarify object",
@@ -1300,7 +1300,7 @@ public class AiFlowGenerationServiceManualRetryTests : IDisposable
         var connector = Substitute.For<IAiConnector>();
         var validator = Substitute.For<IAiFlowValidator>();
         var conversationService = new ConversationalFlowService(_tempRoot);
-        _ = conversationService.GetOrCreateSession("clarification-no-repeat");
+        InitializeSession(conversationService, "clarification-no-repeat");
         conversationService.RecordAssistantResponse(
             "clarification-no-repeat",
             "please clarify object and defect",
@@ -1377,7 +1377,7 @@ public class AiFlowGenerationServiceManualRetryTests : IDisposable
         validator.Validate(Arg.Any<AiGeneratedFlowJson>()).Returns(new AiValidationResult());
 
         var conversationService = new ConversationalFlowService(_tempRoot);
-        _ = conversationService.GetOrCreateSession("calibration-no-repeat");
+        InitializeSession(conversationService, "calibration-no-repeat");
         conversationService.RecordAssistantResponse(
             "calibration-no-repeat",
             "please clarify calibration",
@@ -1702,7 +1702,24 @@ public class AiFlowGenerationServiceManualRetryTests : IDisposable
             new DryRunService(flowExecutionService),
             hostEnvironment,
             promptVersionManager,
-            Substitute.For<Microsoft.Extensions.Logging.ILogger<AiFlowGenerationService>>());
+            Substitute.For<Microsoft.Extensions.Logging.ILogger<AiFlowGenerationService>>(),
+            agentGenerateFlowOptions: Microsoft.Extensions.Options.Options.Create(
+                new ClearVision.Product.Infrastructure.AI.Agent.AgentGenerateFlowOptions
+                {
+                    Enabled = false
+                }));
+    }
+
+    private static void InitializeSession(
+        ConversationalFlowService conversationService,
+        string sessionId)
+    {
+        _ = conversationService.PrepareContext(new AiFlowGenerationRequest(
+            "initialize test conversation",
+            SessionId: sessionId)
+        {
+            OwnerHash = ConversationalFlowService.LegacyTrustedOwnerHash
+        });
     }
 
     private static ScenarioMatchResult BuildPackagingScenarioMatch(double confidence)

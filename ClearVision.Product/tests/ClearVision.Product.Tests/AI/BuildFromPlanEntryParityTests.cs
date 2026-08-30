@@ -20,6 +20,8 @@ namespace ClearVision.Product.Tests.AI;
 [TestClassification(TestDomain.Ai, TestPurpose.Regression, TestLane.Nightly, TestEvidenceType.Contract, TestOracleType.Contract, TestResourceRequirement.None, TestExpectedDuration.Medium, TestFlakyPolicy.Blocking, "vision-agent")]
 public sealed class BuildFromPlanEntryParityTests : IDisposable
 {
+    private const string TestOwnerHash = ConversationalFlowService.LegacyTrustedOwnerHash;
+
     private readonly string _tempRoot = Path.Combine(
         Path.GetTempPath(),
         "clearvision-build-entry-" + Guid.NewGuid().ToString("N"));
@@ -80,6 +82,7 @@ public sealed class BuildFromPlanEntryParityTests : IDisposable
         {
             "missing_contract" => new AiFlowGenerationRequest("detect scratches")
             {
+                OwnerHash = TestOwnerHash,
                 SessionId = $"session-{scenario}",
                 UseVisionAgentGenerateFlow = true,
                 AgentGenerateFlowMode = AiAgentGenerateFlowModes.Scripted
@@ -180,6 +183,7 @@ public sealed class BuildFromPlanEntryParityTests : IDisposable
             request.UseVisionAgentGenerateFlow,
             request.AgentGenerateFlowMode,
             request.RuntimePreviewConsent,
+            ownerHash: request.OwnerHash,
             onAgentRunCreated: id => runId = id);
 
         using var document = JsonDocument.Parse(json);
@@ -210,7 +214,7 @@ public sealed class BuildFromPlanEntryParityTests : IDisposable
     public async Task StartupReconciliation_ShouldProjectUnfinishedTerminalOnce()
     {
         using var harness = CreateHarness();
-        var run = harness.Stream.CreateRun("startup recovery", new
+        var run = CreateRun(harness, "startup recovery", new
         {
             runKind = VisionAgentRunKindResolver.Build,
             sessionId = "session-startup",
@@ -221,6 +225,7 @@ public sealed class BuildFromPlanEntryParityTests : IDisposable
             AgentRunId = run.RunId,
             SessionId = "session-startup"
         };
+        request = EnsureBuildSession(harness, request);
         var association = harness.RunService.PrepareBuildAssociation(
             BuildCommand.FromGenerationRequest(
                 request,
@@ -271,7 +276,7 @@ public sealed class BuildFromPlanEntryParityTests : IDisposable
     public async Task StartupReconciliation_ShouldNotProjectPlanTerminalAsBuild()
     {
         using var harness = CreateHarness();
-        var run = harness.Stream.CreateRun("plan terminal", new
+        var run = CreateRun(harness, "plan terminal", new
         {
             runKind = VisionAgentRunKindResolver.Plan,
             mode = "plan",
@@ -310,7 +315,7 @@ public sealed class BuildFromPlanEntryParityTests : IDisposable
     public async Task StartupReconciliation_BuildTerminalMissingBasis_ShouldWriteConflictOnceWithoutProjection()
     {
         using var harness = CreateHarness();
-        var run = harness.Stream.CreateRun("missing basis", new
+        var run = CreateRun(harness, "missing basis", new
         {
             runKind = VisionAgentRunKindResolver.Build,
             sessionId = "session-missing-basis",
@@ -321,6 +326,7 @@ public sealed class BuildFromPlanEntryParityTests : IDisposable
             AgentRunId = run.RunId,
             SessionId = "session-missing-basis"
         };
+        request = EnsureBuildSession(harness, request);
         harness.RunService.PrepareBuildAssociation(
             BuildCommand.FromGenerationRequest(
                 request,
@@ -360,7 +366,7 @@ public sealed class BuildFromPlanEntryParityTests : IDisposable
     public async Task StartupReconciliation_AssociationFailure_ShouldSkipWithoutCheckpointHistoryOrConflict()
     {
         using var harness = CreateHarness();
-        var run = harness.Stream.CreateRun("association failure", new
+        var run = CreateRun(harness, "association failure", new
         {
             runKind = VisionAgentRunKindResolver.Build,
             sessionId = "session-association-failure",
@@ -398,7 +404,7 @@ public sealed class BuildFromPlanEntryParityTests : IDisposable
     public async Task StartupReconciliation_BuildHostInterrupted_ShouldRemainBuildFailedAfterBuildRecovery()
     {
         using var harness = CreateHarness();
-        var run = harness.Stream.CreateRun("interrupted build", new
+        var run = CreateRun(harness, "interrupted build", new
         {
             runKind = VisionAgentRunKindResolver.Build,
             sessionId = "session-build-interrupted",
@@ -433,7 +439,7 @@ public sealed class BuildFromPlanEntryParityTests : IDisposable
     public async Task StartupReconciliation_AssociatedFailedOrCancelledBuild_ShouldProjectOnlyOnce(string terminalStatus)
     {
         using var harness = CreateHarness();
-        var run = harness.Stream.CreateRun("associated terminal", new
+        var run = CreateRun(harness, "associated terminal", new
         {
             runKind = VisionAgentRunKindResolver.Build,
             sessionId = $"session-associated-{terminalStatus}",
@@ -470,7 +476,7 @@ public sealed class BuildFromPlanEntryParityTests : IDisposable
     public async Task StartupReconciliation_LegacyPlanMode_ShouldRecoverAsInterruptedPlanAndSkipBuildProjector()
     {
         using var harness = CreateHarness();
-        var run = harness.Stream.CreateRun("legacy plan mode", new
+        var run = CreateRun(harness, "legacy plan mode", new
         {
             mode = "plan",
             sessionId = "session-legacy-plan-mode",
@@ -497,7 +503,7 @@ public sealed class BuildFromPlanEntryParityTests : IDisposable
     public async Task StartupReconciliation_FirstBusinessConflict_ShouldContinueWithLaterBuildRun()
     {
         using var harness = CreateHarness();
-        var conflictRun = harness.Stream.CreateRun("first conflict", new
+        var conflictRun = CreateRun(harness, "first conflict", new
         {
             runKind = VisionAgentRunKindResolver.Build,
             sessionId = "session-first-conflict",
@@ -519,7 +525,7 @@ public sealed class BuildFromPlanEntryParityTests : IDisposable
             metadataOnly = true
         }).Should().NotBeNull();
 
-        var goodRun = harness.Stream.CreateRun("later good", new
+        var goodRun = CreateRun(harness, "later good", new
         {
             runKind = VisionAgentRunKindResolver.Build,
             sessionId = "session-later-good",
@@ -547,7 +553,7 @@ public sealed class BuildFromPlanEntryParityTests : IDisposable
     public async Task StartupReconciliation_RepeatedFullRecovery_ShouldNotIncreaseEventsRevisionHistoryOrCheckpoints()
     {
         using var harness = CreateHarness();
-        var run = harness.Stream.CreateRun("full idempotence", new
+        var run = CreateRun(harness, "full idempotence", new
         {
             runKind = VisionAgentRunKindResolver.Build,
             sessionId = "session-full-idempotence",
@@ -583,7 +589,7 @@ public sealed class BuildFromPlanEntryParityTests : IDisposable
     public async Task StartupReconciliation_PrimaryStorePersistenceFailure_ShouldThrow()
     {
         using var harness = CreateHarness();
-        var run = harness.Stream.CreateRun("primary store failure", new
+        var run = CreateRun(harness, "primary store failure", new
         {
             runKind = VisionAgentRunKindResolver.Build,
             sessionId = "session-primary-store-fail",
@@ -611,7 +617,7 @@ public sealed class BuildFromPlanEntryParityTests : IDisposable
         using var harness = CreateHarness();
         var sessionId = "session-plan-recovery";
         var plan = BuildPlan();
-        var run = harness.Stream.CreateRun("plan startup recovery", new
+        var run = CreateRun(harness, "plan startup recovery", new
         {
             sessionId,
             generationMode = "plan",
@@ -701,25 +707,95 @@ public sealed class BuildFromPlanEntryParityTests : IDisposable
     }
 
     [Fact]
+    public async Task StartupRecovery_CrossOwnerSessionReference_ShouldNotMutateForeignWorkspace()
+    {
+        using var harness = CreateHarness();
+        const string runOwnerHash = "usr_recovery_owner_a";
+        const string sessionOwnerHash = "usr_recovery_owner_b";
+        const string sessionId = "session-cross-owner-recovery";
+        var plan = BuildPlan();
+        var run = harness.Stream.CreateRun(
+            "cross-owner recovery must fail closed",
+            new
+            {
+                sessionId,
+                generationMode = "plan",
+                metadataOnly = true
+            },
+            runOwnerHash);
+        var initial = harness.Conversation.TryInitializeWorkspaceSnapshot(
+            sessionOwnerHash,
+            sessionId,
+            new VisionAgentWorkspaceSnapshotUpdate
+            {
+                ClientMutationId = $"foreign-plan-start:{run.RunId}",
+                LifecycleState = "planning",
+                PlanRunId = run.RunId,
+                PlanRunStatus = AgentRunEventStatuses.Running,
+                RequirementMode = AiRequirementModes.Strict
+            });
+        initial.Success.Should().BeTrue();
+        var planCompleted = harness.Stream.Append(run.RunId, new AgentRunEventDraft
+        {
+            EventType = AgentRunEventTypes.PlanCompleted,
+            Stage = "plan_ready",
+            Title = "Plan ready",
+            Summary = "Forged cross-owner plan terminal evidence.",
+            Status = AgentRunEventStatuses.Completed,
+            Payload = new
+            {
+                status = "plan_completed",
+                generationMode = "plan",
+                sessionId,
+                planRunId = run.RunId,
+                planResult = plan,
+                planModeResult = plan,
+                metadataOnly = true
+            }
+        });
+        planCompleted.Should().NotBeNull();
+        harness.Stream.Complete(run.RunId, "terminal before restart", new
+        {
+            sessionId,
+            planRunId = run.RunId,
+            metadataOnly = true
+        }).Should().NotBeNull();
+        var before = harness.Conversation.GetSession(sessionOwnerHash, sessionId)!;
+        var beforeRevision = before.WorkspaceSnapshot!.Revision;
+        var beforeReceiptCount = before.MutationReceipts.Count;
+        var restartedStream = new AgentRunEventStreamService(harness.Store, harness.Redactor);
+        var recovery = new VisionAgentRunRecoveryReconciliationService(
+            harness.Store,
+            restartedStream,
+            harness.Conversation,
+            Substitute.For<Microsoft.Extensions.Logging.ILogger<VisionAgentRunRecoveryReconciliationService>>());
+
+        await recovery.ReconcileAsync(CancellationToken.None);
+
+        var after = harness.Conversation.GetSession(sessionOwnerHash, sessionId)!;
+        after.WorkspaceSnapshot!.Revision.Should().Be(beforeRevision);
+        after.WorkspaceSnapshot.PlanRunStatus.Should().Be(AgentRunEventStatuses.Running);
+        after.WorkspaceSnapshot.PendingPlanSnapshot.Should().BeNull();
+        after.MutationReceipts.Should().HaveCount(beforeReceiptCount);
+        harness.Conversation.GetSession(runOwnerHash, sessionId).Should().BeNull();
+    }
+
+    [Fact]
     public void ProjectorRetry_ShouldRepairPartialProjectionWithoutDuplicatingStableAssistantTurn()
     {
         using var harness = CreateHarness();
-        var run = harness.Stream.CreateRun("partial projection", new { sessionId = "session-partial", metadataOnly = true });
+        var run = CreateRun(harness, "partial projection", new { sessionId = "session-partial", metadataOnly = true });
         var request = BuildRequest(BuildPlan()) with
         {
             AgentRunId = run.RunId,
             SessionId = "session-partial"
         };
+        var association = PrepareAssociatedBuild(harness, request, run.RunId);
         var result = SuccessResult(request);
-        var terminal = harness.Stream.Complete(run.RunId, "done", new
-        {
-            status = result.CompletionStatus,
-            sessionId = request.SessionId,
-            flow = result.Flow,
-            buildResult = result.BuildResult,
-            buildReadiness = result.BuildReadiness,
-            metadataOnly = true
-        })!;
+        var terminal = harness.Stream.Complete(
+            run.RunId,
+            "done",
+            BuildProjectedTerminalPayload(request, result, association))!;
         var partialConversation = new PartialProjectionConversationService(harness.Conversation);
         var projector = new VisionAgentBuildTerminalProjector(
             partialConversation,
@@ -753,12 +829,13 @@ public sealed class BuildFromPlanEntryParityTests : IDisposable
     public void ProjectorFailure_ShouldRemainRetryableAndThenProjectOnce()
     {
         using var harness = CreateHarness();
-        var run = harness.Stream.CreateRun("projection retry", new { sessionId = "session-retry", metadataOnly = true });
+        var run = CreateRun(harness, "projection retry", new { sessionId = "session-retry", metadataOnly = true });
         var request = BuildRequest(BuildPlan()) with
         {
             SessionId = "session-retry",
             AgentRunId = run.RunId
         };
+        EnsureBuildSession(harness, request);
         var result = SuccessResult(request);
         var terminal = harness.Stream.Complete(run.RunId, "done", new { status = result.CompletionStatus, sessionId = request.SessionId, flow = result.Flow, buildResult = result.BuildResult, metadataOnly = true })!;
         var throwingConversation = new ThrowOnceConversationService(harness.Conversation);
@@ -784,13 +861,17 @@ public sealed class BuildFromPlanEntryParityTests : IDisposable
     public void SessionIdPolicy_ShouldUseDeterministicRunSessionAndIgnoreDrift()
     {
         using var harness = CreateHarness();
-        var run = harness.Stream.CreateRun("session policy", new { metadataOnly = true });
+        var run = CreateRun(harness, "session policy", new { metadataOnly = true });
         var terminal = harness.Stream.Cancel(run.RunId)!;
         var request = BuildRequest(BuildPlan()) with
         {
             SessionId = "bad/path",
             AgentRunId = run.RunId
         };
+        harness.Conversation.TryInitializeWorkspaceSnapshot(
+            TestOwnerHash,
+            $"agent-run-{run.RunId}",
+            new VisionAgentWorkspaceSnapshotUpdate { LifecycleState = "building" }).Success.Should().BeTrue();
         var result = new AiFlowGenerationResult
         {
             Success = false,
@@ -929,11 +1010,56 @@ public sealed class BuildFromPlanEntryParityTests : IDisposable
         await CreateBuildReconciler(harness).ReconcileAsync(CancellationToken.None);
     }
 
+    private static AgentRunCreateResult CreateRun(
+        BuildHarness harness,
+        string description,
+        object? payload = null) =>
+        harness.Stream.CreateRun(description, payload, TestOwnerHash);
+
+    private static AiFlowGenerationRequest EnsureBuildSession(
+        BuildHarness harness,
+        AiFlowGenerationRequest request)
+    {
+        var ownedRequest = request with { OwnerHash = TestOwnerHash };
+        var sessionId = ownedRequest.SessionId?.Trim() ?? string.Empty;
+        if (string.IsNullOrWhiteSpace(sessionId) ||
+            harness.Conversation.GetSession(TestOwnerHash, sessionId) != null)
+        {
+            return ownedRequest;
+        }
+
+        var initial = harness.Conversation.TryInitializeWorkspaceSnapshot(
+            TestOwnerHash,
+            sessionId,
+            new VisionAgentWorkspaceSnapshotUpdate
+            {
+                LifecycleState = "plan_ready",
+                PendingPlanSnapshot = ownedRequest.BuildFromPlan?.PlanSnapshot,
+                RequirementMode = ownedRequest.RequirementMode
+            });
+        initial.Success.Should().BeTrue();
+
+        if (ownedRequest.BuildFromPlan == null ||
+            ownedRequest.BuildFromPlan.WorkspaceExpectedRevision.HasValue)
+        {
+            return ownedRequest;
+        }
+
+        return ownedRequest with
+        {
+            BuildFromPlan = ownedRequest.BuildFromPlan with
+            {
+                WorkspaceExpectedRevision = initial.Revision
+            }
+        };
+    }
+
     private static VisionAgentWorkspaceSnapshotMutationResult PrepareAssociatedBuild(
         BuildHarness harness,
         AiFlowGenerationRequest request,
         string runId)
     {
+        request = EnsureBuildSession(harness, request);
         var association = harness.RunService.PrepareBuildAssociation(
             BuildCommand.FromGenerationRequest(
                 request,
@@ -1067,7 +1193,8 @@ public sealed class BuildFromPlanEntryParityTests : IDisposable
         BuildHarness harness,
         AiFlowGenerationRequest request)
     {
-        var create = harness.Stream.CreateRun(request.Description, new
+        request = EnsureBuildSession(harness, request);
+        var create = CreateRun(harness, request.Description, new
         {
             runKind = VisionAgentRunKindResolver.Build,
             sessionId = request.SessionId,
@@ -1092,6 +1219,7 @@ public sealed class BuildFromPlanEntryParityTests : IDisposable
         BuildHarness harness,
         AiFlowGenerationRequest request)
     {
+        request = EnsureBuildSession(harness, request);
         var handler = new GenerateFlowMessageHandler(
             Substitute.For<IAiFlowGenerationService>(),
             Substitute.For<Microsoft.Extensions.Logging.ILogger<GenerateFlowMessageHandler>>(),
@@ -1113,6 +1241,7 @@ public sealed class BuildFromPlanEntryParityTests : IDisposable
             request.UseVisionAgentGenerateFlow,
             request.AgentGenerateFlowMode,
             request.RuntimePreviewConsent,
+            ownerHash: request.OwnerHash,
             onAgentRunCreated: id => runId = id);
 
         using var document = JsonDocument.Parse(json);
@@ -1128,13 +1257,14 @@ public sealed class BuildFromPlanEntryParityTests : IDisposable
         BuildHarness harness,
         AiFlowGenerationRequest request)
     {
+        request = EnsureBuildSession(harness, request);
         var service = CreateInternalGenerationService(harness);
         var result = await service.GenerateFlowAsync(request, cancellationToken: CancellationToken.None);
         result.SessionId.Should().Be(request.SessionId);
         result.CompletionStatus.Should().NotBeNullOrWhiteSpace();
         result.PlanId.Should().NotBeNullOrWhiteSpace();
 
-        var runId = harness.Stream.ReplayLatest()?.Summary.RunId;
+        var runId = harness.Stream.ReplayLatest(TestOwnerHash)?.Summary.RunId;
         runId.Should().NotBeNullOrWhiteSpace();
         var replay = harness.Stream.Replay(runId!)!;
         return new EntryResult(runId!, Terminal(replay), replay);
@@ -1320,6 +1450,7 @@ public sealed class BuildFromPlanEntryParityTests : IDisposable
         build = mutate?.Invoke(build) ?? build;
         return new AiFlowGenerationRequest("detect scratches", Mode: GenerateFlowMode.New)
         {
+            OwnerHash = TestOwnerHash,
             UseVisionAgentGenerateFlow = true,
             AgentGenerateFlowMode = AiAgentGenerateFlowModes.Scripted,
             BuildFromPlan = build
@@ -1510,6 +1641,9 @@ public sealed class BuildFromPlanEntryParityTests : IDisposable
 
         public ConversationSession GetOrCreateSession(string? sessionId) => _inner.GetOrCreateSession(sessionId);
 
+        public ConversationSession GetOrCreateSession(string ownerHash, string? sessionId) =>
+            _inner.GetOrCreateSession(ownerHash, sessionId);
+
         public ConversationIntent DetectIntent(string userDescription, bool hasExistingFlow) =>
             _inner.DetectIntent(userDescription, hasExistingFlow);
 
@@ -1530,6 +1664,29 @@ public sealed class BuildFromPlanEntryParityTests : IDisposable
             }
 
             _inner.RecordAssistantResponse(sessionId, assistantMessage, latestFlowJson, latestCanvasFlowJson, payload);
+        }
+
+        public ConversationSessionWriteResult RecordAssistantResponseWithPersistence(
+            string ownerHash,
+            string sessionId,
+            string assistantMessage,
+            string? latestFlowJson,
+            string? latestCanvasFlowJson = null,
+            ConversationTurnPayload? payload = null)
+        {
+            if (_throw)
+            {
+                _throw = false;
+                throw new InvalidOperationException("public failure");
+            }
+
+            return _inner.RecordAssistantResponseWithPersistence(
+                ownerHash,
+                sessionId,
+                assistantMessage,
+                latestFlowJson,
+                latestCanvasFlowJson,
+                payload);
         }
 
         public ConversationSessionWriteResult RecordAssistantResponseWithPersistence(
@@ -1555,13 +1712,34 @@ public sealed class BuildFromPlanEntryParityTests : IDisposable
 
         public IReadOnlyList<ConversationSessionSummary> ListSessions() => _inner.ListSessions();
 
+        public IReadOnlyList<ConversationSessionSummary> ListSessions(string ownerHash) =>
+            _inner.ListSessions(ownerHash);
+
+        public IReadOnlyList<ConversationSessionSummary> ListSessionsForRecovery() =>
+            _inner.ListSessionsForRecovery();
+
         public ConversationSession? GetSession(string sessionId) => _inner.GetSession(sessionId);
+
+        public ConversationSession? GetSession(string ownerHash, string sessionId) =>
+            _inner.GetSession(ownerHash, sessionId);
+
+        public ConversationSession? GetSessionForRecovery(string sessionId) =>
+            _inner.GetSessionForRecovery(sessionId);
 
         public bool TryBackfillCanvasFlowJson(string sessionId, string canvasFlowJson) =>
             _inner.TryBackfillCanvasFlowJson(sessionId, canvasFlowJson);
 
+        public bool TryBackfillCanvasFlowJson(string ownerHash, string sessionId, string canvasFlowJson) =>
+            _inner.TryBackfillCanvasFlowJson(ownerHash, sessionId, canvasFlowJson);
+
         public ConversationBackfillResult TryBackfillCanvasFlowJsonWithResult(string sessionId, string canvasFlowJson) =>
             _inner.TryBackfillCanvasFlowJsonWithResult(sessionId, canvasFlowJson);
+
+        public ConversationBackfillResult TryBackfillCanvasFlowJsonWithResult(
+            string ownerHash,
+            string sessionId,
+            string canvasFlowJson) =>
+            _inner.TryBackfillCanvasFlowJsonWithResult(ownerHash, sessionId, canvasFlowJson);
 
         public ConversationSession UpdateWorkspaceSnapshot(string sessionId, VisionAgentWorkspaceSnapshotUpdate update) =>
             _inner.UpdateWorkspaceSnapshot(sessionId, update);
@@ -1571,12 +1749,38 @@ public sealed class BuildFromPlanEntryParityTests : IDisposable
             VisionAgentWorkspaceSnapshotUpdate update) =>
             _inner.TryUpdateWorkspaceSnapshot(sessionId, update);
 
+        public VisionAgentWorkspaceSnapshotMutationResult TryUpdateWorkspaceSnapshot(
+            string ownerHash,
+            string sessionId,
+            VisionAgentWorkspaceSnapshotUpdate update) =>
+            _inner.TryUpdateWorkspaceSnapshot(ownerHash, sessionId, update);
+
+        public VisionAgentWorkspaceSnapshotMutationResult TryInitializeWorkspaceSnapshot(
+            string ownerHash,
+            string sessionId,
+            VisionAgentWorkspaceSnapshotUpdate update) =>
+            _inner.TryInitializeWorkspaceSnapshot(ownerHash, sessionId, update);
+
+        public VisionAgentWorkspaceSnapshotMutationResult TryUpdateWorkspaceSnapshotForRecovery(
+            string ownerHash,
+            string sessionId,
+            VisionAgentWorkspaceSnapshotUpdate update) =>
+            _inner.TryUpdateWorkspaceSnapshotForRecovery(ownerHash, sessionId, update);
+
         public VisionAgentWorkspaceSnapshotMutationResult TryBeginAgentRun(
             string sessionId,
             string runId,
             string kind,
             string? clientMutationId = null) =>
             _inner.TryBeginAgentRun(sessionId, runId, kind, clientMutationId);
+
+        public VisionAgentWorkspaceSnapshotMutationResult TryBeginAgentRun(
+            string ownerHash,
+            string sessionId,
+            string runId,
+            string kind,
+            string? clientMutationId = null) =>
+            _inner.TryBeginAgentRun(ownerHash, sessionId, runId, kind, clientMutationId);
 
         public VisionAgentWorkspaceSnapshotMutationResult ProjectBuildTerminal(VisionAgentTerminalProjectionRequest request)
         {
@@ -1589,12 +1793,28 @@ public sealed class BuildFromPlanEntryParityTests : IDisposable
             return _inner.ProjectBuildTerminal(request);
         }
 
+        public VisionAgentWorkspaceSnapshotMutationResult ProjectBuildTerminal(
+            string ownerHash,
+            VisionAgentTerminalProjectionRequest request)
+        {
+            if (_throw)
+            {
+                _throw = false;
+                throw new InvalidOperationException("public failure");
+            }
+
+            return _inner.ProjectBuildTerminal(ownerHash, request);
+        }
+
         public ConversationPersistenceStatus GetLastPersistenceStatus() => _inner.GetLastPersistenceStatus();
 
         public bool DeleteSession(string sessionId) => _inner.DeleteSession(sessionId);
 
         public ConversationSessionDeleteResult DeleteSessionWithResult(string sessionId) =>
             _inner.DeleteSessionWithResult(sessionId);
+
+        public ConversationSessionDeleteResult DeleteSessionWithResult(string ownerHash, string sessionId) =>
+            _inner.DeleteSessionWithResult(ownerHash, sessionId);
     }
 
     private sealed class PartialProjectionConversationService : IConversationalFlowService
@@ -1608,6 +1828,9 @@ public sealed class BuildFromPlanEntryParityTests : IDisposable
         }
 
         public ConversationSession GetOrCreateSession(string? sessionId) => _inner.GetOrCreateSession(sessionId);
+
+        public ConversationSession GetOrCreateSession(string ownerHash, string? sessionId) =>
+            _inner.GetOrCreateSession(ownerHash, sessionId);
 
         public ConversationIntent DetectIntent(string userDescription, bool hasExistingFlow) =>
             _inner.DetectIntent(userDescription, hasExistingFlow);
@@ -1624,6 +1847,21 @@ public sealed class BuildFromPlanEntryParityTests : IDisposable
             _inner.RecordAssistantResponse(sessionId, assistantMessage, latestFlowJson, latestCanvasFlowJson, payload);
 
         public ConversationSessionWriteResult RecordAssistantResponseWithPersistence(
+            string ownerHash,
+            string sessionId,
+            string assistantMessage,
+            string? latestFlowJson,
+            string? latestCanvasFlowJson = null,
+            ConversationTurnPayload? payload = null) =>
+            _inner.RecordAssistantResponseWithPersistence(
+                ownerHash,
+                sessionId,
+                assistantMessage,
+                latestFlowJson,
+                latestCanvasFlowJson,
+                payload);
+
+        public ConversationSessionWriteResult RecordAssistantResponseWithPersistence(
             string sessionId,
             string assistantMessage,
             string? latestFlowJson,
@@ -1638,13 +1876,34 @@ public sealed class BuildFromPlanEntryParityTests : IDisposable
 
         public IReadOnlyList<ConversationSessionSummary> ListSessions() => _inner.ListSessions();
 
+        public IReadOnlyList<ConversationSessionSummary> ListSessions(string ownerHash) =>
+            _inner.ListSessions(ownerHash);
+
+        public IReadOnlyList<ConversationSessionSummary> ListSessionsForRecovery() =>
+            _inner.ListSessionsForRecovery();
+
         public ConversationSession? GetSession(string sessionId) => _inner.GetSession(sessionId);
+
+        public ConversationSession? GetSession(string ownerHash, string sessionId) =>
+            _inner.GetSession(ownerHash, sessionId);
+
+        public ConversationSession? GetSessionForRecovery(string sessionId) =>
+            _inner.GetSessionForRecovery(sessionId);
 
         public bool TryBackfillCanvasFlowJson(string sessionId, string canvasFlowJson) =>
             _inner.TryBackfillCanvasFlowJson(sessionId, canvasFlowJson);
 
+        public bool TryBackfillCanvasFlowJson(string ownerHash, string sessionId, string canvasFlowJson) =>
+            _inner.TryBackfillCanvasFlowJson(ownerHash, sessionId, canvasFlowJson);
+
         public ConversationBackfillResult TryBackfillCanvasFlowJsonWithResult(string sessionId, string canvasFlowJson) =>
             _inner.TryBackfillCanvasFlowJsonWithResult(sessionId, canvasFlowJson);
+
+        public ConversationBackfillResult TryBackfillCanvasFlowJsonWithResult(
+            string ownerHash,
+            string sessionId,
+            string canvasFlowJson) =>
+            _inner.TryBackfillCanvasFlowJsonWithResult(ownerHash, sessionId, canvasFlowJson);
 
         public ConversationSession UpdateWorkspaceSnapshot(string sessionId, VisionAgentWorkspaceSnapshotUpdate update) =>
             _inner.UpdateWorkspaceSnapshot(sessionId, update);
@@ -1654,12 +1913,38 @@ public sealed class BuildFromPlanEntryParityTests : IDisposable
             VisionAgentWorkspaceSnapshotUpdate update) =>
             _inner.TryUpdateWorkspaceSnapshot(sessionId, update);
 
+        public VisionAgentWorkspaceSnapshotMutationResult TryUpdateWorkspaceSnapshot(
+            string ownerHash,
+            string sessionId,
+            VisionAgentWorkspaceSnapshotUpdate update) =>
+            _inner.TryUpdateWorkspaceSnapshot(ownerHash, sessionId, update);
+
+        public VisionAgentWorkspaceSnapshotMutationResult TryInitializeWorkspaceSnapshot(
+            string ownerHash,
+            string sessionId,
+            VisionAgentWorkspaceSnapshotUpdate update) =>
+            _inner.TryInitializeWorkspaceSnapshot(ownerHash, sessionId, update);
+
+        public VisionAgentWorkspaceSnapshotMutationResult TryUpdateWorkspaceSnapshotForRecovery(
+            string ownerHash,
+            string sessionId,
+            VisionAgentWorkspaceSnapshotUpdate update) =>
+            _inner.TryUpdateWorkspaceSnapshotForRecovery(ownerHash, sessionId, update);
+
         public VisionAgentWorkspaceSnapshotMutationResult TryBeginAgentRun(
             string sessionId,
             string runId,
             string kind,
             string? clientMutationId = null) =>
             _inner.TryBeginAgentRun(sessionId, runId, kind, clientMutationId);
+
+        public VisionAgentWorkspaceSnapshotMutationResult TryBeginAgentRun(
+            string ownerHash,
+            string sessionId,
+            string runId,
+            string kind,
+            string? clientMutationId = null) =>
+            _inner.TryBeginAgentRun(ownerHash, sessionId, runId, kind, clientMutationId);
 
         public VisionAgentWorkspaceSnapshotMutationResult ProjectBuildTerminal(VisionAgentTerminalProjectionRequest request)
         {
@@ -1669,19 +1954,35 @@ public sealed class BuildFromPlanEntryParityTests : IDisposable
             }
 
             _failOnce = false;
-            var partial = _inner.ProjectBuildTerminal(new VisionAgentTerminalProjectionRequest
+            var partial = _inner.ProjectBuildTerminal(request);
+
+            return new VisionAgentWorkspaceSnapshotMutationResult
             {
-                SessionId = request.SessionId,
-                AssistantTurnId = request.AssistantTurnId,
-                AssistantMessage = request.AssistantMessage,
-                LatestFlowJson = request.LatestFlowJson,
-                LatestCanvasFlowJson = request.LatestCanvasFlowJson,
-                Payload = request.Payload,
-                WorkspaceUpdate = new VisionAgentWorkspaceSnapshotUpdate
+                Success = false,
+                ErrorCode = "primary_store_save_failed",
+                PublicMessage = "simulated snapshot failure",
+                Snapshot = partial.Snapshot,
+                PersistenceStatus = new ConversationPersistenceStatus
                 {
-                    LifecycleState = "build_projection_partial"
+                    PrimaryStoreSaved = false,
+                    RecoveryBackupSaved = true,
+                    ErrorCode = "primary_store_save_failed",
+                    PublicMessage = "simulated snapshot failure"
                 }
-            });
+            };
+        }
+
+        public VisionAgentWorkspaceSnapshotMutationResult ProjectBuildTerminal(
+            string ownerHash,
+            VisionAgentTerminalProjectionRequest request)
+        {
+            if (!_failOnce)
+            {
+                return _inner.ProjectBuildTerminal(ownerHash, request);
+            }
+
+            _failOnce = false;
+            var partial = _inner.ProjectBuildTerminal(ownerHash, request);
 
             return new VisionAgentWorkspaceSnapshotMutationResult
             {
@@ -1705,6 +2006,9 @@ public sealed class BuildFromPlanEntryParityTests : IDisposable
 
         public ConversationSessionDeleteResult DeleteSessionWithResult(string sessionId) =>
             _inner.DeleteSessionWithResult(sessionId);
+
+        public ConversationSessionDeleteResult DeleteSessionWithResult(string ownerHash, string sessionId) =>
+            _inner.DeleteSessionWithResult(ownerHash, sessionId);
     }
 
     private sealed class FakeBuildExecution : IVisionAgentOrchestrator

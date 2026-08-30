@@ -53,6 +53,7 @@ public class GenerateFlowMessageHandler
         bool useVisionAgentGenerateFlow = false,
         string? agentGenerateFlowMode = null,
         bool runtimePreviewConsent = false,
+        string? ownerHash = null,
         Action<string, string>? onMessage = null,
         CancellationToken cancellationToken = default,
         Action<string>? onAgentRunCreated = null)
@@ -90,6 +91,9 @@ public class GenerateFlowMessageHandler
                 DebugPrompt: debugPrompt,
                 TemplateSelection: templateSelection)
             {
+                OwnerHash = string.IsNullOrWhiteSpace(ownerHash)
+                    ? ConversationalFlowService.LegacyTrustedOwnerHash
+                    : ownerHash.Trim(),
                 RequirementMode = requirementMode ?? AiRequirementModes.Strict,
                 UseVisionAgentGenerateFlow = useVisionAgentGenerateFlow,
                 AgentGenerateFlowMode = modeDecision.EffectiveMode,
@@ -183,6 +187,24 @@ public class GenerateFlowMessageHandler
 
             return SerializeResponse(response, result.FailureType);
         }
+        catch (ConversationSessionAccessException)
+        {
+            _logger.LogInformation(
+                "AI generation session was not found for the authenticated owner. SessionId={SessionId}",
+                sessionId);
+
+            return SerializeResponse(new GenerateFlowResponse
+            {
+                Success = false,
+                Status = AiFlowGenerationResult.CompletionStatusFailed,
+                Code = "not-found",
+                ErrorMessage = "Resource not found.",
+                FailureSummary = "Resource not found.",
+                LastAttemptDiagnostics = Array.Empty<AiAttemptDiagnostic>(),
+                SessionId = sessionId,
+                RequestId = requestId
+            }, AiFlowGenerationResult.FailureTypeSystemError);
+        }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
             _logger.LogInformation("AI generation request was cancelled by the user. SessionId={SessionId}", sessionId);
@@ -228,6 +250,7 @@ public class GenerateFlowMessageHandler
             {
                 Success = false,
                 Status = AiFlowGenerationResult.CompletionStatusFailed,
+                Code = "conflict",
                 ErrorMessage = "服务内部错误，请查看后端日志。",
                 FailureSummary = "服务内部错误，请查看后端日志。",
                 LastAttemptDiagnostics = Array.Empty<AiAttemptDiagnostic>(),
@@ -263,7 +286,7 @@ public class GenerateFlowMessageHandler
             planHash = request.BuildFromPlan?.PlanHash ?? request.BuildFromPlan?.PlanSnapshot?.PlanHash ?? string.Empty,
             hasPlanSnapshot = request.BuildFromPlan?.PlanSnapshot != null,
             metadataOnly = true
-        });
+        }, request.OwnerHash);
 
         onAgentRunCreated?.Invoke(createResult.RunId);
         onMessage?.Invoke(
@@ -349,6 +372,7 @@ public class GenerateFlowMessageHandler
             response.Type,
             response.Success,
             response.Status,
+            response.Code,
             response.Flow,
             response.ErrorMessage,
             response.FailureSummary,

@@ -1,4 +1,5 @@
 using ClearVision.Product.Core.DTOs;
+using ClearVision.Product.Application.Security;
 using ClearVision.Product.Infrastructure.AI;
 using FluentAssertions;
 using System.Text.Json;
@@ -837,6 +838,9 @@ public class ConversationalFlowServiceTests : IDisposable
     public void ProjectBuildTerminal_WhenFirstPersistenceFails_ShouldRetryWithOneAssistantTurn()
     {
         var service = new ConversationalFlowService(_tempRoot);
+        service.PrepareContext(new AiFlowGenerationRequest(
+            "prepare terminal retry",
+            SessionId: "terminal-retry-session"));
         var request = new VisionAgentTerminalProjectionRequest
         {
             SessionId = "terminal-retry-session",
@@ -853,7 +857,9 @@ public class ConversationalFlowServiceTests : IDisposable
 
         service.PrimaryStoreWriteFaultInjector = () => throw new IOException("primary failed");
         service.ProjectBuildTerminal(request).Success.Should().BeFalse();
-        service.GetSession("terminal-retry-session").Should().BeNull();
+        service.GetSession("terminal-retry-session")!.History
+            .Should()
+            .NotContain(turn => turn.TurnId == request.AssistantTurnId);
 
         service.PrimaryStoreWriteFaultInjector = null;
         var success = service.ProjectBuildTerminal(request);
@@ -890,6 +896,224 @@ public class ConversationalFlowServiceTests : IDisposable
         Directory.EnumerateFiles(_tempRoot, "conversation_sessions.json.corrupt-*")
             .Should()
             .ContainSingle();
+    }
+
+    [Fact]
+    public void OwnerScopedOperations_ShouldKeepCreateListGetDeleteAndMutationsOpaque()
+    {
+        var service = new ConversationalFlowService(_tempRoot);
+        var ownerA = AuthenticatedOwnerResolver.ResolveOwnerHash("user-a");
+        var ownerB = AuthenticatedOwnerResolver.ResolveOwnerHash("user-b");
+        var context = service.PrepareContext(new AiFlowGenerationRequest(
+            "create owner A flow",
+            SessionId: "owned-session")
+        {
+            OwnerHash = ownerA
+        });
+
+        service.RecordAssistantResponseWithPersistence(
+                ownerHash: ownerA,
+                sessionId: context.SessionId,
+                assistantMessage: "owner A response",
+                latestFlowJson: "{\"operators\":[],\"connections\":[]}")
+            .Success
+            .Should()
+            .BeTrue();
+
+        service.ListSessions(ownerA).Should().ContainSingle(summary => summary.SessionId == context.SessionId);
+        service.ListSessions(ownerB).Should().BeEmpty();
+        service.GetSession(ownerA, context.SessionId)!.OwnerHash.Should().Be(ownerA);
+        service.GetSession(ownerB, context.SessionId).Should().BeNull();
+        service.Invoking(current => current.GetOrCreateSession(ownerB, context.SessionId))
+            .Should()
+            .Throw<ConversationSessionAccessException>();
+        service.Invoking(current => current.PrepareContext(new AiFlowGenerationRequest(
+                "forge owner A continuation",
+                SessionId: context.SessionId)
+            {
+                OwnerHash = ownerB
+            }))
+            .Should()
+            .Throw<ConversationSessionAccessException>();
+
+        service.TryUpdateWorkspaceSnapshot(ownerB, context.SessionId, new VisionAgentWorkspaceSnapshotUpdate
+        {
+            LifecycleState = "forged"
+        }).ErrorCode.Should().Be("session_not_found");
+        service.TryBackfillCanvasFlowJsonWithResult(
+                ownerB,
+                context.SessionId,
+                "{\"operators\":[],\"connections\":[]}")
+            .Status
+            .Should()
+            .Be(ConversationBackfillStatus.NotFound);
+        service.RecordAssistantResponseWithPersistence(
+                ownerHash: ownerB,
+                sessionId: context.SessionId,
+                assistantMessage: "forged",
+                latestFlowJson: null)
+            .Success
+            .Should()
+            .BeFalse();
+        service.DeleteSessionWithResult(ownerB, context.SessionId).Status
+            .Should()
+            .Be(ConversationSessionDeleteStatus.NotFound);
+
+        service.GetSession(ownerA, context.SessionId)!.History.Should().HaveCount(2);
+        service.DeleteSessionWithResult(ownerA, context.SessionId).Status
+            .Should()
+            .Be(ConversationSessionDeleteStatus.Deleted);
+        service.GetSession(ownerA, context.SessionId).Should().BeNull();
+    }
+
+    [Fact]
+    public void OwnerScopedSession_ShouldPersistOwnerAndRemainIsolatedAfterRestart()
+    {
+        var ownerA = AuthenticatedOwnerResolver.ResolveOwnerHash("persistent-user-a");
+        var ownerB = AuthenticatedOwnerResolver.ResolveOwnerHash("persistent-user-b");
+        var service = new ConversationalFlowService(_tempRoot);
+        service.PrepareContext(new AiFlowGenerationRequest(
+            "persist owner association",
+            SessionId: "persistent-owned-session")
+        {
+            OwnerHash = ownerA
+        });
+
+        using (var document = JsonDocument.Parse(File.ReadAllText(
+                   ConversationalFlowService.ResolveStoragePath(_tempRoot))))
+        {
+            document.RootElement.GetProperty("SchemaVersion").GetInt32()
+                .Should()
+                .Be(ConversationalFlowService.CurrentStoreSchemaVersion);
+            var stored = document.RootElement.GetProperty("Sessions").EnumerateArray().Single();
+            stored.GetProperty("OwnerHash").GetString().Should().Be(ownerA);
+            stored.GetRawText().Should().NotContain("persistent-user-a");
+        }
+
+        var reloaded = new ConversationalFlowService(_tempRoot);
+        reloaded.GetSession(ownerA, "persistent-owned-session").Should().NotBeNull();
+        reloaded.GetSession(ownerB, "persistent-owned-session").Should().BeNull();
+        reloaded.ListSessions(ownerB).Should().BeEmpty();
+    }
+
+    [Fact]
+    public void AgentRunAssociation_ShouldRequireTheSessionOwnerForBeginAndTerminalProjection()
+    {
+        var ownerA = AuthenticatedOwnerResolver.ResolveOwnerHash("agent-owner-a");
+        var ownerB = AuthenticatedOwnerResolver.ResolveOwnerHash("agent-owner-b");
+        var service = new ConversationalFlowService(_tempRoot);
+        service.PrepareContext(new AiFlowGenerationRequest(
+            "prepare owner A agent session",
+            SessionId: "agent-owned-session")
+        {
+            OwnerHash = ownerA
+        });
+
+        var forgedBegin = service.TryBeginAgentRun(
+            ownerHash: ownerB,
+            sessionId: "agent-owned-session",
+            runId: "run-owned-by-b",
+            kind: "build");
+        forgedBegin.Success.Should().BeFalse();
+        forgedBegin.ErrorCode.Should().Be("session_not_found");
+        service.GetSession(ownerA, "agent-owned-session")!.WorkspaceSnapshot.Should().BeNull();
+
+        var validBegin = service.TryBeginAgentRun(
+            ownerHash: ownerA,
+            sessionId: "agent-owned-session",
+            runId: "run-owned-by-a",
+            kind: "build");
+        validBegin.Success.Should().BeTrue();
+
+        var forgedTerminal = service.ProjectBuildTerminal(ownerB, new VisionAgentTerminalProjectionRequest
+        {
+            SessionId = "agent-owned-session",
+            AssistantTurnId = "build:run-owned-by-b:terminal",
+            AssistantMessage = "forged terminal",
+            WorkspaceUpdate = new VisionAgentWorkspaceSnapshotUpdate
+            {
+                LifecycleState = "build_completed",
+                BuildRunId = "run-owned-by-b",
+                BuildRunStatus = "completed"
+            }
+        });
+        forgedTerminal.Success.Should().BeFalse();
+        forgedTerminal.ErrorCode.Should().Be("session_not_found");
+
+        var persisted = service.GetSession(ownerA, "agent-owned-session")!;
+        persisted.WorkspaceSnapshot!.BuildRunId.Should().Be("run-owned-by-a");
+        persisted.History.Should().NotContain(turn => turn.Message == "forged terminal");
+    }
+
+    [Fact]
+    public void LoadSessionsFromStore_ShouldIsolateLegacyAndOwnerlessPrimarySessions()
+    {
+        Directory.CreateDirectory(_tempRoot);
+        File.WriteAllText(
+            ConversationalFlowService.ResolveStoragePath(_tempRoot),
+            """
+            {
+              "SchemaVersion": 1,
+              "Sessions": [
+                {
+                  "SessionId": "legacy-ownerless",
+                  "History": [{ "Role": "user", "Message": "do not restore" }],
+                  "UpdatedAtUtc": "2026-08-30T00:00:00Z"
+                }
+              ]
+            }
+            """);
+
+        var service = new ConversationalFlowService(_tempRoot);
+        var firstUser = AuthenticatedOwnerResolver.ResolveOwnerHash("first-user-after-upgrade");
+
+        service.ListSessions(firstUser).Should().BeEmpty();
+        service.GetSession(firstUser, "legacy-ownerless").Should().BeNull();
+        service.ListSessionsForRecovery().Should().BeEmpty();
+        service.GetSessionForRecovery("legacy-ownerless").Should().BeNull();
+    }
+
+    [Fact]
+    public void LoadSessionsFromStore_WhenPrimaryIsCorrupt_ShouldNotRecoverOwnerlessLastGood()
+    {
+        Directory.CreateDirectory(_tempRoot);
+        var storagePath = ConversationalFlowService.ResolveStoragePath(_tempRoot);
+        File.WriteAllText(storagePath, "{ corrupt primary");
+        File.WriteAllText(
+            storagePath + ".last-good",
+            """
+            {
+              "SchemaVersion": 2,
+              "Sessions": [
+                {
+                  "SessionId": "ownerless-last-good",
+                  "OwnerHash": "",
+                  "History": [{ "Role": "user", "Message": "do not recover" }],
+                  "UpdatedAtUtc": "2026-08-30T00:00:00Z"
+                }
+              ]
+            }
+            """);
+
+        var service = new ConversationalFlowService(_tempRoot);
+        var owner = AuthenticatedOwnerResolver.ResolveOwnerHash("new-owner");
+
+        service.ListSessions(owner).Should().BeEmpty();
+        service.ListSessionsForRecovery().Should().BeEmpty();
+        service.GetSessionForRecovery("ownerless-last-good").Should().BeNull();
+    }
+
+    [Fact]
+    public void AuthenticatedOwnerResolver_ShouldRemainAgentRunHashCompatible()
+    {
+        AuthenticatedOwnerResolver.ResolveOwnerHash("  compatibility-user  ")
+            .Should()
+            .Be("usr_b8e60e43f74c98d3251d947c2b7b9953e2209b16512de74c921d28ee114120b3");
+        AuthenticatedOwnerResolver.IsValidOwnerHash(
+                AuthenticatedOwnerResolver.ResolveOwnerHash("compatibility-user"))
+            .Should()
+            .BeTrue();
+        AuthenticatedOwnerResolver.IsValidOwnerHash("usr_NOT_HEX").Should().BeFalse();
     }
 
     public void Dispose()

@@ -76,9 +76,12 @@ public sealed class VisionAgentBuildTerminalProjector : IVisionAgentBuildTermina
             projection.TerminalEvent.Sequence,
             projection.TerminalEvent.EventType,
             proposedSessionId);
+        var ownerHash = string.IsNullOrWhiteSpace(projection.Request.OwnerHash)
+            ? ConversationalFlowService.LegacyTrustedOwnerHash
+            : projection.Request.OwnerHash.Trim();
         var session = projection.Recovered
-            ? _conversationalFlowService.GetSession(sessionId)
-            : _conversationalFlowService.GetOrCreateSession(sessionId);
+            ? _conversationalFlowService.GetSession(ownerHash, sessionId)
+            : _conversationalFlowService.GetOrCreateSession(ownerHash, sessionId);
         if (session == null)
         {
             return false;
@@ -96,6 +99,7 @@ public sealed class VisionAgentBuildTerminalProjector : IVisionAgentBuildTermina
             !VisionAgentBuildProjectionDispositionResolver.HasCompleteProjectionBasis(terminalSource))
         {
             MarkRecoveryConflict(
+                ownerHash,
                 session.SessionId,
                 runId,
                 NormalizeTerminalStatusFromEvent(terminal),
@@ -190,6 +194,7 @@ public sealed class VisionAgentBuildTerminalProjector : IVisionAgentBuildTermina
             !HasMatchingWorkspaceReceipt(session, projectionMutationId, projectionFingerprint))
         {
             MarkRecoveryConflict(
+                ownerHash,
                 session.SessionId,
                 runId,
                 NormalizeTerminalStatusFromEvent(terminal),
@@ -211,6 +216,7 @@ public sealed class VisionAgentBuildTerminalProjector : IVisionAgentBuildTermina
         if (begin.Status == VisionAgentBuildProjectionBeginStatus.MetadataConflict)
         {
             MarkRecoveryConflict(
+                ownerHash,
                 session.SessionId,
                 runId,
                 NormalizeTerminalStatusFromEvent(terminal),
@@ -226,12 +232,13 @@ public sealed class VisionAgentBuildTerminalProjector : IVisionAgentBuildTermina
 
         try
         {
-            var projectionResult = _conversationalFlowService.ProjectBuildTerminal(projectionRequest);
+            var projectionResult = _conversationalFlowService.ProjectBuildTerminal(ownerHash, projectionRequest);
             if (!projectionResult.Success)
             {
                 if (projection.Recovered && projectionResult.Conflict)
                 {
                     MarkRecoveryConflict(
+                        ownerHash,
                         session.SessionId,
                         runId,
                         NormalizeTerminalStatusFromEvent(terminal),
@@ -384,6 +391,7 @@ public sealed class VisionAgentBuildTerminalProjector : IVisionAgentBuildTermina
     }
 
     private void MarkRecoveryConflict(
+        string ownerHash,
         string sessionId,
         string runId,
         string terminalStatus,
@@ -395,7 +403,7 @@ public sealed class VisionAgentBuildTerminalProjector : IVisionAgentBuildTermina
             return;
         }
 
-        var latest = _conversationalFlowService.GetSession(sessionId);
+        var latest = _conversationalFlowService.GetSession(ownerHash, sessionId);
         if (latest?.WorkspaceSnapshot == null)
         {
             return;
@@ -414,7 +422,10 @@ public sealed class VisionAgentBuildTerminalProjector : IVisionAgentBuildTermina
             BuildRunId = runId,
             BuildRunStatus = terminalStatus
         };
-        var result = _conversationalFlowService.TryUpdateWorkspaceSnapshot(sessionId, update);
+        var result = _conversationalFlowService.TryUpdateWorkspaceSnapshotForRecovery(
+            ownerHash,
+            sessionId,
+            update);
         if (result.Success && result.PersistenceStatus.PrimaryStoreSaved)
         {
             LogRecoveryConflict(runId, sessionId, terminalStatus, conflictCode);
@@ -428,7 +439,7 @@ public sealed class VisionAgentBuildTerminalProjector : IVisionAgentBuildTermina
                 : result.PublicMessage);
         }
 
-        var reread = _conversationalFlowService.GetSession(sessionId);
+        var reread = _conversationalFlowService.GetSession(ownerHash, sessionId);
         if (HasAppliedRecoveryConflict(reread, runId, terminalStatus))
         {
             LogRecoveryConflict(runId, sessionId, terminalStatus, conflictCode);
@@ -534,6 +545,7 @@ public sealed class VisionAgentBuildTerminalProjector : IVisionAgentBuildTermina
             SessionId: sessionId,
             Mode: GenerateFlowModeExtensions.ParseOrAuto(TryReadString(source, "requestedMode")))
         {
+            OwnerHash = replay.Summary.OwnerHash,
             AgentRunId = terminal.RunId,
             UseVisionAgentGenerateFlow = true,
             AgentGenerateFlowMode = AiAgentGenerateFlowModes.Normalize(TryReadString(source, "requestedMode")),

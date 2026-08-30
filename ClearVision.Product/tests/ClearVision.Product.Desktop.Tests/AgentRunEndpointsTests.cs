@@ -1,9 +1,11 @@
 using System.Net;
 using System.Net.Http.Json;
+using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using ClearVision.Product.Application.DTOs;
+using ClearVision.Product.Application.Security;
 using ClearVision.Product.Application.Services;
 using ClearVision.Product.Contracts.Messages;
 using ClearVision.Product.Core.AI.Tools;
@@ -95,7 +97,7 @@ public sealed class AgentRunEndpointsTests
             evt.EventType is AgentRunEventTypes.RunCompleted or
                 AgentRunEventTypes.RunFailed or
                 AgentRunEventTypes.RunCancelled);
-        var session = host.ConversationService.GetSession(sessionId)!;
+        var session = host.GetSession(sessionId)!;
         session.History.Should().HaveCount(1);
         session.History[0].Payload!.Progress.Should()
             .Contain(BuildCommandTransports.AgentRun)
@@ -110,7 +112,7 @@ public sealed class AgentRunEndpointsTests
             terminal));
 
         duplicate.Should().BeFalse();
-        host.ConversationService.GetSession(sessionId)!.History.Should().HaveCount(1);
+        host.GetSession(sessionId)!.History.Should().HaveCount(1);
     }
 
     [Fact(DisplayName = "POST Agent plan returns backend structured scenario-specific PlanModeResult")]
@@ -180,7 +182,9 @@ public sealed class AgentRunEndpointsTests
                     !string.IsNullOrWhiteSpace(option.GetProperty("impact").GetString())));
         scratch.GetProperty("metadataOnly").GetBoolean().Should().BeTrue();
         var recovered = new ConversationalFlowService(Path.Combine(host.RootDirectory, "sessions"));
-        var recoveredSession = recovered.GetSession(scratchEnvelope.GetProperty("sessionId").GetString()!);
+        var recoveredSession = recovered.GetSession(
+            host.OwnerHash,
+            scratchEnvelope.GetProperty("sessionId").GetString()!);
         recoveredSession.Should().NotBeNull();
         recoveredSession!.History.Should().ContainSingle(turn => turn.Role == "user");
         recoveredSession.WorkspaceSnapshot.Should().NotBeNull();
@@ -239,7 +243,7 @@ public sealed class AgentRunEndpointsTests
         root.GetProperty("persistenceStatus").GetProperty("primaryStoreSaved").GetBoolean().Should().BeFalse();
         root.GetProperty("metadataOnly").GetBoolean().Should().BeTrue();
         plannerCalled.Should().BeFalse();
-        host.ConversationService.GetSession("session-plan-create-primary-fail").Should().BeNull();
+        host.GetSession("session-plan-create-primary-fail").Should().BeNull();
     }
 
     [Fact(DisplayName = "POST Agent plan terminal persistence failure returns plan with warning")]
@@ -280,7 +284,7 @@ public sealed class AgentRunEndpointsTests
         root.GetProperty("persistenceWarning").GetProperty("code").GetString().Should().Be("primary_store_save_failed");
         root.GetProperty("workspaceSnapshot").GetProperty("lifecycleState").GetString().Should().Be("planning");
         plannerCalled.Should().BeTrue();
-        host.ConversationService.GetSession("session-plan-create-terminal-fail")!
+        host.GetSession("session-plan-create-terminal-fail")!
             .WorkspaceSnapshot!
             .PendingPlanSnapshot
             .Should()
@@ -322,7 +326,7 @@ public sealed class AgentRunEndpointsTests
         root.TryGetProperty("runId", out _).Should().BeFalse();
         host.StreamService.ReplayLatest(string.Empty).Should().BeNull();
         host.Generation.LastCommand.Should().BeNull();
-        host.ConversationService.GetSession("agent-ui-contract").Should().BeNull();
+        host.GetSession("agent-ui-contract").Should().BeNull();
     }
 
     [Fact(DisplayName = "POST Agent intent router returns public route decision")]
@@ -597,10 +601,10 @@ public sealed class AgentRunEndpointsTests
 
         await host.WaitForTerminalAsync(runId!);
 
-        host.ConversationService.ListSessions()
+        host.ListSessions()
             .Should()
             .Contain(summary => summary.SessionId == sessionId);
-        var session = host.ConversationService.GetSession(sessionId!);
+        var session = host.GetSession(sessionId!);
         session.Should().NotBeNull();
         session!.History.Should().ContainSingle(turn =>
             turn.Role == "user" &&
@@ -655,7 +659,7 @@ public sealed class AgentRunEndpointsTests
         JsonSerializer.Serialize(root.GetProperty("events")).Should().Contain("session_persistence_failed");
         plannerCalled.Should().BeFalse();
         host.StreamService.Replay(runId)!.Summary.Status.Should().Be(AgentRunEventStatuses.Failed);
-        host.ConversationService.GetSession("session-plan-primary-fail").Should().BeNull();
+        host.GetSession("session-plan-primary-fail").Should().BeNull();
     }
 
     [Fact(DisplayName = "PlanRun terminal persistence failure emits explicit warning")]
@@ -698,7 +702,7 @@ public sealed class AgentRunEndpointsTests
             .Should()
             .Be(AgentRunEventStatuses.Running);
         payload.GetProperty("persistenceStatus").GetProperty("primaryStoreSaved").GetBoolean().Should().BeFalse();
-        host.ConversationService.GetSession("session-plan-terminal-fail")!
+        host.GetSession("session-plan-terminal-fail")!
             .WorkspaceSnapshot!
             .PlanRunStatus
             .Should().Be(AgentRunEventStatuses.Running);
@@ -975,7 +979,7 @@ public sealed class AgentRunEndpointsTests
         await WaitForPlanRunBackgroundSettleAsync(host, runId, sessionId);
 
         var beforeReplay = host.StreamService.Replay(runId)!;
-        var beforeRevision = host.ConversationService.GetSession(sessionId)!.WorkspaceSnapshot!.Revision;
+        var beforeRevision = host.GetSession(sessionId)!.WorkspaceSnapshot!.Revision;
         using var cancel = await host.Client.PostAsync($"/api/ai/agent-runs/{runId}/cancel", content: null);
         cancel.StatusCode.Should().Be(HttpStatusCode.Conflict);
         using var document = JsonDocument.Parse(await cancel.Content.ReadAsStringAsync());
@@ -987,8 +991,8 @@ public sealed class AgentRunEndpointsTests
         afterReplay.Events.Count.Should().Be(beforeReplay.Events.Count);
         afterReplay.Events.Count(evt => evt.EventType == AgentRunEventTypes.RunCompleted).Should().Be(1);
         afterReplay.Events.Should().NotContain(evt => evt.EventType == AgentRunEventTypes.RunCancelled);
-        host.ConversationService.GetSession(sessionId)!.WorkspaceSnapshot!.Revision.Should().Be(beforeRevision);
-        host.ConversationService.GetSession(sessionId)!.WorkspaceSnapshot!.PlanRunStatus.Should().Be(AgentRunEventStatuses.Completed);
+        host.GetSession(sessionId)!.WorkspaceSnapshot!.Revision.Should().Be(beforeRevision);
+        host.GetSession(sessionId)!.WorkspaceSnapshot!.PlanRunStatus.Should().Be(AgentRunEventStatuses.Completed);
     }
 
     [Fact(DisplayName = "Plan run failed terminal rejects late cancel without plan_cancelled write")]
@@ -1002,7 +1006,7 @@ public sealed class AgentRunEndpointsTests
         await WaitForPlanRunBackgroundSettleAsync(host, runId, sessionId);
 
         var beforeReplay = host.StreamService.Replay(runId)!;
-        var beforeRevision = host.ConversationService.GetSession(sessionId)!.WorkspaceSnapshot!.Revision;
+        var beforeRevision = host.GetSession(sessionId)!.WorkspaceSnapshot!.Revision;
         var writesAfterFailure = 0;
         host.ConcreteConversationService.PrimaryStoreWriteFaultInjector = () => Interlocked.Increment(ref writesAfterFailure);
 
@@ -1017,8 +1021,8 @@ public sealed class AgentRunEndpointsTests
         afterReplay.Events.Count.Should().Be(beforeReplay.Events.Count);
         afterReplay.Events.Count(evt => evt.EventType == AgentRunEventTypes.RunFailed).Should().Be(1);
         afterReplay.Events.Should().NotContain(evt => evt.EventType == AgentRunEventTypes.PlanCancelled);
-        host.ConversationService.GetSession(sessionId)!.WorkspaceSnapshot!.Revision.Should().Be(beforeRevision);
-        host.ConversationService.GetSession(sessionId)!.WorkspaceSnapshot!.PlanRunStatus.Should().Be(AgentRunEventStatuses.Failed);
+        host.GetSession(sessionId)!.WorkspaceSnapshot!.Revision.Should().Be(beforeRevision);
+        host.GetSession(sessionId)!.WorkspaceSnapshot!.PlanRunStatus.Should().Be(AgentRunEventStatuses.Failed);
     }
 
     [Fact(DisplayName = "Plan run repeated cancel is idempotent without events or revision change")]
@@ -1046,7 +1050,7 @@ public sealed class AgentRunEndpointsTests
         await plannerExited.Task.WaitAsync(TimeSpan.FromSeconds(5));
         await WaitForPlanRunBackgroundSettleAsync(host, runId, sessionId);
         var beforeReplay = host.StreamService.Replay(runId)!;
-        var beforeRevision = host.ConversationService.GetSession(sessionId)!.WorkspaceSnapshot!.Revision;
+        var beforeRevision = host.GetSession(sessionId)!.WorkspaceSnapshot!.Revision;
         var writesAfterFirstCancel = 0;
         host.ConcreteConversationService.PrimaryStoreWriteFaultInjector = () => Interlocked.Increment(ref writesAfterFirstCancel);
 
@@ -1060,8 +1064,8 @@ public sealed class AgentRunEndpointsTests
         var afterReplay = host.StreamService.Replay(runId)!;
         afterReplay.Events.Count.Should().Be(beforeReplay.Events.Count);
         afterReplay.Events.Count(evt => evt.EventType == AgentRunEventTypes.RunCancelled).Should().Be(1);
-        host.ConversationService.GetSession(sessionId)!.WorkspaceSnapshot!.Revision.Should().Be(beforeRevision);
-        host.ConversationService.GetSession(sessionId)!.WorkspaceSnapshot!.PlanRunStatus.Should().Be(AgentRunEventStatuses.Cancelled);
+        host.GetSession(sessionId)!.WorkspaceSnapshot!.Revision.Should().Be(beforeRevision);
+        host.GetSession(sessionId)!.WorkspaceSnapshot!.PlanRunStatus.Should().Be(AgentRunEventStatuses.Cancelled);
     }
 
     [Fact(DisplayName = "Plan run endpoint cancel and planner OperationCanceledException race to one cancelled terminal")]
@@ -1346,7 +1350,7 @@ public sealed class AgentRunEndpointsTests
         releaseFirstBuild.SetResult();
         await host.WaitForTerminalAsync(firstRunId);
         await host.WaitForWorkspaceBuildStatusAsync(sessionId, AgentRunEventStatuses.Completed);
-        host.ConversationService.GetSession(sessionId)!.WorkspaceSnapshot!.BuildRunStatus
+        host.GetSession(sessionId)!.WorkspaceSnapshot!.BuildRunStatus
             .Should().Be(AgentRunEventStatuses.Completed);
     }
 
@@ -1372,10 +1376,16 @@ public sealed class AgentRunEndpointsTests
             return Task.FromResult(result);
         });
         var plan = LegacyBlockedAgentRunBuildFromPlanSnapshot();
+        const string sessionId = "session-old-blocked-plan";
+        var initial = host.InitializeWorkspaceSnapshot(sessionId, new VisionAgentWorkspaceSnapshotUpdate
+        {
+            LifecycleState = "plan_ready"
+        });
 
         using var response = await host.Client.PostAsJsonAsync("/api/ai/agent-runs", new AgentRunCreateRequest
         {
             Description = "start build from confirmed plan",
+            SessionId = sessionId,
             Mode = "new",
             RequirementMode = AiRequirementModes.Strict,
             UseVisionAgentGenerateFlow = true,
@@ -1387,6 +1397,7 @@ public sealed class AgentRunEndpointsTests
                 PlanSnapshot = plan,
                 ConfirmedAnswers = ConfirmedAgentRunBuildFromPlanAnswers(),
                 OriginalUserPrompt = plan.OriginalUserPrompt,
+                WorkspaceExpectedRevision = initial.Revision,
                 MetadataOnly = true
             }
         });
@@ -1431,6 +1442,10 @@ public sealed class AgentRunEndpointsTests
     {
         await using var host = await AgentRunEndpointTestHost.CreateAsync();
         const string currentFlowSnapshot = "{\"operators\":[{\"id\":\"existing-camera\"}],\"connections\":[]}";
+        var initial = host.InitializeWorkspaceSnapshot("session-plan-build", new VisionAgentWorkspaceSnapshotUpdate
+        {
+            LifecycleState = "plan_ready"
+        });
 
         using var response = await host.Client.PostAsJsonAsync("/api/ai/agent-runs", new
         {
@@ -1547,6 +1562,7 @@ public sealed class AgentRunEndpointsTests
                 plcOutputPolicy = "local result first",
                 buildIntent = "modify",
                 originalUserPrompt = "帮我做一个金属表面划痕检测流程",
+                workspaceExpectedRevision = initial.Revision,
                 acceptedRecommendedDefaults = true,
                 metadataOnly = true
             }
@@ -1582,7 +1598,7 @@ public sealed class AgentRunEndpointsTests
             "canonical_build_readiness"
         ]);
         var completed = replay.Events.Single(evt => evt.EventType == AgentRunEventTypes.RunCompleted);
-        var session = host.ConversationService.GetSession("session-plan-build")!;
+        var session = host.GetSession("session-plan-build")!;
         session.History.Should().HaveCount(1);
         session.History[0].Payload!.Progress.Should()
             .Contain(BuildCommandTransports.AgentRun)
@@ -1620,6 +1636,10 @@ public sealed class AgentRunEndpointsTests
     public async Task CreateRun_BuildFromPlanPrimaryPersistenceFailure_ShouldNotStartBackgroundRun()
     {
         await using var host = await AgentRunEndpointTestHost.CreateAsync();
+        var initial = host.InitializeWorkspaceSnapshot("session-build-primary-fail", new VisionAgentWorkspaceSnapshotUpdate
+        {
+            LifecycleState = "plan_ready"
+        });
         host.ConcreteConversationService.PrimaryStoreWriteFaultInjector = () => throw new IOException("primary failed");
 
         using var response = await host.Client.PostAsJsonAsync("/api/ai/agent-runs", new AgentRunCreateRequest
@@ -1628,7 +1648,10 @@ public sealed class AgentRunEndpointsTests
             SessionId = "session-build-primary-fail",
             Mode = "new",
             UseVisionAgentGenerateFlow = true,
-            BuildFromPlan = BuildableAgentRunBuildFromPlanRequest()
+            BuildFromPlan = BuildableAgentRunBuildFromPlanRequest() with
+            {
+                WorkspaceExpectedRevision = initial.Revision
+            }
         });
 
         response.StatusCode.Should().Be(HttpStatusCode.ServiceUnavailable);
@@ -1642,14 +1665,17 @@ public sealed class AgentRunEndpointsTests
         JsonSerializer.Serialize(root.GetProperty("events")).Should().Contain("session_persistence_failed");
         host.Generation.LastCommand.Should().BeNull();
         host.StreamService.Replay(runId)!.Summary.Status.Should().Be(AgentRunEventStatuses.Failed);
-        host.ConversationService.GetSession("session-build-primary-fail").Should().BeNull();
+        var persisted = host.GetSession("session-build-primary-fail");
+        persisted.Should().NotBeNull();
+        persisted!.WorkspaceSnapshot!.Revision.Should().Be(initial.Revision);
+        persisted.WorkspaceSnapshot.BuildRunId.Should().BeNull();
     }
 
     [Fact(DisplayName = "POST AgentRun BuildFromPlan stale workspace revision returns controlled failed run")]
     public async Task CreateRun_BuildFromPlanStaleWorkspaceRevision_ShouldNotStartBackgroundRun()
     {
         await using var host = await AgentRunEndpointTestHost.CreateAsync();
-        var initial = host.ConversationService.UpdateWorkspaceSnapshot(
+        var initial = host.InitializeWorkspaceSnapshot(
             "session-build-stale-revision",
             new VisionAgentWorkspaceSnapshotUpdate
             {
@@ -1665,7 +1691,7 @@ public sealed class AgentRunEndpointsTests
             UseVisionAgentGenerateFlow = true,
             BuildFromPlan = BuildableAgentRunBuildFromPlanRequest() with
             {
-                WorkspaceExpectedRevision = initial.WorkspaceSnapshot!.Revision - 1
+                WorkspaceExpectedRevision = initial.Snapshot!.Revision - 1
             }
         });
 
@@ -1674,10 +1700,10 @@ public sealed class AgentRunEndpointsTests
         var root = document.RootElement;
         root.GetProperty("errorCode").GetString().Should().Be("workspace_revision_conflict");
         root.GetProperty("workspaceSnapshot").GetProperty("revision").GetInt64()
-            .Should().Be(initial.WorkspaceSnapshot.Revision);
+            .Should().Be(initial.Snapshot.Revision);
         JsonSerializer.Serialize(root.GetProperty("events")).Should().Contain("workspace_revision_conflict");
         host.Generation.LastCommand.Should().BeNull();
-        host.ConversationService.GetSession("session-build-stale-revision")!
+        host.GetSession("session-build-stale-revision")!
             .WorkspaceSnapshot!
             .BuildRunId
             .Should().BeNull();
@@ -1687,7 +1713,7 @@ public sealed class AgentRunEndpointsTests
     public async Task CreateRun_BuildFromPlanMissingWorkspaceRevision_ShouldNotStartBackgroundRun()
     {
         await using var host = await AgentRunEndpointTestHost.CreateAsync();
-        var initial = host.ConversationService.UpdateWorkspaceSnapshot(
+        var initial = host.InitializeWorkspaceSnapshot(
             "session-build-missing-revision",
             new VisionAgentWorkspaceSnapshotUpdate
             {
@@ -1709,10 +1735,10 @@ public sealed class AgentRunEndpointsTests
         var root = document.RootElement;
         root.GetProperty("errorCode").GetString().Should().Be("workspace_revision_required");
         root.GetProperty("workspaceSnapshot").GetProperty("revision").GetInt64()
-            .Should().Be(initial.WorkspaceSnapshot!.Revision);
+            .Should().Be(initial.Snapshot!.Revision);
         JsonSerializer.Serialize(root.GetProperty("events")).Should().Contain("workspace_revision_required");
         host.Generation.LastCommand.Should().BeNull();
-        host.ConversationService.GetSession("session-build-missing-revision")!
+        host.GetSession("session-build-missing-revision")!
             .WorkspaceSnapshot!
             .BuildRunId
             .Should().BeNull();
@@ -1737,7 +1763,7 @@ public sealed class AgentRunEndpointsTests
             releaseUpdate.Task.GetAwaiter().GetResult();
         };
 
-        var workspaceTask = Task.Run(() => host.ConversationService.TryUpdateWorkspaceSnapshot(
+        var workspaceTask = Task.Run(() => host.InitializeWorkspaceSnapshot(
             sessionId,
             new VisionAgentWorkspaceSnapshotUpdate
             {
@@ -1766,7 +1792,7 @@ public sealed class AgentRunEndpointsTests
         root.GetProperty("workspaceSnapshot").GetProperty("revision").GetInt64()
             .Should().Be(initial.Revision);
         host.Generation.LastCommand.Should().BeNull();
-        host.ConversationService.GetSession(sessionId)!
+        host.GetSession(sessionId)!
             .WorkspaceSnapshot!
             .BuildRunId
             .Should().BeNull();
@@ -1776,6 +1802,10 @@ public sealed class AgentRunEndpointsTests
     public async Task CreateRun_BuildFromPlanBackupPersistenceFailure_ShouldStartBackgroundRunWithDegradedStatus()
     {
         await using var host = await AgentRunEndpointTestHost.CreateAsync();
+        var initial = host.InitializeWorkspaceSnapshot("session-build-backup-fail", new VisionAgentWorkspaceSnapshotUpdate
+        {
+            LifecycleState = "plan_ready"
+        });
         host.ConcreteConversationService.RecoveryBackupWriteFaultInjector = () => throw new IOException("backup failed");
 
         using var response = await host.Client.PostAsJsonAsync("/api/ai/agent-runs", new AgentRunCreateRequest
@@ -1784,7 +1814,10 @@ public sealed class AgentRunEndpointsTests
             SessionId = "session-build-backup-fail",
             Mode = "new",
             UseVisionAgentGenerateFlow = true,
-            BuildFromPlan = BuildableAgentRunBuildFromPlanRequest()
+            BuildFromPlan = BuildableAgentRunBuildFromPlanRequest() with
+            {
+                WorkspaceExpectedRevision = initial.Revision
+            }
         });
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
@@ -1847,15 +1880,22 @@ public sealed class AgentRunEndpointsTests
         }));
 
         var plan = LegacyBlockedAgentRunBuildFromPlanSnapshot();
+        const string sessionId = "session-blocked-build-readiness";
+        var initial = host.InitializeWorkspaceSnapshot(sessionId, new VisionAgentWorkspaceSnapshotUpdate
+        {
+            LifecycleState = "plan_ready"
+        });
         using var response = await host.Client.PostAsJsonAsync("/api/ai/agent-runs", new AgentRunCreateRequest
         {
             Description = "start build from blocked canonical plan",
+            SessionId = sessionId,
             BuildFromPlan = new VisionAgentBuildFromPlanRequest
             {
                 PlanId = plan.PlanId,
                 PlanHash = plan.PlanHash,
                 PlanSnapshot = plan,
                 ConfirmedAnswers = ConfirmedAgentRunBuildFromPlanAnswers(),
+                WorkspaceExpectedRevision = initial.Revision,
                 MetadataOnly = true
             }
         });
@@ -2176,6 +2216,65 @@ public sealed class AgentRunEndpointsTests
         await host.WaitForTerminalAsync(runId);
     }
 
+    [Fact(DisplayName = "AgentRun and workspace association reject another owner's session id as opaque 404")]
+    public async Task AuthenticatedSessionAssociation_ShouldRejectWrongOwnerAsNotFound()
+    {
+        await using var host = await AgentRunEndpointTestHost.CreateAsync(useAuth: true);
+        host.AuthorizeAs("owner-a-token");
+        const string sessionId = "owner-a-protected-session";
+        var planRunId = await host.CreatePlanRunAsync("owner A plan", sessionId);
+        await host.WaitForTerminalAsync(planRunId);
+        var ownerASession = host.GetSession(sessionId);
+        ownerASession.Should().NotBeNull();
+        var ownerARevision = ownerASession!.WorkspaceSnapshot!.Revision;
+        var buildCallsBeforeForgery = host.Generation.BuildCallCount;
+
+        host.AuthorizeAs("owner-b-token");
+        using var adHoc = await host.Client.PostAsJsonAsync("/api/ai/agent-runs", new AgentRunCreateRequest
+        {
+            Description = "forge owner A ad-hoc continuation",
+            SessionId = sessionId,
+            UseVisionAgentGenerateFlow = true
+        });
+        using var build = await host.Client.PostAsJsonAsync("/api/ai/agent-runs", new AgentRunCreateRequest
+        {
+            Description = "forge owner A plan association",
+            SessionId = sessionId,
+            UseVisionAgentGenerateFlow = true,
+            BuildFromPlan = BuildableAgentRunBuildFromPlanRequest()
+        });
+        using var plan = await host.Client.PostAsJsonAsync("/api/ai/agent-plan-runs", new VisionAgentPlanModeRequest
+        {
+            Description = "forge owner A plan session",
+            OriginalUserPrompt = "forge owner A plan session",
+            SessionId = sessionId
+        });
+        using var mutation = await host.Client.PostAsJsonAsync(
+            $"/api/ai/sessions/{sessionId}/workspace-snapshot",
+            new VisionAgentWorkspaceSnapshotDeltaRequest
+            {
+                LifecycleState = "forged"
+            });
+
+        adHoc.StatusCode.Should().Be(HttpStatusCode.NotFound);
+        build.StatusCode.Should().Be(HttpStatusCode.NotFound);
+        plan.StatusCode.Should().Be(HttpStatusCode.NotFound);
+        mutation.StatusCode.Should().Be(HttpStatusCode.NotFound);
+        host.Generation.BuildCallCount.Should().Be(buildCallsBeforeForgery);
+        host.GetSession(sessionId).Should().BeNull();
+
+        host.AuthorizeAs("owner-a-token");
+        var persisted = host.GetSession(sessionId)!;
+        persisted.WorkspaceSnapshot!.Revision.Should().Be(ownerARevision);
+        persisted.WorkspaceSnapshot.LifecycleState.Should().NotBe("forged");
+        using var replay = await host.Client.GetAsync($"/api/ai/agent-runs/{planRunId}");
+        replay.StatusCode.Should().Be(HttpStatusCode.OK);
+        (await replay.Content.ReadAsStringAsync())
+            .ToLowerInvariant()
+            .Should()
+            .NotContain("ownerhash");
+    }
+
     [Fact(DisplayName = "AgentRun EventSource stream token is single-use run-bound and expires")]
     public async Task EventSourceStreamToken_ShouldBeSingleUseRunBoundAndExpire()
     {
@@ -2420,7 +2519,7 @@ public sealed class AgentRunEndpointsTests
         while (!cts.IsCancellationRequested)
         {
             var replay = host.StreamService.Replay(runId)!;
-            var revision = host.ConversationService.GetSession(sessionId)?.WorkspaceSnapshot?.Revision ?? -1L;
+            var revision = host.GetSession(sessionId)?.WorkspaceSnapshot?.Revision ?? -1L;
             if (replay.Events.Count == lastEventCount && revision == lastRevision)
             {
                 if (DateTimeOffset.UtcNow - stableSince >= TimeSpan.FromMilliseconds(200))
@@ -2454,7 +2553,7 @@ public sealed class AgentRunEndpointsTests
         replay.Diagnostics.DroppedEventCount.Should().Be(0);
         replay.Summary.Status.Should().Be(AgentRunEventStatuses.Cancelled);
 
-        var session = host.ConversationService.GetSession(sessionId)!;
+        var session = host.GetSession(sessionId)!;
         var runCancelled = replay.Events.Last(evt => evt.EventType == AgentRunEventTypes.RunCancelled);
         var payload = SerializePayloadElement(runCancelled.Payload);
         var payloadSnapshot = payload.GetProperty("workspaceSnapshot");
@@ -2521,6 +2620,42 @@ public sealed class AgentRunEndpointsTests
 
         public IVisionAgentBuildTerminalProjector TerminalProjector { get; }
 
+        public string OwnerHash => CurrentOwnerHash;
+
+        private string CurrentOwnerHash
+        {
+            get
+            {
+                var token = Client.DefaultRequestHeaders.Authorization?.Parameter;
+                var userId = token switch
+                {
+                    "owner-a-token" => "user-owner-a",
+                    "owner-b-token" => "user-owner-b",
+                    _ => "user-default"
+                };
+                return AuthenticatedOwnerResolver.ResolveOwnerHash(userId);
+            }
+        }
+
+        public ConversationSession? GetSession(string sessionId) =>
+            ConversationService.GetSession(CurrentOwnerHash, sessionId);
+
+        public ConversationSession GetOrCreateSession(string? sessionId = null) =>
+            ConversationService.GetOrCreateSession(CurrentOwnerHash, sessionId);
+
+        public VisionAgentWorkspaceSnapshotMutationResult InitializeWorkspaceSnapshot(
+            string sessionId,
+            VisionAgentWorkspaceSnapshotUpdate update) =>
+            ConversationService.TryInitializeWorkspaceSnapshot(CurrentOwnerHash, sessionId, update);
+
+        public IReadOnlyList<ConversationSessionSummary> ListSessions() =>
+            ConversationService.ListSessions(CurrentOwnerHash);
+
+        public VisionAgentWorkspaceSnapshotMutationResult TryUpdateWorkspaceSnapshot(
+            string sessionId,
+            VisionAgentWorkspaceSnapshotUpdate update) =>
+            ConversationService.TryUpdateWorkspaceSnapshot(CurrentOwnerHash, sessionId, update);
+
         public static async Task<AgentRunEndpointTestHost> CreateAsync(
             Func<AiFlowGenerationRequest, CancellationToken, Task<AiFlowGenerationResult>>? handler = null,
             bool useAuth = false,
@@ -2575,6 +2710,19 @@ public sealed class AgentRunEndpointsTests
             if (useAuth)
             {
                 app.UseMiddleware<AuthMiddleware>();
+            }
+            else
+            {
+                app.Use(async (context, next) =>
+                {
+                    context.User = new ClaimsPrincipal(new ClaimsIdentity(
+                    [
+                        new Claim(ClaimTypes.NameIdentifier, "user-default"),
+                        new Claim(ClaimTypes.Name, "user-default"),
+                        new Claim(ClaimTypes.Role, "Admin")
+                    ], "AgentRunEndpointTests"));
+                    await next();
+                });
             }
             app.MapAgentRunEndpoints();
             await app.StartAsync();
@@ -2671,7 +2819,7 @@ public sealed class AgentRunEndpointsTests
             using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
             while (!cts.IsCancellationRequested)
             {
-                var session = ConversationService.GetSession(sessionId);
+                var session = GetSession(sessionId);
                 if (session?.History.Count >= expectedCount)
                 {
                     return;
@@ -2688,7 +2836,7 @@ public sealed class AgentRunEndpointsTests
             using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
             while (!cts.IsCancellationRequested)
             {
-                var status = ConversationService.GetSession(sessionId)?.WorkspaceSnapshot?.BuildRunStatus;
+                var status = GetSession(sessionId)?.WorkspaceSnapshot?.BuildRunStatus;
                 if (string.Equals(status, expectedStatus, StringComparison.OrdinalIgnoreCase))
                 {
                     return;
