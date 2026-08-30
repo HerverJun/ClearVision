@@ -166,7 +166,11 @@ public class InspectionServiceSingleRunTests
                     ["Height"] = 1
                 }
             }));
-        imageCache.AddAsync(Arg.Any<byte[]>(), Arg.Any<string>()).Returns(imageId);
+        imageCache.AddResultAsync(
+                Arg.Any<byte[]>(),
+                Arg.Any<string>(),
+                Arg.Any<ResultImageCacheAuthority>())
+            .Returns(imageId);
         resultRepository.AddAsync(Arg.Any<InspectionResult>())
             .Returns(callInfo => Task.FromResult(callInfo.Arg<InspectionResult>()));
 
@@ -189,9 +193,12 @@ public class InspectionServiceSingleRunTests
         result.OutputImage.Should().Equal(inputImage);
         result.ImageId.Should().Be(imageId);
         await imagePersistence.Received(1).PersistAsync(result, Arg.Any<CancellationToken>());
-        await imageCache.Received(1).AddAsync(
+        await imageCache.Received(1).AddResultAsync(
             Arg.Is<byte[]>(bytes => bytes.SequenceEqual(inputImage)),
-            Arg.Any<string>());
+            Arg.Any<string>(),
+            Arg.Is<ResultImageCacheAuthority>(authority =>
+                authority.ProjectId == projectId &&
+                authority.ResultId == result.Id));
     }
 
     [Fact]
@@ -921,7 +928,11 @@ public class InspectionServiceSingleRunTests
                     ["CalibrationBundleId"] = "bundle-followup"
                 }
             }));
-        imageCache.AddAsync(Arg.Any<byte[]>(), Arg.Any<string>()).Returns(Task.FromResult(cachedImageId));
+        imageCache.AddResultAsync(
+                Arg.Any<byte[]>(),
+                Arg.Any<string>(),
+                Arg.Any<ResultImageCacheAuthority>())
+            .Returns(Task.FromResult(cachedImageId));
         resultRepository
             .AddAsync(Arg.Do<InspectionResult>(item => persistedResult = item))
             .Returns(callInfo => Task.FromResult(callInfo.Arg<InspectionResult>()));
@@ -1091,7 +1102,10 @@ public class InspectionServiceSingleRunTests
             .AddAsync(Arg.Any<InspectionResult>())
             .Returns(callInfo => Task.FromResult(callInfo.Arg<InspectionResult>()));
         imageCache
-            .AddAsync(Arg.Any<byte[]>(), Arg.Any<string>())
+            .AddResultAsync(
+                Arg.Any<byte[]>(),
+                Arg.Any<string>(),
+                Arg.Any<ResultImageCacheAuthority>())
             .Returns(Task.FromResult(Guid.Empty));
         var fallbackSnapshot = FallbackImageDirectorySnapshot.Capture();
 

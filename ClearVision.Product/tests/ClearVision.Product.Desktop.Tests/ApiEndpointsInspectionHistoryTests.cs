@@ -315,6 +315,8 @@ public sealed class ApiEndpointsInspectionHistoryTests
         root.GetProperty("id").GetGuid().Should().Be(result.Id);
         root.GetProperty("projectId").GetGuid().Should().Be(projectId);
         root.GetProperty("imageId").GetGuid().Should().Be(imageId);
+        root.GetProperty("imageReference").GetString().Should().Be(
+            $"/api/projects/{projectId:D}/inspection-results/{result.Id:D}/image");
         root.GetProperty("outputImage").ValueKind.Should().Be(JsonValueKind.Null);
         root.GetProperty("outputData").GetProperty("score").GetInt32().Should().Be(88);
         root.GetProperty("defectCount").GetInt32().Should().Be(1);
@@ -445,7 +447,8 @@ public sealed class ApiEndpointsInspectionHistoryTests
         item.TryGetProperty("analysisData", out _).Should().BeFalse();
         item.GetProperty("imageId").GetGuid().Should().Be(imageId);
         item.GetProperty("hasImage").GetBoolean().Should().BeTrue();
-        item.GetProperty("imageReference").GetString().Should().Be($"/api/images/{imageId:D}");
+        item.GetProperty("imageReference").GetString().Should().Be(
+            $"/api/projects/{projectId:D}/inspection-results/{result.Id:D}/image");
         item.GetProperty("hasOutputData").GetBoolean().Should().BeTrue();
         item.GetProperty("hasAnalysisData").GetBoolean().Should().BeTrue();
         item.GetProperty("flowVersionHash").GetString().Should().Be("FLOW-HASH-1");
@@ -540,7 +543,8 @@ public sealed class ApiEndpointsInspectionHistoryTests
 
         using var document = JsonDocument.Parse(json);
         var root = document.RootElement;
-        root.GetProperty("imageReference").GetString().Should().Be($"/api/images/{imageId:D}");
+        root.GetProperty("imageReference").GetString().Should().Be(
+            $"/api/projects/{detail.ProjectId:D}/inspection-results/{detail.Id:D}/image");
         root.GetProperty("outputDataPreview").GetProperty("wasTruncated").GetBoolean().Should().BeTrue();
         root.GetProperty("outputDataPreview").GetProperty("wasRedacted").GetBoolean().Should().BeTrue();
         root.GetProperty("analysisDataPreview").GetProperty("wasRedacted").GetBoolean().Should().BeTrue();

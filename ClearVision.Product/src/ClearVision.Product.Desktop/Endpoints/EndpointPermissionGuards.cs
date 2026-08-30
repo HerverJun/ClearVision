@@ -15,6 +15,7 @@ public static class ClearVisionPermissionPolicies
     public const string CanEditProject = ClearVisionAuthorizationPolicies.CanEditProject;
     public const string CanOperateHardware = ClearVisionAuthorizationPolicies.CanOperateHardware;
     public const string CanReadSensitiveConfig = ClearVisionAuthorizationPolicies.CanReadSensitiveConfig;
+    public const string CanReadInspectionResults = ClearVisionAuthorizationPolicies.CanReadInspectionResults;
 
     public static bool Authorize(HttpContext context, string policy, out ClearVisionPermissionDenial denial)
     {
@@ -45,6 +46,7 @@ public static class ClearVisionPermissionPolicies
         CanEditProject => "ProjectEditPermissionRequired",
         CanOperateHardware => "HardwareOperationPermissionRequired",
         CanReadSensitiveConfig => "SensitiveConfigPermissionRequired",
+        CanReadInspectionResults => "InspectionResultReadPermissionRequired",
         _ => "PermissionRequired"
     };
 

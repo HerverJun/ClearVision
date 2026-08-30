@@ -1238,8 +1238,9 @@ class ResultPanel {
             return result.imageUrl;
         }
 
-        if (result.imageId) {
-            return httpClient.buildRequestUrl(`/images/${result.imageId}`);
+        const imageReference = result.imageReference ?? result.ImageReference;
+        if (typeof imageReference === 'string' && imageReference.trim()) {
+            return httpClient.buildRequestUrl(imageReference.trim());
         }
 
         return '';

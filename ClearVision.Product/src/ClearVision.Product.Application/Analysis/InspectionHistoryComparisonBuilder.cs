@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Text.Json;
+using ClearVision.Product.Application.Services;
 using ClearVision.Product.Core.Enums;
 using ClearVision.Product.Core.Interfaces;
 using ClearVision.Product.Core.Outcomes;
@@ -160,7 +161,7 @@ public static class InspectionHistoryComparisonBuilder
             CalibrationBundleId = result.CalibrationBundleId,
             SessionId = result.SessionId,
             ImageId = result.ImageId,
-            ImageReference = BuildImageReference(result.ImageId),
+            ImageReference = BuildImageReference(result.ProjectId, result.Id, result.ImageId),
             HasImage = result.HasImage,
             HasOutputData = result.HasOutputData,
             HasAnalysisData = result.HasAnalysisData
@@ -434,8 +435,8 @@ public static class InspectionHistoryComparisonBuilder
         InspectionHistoryDetail left,
         InspectionHistoryDetail right)
     {
-        var leftReference = BuildImageReference(left.ImageId);
-        var rightReference = BuildImageReference(right.ImageId);
+        var leftReference = BuildImageReference(left.ProjectId, left.Id, left.ImageId);
+        var rightReference = BuildImageReference(right.ProjectId, right.Id, right.ImageId);
         var leftAvailable = !string.IsNullOrWhiteSpace(leftReference);
         var rightAvailable = !string.IsNullOrWhiteSpace(rightReference);
         var anyAvailable = leftAvailable || rightAvailable;
@@ -645,8 +646,8 @@ public static class InspectionHistoryComparisonBuilder
     private static string SanitizePathKey(string value) =>
         string.IsNullOrWhiteSpace(value) ? "unknown" : value.Trim();
 
-    private static string? BuildImageReference(Guid? imageId) =>
-        imageId.HasValue ? $"/api/images/{imageId.Value:D}" : null;
+    private static string? BuildImageReference(Guid projectId, Guid resultId, Guid? imageId) =>
+        InspectionResultImageReferenceBuilder.Build(projectId, resultId, imageId);
 
     private sealed record DefectSummary(int Count, double AverageConfidence, string BoundingBoxSummary);
 

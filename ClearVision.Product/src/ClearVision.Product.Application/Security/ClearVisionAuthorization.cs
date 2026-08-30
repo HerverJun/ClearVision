@@ -15,6 +15,7 @@ public static class ClearVisionAuthorizationPolicies
     public const string CanEditProject = nameof(CanEditProject);
     public const string CanOperateHardware = nameof(CanOperateHardware);
     public const string CanReadSensitiveConfig = nameof(CanReadSensitiveConfig);
+    public const string CanReadInspectionResults = nameof(CanReadInspectionResults);
 
     public static bool IsAllowed(string? role, string policy)
     {
@@ -32,6 +33,7 @@ public static class ClearVisionAuthorizationPolicies
             CanEditProject => IsEngineerOrAdmin(role),
             CanOperateHardware => IsEngineerOrAdmin(role),
             CanReadSensitiveConfig => IsAdmin(role),
+            CanReadInspectionResults => IsKnownRole(role),
             _ => false
         };
     }
@@ -54,6 +56,7 @@ public static class ClearVisionAuthorizationPolicies
 public static class ClearVisionCapabilities
 {
     public const string ProjectEdit = "project.edit";
+    public const string InspectionResultsRead = "inspection.results.read";
 
     public const string StationCommandsCreate = "station.commands.create";
     public const string StationPackagesRead = "station.packages.read";

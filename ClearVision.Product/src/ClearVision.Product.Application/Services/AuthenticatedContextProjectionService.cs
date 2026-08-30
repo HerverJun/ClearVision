@@ -13,6 +13,7 @@ public sealed class AuthenticatedContextProjectionService
     private static readonly CapabilityPolicyBinding[] CapabilityBindings =
     [
         new(ClearVisionCapabilities.ProjectEdit, ClearVisionAuthorizationPolicies.CanEditProject),
+        new(ClearVisionCapabilities.InspectionResultsRead, ClearVisionAuthorizationPolicies.CanReadInspectionResults),
 
         new(ClearVisionCapabilities.StationCommandsCreate, ClearVisionAuthorizationPolicies.RequireStationAdmin),
         new(ClearVisionCapabilities.StationPackagesRead, ClearVisionAuthorizationPolicies.RequireStationAdmin),

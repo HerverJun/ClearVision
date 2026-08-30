@@ -1279,7 +1279,7 @@ public static class ApiEndpoints
             runId = result.SessionId,
             imageId = result.ImageId,
             hasImage = result.HasImage,
-            imageReference = BuildImageReference(result.ImageId),
+            imageReference = BuildImageReference(result.ProjectId, result.Id, result.ImageId),
             hasOutputData = result.HasOutputData,
             hasAnalysisData = result.HasAnalysisData,
             diagnosticCode = outcome.ReasonCode,
@@ -1348,7 +1348,7 @@ public static class ApiEndpoints
             },
             imageId = result.ImageId,
             hasImage = result.HasImage,
-            imageReference = BuildImageReference(result.ImageId),
+            imageReference = BuildImageReference(result.ProjectId, result.Id, result.ImageId),
             imageMissing = result.HasImage && !hasImageReference,
             imageMissingMessage = result.HasImage && !hasImageReference
                 ? "图像文件不存在或已清理"
@@ -1502,11 +1502,12 @@ public static class ApiEndpoints
         };
     }
 
-    private static string? BuildImageReference(Guid? imageId)
+    private static string? BuildImageReference(
+        Guid projectId,
+        Guid resultId,
+        Guid? imageId)
     {
-        return imageId.HasValue
-            ? $"/api/images/{imageId.Value:D}"
-            : null;
+        return InspectionResultImageReferenceBuilder.Build(projectId, resultId, imageId);
     }
 
     private static object ToInspectionDefectListItem(InspectionHistoryDefectItem defect)
@@ -1546,6 +1547,7 @@ public static class ApiEndpoints
             inspectionTime = result.InspectionTime,
             confidenceScore = result.ConfidenceScore,
             imageId = result.ImageId,
+            imageReference = BuildImageReference(result.ProjectId, result.Id, result.ImageId),
             outputImage = result.ImageId.HasValue
                 ? null
                 : (result.OutputImage != null ? Convert.ToBase64String(result.OutputImage) : null),
@@ -1641,17 +1643,45 @@ public static class ApiEndpoints
             }
         });
 
-        // 获取图像
-        app.MapGet("/api/images/{id:guid}", async (Guid id, IImageCacheRepository cache) =>
+        app.MapGet("/api/projects/{projectId:guid}/inspection-results/{resultId:guid}/image", async (
+            Guid projectId,
+            Guid resultId,
+            IProjectRepository projectRepository,
+            IInspectionResultRepository resultRepository,
+            IImageCacheRepository cache) =>
         {
-            var imageData = await cache.GetAsync(id);
-            if (imageData == null)
+            var project = await projectRepository.GetByIdAsync(projectId);
+            if (project is null || project.IsDeleted)
             {
                 return Results.NotFound();
             }
 
-            return Results.File(imageData, GetImageResponseContentType(imageData));
-        });
+            var result = await resultRepository.GetHistoryDetailAsync(projectId, resultId);
+            if (result is null ||
+                result.ProjectId != projectId ||
+                result.Id != resultId ||
+                !result.ImageId.HasValue)
+            {
+                return Results.NotFound();
+            }
+
+            var cachedImage = await cache.GetEntryAsync(result.ImageId.Value);
+            if (cachedImage is null ||
+                cachedImage.Authority is null ||
+                cachedImage.Authority.ProjectId != projectId ||
+                cachedImage.Authority.ResultId != resultId)
+            {
+                return Results.NotFound();
+            }
+
+            return Results.File(cachedImage.Data, GetImageResponseContentType(cachedImage.Data));
+        })
+        .RequireClearVisionPermission(ClearVisionPermissionPolicies.CanReadInspectionResults);
+
+        // Legacy cache GUID reads are deliberately retired. Authentication and the result-read
+        // capability are still evaluated so the status matrix remains 401/403/opaque 404.
+        app.MapGet("/api/images/{id:guid}", (Guid id) => Results.NotFound())
+            .RequireClearVisionPermission(ClearVisionPermissionPolicies.CanReadInspectionResults);
     }
 
     private static string GetImageResponseContentType(byte[] imageData) =>

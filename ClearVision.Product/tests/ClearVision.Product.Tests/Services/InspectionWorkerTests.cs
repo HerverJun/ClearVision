@@ -620,7 +620,11 @@ public class InspectionWorkerTests
 
         var imageAcquisition = Substitute.For<IImageAcquisitionService>();
         var imageCache = Substitute.For<IImageCacheRepository>();
-        imageCache.AddAsync(Arg.Any<byte[]>(), Arg.Any<string>()).Returns(Task.FromResult(Guid.NewGuid()));
+        imageCache.AddResultAsync(
+                Arg.Any<byte[]>(),
+                Arg.Any<string>(),
+                Arg.Any<ResultImageCacheAuthority>())
+            .Returns(Task.FromResult(Guid.NewGuid()));
         var imagePersistence = Substitute.For<IInspectionImagePersistenceService>();
         using var serviceProvider = BuildScopedServices(
             flowExecution,
@@ -685,7 +689,11 @@ public class InspectionWorkerTests
 
         var imageAcquisition = Substitute.For<IImageAcquisitionService>();
         var imageCache = Substitute.For<IImageCacheRepository>();
-        imageCache.AddAsync(Arg.Any<byte[]>(), Arg.Any<string>()).Returns(Task.FromResult(Guid.NewGuid()));
+        imageCache.AddResultAsync(
+                Arg.Any<byte[]>(),
+                Arg.Any<string>(),
+                Arg.Any<ResultImageCacheAuthority>())
+            .Returns(Task.FromResult(Guid.NewGuid()));
         var imagePersistence = Substitute.For<IInspectionImagePersistenceService>();
         using var serviceProvider = BuildScopedServices(
             flowExecution,
@@ -722,9 +730,12 @@ public class InspectionWorkerTests
                 item.OutputImage != null &&
                 item.OutputImage.SequenceEqual(inputImage)),
             Arg.Any<CancellationToken>());
-        await imageCache.Received(1).AddAsync(
+        await imageCache.Received(1).AddResultAsync(
             Arg.Is<byte[]>(bytes => bytes.SequenceEqual(inputImage)),
-            Arg.Any<string>());
+            Arg.Any<string>(),
+            Arg.Is<ResultImageCacheAuthority>(authority =>
+                authority.ProjectId == result.ProjectId &&
+                authority.ResultId == result.Id));
     }
 
     [Fact]

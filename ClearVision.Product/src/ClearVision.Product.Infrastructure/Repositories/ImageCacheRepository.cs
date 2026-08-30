@@ -19,9 +19,32 @@ public class ImageCacheRepository : IImageCacheRepository
         public byte[] Data { get; set; } = Array.Empty<byte>();
         public string Format { get; set; } = string.Empty;
         public DateTime CreatedAt { get; set; }
+        public ResultImageCacheAuthority? Authority { get; set; }
     }
 
     public Task<Guid> AddAsync(byte[] imageData, string format)
+    {
+        return AddInternalAsync(imageData, format, authority: null);
+    }
+
+    public Task<Guid> AddResultAsync(
+        byte[] imageData,
+        string format,
+        ResultImageCacheAuthority authority)
+    {
+        ArgumentNullException.ThrowIfNull(authority);
+        if (authority.ProjectId == Guid.Empty || authority.ResultId == Guid.Empty)
+        {
+            throw new ArgumentException("Result image authority must contain non-empty project and result identifiers.", nameof(authority));
+        }
+
+        return AddInternalAsync(imageData, format, authority);
+    }
+
+    private Task<Guid> AddInternalAsync(
+        byte[] imageData,
+        string format,
+        ResultImageCacheAuthority? authority)
     {
         var id = Guid.NewGuid();
 
@@ -31,22 +54,29 @@ public class ImageCacheRepository : IImageCacheRepository
             {
                 Data = imageData,
                 Format = format,
-                CreatedAt = DateTime.UtcNow
+                CreatedAt = DateTime.UtcNow,
+                Authority = authority
             };
         }
 
         return Task.FromResult(id);
     }
 
-    public Task<byte[]?> GetAsync(Guid id)
+    public async Task<byte[]?> GetAsync(Guid id)
+    {
+        var entry = await GetEntryAsync(id);
+        return entry?.Data;
+    }
+
+    public Task<CachedImage?> GetEntryAsync(Guid id)
     {
         lock (_lock)
         {
             if (_cache.TryGetValue(id, out var entry))
             {
-                return Task.FromResult<byte[]?>(entry.Data);
+                return Task.FromResult<CachedImage?>(new CachedImage(entry.Data, entry.Format, entry.Authority));
             }
-            return Task.FromResult<byte[]?>(null);
+            return Task.FromResult<CachedImage?>(null);
         }
     }
 

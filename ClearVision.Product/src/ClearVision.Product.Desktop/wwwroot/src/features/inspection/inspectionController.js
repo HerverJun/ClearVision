@@ -203,12 +203,12 @@ function createLightweightInspectionResult(result) {
 }
 
 function getResultImageUrl(result) {
-    const imageId = result?.imageId ?? result?.ImageId;
-    if (!imageId) {
+    const imageReference = result?.imageReference ?? result?.ImageReference;
+    if (typeof imageReference !== 'string' || !imageReference.trim()) {
         return null;
     }
 
-    return httpClient.buildRequestUrl(`/images/${encodeURIComponent(imageId)}`);
+    return httpClient.buildRequestUrl(imageReference.trim());
 }
 
 function encodeBytesToBase64(bytes) {
@@ -896,6 +896,7 @@ class InspectionController {
             id: data.resultId ?? data.ResultId ?? data.id ?? data.Id,
             projectId: data.projectId ?? data.ProjectId,
             imageId: data.imageId ?? data.ImageId,
+            imageReference: data.imageReference ?? data.ImageReference,
             status: data.status ?? data.Status,
             executionOutcome: data.executionOutcome ?? data.ExecutionOutcome,
             decisionOutcome: data.decisionOutcome ?? data.DecisionOutcome,
@@ -1538,6 +1539,7 @@ class InspectionController {
             || normalized.resultImageBase64
             || normalized.outputImageBase64;
         normalized.imageId = normalized.imageId || normalized.ImageId;
+        normalized.imageReference = normalized.imageReference ?? normalized.ImageReference ?? null;
 
         return normalized;
     }

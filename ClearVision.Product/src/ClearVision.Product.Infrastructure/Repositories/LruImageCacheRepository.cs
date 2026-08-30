@@ -39,6 +39,28 @@ public class LruImageCacheRepository : BackgroundService, IImageCacheRepository
 
     public Task<Guid> AddAsync(byte[] imageData, string format)
     {
+        return AddInternalAsync(imageData, format, authority: null);
+    }
+
+    public Task<Guid> AddResultAsync(
+        byte[] imageData,
+        string format,
+        ResultImageCacheAuthority authority)
+    {
+        ArgumentNullException.ThrowIfNull(authority);
+        if (authority.ProjectId == Guid.Empty || authority.ResultId == Guid.Empty)
+        {
+            throw new ArgumentException("Result image authority must contain non-empty project and result identifiers.", nameof(authority));
+        }
+
+        return AddInternalAsync(imageData, format, authority);
+    }
+
+    private Task<Guid> AddInternalAsync(
+        byte[] imageData,
+        string format,
+        ResultImageCacheAuthority? authority)
+    {
         ArgumentNullException.ThrowIfNull(imageData);
 
         if (imageData.Length > _maxSizeInBytes)
@@ -56,7 +78,8 @@ public class LruImageCacheRepository : BackgroundService, IImageCacheRepository
             Format = format,
             CreatedAt = now,
             LastAccessedAt = now,
-            SizeInBytes = imageData.Length
+            SizeInBytes = imageData.Length,
+            Authority = authority
         };
 
         lock (_admissionLock)
@@ -84,13 +107,19 @@ public class LruImageCacheRepository : BackgroundService, IImageCacheRepository
         return Task.FromResult(id);
     }
 
-    public Task<byte[]?> GetAsync(Guid id)
+    public async Task<byte[]?> GetAsync(Guid id)
+    {
+        var entry = await GetEntryAsync(id);
+        return entry?.Data;
+    }
+
+    public Task<CachedImage?> GetEntryAsync(Guid id)
     {
         if (_pendingAdds.TryGetValue(id, out var pending))
         {
             pending.LastAccessedAt = DateTime.UtcNow;
             Interlocked.Increment(ref _hitCount);
-            return Task.FromResult<byte[]?>(pending.Data);
+            return Task.FromResult<CachedImage?>(ToCachedImage(pending));
         }
 
         lock (_lock)
@@ -101,12 +130,12 @@ public class LruImageCacheRepository : BackgroundService, IImageCacheRepository
                 _accessOrder.Remove(id);
                 _accessOrder.AddFirst(id);
                 Interlocked.Increment(ref _hitCount);
-                return Task.FromResult<byte[]?>(entry.Data);
+                return Task.FromResult<CachedImage?>(ToCachedImage(entry));
             }
         }
 
         Interlocked.Increment(ref _missCount);
-        return Task.FromResult<byte[]?>(null);
+        return Task.FromResult<CachedImage?>(null);
     }
 
     public Task DeleteAsync(Guid id)
@@ -282,6 +311,9 @@ public class LruImageCacheRepository : BackgroundService, IImageCacheRepository
         }
     }
 
+    private static CachedImage ToCachedImage(CacheEntry entry) =>
+        new(entry.Data, entry.Format, entry.Authority);
+
     private sealed class CacheEntry
     {
         public byte[] Data { get; init; } = [];
@@ -289,6 +321,7 @@ public class LruImageCacheRepository : BackgroundService, IImageCacheRepository
         public DateTime CreatedAt { get; init; }
         public DateTime LastAccessedAt { get; set; }
         public long SizeInBytes { get; init; }
+        public ResultImageCacheAuthority? Authority { get; init; }
     }
 }
 

@@ -1322,6 +1322,7 @@ public class WebMessageHandler : IWebMessageClient, IDisposable
             }).ToList(),
             processingTimeMs = result.ProcessingTimeMs,
             imageId = result.ImageId,
+            imageReference = InspectionResultImageReferenceBuilder.Build(projectId, result.Id, result.ImageId),
             outputImage = result.ImageId.HasValue
                 ? null
                 : (result.OutputImage != null ? Convert.ToBase64String(result.OutputImage) : null),

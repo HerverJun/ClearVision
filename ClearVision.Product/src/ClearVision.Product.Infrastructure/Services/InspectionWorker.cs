@@ -1526,9 +1526,10 @@ public class InspectionWorker : IHostedService, IInspectionWorker, IAsyncDisposa
 
         try
         {
-            var imageId = await _imageCacheRepository.AddAsync(
+            var imageId = await _imageCacheRepository.AddResultAsync(
                 result.OutputImage,
-                InspectionImageFormatDetector.GuessFormat(result.OutputImage));
+                InspectionImageFormatDetector.GuessFormat(result.OutputImage),
+                new ResultImageCacheAuthority(result.ProjectId, result.Id));
             if (imageId != Guid.Empty)
             {
                 result.SetImageId(imageId);

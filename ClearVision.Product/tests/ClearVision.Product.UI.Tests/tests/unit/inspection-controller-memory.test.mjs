@@ -317,7 +317,9 @@ test('handleInspectionCompleted keeps last result lightweight and stores latest 
 test('handleResultEvent fetches cached image with authorization and publishes a Blob', async (t) => {
   const publishedImages = [];
   const imageId = '00000000-0000-0000-0000-000000000123';
-  const expectedUrl = `http://localhost:5000/api/images/${imageId}`;
+  const resultId = `url-result-${Date.now()}`;
+  const imageReference = `/api/projects/project-current/inspection-results/${resultId}/image`;
+  const expectedUrl = `http://localhost:5000${imageReference}`;
   const completedResults = [];
   const originalFetch = globalThis.fetch;
   const originalHeaders = httpClient.defaultHeaders;
@@ -353,9 +355,10 @@ test('handleResultEvent fetches cached image with authorization and publishes a 
   };
 
   inspectionController.handleResultEvent({
-    resultId: `url-result-${Date.now()}`,
+    resultId,
     projectId: 'project-current',
     imageId,
+    imageReference,
     status: 'OK',
     outputData: { Count: 2 }
   });
@@ -419,6 +422,7 @@ test('cached inspection image failure is visible and retry publishes the recover
     resultId: `retry-result-${Date.now()}`,
     projectId: 'project-current',
     imageId: '00000000-0000-0000-0000-000000000456',
+    imageReference: '/api/projects/project-current/inspection-results/retry-result/image',
     status: 'OK'
   });
   await inspectionController.ensureLastResultImageLoaded();
@@ -463,6 +467,7 @@ test('missing cached inspection image exposes a 404 load error', async (t) => {
     resultId: `missing-image-${Date.now()}`,
     projectId: 'project-current',
     imageId: '00000000-0000-0000-0000-000000000457',
+    imageReference: '/api/projects/project-current/inspection-results/missing-image/image',
     status: 'OK'
   });
   await inspectionController.ensureLastResultImageLoaded();
@@ -502,12 +507,14 @@ test('stale cached image loads cannot replace the newest result image', async (t
     resultId: `stale-first-${Date.now()}`,
     projectId: 'project-current',
     imageId: '00000000-0000-0000-0000-000000000701',
+    imageReference: '/api/projects/project-current/inspection-results/stale-first/image',
     status: 'OK'
   });
   inspectionController.handleResultEvent({
     resultId: `stale-second-${Date.now()}`,
     projectId: 'project-current',
     imageId: '00000000-0000-0000-0000-000000000702',
+    imageReference: '/api/projects/project-current/inspection-results/stale-second/image',
     status: 'OK'
   });
 

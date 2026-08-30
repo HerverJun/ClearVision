@@ -28,6 +28,8 @@ public class InspectionRealtimeEventMapperTests
         GetProperty(payloadJson.RootElement, "reasonCode").GetString().Should().Be("DerivedFromJudgmentResult");
         GetProperty(payloadJson.RootElement, "errorMessage").GetString().Should().Be("missing signal");
         GetProperty(payloadJson.RootElement, "imageId").GetGuid().Should().NotBeEmpty();
+        GetProperty(payloadJson.RootElement, "imageReference").GetString().Should().Be(
+            $"/api/projects/{inspectionResultEvent.ProjectId:D}/inspection-results/{inspectionResultEvent.ResultId:D}/image");
         GetProperty(analysisData, "version").GetInt32().Should().Be(1);
         GetProperty(analysisData, "cards").GetArrayLength().Should().Be(1);
 
@@ -64,6 +66,7 @@ public class InspectionRealtimeEventMapperTests
         var payloadJson = JsonDocument.Parse(JsonSerializer.Serialize(resultMessage.Payload));
 
         GetProperty(payloadJson.RootElement, "imageId").ValueKind.Should().Be(JsonValueKind.Null);
+        GetProperty(payloadJson.RootElement, "imageReference").ValueKind.Should().Be(JsonValueKind.Null);
         GetProperty(payloadJson.RootElement, "outputImageBase64").GetString().Should().Be("inline-fallback");
     }
 

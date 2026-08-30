@@ -705,7 +705,10 @@ public sealed class ContinuousInspectionWorker
             return;
         }
 
-        var imageId = await imageCacheRepository.AddAsync(result.OutputImage, "png");
+        var imageId = await imageCacheRepository.AddResultAsync(
+            result.OutputImage,
+            "png",
+            new ResultImageCacheAuthority(result.ProjectId, result.Id));
         if (imageId != Guid.Empty)
         {
             result.SetImageId(imageId);

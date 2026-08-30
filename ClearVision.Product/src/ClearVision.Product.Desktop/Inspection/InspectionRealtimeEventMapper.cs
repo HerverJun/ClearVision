@@ -1,3 +1,4 @@
+using ClearVision.Product.Application.Services;
 using ClearVision.Product.Core.Events;
 using ClearVision.Product.Core.Services;
 
@@ -54,6 +55,10 @@ public static class InspectionRealtimeEventMapper
                         sessionId = result.SessionId,
                         resultId = result.ResultId,
                         imageId = result.ImageId,
+                        imageReference = InspectionResultImageReferenceBuilder.Build(
+                            result.ProjectId,
+                            result.ResultId,
+                            result.ImageId),
                         status = result.Status,
                         executionOutcome = result.ExecutionOutcome,
                         decisionOutcome = result.DecisionOutcome,

@@ -1466,7 +1466,10 @@ public class InspectionService : IInspectionService
         try
         {
             var format = InspectionImageFormatDetector.GuessFormat(result.OutputImage);
-            var imageId = await _imageCacheRepository.AddAsync(result.OutputImage, format);
+            var imageId = await _imageCacheRepository.AddResultAsync(
+                result.OutputImage,
+                format,
+                new ResultImageCacheAuthority(result.ProjectId, result.Id));
             if (imageId != Guid.Empty)
             {
                 result.SetImageId(imageId);
@@ -1485,9 +1488,22 @@ public class InspectionService : IInspectionService
             return Task.FromResult(Guid.Empty);
         }
 
+        public Task<Guid> AddResultAsync(
+            byte[] imageData,
+            string format,
+            ResultImageCacheAuthority authority)
+        {
+            return Task.FromResult(Guid.Empty);
+        }
+
         public Task<byte[]?> GetAsync(Guid id)
         {
             return Task.FromResult<byte[]?>(null);
+        }
+
+        public Task<CachedImage?> GetEntryAsync(Guid id)
+        {
+            return Task.FromResult<CachedImage?>(null);
         }
 
         public Task DeleteAsync(Guid id)

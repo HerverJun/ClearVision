@@ -244,6 +244,7 @@ test('inspection result fetches a protected image as a Blob before drawing it', 
         resultId: `protected-image-${Date.now()}`,
         projectId: 'project-protected-image',
         imageId: '00000000-0000-0000-0000-000000000888',
+        imageReference: '/api/projects/project-protected-image/inspection-results/protected-result/image',
         status: 'OK',
       });
       await controller.ensureLastResultImageLoaded();
@@ -269,7 +270,7 @@ test('inspection result fetches a protected image as a Blob before drawing it', 
   });
 
   expect(result.requests).toHaveLength(1);
-  expect(result.requests[0].url).toContain('/api/images/00000000-0000-0000-0000-000000000888');
+  expect(result.requests[0].url).toContain('/api/projects/project-protected-image/inspection-results/protected-result/image');
   expect(result.requests[0].authorization).toBe('Bearer browser-image-token');
   expect(result.imageIsBlob).toBe(true);
   expect(result.imageWidth).toBe(1);

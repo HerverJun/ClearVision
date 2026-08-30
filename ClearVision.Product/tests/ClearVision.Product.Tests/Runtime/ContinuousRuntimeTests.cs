@@ -561,9 +561,10 @@ public class ContinuousRuntimeTests
         var writer = new CapturingResultWriter();
         var imagePersistence = Substitute.For<IInspectionImagePersistenceService>();
         var imageCache = Substitute.For<IImageCacheRepository>();
-        imageCache.AddAsync(
+        imageCache.AddResultAsync(
                 Arg.Is<byte[]>(bytes => bytes.SequenceEqual(outputImage)),
-                Arg.Any<string>())
+                Arg.Any<string>(),
+                Arg.Any<ResultImageCacheAuthority>())
             .Returns(Task.FromResult(imageId));
         var eventBus = new CapturingEventBus();
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
@@ -601,6 +602,12 @@ public class ContinuousRuntimeTests
         eventBus.Results[0].OutputData.Should().NotContainKey("Image");
         eventBus.Results[0].OutputData.Should().ContainKey("JudgmentResult");
         eventBus.Results[0].OutputData.Should().ContainKey("ContinuousInspection");
+        await imageCache.Received(1).AddResultAsync(
+            Arg.Is<byte[]>(bytes => bytes.SequenceEqual(outputImage)),
+            Arg.Any<string>(),
+            Arg.Is<ResultImageCacheAuthority>(authority =>
+                authority.ProjectId == writer.Results[0].ProjectId &&
+                authority.ResultId == writer.Results[0].Id));
         await imagePersistence.Received(1).PersistAsync(
             Arg.Is<InspectionResult>(item =>
                 item.Status == InspectionStatus.NG &&
