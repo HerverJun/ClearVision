@@ -4,8 +4,8 @@ doc_type: "plan"
 status: "active"
 topic: "跨计划闭环治理"
 created: "2026-08-28"
-updated: "2026-08-29"
-code_baseline: "139e9a062102feab7e6d2a0fdef6085f5b078e34"
+updated: "2026-08-30"
+code_baseline: "fd4b26d82df3f0802623a813abe88c0aa69c79fb"
 review_input_revision: "78d693fb4"
 ---
 
@@ -18,6 +18,8 @@ review_input_revision: "78d693fb4"
 > Wave 1A 的 U13 实现 SHA 为 `d757efa3bcc0f69d1443c78a5982ff93e45da329`，U13 + replay P0 的 integration/evidence SHA 为 `16c03126774aaa18b6cb9c3105c44b5022f163d6`。`CV-AUDIT-092/099/100/101` 已按该 integration SHA 的 focused acceptance 关闭；`CV-AUDIT-086` 仅关闭“replay 写失败阻断正式结果”的 P0 子范围，P1 retention 仍开放。
 >
 > Wave 1B1 的 capability/password-policy 实现 SHA 为 `6a476939b143a62a104ebfd4e655979d117f15b2`，active Admin/installation latch 实现 SHA 为 `6c5ca3edacefe56a0ac998a683f5e68f95bdcf08`，本机 draft 隔离及最终 implementation/integration evidence SHA 为 `139e9a062102feab7e6d2a0fdef6085f5b078e34`。`CV-AUDIT-011/014/015/018/028/034/091` 已按该 integration SHA 的 focused acceptance 关闭；U08 仍为 `OPEN_RESCOPED`，其余主体归属、provenance 与 Station identity 项未开始。
+>
+> Wave 1B2 的 AI session owner 实现 SHA 为 `1cf200d5adb7d50083a046533a7badc72dce2af8`，标定 solve provenance 实现 SHA 为 `ebda3b26dd9fcd9589b5672c6a48f8ba881f0c23`，WebMessage 认证及最终 implementation/integration evidence SHA 为 `fd4b26d82df3f0802623a813abe88c0aa69c79fb`。`CV-AUDIT-023/024/025` 已按该 integration SHA 的 owner/authority 负向矩阵关闭；U08 因 `CV-AUDIT-036/064/077` 继续保持 `OPEN_RESCOPED`，U09/U10/G16 未改动。
 
 ## 1. 状态与证据口径
 
@@ -63,7 +65,7 @@ review_input_revision: "78d693fb4"
 | [全面提升 TODO](./ClearVision-全面提升TODO-2026-05-09.md) | 按 46 个主题：35 个 `IMPLEMENTED_SYNC_PENDING`、10 个 `OPEN_RESCOPED`、P2-2 被本次前端架构决定取代。按 147 个 checkbox：原勾 3、实现待同步 106、实质残项 33、总关闭条件 5。 | U01-U06、U14 |
 | [T01 测试与覆盖率治理总体计划](./测试治理/ClearVision_T01_测试与覆盖率治理总体计划_PROPOSED_AUDITED.md) | G01 阶段证据已归档，G01B-R3/G02 仍需当前 SHA；G03-G06 原方案有重复建设，G07 引用了非当前分支架构，G08 仍应 report-only，G09 按 SKU 外部验收。 | U05-U07 |
 | [Studio2](../Studio2/README.md) | G00-G15 Goal 卡已完成或历史回填，但 G16 不能通过直接打开不具产品 parity 的 `/v2` 关闭；当前 release root 决定改为 legacy root + capability owners。 | U05 |
-| [持续问题排查记录](../待复核/持续问题排查记录-2026-07-06.md) | 102 个源 ID：31 个 `IMPLEMENTED_SYNC_PENDING`、59 个仍开放、12 个已关闭；Wave 1B1 新关闭 `CV-AUDIT-011/014/015/018/028/034/091`。`CV-AUDIT-086` 保持 `OPEN_RESCOPED / P0_SUBRANGE_CLOSED`。 | U08-U14 |
+| [持续问题排查记录](../待复核/持续问题排查记录-2026-07-06.md) | 102 个源 ID：31 个 `IMPLEMENTED_SYNC_PENDING`、56 个仍开放、15 个已关闭；Wave 1B2 新关闭 `CV-AUDIT-023/024/025`。`CV-AUDIT-086` 保持 `OPEN_RESCOPED / P0_SUBRANGE_CLOSED`。 | U08-U14 |
 | [0407 Qwen 排查](../未闭环事项/0407-Qwen排查未闭环.md) | #1-#26 已由当前实现、文件移除或等价契约覆盖，原状态未同步。 | U14 回填 |
 | [0418 临时问题记录](../未闭环事项/0418-临时问题记录.md) | 主体实现已落地；工业证据尾项去重并入 U01/U03/U13。 | U01、U03、U13、U14 |
 | [深度学习算子问题](../未闭环事项/深度学习算子问题.md) | 灰度/16-bit、NMS、异步加载和工程化契约已改造；旧 tensor-copy 阻断是死代码误判。真实残项是证据声明、模型身份、交付 profile 性能和现场签核。 | U01、U07、U14 |
@@ -144,18 +146,19 @@ Wave 0 只做了一次既有 Gate 的 generated artifact hygiene：通过 `Opera
 
 ### U08 身份、能力、主体归属与资源 authority
 
-优先级：P0 安全主线（`023/024` 剩余、`025` provenance、`036/077`）；其余 capability/UI 一致性为 P1。状态：`OPEN_RESCOPED`。Owner：Desktop 安全/权限。
+优先级：P0 安全主线（`036` 结果图 authority、`077` Station identity）；`064` Station 敏感读分层为 P1。状态：`OPEN_RESCOPED`。Owner：Desktop 安全/权限。
 
-- [ ] 建立资源授权矩阵：复用 preview artifact/AgentRun 已有的 user-owner 模型治理 AI session；Station ingress 使用 Station identity；共享 Project/InspectionResult 使用项目存在性、删除态和角色能力，不虚构“创建者 Owner”，也不重做已闭环的 preview artifact owner 保护。
+- [ ] 资源授权矩阵已完成 AI session/AgentRun 的统一 owner authority；剩余 Station ingress 使用 Station identity，以及共享 Project/InspectionResult 按项目存在性、删除态和角色能力授权。不得虚构“创建者 Owner”，也不重做已闭环的 preview artifact owner 保护。
 - [x] `/auth/me` 返回服务端按 endpoint policy 投影的 action capabilities 与有效密码最小长度；Station 生产命令、设置 mutation、AI 模型管理、数据库危险维护及用户管理均 fail-closed gate，并在 handler 入口复核。相机操作遵循 `CanOperateHardware`，PLC 写和危险维护遵循 Admin policy。
-- [ ] 为 AI session 与仍开放的 WebMessage list/get/delete/generate/planar2d 命令传递 authenticated principal；复用 AgentRun owner 模型，并定义旧 ownerless session 的迁移、隔离或失效策略。
+- [x] AI session 与 active WebMessage list/get/delete/generate/cancel/planar2d/PickFile 均使用同一默认拒绝 admission 取得 authenticated principal；HTTP/WebMessage 共用 AgentRun 兼容 owner hash。旧 schema 1 或 ownerless 主/last-good store 整体隔离失效，不归给首个登录用户，也不恢复执行。
 - [x] 在 SQLite 原子事务内保证至少一个 active Admin：唯一 active Admin 的删除、禁用或降级返回稳定 409；并发修改最后两个 active Admin 时恰有一个成功。安装完成 singleton latch 独立于用户表且由 trigger 保证不可逆，恢复只走默认关闭的显式本机 console break-glass。
-- [ ] 标定结果具有服务端 solve provenance，并由 calibration draft 提交为 project asset；结果图通过 `ProjectId + ResultId` 或等价反查授权，不再把裸 cache GUID 作为 authority。
+- [x] planar2d 与 NPoint 标定 solve 生成 owner/project/kind/TTL/content-hash scoped 服务端 artifact；正式保存只提交 artifact reference、project/revision 与必要 asset context，由服务端重读 artifact bytes、验证 `CalibrationBundleV2` 后写入 project asset。
+- [ ] 结果图通过 `ProjectId + ResultId` 或等价反查授权，不再把裸 cache GUID 作为 authority。
 - [ ] Station 命令回执以 authenticated Station identity 与持久命令记录的 `StationId` 联合授权；`commandId` 属于其他站点时不得更新状态、进度或审计，并补跨站伪造回归。
 - [x] 本机 autosave draft 按 `userId + projectId` 隔离，key 与 versioned payload 双重绑定；logout/用户切换清空内存提示状态但保留退出用户自己的 namespace，legacy ownerless backup 删除且不猜测归属。共享 Project 不等于共享本机草稿。
-- [ ] 回归语义：缺失/无效 user 或 Station credential 返回 401；已认证但 capability 不足返回 403；需防枚举的 owner-scoped opaque resource 在不存在/wrong-owner 时统一 404；最后 Admin/revision 冲突返回 409；输入校验返回 422。跨用户、跨站点、软删除和伪造 ID 不泄露存在性。
+- [ ] WebMessage、AI session 与标定已落实稳定 `auth-required`/403、opaque 404、409、422 语义，并覆盖跨用户及伪造 artifact；剩余 Station credential/跨站点、结果软删除和裸 image GUID 仍需按同一语义闭环。
 
-Wave 1B1 已独立关闭 `CV-AUDIT-011/014/015/018/028/034/091`。已完成但仅作子范围回填：`CV-AUDIT-024` 的 legacy ExecuteOperator/UpdateFlow/Start/StopInspection；`CV-AUDIT-025` 的绝对路径/traversal 防护。`CV-AUDIT-023/024/025/036/064/077` 状态保持不变；`CV-AUDIT-064` 的目标仍是 Operator 可读脱敏运行视图、Admin 可读 logs/commands/audit，不是全面禁止 Station telemetry。
+Wave 1B1 已独立关闭 `CV-AUDIT-011/014/015/018/028/034/091`；Wave 1B2 已独立关闭 `CV-AUDIT-023/024/025`。U08 只剩 `CV-AUDIT-036/064/077`，因此继续保持 `OPEN_RESCOPED`；`CV-AUDIT-064` 的目标仍是 Operator 可读脱敏运行视图、Admin 可读 logs/commands/audit，不是全面禁止 Station telemetry。
 
 ### U09 分 authority 的持久化、运行态 apply 与恢复
 
@@ -246,7 +249,7 @@ Wave 1B1 已独立关闭 `CV-AUDIT-011/014/015/018/028/034/091`。已完成但�
 优先级：随项。状态：`OPEN_CONFIRMED`。Owner：文档治理。
 
 - [ ] 每个源 ID 建 ledger：disposition、精确剩余动作、acceptance、evidence SHA、Owner、依赖；合并实现不等于合并验收或丢失 ID。
-- [ ] 31 个 `IMPLEMENTED_SYNC_PENDING` 逐项回填实现/测试依据后才标 `CLOSED`；已关闭的 12 个 ID 保留独立证据，余下 59 个开放 ID 按本计划实际关闭，不能按治理线整体勾选。`CV-AUDIT-086` 的 P0 子范围完成不等于整体关闭。
+- [ ] 31 个 `IMPLEMENTED_SYNC_PENDING` 逐项回填实现/测试依据后才标 `CLOSED`；已关闭的 15 个 ID 保留独立证据，余下 56 个开放 ID 按本计划实际关闭，不能按治理线整体勾选。`CV-AUDIT-086` 的 P0 子范围完成不等于整体关闭。
 - [ ] 全面提升 TODO 回填 35 个已实现主题（106 checkbox），10 个窄化主题随 U01-U06 关闭，P2-2 标记由前端架构决定取代；5 个总关闭条件最后验收。
 - [ ] 0407、0418、深度学习文档继续保留为历史快照；Studio2 仅在 G16 当前 release 验收关闭后整批归档 Goal 卡。
 - [ ] U01-U13 与 U14 的逐 ID ledger、源文档回填、关闭核对全部完成后，才关闭 U14、将本文改为 `closed` 并生成归档说明；任一 required release profile 仍外部阻断时不得宣称全项目闭环。
@@ -259,20 +262,20 @@ Wave 1B1 已独立关闭 `CV-AUDIT-011/014/015/018/028/034/091`。已完成但�
 
 这些 ID 只能在源文档补齐当前事实和证据后转 `CLOSED`。其中 `CV-AUDIT-094` 的关闭依据是全局 Profile/TcpDeviceManager 已实现真实 TCP Server；node-local UX 是派生项，不占用该 ID。
 
-### 5.2 仍开放（59）
+### 5.2 仍开放（56）
 
 | 唯一治理线 | ID |
 | --- | --- |
-| U08 身份/能力/authority | `CV-AUDIT-023, CV-AUDIT-024, CV-AUDIT-025, CV-AUDIT-036, CV-AUDIT-064, CV-AUDIT-077` |
+| U08 身份/能力/authority | `CV-AUDIT-036, CV-AUDIT-064, CV-AUDIT-077` |
 | U09 持久化/apply/recovery | `CV-AUDIT-006, CV-AUDIT-009, CV-AUDIT-012, CV-AUDIT-021, CV-AUDIT-029, CV-AUDIT-040, CV-AUDIT-041, CV-AUDIT-042, CV-AUDIT-069, CV-AUDIT-070, CV-AUDIT-079, CV-AUDIT-080, CV-AUDIT-082, CV-AUDIT-083, CV-AUDIT-089` |
 | U10 execution authority/state | `CV-AUDIT-032, CV-AUDIT-048, CV-AUDIT-049, CV-AUDIT-050, CV-AUDIT-051, CV-AUDIT-052, CV-AUDIT-053, CV-AUDIT-055, CV-AUDIT-056, CV-AUDIT-065, CV-AUDIT-072, CV-AUDIT-102` |
 | U11 长进程资源/保留 | `CV-AUDIT-057, CV-AUDIT-058, CV-AUDIT-059, CV-AUDIT-060, CV-AUDIT-063, CV-AUDIT-066, CV-AUDIT-067, CV-AUDIT-068, CV-AUDIT-071, CV-AUDIT-081, CV-AUDIT-084, CV-AUDIT-086, CV-AUDIT-087, CV-AUDIT-090, CV-AUDIT-093` |
 | U12 查询/发布/导出 | `CV-AUDIT-001, CV-AUDIT-003, CV-AUDIT-074, CV-AUDIT-075, CV-AUDIT-076, CV-AUDIT-078, CV-AUDIT-088` |
 | U13 算子契约 | `CV-AUDIT-095, CV-AUDIT-096, CV-AUDIT-097, CV-AUDIT-098` |
 
-部分已关闭子范围不得回退：`021` 非 Admin 主题写入、`024` legacy execution bridge、`025` 路径逃逸、`057` OnnxPatch cache、`071` 原时间 TTL 诉求、`086` replay fail-soft P0、`102` Studio formal/realtime/node preview admission。剩余动作仍按对应源 ID 独立验收。
+部分已关闭子范围不得回退：`021` 非 Admin 主题写入、`057` OnnxPatch cache、`071` 原时间 TTL 诉求、`086` replay fail-soft P0、`102` Studio formal/realtime/node preview admission。剩余动作仍按对应源 ID 独立验收。
 
-### 5.3 已关闭（12）
+### 5.3 已关闭（15）
 
 | ID | 关闭证据 |
 | --- | --- |
@@ -281,6 +284,9 @@ Wave 1B1 已独立关闭 `CV-AUDIT-011/014/015/018/028/034/091`。已完成但�
 | `CV-AUDIT-014` | 同上；设置、PLC、相机 mutation 与实际 Admin/`CanOperateHardware` policy 对齐，缺失 capability 时 fail closed。 |
 | `CV-AUDIT-015` | 同上；AI 模型新增、更新、删除、激活、设默认与连接测试均按 action capability gate。 |
 | `CV-AUDIT-018` | 同上；database status/backup/repair/restore/cleanup 各自使用 Admin capability，handler 无权限时不发请求。 |
+| `CV-AUDIT-023` | AI session owner implementation SHA `1cf200d5adb7d50083a046533a7badc72dce2af8`；Wave 1B2 integration/evidence SHA `fd4b26d82df3f0802623a813abe88c0aa69c79fb`；create/continue/list/get/delete/workspace/Plan/Build/AgentRun owner 一致性、重启与 ownerless 主/备隔离矩阵通过。 |
+| `CV-AUDIT-024` | WebMessage implementation/integration/evidence SHA `fd4b26d82df3f0802623a813abe88c0aa69c79fb`；`app.local` origin、token、policy、默认拒绝、legacy block 与 A/B rebind 异步投递隔离矩阵通过。 |
+| `CV-AUDIT-025` | calibration provenance implementation SHA `ebda3b26dd9fcd9589b5672c6a48f8ba881f0c23`；integration/evidence SHA `fd4b26d82df3f0802623a813abe88c0aa69c79fb`；planar2d/NPoint forged/wrong-owner/project/expired/revision/valid-save 矩阵通过。 |
 | `CV-AUDIT-028` | active Admin implementation SHA `6c5ca3edacefe56a0ac998a683f5e68f95bdcf08`；integration/evidence SHA 同上；file-backed SQLite 并发、installation latch、409 error code 与 local-only recovery 验收通过。 |
 | `CV-AUDIT-034` | capability implementation SHA 与 integration/evidence SHA 同上；创建、重置、修改密码共用 `/auth/me.passwordPolicy.minimumLength` 投影，服务端仍独立返回 422。 |
 | `CV-AUDIT-091` | draft isolation implementation/integration/evidence SHA `139e9a062102feab7e6d2a0fdef6085f5b078e34`；两用户、两工程、logout、legacy/corrupt payload、scoped clear 与浏览器隔离验收通过。 |
@@ -305,7 +311,7 @@ Wave 1B1 已独立关闭 `CV-AUDIT-011/014/015/018/028/034/091`。已完成但�
 ## 7. 执行顺序与归档门禁
 
 1. **Wave 0：事实与产品决定** — 本轮已完成 U09 模板 authority、U05 owner disposition、U04 SDK policy 及对应 canonical 文档同步；U04/U05/U09 的后续 release/authority 子项不因此整体关闭。
-2. **Wave 1：安全与不可逆副作用** — Wave 1A 已完成 `CV-AUDIT-092/099/100/101` 与 `CV-AUDIT-086` replay fail-soft P0；Wave 1B1 已完成 `CV-AUDIT-011/014/015/018/028/034/091`。Wave 1B2/1B3 的 `023/024/025/036/064/077` 与 U10 Draft capability escalation 均未开始。
+2. **Wave 1：安全与不可逆副作用** — Wave 1A 已完成 `CV-AUDIT-092/099/100/101` 与 `CV-AUDIT-086` replay fail-soft P0；Wave 1B1 已完成 `CV-AUDIT-011/014/015/018/028/034/091`；Wave 1B2 已完成 `CV-AUDIT-023/024/025`。Wave 1B3 的 `036/064/077` 与 U10 Draft capability escalation 均未开始。
 3. **Wave 2：一致性与长进程稳定性** — U02、U09、U11 其余项、U12。
 4. **Wave 3：质量、发布和当前 UI 证据** — U01、U03、U04、U05、U06。
 5. **Wave 4：目标 SKU 外部验收与归档** — U07、U14。
@@ -350,5 +356,20 @@ Wave 1B1 已独立关闭 `CV-AUDIT-011/014/015/018/028/034/091`。已完成但�
 - 静态与 build：从 Initial HEAD 到 integration SHA 的 changed JS/MJS `node --check` 为 `18/18` PASS；AdminRecovery `packages.lock.json` parse `1/1`；`dotnet build ClearVision.Product.AdminRecovery.csproj --no-restore --nologo` PASS（0 warning / 0 error）；`git diff --check` PASS。
 - 未覆盖与未开始：没有执行 clean clone、真实 WebView2、真实目标机、同 SHA GitHub CI、全量 Playwright 或 G16 release evidence；未进入 Wave 1B2/1B3 的 `CV-AUDIT-023/024/025/036/064/077`，U09/U10 未改动。U08 因这些开放项继续保持 `OPEN_RESCOPED`。
 - Disposition：`CV-AUDIT-011/014/015/018/028/034/091 = CLOSED`；`CV-AUDIT-023/024/025/036/064/077` 状态不变，`CV-AUDIT-086` 仍为 `OPEN_RESCOPED / P0_SUBRANGE_CLOSED`。
+
+### 7.4 Wave 1B2 验证证据（2026-08-30）
+
+- Initial HEAD：`511342185ba3af85f10864577e051073d61351d9`。AI session owner implementation SHA：`1cf200d5adb7d50083a046533a7badc72dce2af8`（`fix: scope ai sessions to authenticated owners`）；calibration solve provenance implementation SHA：`ebda3b26dd9fcd9589b5672c6a48f8ba881f0c23`（`fix: bind calibration assets to solve provenance`）；WebMessage 认证及最终 implementation/integration evidence SHA：`fd4b26d82df3f0802623a813abe88c0aa69c79fb`（`feat: authenticate webview message commands`）。本节所在的后续 docs-only 提交只引用上述实现 SHA，不把文档提交自身绑定为 `code_baseline`。
+- WebMessage admission：唯一 `WebMessageReceived -> DispatchWebMessageAsync -> WebMessageAdmissionService` 链只接受正式 `https://app.local` origin；中央 bridge 自动附带 token、bindingId、navigationEpoch，服务端每次通过 `IAuthService` 解析 user/role 并计算 owner hash。policy 为 PickFile/`planar2d:save`=`CanEditProject`，AI session list/get/delete、Generate/Cancel、`planar2d:solve`、binding change=`RequireAuthenticated`；未知命令默认拒绝，ExecuteOperator/UpdateFlow/Start/StopInspection 固定 `forbidden`。稳定公开码为 `auth-required`、`forbidden`、`not-found`、`conflict`、`validation-error`，token 不进入日志、响应或持久化。
+- WebMessage 异步隔离：active Generate/Cancel 同时绑定 owner、request、session、client binding 与 navigation epoch；logout、导航或 B 重新登录会取消/失效 A 的 binding，A 的 progress/result/path 不投递给 B，B 也不能取消 A 的任务。production JS 的 direct `window.chrome.webview.postMessage` 只剩 `webMessageBridge.js` 底层发送点。
+- AI owner authority：`AuthenticatedOwnerResolver` 保持 `usr_ + SHA256("agent-run-owner:" + trimmedUserId)` 既有输出；Conversation store schema 2 仅持久化 ownerHash，不保存 token/显示名，也不向前端投影 ownerHash。create/continue/list/get/delete、workspace mutation、Plan/Build 与 AgentRun association 全部显式校验 owner；不存在与 wrong-owner 统一 opaque 404。源码外部调用均传 owner，只有具名 recovery API 可跨列表读取且仍要求 run/session owner 一致。
+- Ownerless 策略：旧 schema 1 主存储整体失效；schema 2 中 ownerHash 缺失/非法的 session 不加载。主存储损坏时，ownerless last-good 同样不恢复；数据不迁移给首个登录用户，也不重新进入 recovery/reconciliation 执行。
+- Calibration provenance：planar2d 与 NPoint solve 均把 `CalibrationBundleV2` 放入 owner/project/kind/TTL/content-hash scoped `PreviewArtifactStore` artifact。客户端数值仅用于 draft 展示；formal save 只提交 solveArtifactId、projectId、expected revision 与必要 session/node/image/asset context。服务端按当前用户重读 artifact bytes，核对 owner/project/kind/TTL/hash/context，重新解析并要求 accepted bundle，再通过 mutation lease 与 `ProjectService.SaveCalibrationAssetAsync` 保存。wrong-owner/project/expired/forged/context mismatch 统一 404，lease/revision 为 409，bundle/input validation 为 422；无 project context 时仅可展示 draft，formal save 禁用。旧绝对路径/traversal 防护保留，正式 UI 不返回本机保存路径。
+- .NET focused：按根 `AGENTS.md` 对同一 csproj 串行且合并类运行。Product 单 invocation 合并 `ConversationalFlowServiceTests,AiFlowGenerationServiceManualRetryTests,GenerateFlowMessageHandlerTests,BuildFromPlanEntryParityTests,AgentRunEventStreamServiceTests`，`184/184` PASS；Desktop 单 invocation 合并 `WebMessageHandlerTests,PlanarCalibrationWebMessageTests,CalibrationDraftEndpointsTests,PreviewArtifactStoreTests,AgentRunEndpointsTests,ProgramCorsTests,StudioStartupPageResolverTests,WebView2HostTests`，`163/163` PASS。两次均在最终 implementation SHA 使用 `-NoBuild -NoRestore`。
+- UI 与静态：完整 `npm run test:unit` 为 48 files、`1008/1008` PASS；changed JS/MJS `node --check` 为 `8/8` PASS。focused calibration Playwright 为 planar2d 2 + NPoint 2=`4/4` PASS。focused AI 三 spec 为 `30 passed / 12 failed / 1 skipped`；12 个失败中 10 个为既有 Plan/readiness/resource-binding 旧契约，另 2 个是标题未含 `visual baseline` 的截图断言，未更新 baseline。
+- 完整非视觉 lane：在最终 implementation SHA 以 Chromium 单 worker 执行 `--grep-invert='visual baseline'`，共 188 项，结果为 `164 passed / 23 failed / 1 skipped`，耗时 10.6 分钟；23 个失败由 AI 12、flow-editor-port 1、flow-layout 5、high-frequency settings/station 3、quiet-precision layout audit 2 组成。该结果不称完整 Playwright PASS，也未更新 visual baseline。
+- 静态终验：implementation diff 的 `git diff --check` PASS；production direct postMessage、旧 `{ result, fileName }` formal authority、NPoint client CandidateBundle/ExpectedContentHash authority、frontend ownerHash 与缺 owner 的 external session calls 搜索均无回退命中。
+- NOT RUN / 外部项：未执行 clean clone、真实 WebView2、真实目标机、真实 LLM/PLC/相机、同 SHA GitHub CI、视觉 baseline 更新或 G16 release evidence；没有进入 Wave 1B3、U09、U10。
+- Disposition：`CV-AUDIT-023/024/025 = CLOSED`；`CV-AUDIT-036/064/077` 仍开放，U08 保持 `OPEN_RESCOPED`。102 个源 ID 重算为 31 个 `IMPLEMENTED_SYNC_PENDING`、56 个仍开放、15 个已关闭；`CV-AUDIT-086` 仍为 `OPEN_RESCOPED / P0_SUBRANGE_CLOSED`。
 
 Wave 可以拆成小提交，但每个源 ID 必须保留独立验收行。只有在 required profiles、最终 Release SHA 和源文档回填全部关闭后，才归档本文及用户指定的七组文档。
