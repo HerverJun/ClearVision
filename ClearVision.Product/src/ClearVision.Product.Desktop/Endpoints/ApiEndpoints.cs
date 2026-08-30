@@ -10,6 +10,7 @@ using ClearVision.Product.Application.Services;
 using ClearVision.Product.Core.Decisions;
 using ClearVision.Product.Core.Entities;
 using ClearVision.Product.Core.Enums;
+using ClearVision.Product.Core.Exceptions;
 using ClearVision.Product.Core.Interfaces;
 using ClearVision.Product.Core.Outcomes;
 using ClearVision.Product.Core.ProjectVariables;
@@ -145,7 +146,7 @@ public static class ApiEndpoints
             }
             catch (Exception ex)
             {
-                return ToBadRequest(ex);
+                return ex is ProjectNotFoundException ? Results.NotFound() : ToBadRequest(ex);
             }
         });
 
@@ -159,7 +160,21 @@ public static class ApiEndpoints
             }
             catch (Exception ex)
             {
-                return Results.BadRequest(new { Error = ex.Message });
+                if (TryParseStableError(ex.Message, out var code, out var message))
+                {
+                    if (string.Equals(code, "PSV027", StringComparison.Ordinal))
+                    {
+                        return Results.Conflict(new { Code = code, Error = message });
+                    }
+
+                    if (code.StartsWith("GV", StringComparison.Ordinal) ||
+                        code.StartsWith("PMU", StringComparison.Ordinal))
+                    {
+                        return Results.UnprocessableEntity(new { Code = code, Error = message });
+                    }
+                }
+
+                return Results.Problem(statusCode: StatusCodes.Status500InternalServerError);
             }
         })
         .RequireClearVisionPermission(ClearVisionPermissionPolicies.CanEditProject);
@@ -168,18 +183,8 @@ public static class ApiEndpoints
         app.MapPut("/api/projects/{id:guid}", async (
             Guid id,
             UpdateProjectRequest request,
-            ProjectService service,
-            IInspectionRuntimeCoordinator runtimeCoordinator) =>
+            ProjectService service) =>
         {
-            var requiresMutationLease = request.Flow != null || request.GlobalVariables != null;
-            await using var mutationLease = requiresMutationLease
-                ? await runtimeCoordinator.TryAcquireMutationLeaseAsync(id, "project-update", CancellationToken.None)
-                : null;
-            if (requiresMutationLease && mutationLease == null)
-            {
-                return Results.Conflict(new { Code = "GV031", Error = "Project is currently running." });
-            }
-
             try
             {
                 var project = await service.UpdateAsync(id, request);
@@ -187,7 +192,7 @@ public static class ApiEndpoints
             }
             catch (Exception ex)
             {
-                return ToProjectUpdateFailure(ex);
+                return ToProjectMutationFailure(ex);
             }
         })
         .RequireClearVisionPermission(ClearVisionPermissionPolicies.CanEditProject);
@@ -211,7 +216,7 @@ public static class ApiEndpoints
             }
             catch (Exception ex)
             {
-                return ToBadRequest(ex);
+                return ex is ProjectNotFoundException ? Results.NotFound() : ToBadRequest(ex);
             }
         })
         .RequireClearVisionPermission(ClearVisionPermissionPolicies.CanEditProject);
@@ -220,15 +225,8 @@ public static class ApiEndpoints
         app.MapPut("/api/projects/{id:guid}/flow", async (
             Guid id,
             UpdateFlowRequest request,
-            ProjectService service,
-            IInspectionRuntimeCoordinator runtimeCoordinator) =>
+            ProjectService service) =>
         {
-            await using var mutationLease = await runtimeCoordinator.TryAcquireMutationLeaseAsync(id, "flow-update", CancellationToken.None);
-            if (mutationLease == null)
-            {
-                return Results.Conflict(new { Code = "GV031", Error = "Project is currently running." });
-            }
-
             try
             {
                 // 使用 ProjectService 处理更新，它现在使用文件存储
@@ -248,7 +246,7 @@ public static class ApiEndpoints
             catch (Exception ex)
             {
                 // 日志已由全局异常中间件记录
-                return ToProjectUpdateFailure(ex);
+                return ToProjectMutationFailure(ex);
             }
         })
         .RequireClearVisionPermission(ClearVisionPermissionPolicies.CanEditProject);
@@ -266,30 +264,23 @@ public static class ApiEndpoints
             }
             catch (Exception ex)
             {
-                return ToBadRequest(ex);
+                return ex is ProjectNotFoundException ? Results.NotFound() : ToBadRequest(ex);
             }
         });
 
         app.MapPut("/api/projects/{id:guid}/global-variables", async (
             Guid id,
-            ProjectGlobalVariableSchema schema,
-            ProjectService service,
-            IInspectionRuntimeCoordinator runtimeCoordinator) =>
+            UpdateProjectGlobalVariablesRequest request,
+            ProjectService service) =>
         {
-            await using var mutationLease = await runtimeCoordinator.TryAcquireMutationLeaseAsync(id, "global-variable-schema-update", CancellationToken.None);
-            if (mutationLease == null)
-            {
-                return Results.Conflict(new { Code = "GV031", Error = "Project is currently running." });
-            }
-
             try
             {
-                var saved = await service.UpdateGlobalVariablesAsync(id, schema);
+                var saved = await service.UpdateGlobalVariablesAsync(id, request);
                 return Results.Ok(saved);
             }
             catch (Exception ex)
             {
-                return ToBadRequest(ex);
+                return ToProjectMutationFailure(ex);
             }
         })
         .RequireClearVisionPermission(ClearVisionPermissionPolicies.CanEditProject);
@@ -925,18 +916,35 @@ public static class ApiEndpoints
             : Results.BadRequest(new { Error = ex.Message });
     }
 
-    private static IResult ToProjectUpdateFailure(Exception ex)
+    private static IResult ToProjectMutationFailure(Exception ex)
     {
+        if (ex is ProjectNotFoundException)
+        {
+            return Results.NotFound();
+        }
+
         if (TryParseStableError(ex.Message, out var code, out var message))
         {
-            return string.Equals(code, "PSV011", StringComparison.Ordinal)
-                ? Results.Conflict(new
+            if (string.Equals(code, "PSV011", StringComparison.Ordinal) ||
+                string.Equals(code, "PMU001", StringComparison.Ordinal))
+            {
+                return Results.Conflict(new
                 {
-                    Code = code,
-                    Error = "Project flow was updated by another save. Refresh and retry.",
+                    Code = string.Equals(code, "PMU001", StringComparison.Ordinal) ? "GV031" : code,
+                    Error = string.Equals(code, "PSV011", StringComparison.Ordinal)
+                        ? "Project was updated by another save. Refresh and retry."
+                        : "Project is currently running.",
                     Detail = message
-                })
-                : Results.BadRequest(new { Code = code, Error = message });
+                });
+            }
+
+            if (code.StartsWith("GV", StringComparison.Ordinal) ||
+                code.StartsWith("PMU", StringComparison.Ordinal))
+            {
+                return Results.UnprocessableEntity(new { Code = code, Error = message });
+            }
+
+            return Results.BadRequest(new { Code = code, Error = message });
         }
 
         return Results.BadRequest(new { Error = ex.Message });
@@ -991,6 +999,7 @@ public static class ApiEndpoints
         var candidateCode = separatorIndex > 0 ? message[..separatorIndex] : message;
         if (!candidateCode.StartsWith("GV", StringComparison.OrdinalIgnoreCase) &&
             !candidateCode.StartsWith("PSV", StringComparison.OrdinalIgnoreCase) &&
+            !candidateCode.StartsWith("PMU", StringComparison.OrdinalIgnoreCase) &&
             !candidateCode.StartsWith("ADMISSION", StringComparison.OrdinalIgnoreCase))
         {
             return false;

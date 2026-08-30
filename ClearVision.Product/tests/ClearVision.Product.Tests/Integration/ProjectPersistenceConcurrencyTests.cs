@@ -54,7 +54,6 @@ public sealed class ProjectPersistenceConcurrencyTests : IDisposable
             var variableId = Guid.NewGuid();
             var initialSchema = CreateSchema(variableId, 1, "stats.count");
             var remoteSchema = CreateSchema(variableId, 2, "stats.remote");
-            var staleSchema = CreateSchema(variableId, 99, "stats.stale");
             var retrySchema = CreateSchema(variableId, 3, "stats.retry");
             var projectId = await SeedProjectAsync(initialSchema);
             var flowStorage = new JsonFileProjectFlowStorage(_flowRoot);
@@ -73,16 +72,22 @@ public sealed class ProjectPersistenceConcurrencyTests : IDisposable
             await using (var remoteContext = CreateContext())
             {
                 var remoteService = CreateService(remoteContext, flowStorage, registry);
+                var schemaSaved = await remoteService.UpdateGlobalVariablesAsync(
+                    projectId,
+                    new UpdateProjectGlobalVariablesRequest
+                    {
+                        Schema = remoteSchema,
+                        ExpectedPersistenceRevision = 0
+                    });
                 var remote = await remoteService.UpdateAsync(projectId, new UpdateProjectRequest
                 {
                     Name = "remote",
                     Description = "committed elsewhere",
                     Flow = CreateFlow("remote-flow"),
-                    GlobalVariables = remoteSchema,
-                    ExpectedPersistenceRevision = 0
+                    ExpectedPersistenceRevision = schemaSaved.PersistenceRevision
                 });
 
-                remote.PersistenceRevision.Should().Be(1);
+                remote.PersistenceRevision.Should().Be(2);
             }
 
             var staleService = CreateService(staleContext, flowStorage, registry);
@@ -91,32 +96,37 @@ public sealed class ProjectPersistenceConcurrencyTests : IDisposable
                 Name = "stale",
                 Description = "must not win",
                 Flow = CreateFlow("stale-flow"),
-                GlobalVariables = staleSchema,
                 ExpectedPersistenceRevision = 0
             });
 
             await staleSave.Should().ThrowAsync<InvalidOperationException>().WithMessage("*PSV011*");
-            await AssertPersistedProjectAsync(projectId, "remote", "committed elsewhere", 1, remoteSchema);
+            await AssertPersistedProjectAsync(projectId, "remote", "committed elsewhere", 2, remoteSchema);
             (await flowStorage.LoadFlowJsonAsync(projectId)).Should().Contain("remote-flow").And.NotContain("stale-flow");
             AssertVariableState(projectId, remoteSchema, 1, 11L);
             EnumerateManifests().Should().BeEmpty();
 
             var reread = await staleService.GetByIdAsync(projectId);
             reread.Should().NotBeNull();
-            reread!.PersistenceRevision.Should().Be(1);
+            reread!.PersistenceRevision.Should().Be(2);
+            var retrySchemaSaved = await staleService.UpdateGlobalVariablesAsync(
+                projectId,
+                new UpdateProjectGlobalVariablesRequest
+                {
+                    Schema = retrySchema,
+                    ExpectedPersistenceRevision = 2
+                });
             var retry = await staleService.UpdateAsync(projectId, new UpdateProjectRequest
             {
                 Name = "retry",
                 Description = "after reread",
                 Flow = CreateFlow("retry-flow"),
-                GlobalVariables = retrySchema,
-                ExpectedPersistenceRevision = 1
+                ExpectedPersistenceRevision = retrySchemaSaved.PersistenceRevision
             });
 
-            retry.PersistenceRevision.Should().Be(2);
-            await AssertPersistedProjectAsync(projectId, "retry", "after reread", 2, retrySchema);
+            retry.PersistenceRevision.Should().Be(4);
+            await AssertPersistedProjectAsync(projectId, "retry", "after reread", 4, retrySchema);
             (await flowStorage.LoadFlowJsonAsync(projectId)).Should().Contain("retry-flow");
-            AssertVariableState(projectId, retrySchema, 2, 11L);
+            AssertVariableState(projectId, retrySchema, 3, 11L);
             EnumerateManifests().Should().BeEmpty();
         }
         finally
@@ -126,7 +136,7 @@ public sealed class ProjectPersistenceConcurrencyTests : IDisposable
     }
 
     [Fact]
-    public async Task UpdateAsync_WhenAnotherScopeCommitsAfterInitialRead_ShouldReloadForUpdateAndRejectStaleSave()
+    public async Task UpdateAsync_WhenFirstMutationHoldsProjectAccess_ShouldSerializeSecondAndRejectItsStaleRevision()
     {
         ProjectSaveCoordinator.ResetStaticStateForTests();
         try
@@ -159,31 +169,30 @@ public sealed class ProjectPersistenceConcurrencyTests : IDisposable
                 Name = "first",
                 Description = "stale after pause",
                 Flow = CreateBlockingFlow("first-flow"),
-                GlobalVariables = CreateSchema(variableId, 5, "stats.first"),
                 ExpectedPersistenceRevision = 0
             });
             await blocker.WaitUntilBlockedAsync();
 
-            await using (var secondContext = CreateContext())
+            await using var secondContext = CreateContext();
+            var secondService = CreateService(secondContext, flowStorage, registry);
+            var secondSave = secondService.UpdateAsync(projectId, new UpdateProjectRequest
             {
-                var secondService = CreateService(secondContext, flowStorage, registry);
-                var second = await secondService.UpdateAsync(projectId, new UpdateProjectRequest
-                {
-                    Name = "second",
-                    Description = "wins",
-                    Flow = CreateFlow("second-flow"),
-                    GlobalVariables = CreateSchema(variableId, 2, "stats.second"),
-                    ExpectedPersistenceRevision = 0
-                });
+                Name = "second",
+                Description = "must become stale",
+                Flow = CreateFlow("second-flow"),
+                ExpectedPersistenceRevision = 0
+            });
 
-                second.PersistenceRevision.Should().Be(1);
-            }
+            secondSave.IsCompleted.Should().BeFalse(
+                "the first mutation retains project access while preparing its authoritative candidate");
 
             blocker.Release();
-            var firstAct = async () => await firstSave;
-            await firstAct.Should().ThrowAsync<InvalidOperationException>().WithMessage("*PSV011*");
-            await AssertPersistedProjectAsync(projectId, "second", "wins", 1, CreateSchema(variableId, 2, "stats.second"));
-            (await flowStorage.LoadFlowJsonAsync(projectId)).Should().Contain("second-flow").And.NotContain("first-flow");
+            var first = await firstSave.WaitAsync(TimeSpan.FromSeconds(3));
+            first.PersistenceRevision.Should().Be(1);
+            var secondAct = async () => await secondSave.WaitAsync(TimeSpan.FromSeconds(3));
+            await secondAct.Should().ThrowAsync<InvalidOperationException>().WithMessage("*PSV011*");
+            await AssertPersistedProjectAsync(projectId, "first", "stale after pause", 1, initialSchema);
+            (await flowStorage.LoadFlowJsonAsync(projectId)).Should().Contain("first-flow").And.NotContain("second-flow");
             EnumerateManifests().Should().BeEmpty();
         }
         finally

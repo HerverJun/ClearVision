@@ -29,6 +29,7 @@ public class ProjectService
     private readonly ProjectSaveCoordinator _saveCoordinator;
     private readonly IProjectAssetStorage? _projectAssetStorage;
     private readonly IWorkflowArtifactAdmissionGate? _workflowArtifactAdmissionGate;
+    private readonly ProjectMutationAuthority _mutationAuthority;
 
     private static readonly JsonSerializerOptions _jsonOptions = new()
     {
@@ -60,7 +61,9 @@ public class ProjectService
         ProjectVariableSessionRegistry? projectVariableSessions,
         ProjectSaveCoordinator? saveCoordinator = null,
         IProjectAssetStorage? projectAssetStorage = null,
-        IWorkflowArtifactAdmissionGate? workflowArtifactAdmissionGate = null)
+        IWorkflowArtifactAdmissionGate? workflowArtifactAdmissionGate = null,
+        IInspectionRuntimeCoordinator? runtimeCoordinator = null,
+        ProjectMutationAuthority? mutationAuthority = null)
     {
         _projectRepository = projectRepository;
         _flowStorage = flowStorage;
@@ -74,6 +77,12 @@ public class ProjectService
             flowStorage,
             projectVariableSessions,
             projectAssetStorage: projectAssetStorage);
+        _mutationAuthority = mutationAuthority ?? new ProjectMutationAuthority(
+            projectRepository,
+            flowStorage,
+            _saveCoordinator,
+            runtimeCoordinator,
+            projectAssetStorage);
     }
 
     /// <summary>
@@ -81,6 +90,12 @@ public class ProjectService
     /// </summary>
     public async Task<ProjectDto> CreateAsync(CreateProjectRequest request)
     {
+        ArgumentNullException.ThrowIfNull(request);
+        if (string.IsNullOrWhiteSpace(request.Name))
+        {
+            throw new InvalidOperationException("PMU004: project name cannot be empty.");
+        }
+
         var project = new Project(request.Name, request.Description);
         var globalVariables = request.GlobalVariables ?? new ProjectGlobalVariableSchema();
         if (request.Flow != null)
@@ -94,16 +109,20 @@ public class ProjectService
 
         ProjectGlobalVariableSchemaValidator.ThrowIfInvalid(globalVariables, request.Flow?.ToEntity());
         project.UpdateGlobalVariables(globalVariables);
-        await _projectRepository.AddAsync(project);
-
-        // 如果创建时带有流程（通常是空的，但为了完整性）
-        if (request.Flow != null)
-        {
-            var json = JsonSerializer.Serialize(request.Flow);
-            await _flowStorage.SaveFlowJsonAsync(project.Id, json);
-        }
-
-        return MapToDto(project);
+        var flowJson = request.Flow == null
+            ? null
+            : JsonSerializer.Serialize(request.Flow, _jsonOptions);
+        var saved = await _saveCoordinator.CreateProjectAsync(new ProjectCreateSaveRequest(
+            project,
+            request.Flow,
+            flowJson,
+            _projectAssetStorage == null ? null : new ProjectAssetsDto()));
+        var dto = MapToDto(saved.Project);
+        dto.Flow = request.Flow ?? dto.Flow;
+        dto.Assets = _projectAssetStorage == null
+            ? new ProjectAssetsDto()
+            : await _projectAssetStorage.LoadAssetsAsync(project.Id);
+        return dto;
     }
 
     /// <summary>
@@ -201,55 +220,32 @@ public class ProjectService
     /// </summary>
     public async Task<ProjectDto> UpdateAsync(Guid id, UpdateProjectRequest request)
     {
-        Project project;
-        ProjectGlobalVariableSchema previousGlobalVariables;
-        string? previousFlowJson;
-        OperatorFlowDto? nextFlow;
-        long expectedRevision;
-        await using (await _saveCoordinator.AcquireProjectAccessAsync(id))
+        ArgumentNullException.ThrowIfNull(request);
+        if (request.HasGlobalVariables)
         {
-            project = await _projectRepository.GetByIdAsync(id)
-                ?? throw new ProjectNotFoundException(id);
-            expectedRevision = request.ExpectedPersistenceRevision ?? project.PersistenceRevision;
-            previousGlobalVariables = CloneSchema(project.GlobalVariables);
-            previousFlowJson = await _flowStorage.LoadFlowJsonAsync(id);
-            nextFlow = request.Flow ?? await LoadStoredFlowDtoAsync(id);
+            throw new InvalidOperationException(
+                "PMU008: global-variable schema must be saved through the dedicated revisioned endpoint.");
         }
 
-        var nextSchema = request.GlobalVariables ?? previousGlobalVariables;
-        var flowChanged = request.Flow != null;
-        if (nextFlow != null)
-        {
-            if (request.Flow != null)
-            {
-                nextFlow = AdmitFlowForPersistence(nextFlow, "project.update.input");
-            }
-
-            flowChanged |= MigrateFlowDto(nextFlow);
-            EnrichFlowDtoWithMetadata(nextFlow);
-            flowChanged |= NormalizeProjectVariableOperatorNames(nextFlow, nextSchema);
-
-            nextFlow = AdmitFlowForPersistence(nextFlow, "project.update");
-        }
-
-        ProjectGlobalVariableSchemaValidator.ThrowIfInvalid(nextSchema, nextFlow?.ToEntity());
-        var nextFlowJson = flowChanged && nextFlow != null ? JsonSerializer.Serialize(nextFlow, _jsonOptions) : null;
-
-        var saveResult = await _saveCoordinator.SaveExistingProjectAsync(new ProjectSaveRequest(
-            project,
+        var expectedRevision = RequireExpectedPersistenceRevision(request.ExpectedPersistenceRevision);
+        var patch = new ProjectMutationPatch(
+            request.HasName
+                ? ProjectPatchValue<string>.Present(request.Name)
+                : ProjectPatchValue<string>.Absent(),
+            request.HasDescription
+                ? ProjectPatchValue<string?>.Present(request.Description)
+                : ProjectPatchValue<string?>.Absent(),
+            request.HasFlow
+                ? ProjectPatchValue<OperatorFlowDto>.Present(request.Flow)
+                : ProjectPatchValue<OperatorFlowDto>.Absent(),
+            ProjectPatchValue<ProjectGlobalVariableSchema>.Absent(),
+            "project-patch");
+        var result = await _mutationAuthority.MutateAsync(
+            id,
             expectedRevision,
-            request.Name,
-            request.Description,
-            previousGlobalVariables,
-            nextSchema,
-            previousFlowJson,
-            nextFlow,
-            nextFlowJson));
-
-        var dto = MapToDto(saveResult.Project);
-        dto.Flow = nextFlow;
-        dto.Assets = await LoadProjectAssetsAsync(id);
-        return dto;
+            patch,
+            PrepareExplicitFlowForPersistence);
+        return MapMutationResult(result);
     }
 
     public async Task<ProjectCalibrationAssetSaveResponse> SaveCalibrationAssetAsync(
@@ -346,35 +342,20 @@ public class ProjectService
     /// </summary>
     public async Task<ProjectDto> UpdateFlowAsync(Guid id, UpdateFlowRequest request)
     {
-        // 1. 验证工程存在
-        Project project;
-        OperatorFlowDto? existingFlow;
-        await using (await _saveCoordinator.AcquireProjectAccessAsync(id))
-        {
-            project = await _projectRepository.GetByIdAsync(id)
-                ?? throw new ProjectNotFoundException(id);
-            existingFlow = await LoadStoredFlowDtoAsync(id);
-        }
-
-        // 2. 构造流程DTO
+        ArgumentNullException.ThrowIfNull(request);
         var flowDto = new OperatorFlowDto
         {
-            Name = ResolveFlowName(request.Name, existingFlow?.Name, project.Flow?.Name),
-            DecisionConfiguration = request.DecisionConfiguration ?? existingFlow?.DecisionConfiguration,
+            Name = request.Name ?? string.Empty,
+            DecisionConfiguration = request.DecisionConfiguration,
             Operators = request.Operators,
             Connections = request.Connections
         };
-        return await UpdateAsync(id, new UpdateProjectRequest
-        {
-            Name = project.Name,
-            Description = project.Description,
-            ExpectedPersistenceRevision = request.ExpectedPersistenceRevision ?? project.PersistenceRevision,
-            Flow = flowDto
-        });
-
-        // 4. 更新工程修改时间 (可选，但推荐)
-        // project.LastModified = DateTime.UtcNow; // 如果 Project 有这个字段
-        // await _projectRepository.UpdateAsync(project);
+        var result = await _mutationAuthority.MutateAsync(
+            id,
+            RequireExpectedPersistenceRevision(request.ExpectedPersistenceRevision),
+            ProjectMutationPatch.FlowOnly(flowDto),
+            PrepareExplicitFlowForPersistence);
+        return MapMutationResult(result);
     }
 
     private static string ResolveFlowName(string? requestedName, string? storedName, string? databaseName)
@@ -551,22 +532,52 @@ public class ProjectService
         return await MapProjectListWithAccessAsync(projects);
     }
 
-    public async Task<ProjectGlobalVariableSchema> UpdateGlobalVariablesAsync(Guid id, ProjectGlobalVariableSchema schema)
+    public async Task<UpdateProjectGlobalVariablesResponse> UpdateGlobalVariablesAsync(
+        Guid id,
+        UpdateProjectGlobalVariablesRequest request)
     {
-        Project project;
-        await using (await _saveCoordinator.AcquireProjectAccessAsync(id))
+        ArgumentNullException.ThrowIfNull(request);
+        var schema = request.Schema
+            ?? throw new InvalidOperationException("PMU005: global-variable schema is required.");
+        var result = await _mutationAuthority.MutateAsync(
+            id,
+            RequireExpectedPersistenceRevision(request.ExpectedPersistenceRevision),
+            ProjectMutationPatch.GlobalVariableSchema(schema));
+        return new UpdateProjectGlobalVariablesResponse
         {
-            project = await _projectRepository.GetByIdAsync(id)
-                ?? throw new ProjectNotFoundException(id);
+            ProjectId = result.Project.Id,
+            PersistenceRevision = result.Project.PersistenceRevision,
+            GlobalVariables = result.Project.GlobalVariables
+        };
+    }
+
+    private OperatorFlowDto PrepareExplicitFlowForPersistence(
+        OperatorFlowDto flow,
+        ProjectGlobalVariableSchema schema)
+    {
+        flow = AdmitFlowForPersistence(flow, "project.update.input");
+        MigrateFlowDto(flow);
+        EnrichFlowDtoWithMetadata(flow);
+        NormalizeProjectVariableOperatorNames(flow, schema);
+        return AdmitFlowForPersistence(flow, "project.update");
+    }
+
+    private ProjectDto MapMutationResult(ProjectMutationResult result)
+    {
+        var dto = MapToDto(result.Project);
+        dto.Flow = result.Flow;
+        dto.Assets = result.Assets;
+        return dto;
+    }
+
+    private static long RequireExpectedPersistenceRevision(long? revision)
+    {
+        if (!revision.HasValue || revision.Value < 0)
+        {
+            throw new InvalidOperationException("PMU003: expectedPersistenceRevision is required and must be a non-negative integer.");
         }
 
-        var updated = await UpdateAsync(id, new UpdateProjectRequest
-        {
-            Name = project.Name,
-            Description = project.Description,
-            GlobalVariables = schema
-        });
-        return updated.GlobalVariables;
+        return revision.Value;
     }
 
     private static ProjectGlobalVariableSchema CloneSchema(ProjectGlobalVariableSchema schema)
@@ -658,6 +669,11 @@ public class ProjectService
         {
             try
             {
+                if (ProjectSaveCoordinator.IsProjectHidden(candidate.Id))
+                {
+                    continue;
+                }
+
                 await using var access = await _saveCoordinator.AcquireProjectAccessAsync(candidate.Id);
                 var current = await _projectRepository.GetByIdFreshAsync(candidate.Id);
                 if (current != null)
@@ -671,6 +687,10 @@ public class ProjectService
                     ex,
                     "Skipping project {ProjectId} in project list because save recovery is required.",
                     candidate.Id);
+            }
+            catch (ProjectNotFoundException)
+            {
+                // An interrupted create remains opaque until deterministic rollback completes.
             }
         }
 

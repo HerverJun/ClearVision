@@ -262,6 +262,7 @@ public static class VisionRuntimeServiceCollectionExtensions
 
         services.AddSingleton<ProjectVariableSessionRegistry>();
         services.AddScoped<ProjectSaveCoordinator>();
+        services.AddScoped<ProjectMutationAuthority>();
         services.AddHostedService<ProjectSaveRecoveryHostedService>();
 
         services.AddSingleton<IInspectionRuntimeCoordinator, InspectionRuntimeCoordinator>();

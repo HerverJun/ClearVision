@@ -128,7 +128,8 @@ public sealed class ProjectVariableSessionRegistry
                 nextSchema,
                 migrated.GetSnapshots(),
                 schemaGeneration,
-                sessionWasLoaded);
+                sessionWasLoaded,
+                _stateStore?.LoadMetadata(ToProjectScopeId(projectId)));
         }
     }
 
@@ -448,4 +449,5 @@ public sealed record ProjectVariableSessionMigrationCandidate(
     ProjectGlobalVariableSchema Schema,
     IReadOnlyList<ProjectVariableValueSnapshot> Snapshots,
     long SchemaGeneration,
-    bool SessionWasLoaded);
+    bool SessionWasLoaded,
+    ProjectVariableStateMetadata? SourceMetadata = null);

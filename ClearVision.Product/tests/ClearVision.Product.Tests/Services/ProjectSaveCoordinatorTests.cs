@@ -6,6 +6,7 @@ using System.Text.Json.Nodes;
 using ClearVision.Product.Application.DTOs;
 using ClearVision.Product.Application.Services;
 using ClearVision.Product.Core.Entities;
+using ClearVision.Product.Core.Enums;
 using ClearVision.Product.Core.Interfaces;
 using ClearVision.Product.Core.ProjectVariables;
 using ClearVision.Product.Infrastructure.Services;
@@ -779,6 +780,61 @@ public sealed class ProjectSaveCoordinatorTests
     }
 
     [Fact]
+    public async Task SaveExistingProjectAsync_WhenVariableStateRevisionLagsUnrelatedProjectRevisions_ShouldFenceBySourceHashAndAdvance()
+    {
+        var root = CreateTempPath();
+        var stateRoot = CreateTempPath();
+        try
+        {
+            var variableId = Guid.NewGuid();
+            var previousSchema = CreateSchema(variableId, 1, "stats.count");
+            var nextSchema = CreateSchema(variableId, 5, "stats.renamed");
+            var project = new Project("demo");
+            project.UpdateGlobalVariables(previousSchema);
+            project.SetPersistenceRevision(2);
+            var repository = new InMemoryProjectRepository(project);
+            var flowStorage = new InMemoryProjectFlowStorage();
+            var stateStore = new JsonFileProjectVariableStateStore(stateRoot);
+            var registry = new ProjectVariableSessionRegistry(stateStore);
+            registry.TryMutateAndPersist(
+                    project.Id,
+                    previousSchema,
+                    session => session.SetValue(variableId, 9L, ProjectVariableUpdatedBy.StudioManual),
+                    out _,
+                    out var seedError)
+                .Should()
+                .BeTrue(seedError);
+            registry.LoadStateMetadata(project.Id)!.PersistenceRevision.Should().Be(0);
+            var coordinator = new ProjectSaveCoordinator(repository, flowStorage, registry, root);
+
+            var result = await coordinator.SaveExistingProjectAsync(new ProjectSaveRequest(
+                project,
+                2,
+                "demo",
+                null,
+                previousSchema,
+                nextSchema,
+                null,
+                null,
+                null));
+
+            result.Project.PersistenceRevision.Should().Be(3);
+            result.Project.GlobalVariables.Variables.Single().Name.Should().Be("stats.renamed");
+            var metadata = registry.LoadStateMetadata(project.Id);
+            metadata.Should().NotBeNull();
+            metadata!.PersistenceRevision.Should().Be(3);
+            registry.GetOrCreate(project.Id, nextSchema).TryGetSnapshot(variableId, out var snapshot).Should().BeTrue();
+            ProjectVariableValueConverter.ToObject(snapshot.Value).Should().Be(9L);
+        }
+        finally
+        {
+            ProjectSaveCoordinator.ResetStaticStateForTests();
+            DeleteDirectoryIfExists(root);
+            DeleteDirectoryIfExists(stateRoot);
+        }
+    }
+
+    [Fact]
     public async Task RecoverAllAsync_WhenVariableStateAtTargetHasDifferentHash_ShouldFailClosed()
     {
         var root = CreateTempPath();
@@ -1006,7 +1062,11 @@ public sealed class ProjectSaveCoordinatorTests
             recovery.Invoking(item => item.EnsureProjectAvailable(badProject.Id)).Should().Throw<InvalidOperationException>().WithMessage("*PSV001*");
             recovery.Invoking(item => item.EnsureProjectAvailable(healthyProject.Id)).Should().NotThrow();
             healthyProject.Name.Should().Be("healthy-renamed");
-            Directory.EnumerateFiles(Path.Combine(root, healthyProject.Id.ToString("D")), "manifest.json", SearchOption.AllDirectories).Should().BeEmpty();
+            var healthyTransactionDirectory = Path.Combine(root, healthyProject.Id.ToString("D"));
+            if (Directory.Exists(healthyTransactionDirectory))
+            {
+                Directory.EnumerateFiles(healthyTransactionDirectory, "manifest.json", SearchOption.AllDirectories).Should().BeEmpty();
+            }
             Directory.EnumerateFiles(Path.Combine(root, badProject.Id.ToString("D")), "manifest.json", SearchOption.AllDirectories).Should().NotBeEmpty();
         }
         finally
@@ -1064,6 +1124,255 @@ public sealed class ProjectSaveCoordinatorTests
             await using var healthyAccess = await recovery.AcquireProjectAccessAsync(healthyProject.Id);
             healthyProject.Name.Should().Be("healthy-renamed");
             await Assert.ThrowsAsync<InvalidOperationException>(() => recovery.AcquireProjectAccessAsync(badProject.Id));
+        }
+        finally
+        {
+            ProjectSaveCoordinator.ResetStaticStateForTests();
+            DeleteDirectoryIfExists(root);
+        }
+    }
+
+    [Fact]
+    public async Task CreateProjectAsync_WhenAllParticipantsCommit_ShouldBeCompleteBeforeReturnAndCleanJournal()
+    {
+        var root = CreateTempPath();
+        var stateRoot = CreateTempPath();
+        try
+        {
+            var variableId = Guid.NewGuid();
+            var project = new Project("created");
+            project.Flow.Name = "database-flow";
+            project.Flow.AddOperator(new Operator("db-operator", OperatorType.Preprocessing, 10, 20));
+            project.UpdateGlobalVariables(CreateSchema(variableId, 3, "stats.count"));
+            var repository = new InMemoryProjectRepository();
+            var flowStorage = new InMemoryProjectFlowStorage();
+            var assetStorage = new InMemoryProjectAssetStorage();
+            var stateStore = new JsonFileProjectVariableStateStore(stateRoot);
+            var registry = new ProjectVariableSessionRegistry(stateStore);
+            var coordinator = new ProjectSaveCoordinator(
+                repository,
+                flowStorage,
+                registry,
+                root,
+                projectAssetStorage: assetStorage);
+            var flow = CreateFlow("create-flow");
+            var flowJson = JsonSerializer.Serialize(flow);
+
+            var result = await coordinator.CreateProjectAsync(new ProjectCreateSaveRequest(
+                project,
+                flow,
+                flowJson,
+                new ProjectAssetsDto()));
+
+            result.Project.Id.Should().Be(project.Id);
+            result.Project.PersistenceRevision.Should().Be(0);
+            var persistedProject = await repository.GetByIdAsync(project.Id);
+            persistedProject.Should().NotBeNull();
+            persistedProject!.Flow.Id.Should().Be(project.Id);
+            persistedProject.Flow.Name.Should().Be("database-flow");
+            persistedProject.Flow.Operators.Should().ContainSingle(item => item.Name == "db-operator");
+            (await flowStorage.LoadFlowJsonAsync(project.Id)).Should().Be(flowJson);
+            (await flowStorage.LoadMetadataAsync(project.Id))!.PersistenceRevision.Should().Be(0);
+            assetStorage.Metadata.Should().NotBeNull();
+            assetStorage.Metadata!.PersistenceRevision.Should().Be(0);
+            registry.LoadStateMetadata(project.Id).Should().NotBeNull();
+            registry.LoadStateMetadata(project.Id)!.PersistenceRevision.Should().Be(0);
+            Directory.Exists(Path.Combine(root, project.Id.ToString("D"))).Should().BeFalse();
+        }
+        finally
+        {
+            ProjectSaveCoordinator.ResetStaticStateForTests();
+            DeleteDirectoryIfExists(root);
+            DeleteDirectoryIfExists(stateRoot);
+        }
+    }
+
+    [Theory]
+    [InlineData(ProjectSaveFailurePoint.AfterPrepared)]
+    [InlineData(ProjectSaveFailurePoint.BeforeCommitIntent)]
+    [InlineData(ProjectSaveFailurePoint.AfterCommitIntent)]
+    [InlineData(ProjectSaveFailurePoint.AfterProjectApply)]
+    [InlineData(ProjectSaveFailurePoint.BeforeProjectAssetsApply)]
+    [InlineData(ProjectSaveFailurePoint.AfterFlowApply)]
+    [InlineData(ProjectSaveFailurePoint.AfterVariableStateApply)]
+    [InlineData(ProjectSaveFailurePoint.BeforeComplete)]
+    public async Task CreateProjectAsync_WhenStageFails_ShouldRollbackEveryParticipant(
+        ProjectSaveFailurePoint failurePoint)
+    {
+        var root = CreateTempPath();
+        var stateRoot = CreateTempPath();
+        try
+        {
+            var project = new Project($"created-{failurePoint}");
+            project.UpdateGlobalVariables(CreateSchema(Guid.NewGuid(), 1, "stats.count"));
+            var repository = new InMemoryProjectRepository();
+            var flowStorage = new InMemoryProjectFlowStorage();
+            var assetStorage = new InMemoryProjectAssetStorage();
+            var registry = new ProjectVariableSessionRegistry(new JsonFileProjectVariableStateStore(stateRoot));
+            var failure = new ThrowingProjectSaveFailureInjector(failurePoint, failAlways: true);
+            var coordinator = new ProjectSaveCoordinator(
+                repository,
+                flowStorage,
+                registry,
+                root,
+                failure,
+                assetStorage);
+
+            var act = async () => await coordinator.CreateProjectAsync(new ProjectCreateSaveRequest(
+                project,
+                CreateFlow("create-flow"),
+                SerializeFlow("create-flow"),
+                new ProjectAssetsDto()));
+
+            await act.Should().ThrowAsync<InvalidOperationException>();
+            (await repository.ExistsAsync(project.Id)).Should().BeFalse();
+            (await flowStorage.LoadFlowJsonAsync(project.Id)).Should().BeNull();
+            (await flowStorage.LoadMetadataAsync(project.Id)).Should().BeNull();
+            assetStorage.Metadata.Should().BeNull();
+            registry.LoadStateMetadata(project.Id).Should().BeNull();
+            ProjectSaveCoordinator.IsProjectHidden(project.Id).Should().BeFalse();
+            Directory.Exists(Path.Combine(root, project.Id.ToString("D"))).Should().BeFalse();
+        }
+        finally
+        {
+            ProjectSaveCoordinator.ResetStaticStateForTests();
+            DeleteDirectoryIfExists(root);
+            DeleteDirectoryIfExists(stateRoot);
+        }
+    }
+
+    [Fact]
+    public async Task CreateProjectAsync_WhenDatabaseInsertFails_ShouldLeaveNoReadableParticipants()
+    {
+        var root = CreateTempPath();
+        try
+        {
+            var project = new Project("db-failure");
+            var repository = new InMemoryProjectRepository { FailAdds = 1 };
+            var flowStorage = new InMemoryProjectFlowStorage();
+            var coordinator = new ProjectSaveCoordinator(repository, flowStorage, transactionRoot: root);
+
+            var act = async () => await coordinator.CreateProjectAsync(new ProjectCreateSaveRequest(
+                project,
+                CreateFlow("create-flow"),
+                SerializeFlow("create-flow")));
+
+            await act.Should().ThrowAsync<IOException>().WithMessage("*database insert failed*");
+            (await repository.ExistsAsync(project.Id)).Should().BeFalse();
+            (await flowStorage.LoadFlowJsonAsync(project.Id)).Should().BeNull();
+            Directory.Exists(Path.Combine(root, project.Id.ToString("D"))).Should().BeFalse();
+        }
+        finally
+        {
+            ProjectSaveCoordinator.ResetStaticStateForTests();
+            DeleteDirectoryIfExists(root);
+        }
+    }
+
+    [Fact]
+    public async Task CreateProjectAsync_WhenFlowBodySucceedsButMetadataFails_ShouldDeleteBodyAndDatabaseRow()
+    {
+        var root = CreateTempPath();
+        try
+        {
+            var project = new Project("flow-metadata-failure");
+            var repository = new InMemoryProjectRepository();
+            var flowStorage = new BodyThenMetadataFailureFlowStorage();
+            var coordinator = new ProjectSaveCoordinator(repository, flowStorage, transactionRoot: root);
+
+            var act = async () => await coordinator.CreateProjectAsync(new ProjectCreateSaveRequest(
+                project,
+                CreateFlow("create-flow"),
+                SerializeFlow("create-flow")));
+
+            await act.Should().ThrowAsync<IOException>().WithMessage("*metadata failed*");
+            (await repository.ExistsAsync(project.Id)).Should().BeFalse();
+            (await flowStorage.LoadFlowJsonAsync(project.Id)).Should().BeNull();
+            (await flowStorage.LoadMetadataAsync(project.Id)).Should().BeNull();
+            flowStorage.DeleteCount.Should().Be(1);
+        }
+        finally
+        {
+            ProjectSaveCoordinator.ResetStaticStateForTests();
+            DeleteDirectoryIfExists(root);
+        }
+    }
+
+    [Fact]
+    public async Task RecoverAllAsync_WhenCreateRollbackWasInterrupted_ShouldKeepOpaqueThenRollbackOnRestart()
+    {
+        var root = CreateTempPath();
+        try
+        {
+            var project = new Project("interrupted-create");
+            var repository = new InMemoryProjectRepository();
+            var flowStorage = new InMemoryProjectFlowStorage();
+            var failure = new MultiPointProjectSaveFailureInjector(
+                ProjectSaveFailurePoint.AfterProjectApply,
+                ProjectSaveFailurePoint.BeforeCreateRollback);
+            var crashingCoordinator = new ProjectSaveCoordinator(
+                repository,
+                flowStorage,
+                transactionRoot: root,
+                failureInjector: failure);
+
+            var act = async () => await crashingCoordinator.CreateProjectAsync(new ProjectCreateSaveRequest(
+                project,
+                CreateFlow("create-flow"),
+                SerializeFlow("create-flow")));
+
+            await act.Should().ThrowAsync<InvalidOperationException>().WithMessage("*PSV028*");
+            (await repository.ExistsAsync(project.Id)).Should().BeTrue();
+            ProjectSaveCoordinator.IsProjectHidden(project.Id).Should().BeTrue();
+            await Assert.ThrowsAsync<ClearVision.Product.Core.Exceptions.ProjectNotFoundException>(
+                () => crashingCoordinator.AcquireProjectAccessAsync(project.Id));
+
+            ProjectSaveCoordinator.ResetStaticStateForTests();
+            var recovery = new ProjectSaveCoordinator(repository, flowStorage, transactionRoot: root);
+            var summary = await recovery.RecoverAllAsync();
+
+            summary.RecoveredCount.Should().Be(1);
+            (await repository.ExistsAsync(project.Id)).Should().BeFalse();
+            (await flowStorage.LoadFlowJsonAsync(project.Id)).Should().BeNull();
+            ProjectSaveCoordinator.IsProjectHidden(project.Id).Should().BeFalse();
+            Directory.Exists(Path.Combine(root, project.Id.ToString("D"))).Should().BeFalse();
+        }
+        finally
+        {
+            ProjectSaveCoordinator.ResetStaticStateForTests();
+            DeleteDirectoryIfExists(root);
+        }
+    }
+
+    [Fact]
+    public async Task CreateProjectAsync_WhenSameNameIsConcurrent_ShouldCommitAtMostOne()
+    {
+        var root = CreateTempPath();
+        try
+        {
+            var repository = new InMemoryProjectRepository();
+            var coordinator = new ProjectSaveCoordinator(repository, new InMemoryProjectFlowStorage(), transactionRoot: root);
+            var first = new Project("same-name");
+            var second = new Project("same-name");
+
+            async Task<Exception?> TryCreateAsync(Project project)
+            {
+                try
+                {
+                    await coordinator.CreateProjectAsync(new ProjectCreateSaveRequest(project, null, null));
+                    return null;
+                }
+                catch (Exception ex)
+                {
+                    return ex;
+                }
+            }
+
+            var outcomes = await Task.WhenAll(TryCreateAsync(first), TryCreateAsync(second));
+
+            outcomes.Count(item => item == null).Should().Be(1);
+            outcomes.Count(item => item?.Message.Contains("PSV027", StringComparison.Ordinal) == true).Should().Be(1);
+            (await repository.GetAllAsync()).Should().ContainSingle();
         }
         finally
         {
@@ -1159,6 +1468,26 @@ public sealed class ProjectSaveCoordinatorTests
             if (point == _point && (_failAlways || !_hasFailed))
             {
                 _hasFailed = true;
+                throw new InvalidOperationException($"injected failure at {point}");
+            }
+
+            return Task.CompletedTask;
+        }
+    }
+
+    private sealed class MultiPointProjectSaveFailureInjector : IProjectSaveFailureInjector
+    {
+        private readonly HashSet<ProjectSaveFailurePoint> _points;
+
+        public MultiPointProjectSaveFailureInjector(params ProjectSaveFailurePoint[] points)
+        {
+            _points = points.ToHashSet();
+        }
+
+        public Task OnPointAsync(ProjectSaveFailurePoint point, ProjectSaveManifest manifest)
+        {
+            if (_points.Contains(point))
+            {
                 throw new InvalidOperationException($"injected failure at {point}");
             }
 
@@ -1316,9 +1645,40 @@ public sealed class ProjectSaveCoordinatorTests
         }
     }
 
+    private sealed class BodyThenMetadataFailureFlowStorage : IProjectFlowStorage
+    {
+        private readonly Dictionary<Guid, string> _flowJsonByProject = new();
+
+        public int DeleteCount { get; private set; }
+
+        public Task SaveFlowJsonAsync(Guid projectId, string flowJson)
+        {
+            _flowJsonByProject[projectId] = flowJson;
+            throw new IOException("metadata failed");
+        }
+
+        public Task SaveFlowJsonAsync(Guid projectId, string flowJson, long persistenceRevision) =>
+            SaveFlowJsonAsync(projectId, flowJson);
+
+        public Task<string?> LoadFlowJsonAsync(Guid projectId) =>
+            Task.FromResult(_flowJsonByProject.GetValueOrDefault(projectId));
+
+        public Task<ProjectFlowStorageMetadata?> LoadMetadataAsync(Guid projectId) =>
+            Task.FromResult<ProjectFlowStorageMetadata?>(null);
+
+        public Task DeleteFlowJsonAsync(Guid projectId)
+        {
+            DeleteCount += 1;
+            _flowJsonByProject.Remove(projectId);
+            return Task.CompletedTask;
+        }
+    }
+
     private sealed class InMemoryProjectRepository : IProjectRepository
     {
         private readonly Dictionary<Guid, Project> _projects;
+
+        public int FailAdds { get; set; }
 
         public InMemoryProjectRepository(params Project[] projects)
         {
@@ -1338,15 +1698,29 @@ public sealed class ProjectSaveCoordinatorTests
 
         public Task<Project> AddAsync(Project entity)
         {
+            if (FailAdds > 0)
+            {
+                FailAdds -= 1;
+                throw new IOException("database insert failed");
+            }
+
             _projects[entity.Id] = entity;
             return Task.FromResult(entity);
         }
 
         public Task UpdateAsync(Project entity) => Task.CompletedTask;
 
-        public Task DeleteAsync(Project entity) => Task.CompletedTask;
+        public Task DeleteAsync(Project entity)
+        {
+            _projects.Remove(entity.Id);
+            return Task.CompletedTask;
+        }
 
-        public Task DeleteByIdAsync(Guid id) => Task.CompletedTask;
+        public Task DeleteByIdAsync(Guid id)
+        {
+            _projects.Remove(id);
+            return Task.CompletedTask;
+        }
 
         public Task<bool> ExistsAsync(Guid id) => Task.FromResult(_projects.ContainsKey(id));
 

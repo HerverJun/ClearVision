@@ -40,7 +40,9 @@ public sealed class ProjectGlobalVariableEndpointsTests
             CreateSchema(variableId, 1, manualWriteAllowed: true));
 
         var updated = CreateSchema(variableId, 5, manualWriteAllowed: true);
-        using var updateResponse = await host.Client.PutAsJsonAsync($"/api/projects/{host.Project.Id}/global-variables", updated);
+        using var updateResponse = await host.Client.PutAsJsonAsync(
+            $"/api/projects/{host.Project.Id}/global-variables",
+            SchemaPatch(host.Project, updated));
         updateResponse.StatusCode.Should().Be(HttpStatusCode.OK, await updateResponse.Content.ReadAsStringAsync());
 
         using var valuesResponse = await host.Client.GetAsync($"/api/projects/{host.Project.Id}/global-variable-values");
@@ -69,6 +71,101 @@ public sealed class ProjectGlobalVariableEndpointsTests
         resetResponse.StatusCode.Should().Be(HttpStatusCode.OK);
         host.Registry.GetOrCreate(host.Project.Id, host.Project.GlobalVariables).TryGetValue(variableId, out var reset).Should().BeTrue();
         ProjectVariableValueConverter.ToObject(reset).Should().Be(5L);
+    }
+
+    [Fact]
+    public async Task GlobalVariablesPut_WhenExpectedPersistenceRevisionIsMissing_ShouldReturn422WithoutWrite()
+    {
+        var variableId = Guid.NewGuid();
+        await using var host = await ProjectGlobalVariableEndpointHost.CreateAsync(
+            CreateSchema(variableId, 1, manualWriteAllowed: true));
+
+        using var response = await host.Client.PutAsJsonAsync(
+            $"/api/projects/{host.Project.Id}/global-variables",
+            new UpdateProjectGlobalVariablesRequest
+            {
+                Schema = CreateSchema(variableId, 2, manualWriteAllowed: true)
+            });
+
+        response.StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        body.GetProperty("code").GetString().Should().Be("PMU003");
+        host.Project.PersistenceRevision.Should().Be(0);
+        host.Project.GlobalVariables.Variables.Single().InitialValue.GetInt64().Should().Be(1L);
+        await host.Repository.DidNotReceive().UpdateAsync(Arg.Any<Project>());
+    }
+
+    [Fact]
+    public async Task GlobalVariablesPut_WhenSchemaIsMissing_ShouldReturn422WithoutWrite()
+    {
+        var variableId = Guid.NewGuid();
+        await using var host = await ProjectGlobalVariableEndpointHost.CreateAsync(
+            CreateSchema(variableId, 1, manualWriteAllowed: true));
+
+        using var response = await host.Client.PutAsJsonAsync(
+            $"/api/projects/{host.Project.Id}/global-variables",
+            new UpdateProjectGlobalVariablesRequest
+            {
+                ExpectedPersistenceRevision = 0
+            });
+
+        response.StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        body.GetProperty("code").GetString().Should().Be("PMU005");
+        host.Project.PersistenceRevision.Should().Be(0);
+        await host.Repository.DidNotReceive().UpdateAsync(Arg.Any<Project>());
+    }
+
+    [Fact]
+    public async Task GlobalVariablesPut_WhenExpectedPersistenceRevisionIsStale_ShouldReturn409WithoutWrite()
+    {
+        var variableId = Guid.NewGuid();
+        await using var host = await ProjectGlobalVariableEndpointHost.CreateAsync(
+            CreateSchema(variableId, 1, manualWriteAllowed: true));
+        host.Project.SetPersistenceRevision(2);
+
+        using var response = await host.Client.PutAsJsonAsync(
+            $"/api/projects/{host.Project.Id}/global-variables",
+            SchemaPatch(
+                host.Project,
+                CreateSchema(variableId, 2, manualWriteAllowed: true),
+                expectedPersistenceRevision: 1));
+
+        response.StatusCode.Should().Be(HttpStatusCode.Conflict);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        body.GetProperty("code").GetString().Should().Be("PSV011");
+        host.Project.PersistenceRevision.Should().Be(2);
+        host.Project.GlobalVariables.Variables.Single().InitialValue.GetInt64().Should().Be(1L);
+        await host.Repository.DidNotReceive().UpdateAsync(Arg.Any<Project>());
+    }
+
+    [Fact]
+    public async Task ProjectMutationPut_WhenProjectIsMissing_ShouldReturnOpaque404()
+    {
+        var variableId = Guid.NewGuid();
+        await using var host = await ProjectGlobalVariableEndpointHost.CreateAsync(
+            CreateSchema(variableId, 1, manualWriteAllowed: true));
+        var missingId = Guid.NewGuid();
+
+        using var projectResponse = await host.Client.PutAsJsonAsync(
+            $"/api/projects/{missingId}",
+            new UpdateProjectRequest
+            {
+                ExpectedPersistenceRevision = 0,
+                Name = "missing"
+            });
+        using var schemaResponse = await host.Client.PutAsJsonAsync(
+            $"/api/projects/{missingId}/global-variables",
+            new UpdateProjectGlobalVariablesRequest
+            {
+                ExpectedPersistenceRevision = 0,
+                Schema = CreateSchema(variableId, 2, manualWriteAllowed: true)
+            });
+
+        projectResponse.StatusCode.Should().Be(HttpStatusCode.NotFound);
+        schemaResponse.StatusCode.Should().Be(HttpStatusCode.NotFound);
+        (await projectResponse.Content.ReadAsStringAsync()).Should().BeEmpty();
+        (await schemaResponse.Content.ReadAsStringAsync()).Should().BeEmpty();
     }
 
     [Fact]
@@ -184,9 +281,11 @@ public sealed class ProjectGlobalVariableEndpointsTests
             ManualWriteAllowed = true
         });
 
-        using var response = await host.Client.PutAsJsonAsync($"/api/projects/{host.Project.Id}/global-variables", invalid);
+        using var response = await host.Client.PutAsJsonAsync(
+            $"/api/projects/{host.Project.Id}/global-variables",
+            SchemaPatch(host.Project, invalid));
 
-        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        response.StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity);
         host.Registry.GetOrCreate(host.Project.Id, host.Project.GlobalVariables).Should().BeSameAs(oldSession);
         oldSession.TryGetValue(variableId, out var current).Should().BeTrue();
         ProjectVariableValueConverter.ToObject(current).Should().Be(9L);
@@ -204,7 +303,7 @@ public sealed class ProjectGlobalVariableEndpointsTests
 
         using var response = await host.Client.PutAsJsonAsync(
             $"/api/projects/{host.Project.Id}/global-variables",
-            CreateSchema(variableId, 5, manualWriteAllowed: true));
+            SchemaPatch(host.Project, CreateSchema(variableId, 5, manualWriteAllowed: true)));
 
         response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
         var body = await response.Content.ReadFromJsonAsync<JsonElement>();
@@ -311,7 +410,7 @@ public sealed class ProjectGlobalVariableEndpointsTests
         using var flow = await host.Client.PutAsJsonAsync($"/api/projects/{host.Project.Id}/flow", new UpdateFlowRequest());
         using var schemaWrite = await host.Client.PutAsJsonAsync(
             $"/api/projects/{host.Project.Id}/global-variables",
-            CreateSchema(variableId, 2, manualWriteAllowed: true));
+            SchemaPatch(host.Project, CreateSchema(variableId, 2, manualWriteAllowed: true)));
         using var valueWrite = await host.Client.PutAsJsonAsync(
             $"/api/projects/{host.Project.Id}/global-variable-values/{variableId}",
             new { value = 3L });
@@ -364,7 +463,7 @@ public sealed class ProjectGlobalVariableEndpointsTests
 
         using var schemaResponse = await host.Client.PutAsJsonAsync(
             $"/api/projects/{host.Project.Id}/global-variables",
-            CreateSchema(variableId, 5, manualWriteAllowed: true));
+            SchemaPatch(host.Project, CreateSchema(variableId, 5, manualWriteAllowed: true)));
         using var writeResponse = await host.Client.PutAsJsonAsync(
             $"/api/projects/{host.Project.Id}/global-variable-values/{variableId}",
             new { value = 8L });
@@ -398,7 +497,7 @@ public sealed class ProjectGlobalVariableEndpointsTests
 
         using var response = await host.Client.PutAsJsonAsync(
             $"/api/projects/{host.Project.Id}/flow",
-            new UpdateFlowRequest());
+            new UpdateFlowRequest { ExpectedPersistenceRevision = host.Project.PersistenceRevision });
 
         response.StatusCode.Should().Be(HttpStatusCode.Conflict);
         var body = await response.Content.ReadFromJsonAsync<JsonElement>();
@@ -604,7 +703,7 @@ public sealed class ProjectGlobalVariableEndpointsTests
     [InlineData(RuntimeStatus.Starting)]
     [InlineData(RuntimeStatus.Running)]
     [InlineData(RuntimeStatus.Stopping)]
-    public async Task ProjectPut_WhenRuntimeBusyAndGlobalVariablesProvided_ShouldRejectWithoutPartialUpdate(RuntimeStatus status)
+    public async Task ProjectPut_WhenGlobalVariablesProvided_ShouldRejectDedicatedEndpointBypass(RuntimeStatus status)
     {
         var variableId = Guid.NewGuid();
         await using var host = await ProjectGlobalVariableEndpointHost.CreateAsync(
@@ -617,12 +716,15 @@ public sealed class ProjectGlobalVariableEndpointsTests
             $"/api/projects/{host.Project.Id}",
             new UpdateProjectRequest
             {
+                ExpectedPersistenceRevision = host.Project.PersistenceRevision,
                 Name = "renamed",
                 Description = "changed",
                 GlobalVariables = CreateSchema(variableId, 5, manualWriteAllowed: true)
             });
 
-        response.StatusCode.Should().Be(HttpStatusCode.Conflict);
+        response.StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        body.GetProperty("code").GetString().Should().Be("PMU008");
         host.Project.Name.Should().Be("demo");
         host.Project.Description.Should().BeNull();
         host.Project.GlobalVariables.Variables.Single().InitialValue.GetInt64().Should().Be(1L);
@@ -649,6 +751,7 @@ public sealed class ProjectGlobalVariableEndpointsTests
             $"/api/projects/{host.Project.Id}",
             new UpdateProjectRequest
             {
+                ExpectedPersistenceRevision = host.Project.PersistenceRevision,
                 Name = "renamed",
                 Description = "changed",
                 Flow = new OperatorFlowDto
@@ -682,6 +785,7 @@ public sealed class ProjectGlobalVariableEndpointsTests
             $"/api/projects/{host.Project.Id}",
             new UpdateProjectRequest
             {
+                ExpectedPersistenceRevision = host.Project.PersistenceRevision,
                 Name = "renamed",
                 Description = "changed"
             });
@@ -693,7 +797,7 @@ public sealed class ProjectGlobalVariableEndpointsTests
     }
 
     [Fact]
-    public async Task ProjectPut_WhenIdleAndGlobalVariablesProvided_ShouldUpdateAndRefreshSession()
+    public async Task GlobalVariablesPut_WhenIdle_ShouldUpdateSchemaOnlyAndRefreshSession()
     {
         var variableId = Guid.NewGuid();
         await using var host = await ProjectGlobalVariableEndpointHost.CreateAsync(
@@ -702,17 +806,15 @@ public sealed class ProjectGlobalVariableEndpointsTests
         oldSession.SetValue(variableId, 9L, ProjectVariableUpdatedBy.StudioManual);
 
         using var response = await host.Client.PutAsJsonAsync(
-            $"/api/projects/{host.Project.Id}",
-            new UpdateProjectRequest
-            {
-                Name = "renamed",
-                Description = "changed",
-                GlobalVariables = CreateSchema(variableId, 5, manualWriteAllowed: true)
-            });
+            $"/api/projects/{host.Project.Id}/global-variables",
+            SchemaPatch(host.Project, CreateSchema(variableId, 5, manualWriteAllowed: true)));
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
-        host.Project.Name.Should().Be("renamed");
-        host.Project.Description.Should().Be("changed");
+        var body = await response.Content.ReadFromJsonAsync<UpdateProjectGlobalVariablesResponse>();
+        body.Should().NotBeNull();
+        body!.PersistenceRevision.Should().Be(1);
+        host.Project.Name.Should().Be("demo");
+        host.Project.Description.Should().BeNull();
         host.Project.GlobalVariables.Variables.Single().InitialValue.GetInt64().Should().Be(5L);
         var newSession = host.Registry.GetOrCreate(host.Project.Id, host.Project.GlobalVariables);
         newSession.Should().NotBeSameAs(oldSession);
@@ -748,7 +850,7 @@ public sealed class ProjectGlobalVariableEndpointsTests
     }
 
     [Fact]
-    public async Task ProjectPut_WhenFlowAndGlobalVariablesProvided_ShouldPersistThroughSingleProjectSave()
+    public async Task DedicatedSchemaThenProjectFlowPatch_ShouldPreserveEachAuthoritativeParticipant()
     {
         var variableId = Guid.NewGuid();
         var flowStorage = new RecordingProjectFlowStorage();
@@ -782,28 +884,32 @@ public sealed class ProjectGlobalVariableEndpointsTests
             Connections = []
         };
 
+        using var schemaResponse = await host.Client.PutAsJsonAsync(
+            $"/api/projects/{host.Project.Id}/global-variables",
+            SchemaPatch(host.Project, nextSchema, expectedPersistenceRevision: 0));
+        schemaResponse.StatusCode.Should().Be(HttpStatusCode.OK, await schemaResponse.Content.ReadAsStringAsync());
+
         using var response = await host.Client.PutAsJsonAsync(
             $"/api/projects/{host.Project.Id}",
             new UpdateProjectRequest
             {
                 Name = "renamed",
                 Description = "changed",
-                ExpectedPersistenceRevision = 0,
-                Flow = nextFlow,
-                GlobalVariables = nextSchema
+                ExpectedPersistenceRevision = 1,
+                Flow = nextFlow
             });
 
         response.StatusCode.Should().Be(HttpStatusCode.OK, await response.Content.ReadAsStringAsync());
         var body = await response.Content.ReadFromJsonAsync<ProjectDto>();
         body.Should().NotBeNull();
-        body!.PersistenceRevision.Should().Be(1);
+        body!.PersistenceRevision.Should().Be(2);
         body.Flow.Should().NotBeNull();
         host.Project.Name.Should().Be("renamed");
         host.Project.Description.Should().Be("changed");
         host.Project.GlobalVariables.Variables.Single().InitialValue.GetInt64().Should().Be(5L);
-        await host.Repository.Received(1).UpdateAsync(host.Project);
+        await host.Repository.Received(2).UpdateAsync(host.Project);
         flowStorage.SaveCount.Should().Be(1);
-        flowStorage.LastPersistenceRevision.Should().Be(1);
+        flowStorage.LastPersistenceRevision.Should().Be(2);
         flowStorage.LastSavedFlowJson.Should().Contain("Threshold");
     }
 
@@ -850,6 +956,16 @@ public sealed class ProjectGlobalVariableEndpointsTests
             ]
         };
     }
+
+    private static UpdateProjectGlobalVariablesRequest SchemaPatch(
+        Project project,
+        ProjectGlobalVariableSchema schema,
+        long? expectedPersistenceRevision = null) =>
+        new()
+        {
+            ExpectedPersistenceRevision = expectedPersistenceRevision ?? project.PersistenceRevision,
+            Schema = schema
+        };
 
     private static ProjectAssetsDto CreateProjectAssets(string assetId, long projectRevision)
     {

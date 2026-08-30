@@ -4,8 +4,10 @@ using System.Text;
 using System.Text.Json;
 using ClearVision.Product.Application.DTOs;
 using ClearVision.Product.Core.Entities;
+using ClearVision.Product.Core.Exceptions;
 using ClearVision.Product.Core.Interfaces;
 using ClearVision.Product.Core.ProjectVariables;
+using ClearVision.Product.Core.Services;
 
 namespace ClearVision.Product.Application.Services;
 
@@ -19,7 +21,9 @@ public sealed class ProjectSaveCoordinator
     private const string ManifestFileName = "manifest.json";
     private static readonly ConcurrentDictionary<Guid, ProjectGate> ProjectGates = new();
     private static readonly ConcurrentDictionary<Guid, string> RecoveryRequired = new();
+    private static readonly ConcurrentDictionary<Guid, byte> HiddenCreates = new();
     private static readonly ConcurrentDictionary<Guid, ProjectAccessState> ProjectStates = new();
+    private static readonly SemaphoreSlim CreateGate = new(1, 1);
     private static readonly object StartupRecoveryGate = new();
     private static TaskCompletionSource StartupRecoveryReady = CreateCompletedStartupBarrier();
     private static bool StartupRecoveryCompleted = true;
@@ -58,6 +62,11 @@ public sealed class ProjectSaveCoordinator
     public void EnsureProjectAvailable(Guid projectId)
     {
         EnsureStartupRecoveryReady();
+        if (HiddenCreates.ContainsKey(projectId))
+        {
+            throw new ProjectNotFoundException(projectId);
+        }
+
         if (RecoveryRequired.TryGetValue(projectId, out var reason))
         {
             throw new InvalidOperationException($"PSV001: project '{projectId}' requires save recovery before access: {reason}");
@@ -73,12 +82,17 @@ public sealed class ProjectSaveCoordinator
         {
             await gate.WaitAsync(cancellationToken);
             acquired = true;
+            if (HiddenCreates.ContainsKey(projectId))
+            {
+                throw new ProjectNotFoundException(projectId);
+            }
+
             if (RecoveryRequired.TryGetValue(projectId, out var reason))
             {
                 throw new InvalidOperationException($"PSV001: project '{projectId}' requires save recovery before access: {reason}");
             }
 
-            return new ProjectAccessLease(() => ReleaseAcquiredProjectGate(projectId, gate));
+            return new ProjectAccessLease(projectId, () => ReleaseAcquiredProjectGate(projectId, gate));
         }
         catch
         {
@@ -108,14 +122,21 @@ public sealed class ProjectSaveCoordinator
     public async Task<ProjectSaveResult> SaveExistingProjectAsync(ProjectSaveRequest request)
     {
         ArgumentNullException.ThrowIfNull(request);
-        await WaitForStartupRecoveryAsync();
+        await using var access = await AcquireProjectAccessAsync(request.Project.Id);
+        return await SaveExistingProjectUnderProjectAccessAsync(access, request);
+    }
 
-        var gate = await RentProjectGateAsync(request.Project.Id);
-        await gate.WaitAsync();
+    public async Task<ProjectSaveResult> SaveExistingProjectUnderProjectAccessAsync(
+        ProjectAccessLease projectAccess,
+        ProjectSaveRequest request)
+    {
+        ArgumentNullException.ThrowIfNull(projectAccess);
+        ArgumentNullException.ThrowIfNull(request);
+        projectAccess.EnsureActiveFor(request.Project.Id);
+        EnsureProjectAvailable(request.Project.Id);
+        ProjectStates[request.Project.Id] = ProjectAccessState.Saving;
         try
         {
-            EnsureProjectAvailable(request.Project.Id);
-            ProjectStates[request.Project.Id] = ProjectAccessState.Saving;
             return await SaveExistingProjectUnderGateAsync(request);
         }
         finally
@@ -128,9 +149,44 @@ public sealed class ProjectSaveCoordinator
             {
                 ProjectStates[request.Project.Id] = ProjectAccessState.Idle;
             }
+        }
+    }
 
-            gate.Release();
-            ReleaseProjectGateReference(request.Project.Id, gate);
+    public async Task<ProjectSaveResult> CreateProjectAsync(
+        ProjectCreateSaveRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        await WaitForStartupRecoveryAsync(cancellationToken);
+        await CreateGate.WaitAsync(cancellationToken);
+        try
+        {
+            var duplicate = await _projectRepository.GetByNameAsync(request.Project.Name);
+            if (duplicate != null)
+            {
+                throw new InvalidOperationException("PSV027: a project with the same name already exists.");
+            }
+
+            var gate = await RentProjectGateAsync(request.Project.Id, cancellationToken);
+            await gate.WaitAsync(cancellationToken);
+            try
+            {
+                EnsureProjectAvailable(request.Project.Id);
+                ProjectStates[request.Project.Id] = ProjectAccessState.Saving;
+                return await CreateProjectUnderGateAsync(request);
+            }
+            finally
+            {
+                ProjectStates[request.Project.Id] = RecoveryRequired.ContainsKey(request.Project.Id)
+                    ? ProjectAccessState.RecoveryRequired
+                    : ProjectAccessState.Idle;
+                gate.Release();
+                ReleaseProjectGateReference(request.Project.Id, gate);
+            }
+        }
+        finally
+        {
+            CreateGate.Release();
         }
     }
 
@@ -239,6 +295,114 @@ public sealed class ProjectSaveCoordinator
             SystemFailure: null);
     }
 
+    private async Task<ProjectSaveResult> CreateProjectUnderGateAsync(ProjectCreateSaveRequest request)
+    {
+        if (await _projectRepository.GetByIdForUpdateAsync(request.Project.Id) != null)
+        {
+            throw new InvalidOperationException($"PSV027: project '{request.Project.Id}' already exists.");
+        }
+
+        const long fromRevision = -1;
+        const long toRevision = 0;
+        var saveId = Guid.NewGuid();
+        var saveDirectory = GetSaveDirectory(request.Project.Id, saveId);
+        Directory.CreateDirectory(saveDirectory);
+
+        var variableCandidate = request.Project.GlobalVariables.Variables.Count > 0 && _projectVariableSessions != null
+            ? _projectVariableSessions.BuildSchemaMigrationCandidate(
+                request.Project.Id,
+                new ProjectGlobalVariableSchema(),
+                request.Project.GlobalVariables)
+            : null;
+        var participants = BuildCreateParticipants(
+            request.FlowJson != null,
+            variableCandidate != null,
+            request.Assets != null);
+        var projectCandidate = ProjectCandidate.FromNew(request.Project);
+        var artifacts = new List<ProjectSaveArtifact>();
+        ProjectSaveManifest manifest;
+
+        try
+        {
+            var projectBytes = SerializeToBytes(projectCandidate);
+            WriteArtifact(saveDirectory, ProjectCandidateFileName, projectBytes);
+            artifacts.Add(ProjectSaveArtifact.From(ProjectCandidateFileName, fromRevision, toRevision, projectBytes));
+
+            if (request.FlowJson != null)
+            {
+                var flowBytes = new UTF8Encoding(false).GetBytes(request.FlowJson);
+                WriteArtifact(saveDirectory, FlowFileName, flowBytes);
+                artifacts.Add(ProjectSaveArtifact.From(FlowFileName, fromRevision, toRevision, flowBytes));
+            }
+
+            if (variableCandidate != null)
+            {
+                var variableBytes = SerializeToBytes(VariableStateCandidate.From(variableCandidate));
+                WriteArtifact(saveDirectory, VariableStateFileName, variableBytes);
+                artifacts.Add(ProjectSaveArtifact.From(VariableStateFileName, fromRevision, toRevision, variableBytes));
+            }
+
+            if (request.Assets != null)
+            {
+                var normalizedAssets = ProjectAssetJson.WithProjectRevision(request.Assets, toRevision);
+                var assetBytes = ProjectAssetJson.SerializeToBytes(normalizedAssets);
+                WriteArtifact(saveDirectory, ProjectAssetsFileName, assetBytes);
+                artifacts.Add(ProjectSaveArtifact.From(ProjectAssetsFileName, fromRevision, toRevision, assetBytes));
+            }
+
+            manifest = ProjectSaveManifest.Create(
+                saveId,
+                request.Project.Id,
+                fromRevision,
+                toRevision,
+                participants,
+                ProjectSavePhase.Prepared,
+                artifacts,
+                ProjectSaveOperation.Create);
+            WriteManifestAtomic(saveDirectory, manifest);
+            await InjectFailureAsync(ProjectSaveFailurePoint.AfterPrepared, manifest);
+            ValidateStagedArtifacts(saveDirectory, manifest);
+            await InjectFailureAsync(ProjectSaveFailurePoint.BeforeCommitIntent, manifest);
+            manifest = manifest with { Phase = ProjectSavePhase.CommitIntended };
+            WriteManifestAtomic(saveDirectory, manifest);
+        }
+        catch
+        {
+            TryDeleteSaveDirectory(saveDirectory);
+            TryDeleteProjectDirectoryIfEmpty(request.Project.Id);
+            throw;
+        }
+
+        HiddenCreates[request.Project.Id] = 0;
+        try
+        {
+            await InjectFailureAsync(ProjectSaveFailurePoint.AfterCommitIntent, manifest);
+            var created = await ApplyCreateCommittedIntentAsync(saveDirectory, manifest, request.Project);
+            HiddenCreates.TryRemove(request.Project.Id, out _);
+            RecoveryRequired.TryRemove(request.Project.Id, out _);
+            return new ProjectSaveResult(created, request.Flow, Changed: true);
+        }
+        catch (Exception originalException)
+        {
+            try
+            {
+                await RollbackCreateCommittedIntentAsync(saveDirectory, manifest);
+                HiddenCreates.TryRemove(request.Project.Id, out _);
+                RecoveryRequired.TryRemove(request.Project.Id, out _);
+            }
+            catch (Exception rollbackException)
+            {
+                HiddenCreates[request.Project.Id] = 0;
+                RecoveryRequired[request.Project.Id] = rollbackException.Message;
+                throw new InvalidOperationException(
+                    $"PSV028: project create rollback failed. Original={originalException.Message}; Rollback={rollbackException.Message}",
+                    rollbackException);
+            }
+
+            throw;
+        }
+    }
+
     private async Task<ProjectSaveResult> SaveExistingProjectUnderGateAsync(ProjectSaveRequest request)
     {
         var project = await _projectRepository.GetByIdForUpdateAsync(request.Project.Id)
@@ -341,7 +505,15 @@ public sealed class ProjectSaveCoordinator
         };
         if (flowBytes != null)
         {
-            artifacts.Add(ProjectSaveArtifact.From(FlowFileName, fromRevision, toRevision, flowBytes));
+            var previousFlowBytes = previousFlowJson == null
+                ? null
+                : new UTF8Encoding(false).GetBytes(previousFlowJson);
+            artifacts.Add(ProjectSaveArtifact.From(
+                FlowFileName,
+                fromRevision,
+                toRevision,
+                flowBytes,
+                previousFlowBytes));
         }
 
         if (variableBytes != null)
@@ -416,10 +588,16 @@ public sealed class ProjectSaveCoordinator
         var manifestPath = Path.Combine(saveDirectory, ManifestFileName);
         if (!File.Exists(manifestPath))
         {
-            return new ProjectSaveRecoveryDirectoryResult(0, 0);
+            Directory.Delete(saveDirectory, recursive: true);
+            TryDeleteDirectoryIfEmpty(Path.GetDirectoryName(saveDirectory));
+            return new ProjectSaveRecoveryDirectoryResult(0, 1);
         }
 
         var manifest = DeserializeFile<ProjectSaveManifest>(manifestPath);
+        if (manifest.Operation == ProjectSaveOperation.Create && manifest.Phase != ProjectSavePhase.Completed)
+        {
+            HiddenCreates[manifest.ProjectId] = 0;
+        }
         var gate = await RentProjectGateAsync(manifest.ProjectId);
         await gate.WaitAsync();
         try
@@ -428,18 +606,30 @@ public sealed class ProjectSaveCoordinator
             if (manifest.Phase == ProjectSavePhase.Prepared)
             {
                 Directory.Delete(saveDirectory, recursive: true);
+                HiddenCreates.TryRemove(manifest.ProjectId, out _);
+                TryDeleteProjectDirectoryIfEmpty(manifest.ProjectId);
                 return new ProjectSaveRecoveryDirectoryResult(0, 1);
             }
 
             if (manifest.Phase == ProjectSavePhase.Completed)
             {
                 Directory.Delete(saveDirectory, recursive: true);
+                HiddenCreates.TryRemove(manifest.ProjectId, out _);
                 RecoveryRequired.TryRemove(manifest.ProjectId, out _);
+                TryDeleteProjectDirectoryIfEmpty(manifest.ProjectId);
                 return new ProjectSaveRecoveryDirectoryResult(1, 0);
             }
 
             ValidateStagedArtifacts(saveDirectory, manifest);
-            await ApplyCommittedIntentAsync(saveDirectory, manifest);
+            if (manifest.Operation == ProjectSaveOperation.Create)
+            {
+                await RollbackCreateCommittedIntentAsync(saveDirectory, manifest);
+                HiddenCreates.TryRemove(manifest.ProjectId, out _);
+            }
+            else
+            {
+                await ApplyCommittedIntentAsync(saveDirectory, manifest);
+            }
             RecoveryRequired.TryRemove(manifest.ProjectId, out _);
             return new ProjectSaveRecoveryDirectoryResult(1, 0);
         }
@@ -462,6 +652,162 @@ public sealed class ProjectSaveCoordinator
             gate.Release();
             ReleaseProjectGateReference(manifest.ProjectId, gate);
         }
+    }
+
+    private async Task<Project> ApplyCreateCommittedIntentAsync(
+        string saveDirectory,
+        ProjectSaveManifest manifest,
+        Project createProject)
+    {
+        ArgumentNullException.ThrowIfNull(createProject);
+        var projectCandidate = DeserializeFile<ProjectCandidate>(Path.Combine(saveDirectory, ProjectCandidateFileName));
+        await InjectFailureAsync(ProjectSaveFailurePoint.BeforeProjectApply, manifest);
+        var project = await LoadCreateProjectForVerificationAsync(manifest.ProjectId);
+        if (project == null)
+        {
+            if (createProject.Id != manifest.ProjectId ||
+                createProject.PersistenceRevision != manifest.ToRevision)
+            {
+                throw new InvalidOperationException("PSV003: in-memory create project does not match the staged target revision.");
+            }
+
+            VerifyProjectAtCandidate(createProject, projectCandidate);
+            project = await _projectRepository.AddAsync(createProject)
+                ?? throw new InvalidOperationException("PSV003: project repository returned no created aggregate.");
+            if (project.Id != manifest.ProjectId || project.PersistenceRevision != manifest.ToRevision)
+            {
+                throw new InvalidOperationException("PSV003: created project does not match the staged target revision.");
+            }
+
+            VerifyProjectAtCandidate(project, projectCandidate);
+        }
+        else
+        {
+            if (project.PersistenceRevision != manifest.ToRevision)
+            {
+                throw new InvalidOperationException(
+                    $"PSV003: create project revision conflict. Current={project.PersistenceRevision}, To={manifest.ToRevision}.");
+            }
+
+            VerifyProjectAtCandidate(project, projectCandidate);
+        }
+
+        await InjectFailureAsync(ProjectSaveFailurePoint.AfterProjectApply, manifest);
+        if (manifest.Participants.Contains(ProjectSaveParticipant.ProjectAssets))
+        {
+            if (_projectAssetStorage == null)
+            {
+                throw new InvalidOperationException("PSV017: project asset persistence is unavailable.");
+            }
+
+            var assetArtifact = manifest.Artifacts.Single(item => item.Name == ProjectAssetsFileName);
+            var assets = DeserializeFile<ProjectAssetsDto>(Path.Combine(saveDirectory, ProjectAssetsFileName));
+            await InjectFailureAsync(ProjectSaveFailurePoint.BeforeProjectAssetsApply, manifest);
+            var metadata = await _projectAssetStorage.LoadMetadataAsync(manifest.ProjectId);
+            if (metadata == null)
+            {
+                await _projectAssetStorage.SaveAssetsAsync(
+                    manifest.ProjectId,
+                    assets,
+                    manifest.ToRevision,
+                    manifest.SaveId,
+                    assetArtifact.Sha256);
+            }
+            else if (metadata.PersistenceRevision != manifest.ToRevision ||
+                !string.Equals(metadata.AssetsHash, assetArtifact.Sha256, StringComparison.Ordinal))
+            {
+                throw new InvalidOperationException("PSV020: project asset hash mismatch at create target revision.");
+            }
+
+            await InjectFailureAsync(ProjectSaveFailurePoint.AfterProjectAssetsApply, manifest);
+        }
+
+        if (manifest.Participants.Contains(ProjectSaveParticipant.Flow))
+        {
+            var flowArtifact = manifest.Artifacts.Single(item => item.Name == FlowFileName);
+            var flowJson = await File.ReadAllTextAsync(Path.Combine(saveDirectory, FlowFileName), Encoding.UTF8);
+            var metadata = await _flowStorage.LoadMetadataAsync(manifest.ProjectId);
+            if (metadata == null)
+            {
+                await _flowStorage.SaveFlowJsonAsync(manifest.ProjectId, flowJson, manifest.ToRevision);
+            }
+            else if (metadata.PersistenceRevision != manifest.ToRevision ||
+                !string.Equals(metadata.FlowHash, flowArtifact.Sha256, StringComparison.Ordinal))
+            {
+                throw new InvalidOperationException("PSV004: flow artifact hash mismatch at create target revision.");
+            }
+
+            await InjectFailureAsync(ProjectSaveFailurePoint.AfterFlowApply, manifest);
+        }
+
+        if (manifest.Participants.Contains(ProjectSaveParticipant.VariableState))
+        {
+            if (_projectVariableSessions == null)
+            {
+                throw new InvalidOperationException("PSV007: project variable state persistence is unavailable.");
+            }
+
+            var variableState = DeserializeFile<VariableStateCandidate>(Path.Combine(saveDirectory, VariableStateFileName));
+            var metadata = _projectVariableSessions.LoadStateMetadata(manifest.ProjectId);
+            if (metadata == null)
+            {
+                if (!_projectVariableSessions.TryPersistMigrationCandidate(
+                        manifest.ProjectId,
+                        variableState.ToMigrationCandidate(),
+                        manifest.ToRevision,
+                        manifest.SaveId,
+                        variableState.StateHash,
+                        out _,
+                        out var persistError))
+                {
+                    throw new InvalidOperationException(persistError ?? "PSV007: project variable state persistence is unavailable.");
+                }
+            }
+            else if (metadata.PersistenceRevision != manifest.ToRevision ||
+                !string.Equals(metadata.StateHash, variableState.StateHash, StringComparison.Ordinal))
+            {
+                throw new InvalidOperationException("PSV013: variable state hash mismatch at create target revision.");
+            }
+
+            await InjectFailureAsync(ProjectSaveFailurePoint.AfterVariableStateApply, manifest);
+        }
+
+        await InjectFailureAsync(ProjectSaveFailurePoint.BeforeComplete, manifest);
+        WriteManifestAtomic(saveDirectory, manifest with { Phase = ProjectSavePhase.Completed });
+        TryDeleteSaveDirectory(saveDirectory);
+        TryDeleteProjectDirectoryIfEmpty(manifest.ProjectId);
+        return project;
+    }
+
+    private async Task RollbackCreateCommittedIntentAsync(
+        string saveDirectory,
+        ProjectSaveManifest manifest)
+    {
+        var projectCandidate = DeserializeFile<ProjectCandidate>(Path.Combine(saveDirectory, ProjectCandidateFileName));
+        await InjectFailureAsync(ProjectSaveFailurePoint.BeforeCreateRollback, manifest);
+        var project = await LoadCreateProjectForVerificationAsync(manifest.ProjectId);
+        if (project != null)
+        {
+            if (project.PersistenceRevision != manifest.ToRevision)
+            {
+                throw new InvalidOperationException(
+                    $"PSV003: create rollback revision conflict. Current={project.PersistenceRevision}, To={manifest.ToRevision}.");
+            }
+
+            VerifyProjectAtCandidate(project, projectCandidate);
+            await _projectRepository.DeleteAsync(project);
+        }
+
+        await _flowStorage.DeleteFlowJsonAsync(manifest.ProjectId);
+        if (_projectAssetStorage != null)
+        {
+            await _projectAssetStorage.DeleteAssetsAsync(manifest.ProjectId);
+        }
+
+        _projectVariableSessions?.Delete(manifest.ProjectId);
+        await InjectFailureAsync(ProjectSaveFailurePoint.AfterCreateRollback, manifest);
+        TryDeleteSaveDirectory(saveDirectory);
+        TryDeleteProjectDirectoryIfEmpty(manifest.ProjectId);
     }
 
     private async Task ApplyCommittedIntentAsync(string saveDirectory, ProjectSaveManifest manifest)
@@ -566,10 +912,22 @@ public sealed class ProjectSaveCoordinator
                     throw new InvalidOperationException("PSV004: flow artifact hash mismatch at target revision.");
                 }
             }
-            else if (metadata == null ||
-                metadata.PersistenceRevision == manifest.FromRevision ||
-                (metadata.PersistenceRevision == 0 && manifest.FromRevision == 0))
+            else if (metadata == null || metadata.PersistenceRevision <= manifest.FromRevision)
             {
+                if (!string.IsNullOrWhiteSpace(flowArtifact.PreviousSha256))
+                {
+                    var currentFlowJson = await _flowStorage.LoadFlowJsonAsync(manifest.ProjectId);
+                    var currentFlowHash = currentFlowJson == null
+                        ? null
+                        : ComputeSha256(new UTF8Encoding(false).GetBytes(currentFlowJson));
+                    if (!string.Equals(currentFlowHash, flowArtifact.PreviousSha256, StringComparison.Ordinal) ||
+                        (metadata != null &&
+                         !string.Equals(metadata.FlowHash, flowArtifact.PreviousSha256, StringComparison.Ordinal)))
+                    {
+                        throw new InvalidOperationException("PSV006: authoritative flow changed outside the project revision CAS.");
+                    }
+                }
+
                 await _flowStorage.SaveFlowJsonAsync(manifest.ProjectId, flowJson, manifest.ToRevision);
                 metadata = await _flowStorage.LoadMetadataAsync(manifest.ProjectId);
                 if (metadata?.PersistenceRevision != manifest.ToRevision ||
@@ -605,9 +963,7 @@ public sealed class ProjectSaveCoordinator
                     throw new InvalidOperationException("PSV013: variable state hash mismatch at target revision.");
                 }
             }
-            else if (metadata == null ||
-                metadata.PersistenceRevision == manifest.FromRevision ||
-                (metadata.PersistenceRevision == 0 && manifest.FromRevision == 0))
+            else if (CanApplyVariableStateCandidate(metadata, variableState, manifest.FromRevision))
             {
                 if (!_projectVariableSessions.TryPersistMigrationCandidate(
                         manifest.ProjectId,
@@ -624,7 +980,7 @@ public sealed class ProjectSaveCoordinator
             else
             {
                 throw new InvalidOperationException(
-                    $"PSV014: variable state revision conflict. Current={metadata.PersistenceRevision}, From={manifest.FromRevision}, To={manifest.ToRevision}.");
+                    $"PSV014: variable state revision conflict. Current={metadata?.PersistenceRevision.ToString() ?? "missing"}, From={manifest.FromRevision}, To={manifest.ToRevision}.");
             }
 
             await InjectFailureAsync(ProjectSaveFailurePoint.AfterVariableStateApply, manifest);
@@ -634,10 +990,38 @@ public sealed class ProjectSaveCoordinator
         await InjectFailureAsync(ProjectSaveFailurePoint.BeforeComplete, manifest);
         WriteManifestAtomic(saveDirectory, completed);
         Directory.Delete(saveDirectory, recursive: true);
+        TryDeleteProjectDirectoryIfEmpty(manifest.ProjectId);
     }
 
     private Task InjectFailureAsync(ProjectSaveFailurePoint point, ProjectSaveManifest manifest) =>
         _failureInjector?.OnPointAsync(point, manifest) ?? Task.CompletedTask;
+
+    private async Task<Project?> LoadCreateProjectForVerificationAsync(Guid projectId) =>
+        await _projectRepository.GetWithFlowAsync(projectId) ??
+        await _projectRepository.GetByIdForUpdateAsync(projectId);
+
+    private static bool CanApplyVariableStateCandidate(
+        ProjectVariableStateMetadata? metadata,
+        VariableStateCandidate candidate,
+        long fromRevision)
+    {
+        if (metadata == null)
+        {
+            return true;
+        }
+
+        if (!string.IsNullOrWhiteSpace(candidate.SourceStateHash))
+        {
+            return metadata.PersistenceRevision <= fromRevision &&
+                candidate.SourcePersistenceRevision == metadata.PersistenceRevision &&
+                string.Equals(candidate.SourceSchemaHash, metadata.SchemaHash, StringComparison.Ordinal) &&
+                string.Equals(candidate.SourceStateHash, metadata.StateHash, StringComparison.Ordinal);
+        }
+
+        // Compatibility for manifests staged before source-state fencing was added.
+        return metadata.PersistenceRevision == fromRevision ||
+            (metadata.PersistenceRevision == 0 && fromRevision == 0);
+    }
 
     private static void TryDeleteSaveDirectory(string saveDirectory)
     {
@@ -651,6 +1035,26 @@ public sealed class ProjectSaveCoordinator
         catch
         {
             // Preserve the original pre-commit failure; prepared-only journals are still discardable on recovery.
+        }
+    }
+
+    private void TryDeleteProjectDirectoryIfEmpty(Guid projectId) =>
+        TryDeleteDirectoryIfEmpty(Path.Combine(_transactionRoot, projectId.ToString("D")));
+
+    private static void TryDeleteDirectoryIfEmpty(string? directory)
+    {
+        try
+        {
+            if (!string.IsNullOrWhiteSpace(directory) &&
+                Directory.Exists(directory) &&
+                !Directory.EnumerateFileSystemEntries(directory).Any())
+            {
+                Directory.Delete(directory);
+            }
+        }
+        catch
+        {
+            // Empty transaction directories are non-authoritative cleanup residue.
         }
     }
 
@@ -790,6 +1194,7 @@ public sealed class ProjectSaveCoordinator
     {
         ProjectGates.Clear();
         RecoveryRequired.Clear();
+        HiddenCreates.Clear();
         ProjectStates.Clear();
         lock (StartupRecoveryGate)
         {
@@ -805,13 +1210,30 @@ public sealed class ProjectSaveCoordinator
 
     internal static bool HasProjectGateForTests(Guid projectId) => ProjectGates.ContainsKey(projectId);
 
+    public static bool IsProjectHidden(Guid projectId) => HiddenCreates.ContainsKey(projectId);
+
     private static void VerifyProjectAtCandidate(Project project, ProjectCandidate candidate)
     {
         var currentHash = ProjectGlobalVariableSchemaValidator.ComputeSchemaHash(project.GlobalVariables);
         var candidateHash = ProjectGlobalVariableSchemaValidator.ComputeSchemaHash(candidate.GlobalVariables);
+        var settingsMatch = project.GlobalSettings.Count == candidate.GlobalSettings.Count &&
+            project.GlobalSettings.All(item =>
+                candidate.GlobalSettings.TryGetValue(item.Key, out var value) &&
+                string.Equals(item.Value, value, StringComparison.Ordinal));
+        var flowMatches = string.IsNullOrWhiteSpace(candidate.DatabaseFlowHash) ||
+            (string.Equals(
+                 ExecutionFlowIdentity.ComputeFlowHash(project.Flow),
+                 candidate.DatabaseFlowHash,
+                 StringComparison.Ordinal) &&
+             (!candidate.DatabaseFlowId.HasValue || project.Flow.Id == candidate.DatabaseFlowId.Value) &&
+             (candidate.DatabaseFlowName == null ||
+              string.Equals(project.Flow.Name, candidate.DatabaseFlowName, StringComparison.Ordinal)));
         if (!string.Equals(project.Name, candidate.Name, StringComparison.Ordinal) ||
             !string.Equals(project.Description, candidate.Description, StringComparison.Ordinal) ||
-            !string.Equals(currentHash, candidateHash, StringComparison.Ordinal))
+            !string.Equals(project.Version, candidate.Version, StringComparison.Ordinal) ||
+            !settingsMatch ||
+            !string.Equals(currentHash, candidateHash, StringComparison.Ordinal) ||
+            !flowMatches)
         {
             throw new InvalidOperationException("PSV008: project candidate does not match target revision.");
         }
@@ -837,6 +1259,30 @@ public sealed class ProjectSaveCoordinator
         }
 
         if (projectAssetsChanged)
+        {
+            participants.Add(ProjectSaveParticipant.ProjectAssets);
+        }
+
+        return participants;
+    }
+
+    private static IReadOnlyList<ProjectSaveParticipant> BuildCreateParticipants(
+        bool hasFlow,
+        bool hasVariableState,
+        bool hasProjectAssets)
+    {
+        var participants = new List<ProjectSaveParticipant> { ProjectSaveParticipant.Project };
+        if (hasFlow)
+        {
+            participants.Add(ProjectSaveParticipant.Flow);
+        }
+
+        if (hasVariableState)
+        {
+            participants.Add(ProjectSaveParticipant.VariableState);
+        }
+
+        if (hasProjectAssets)
         {
             participants.Add(ProjectSaveParticipant.ProjectAssets);
         }
@@ -943,6 +1389,12 @@ public sealed record ProjectSaveRequest(
     string? NextFlowJson,
     ProjectAssetSaveCandidate? ProjectAssetCandidate = null);
 
+public sealed record ProjectCreateSaveRequest(
+    Project Project,
+    OperatorFlowDto? Flow,
+    string? FlowJson,
+    ProjectAssetsDto? Assets = null);
+
 public sealed record ProjectSaveResult(Project Project, OperatorFlowDto? Flow, bool Changed);
 
 public sealed record ProjectSaveRecoverySummary(
@@ -1004,7 +1456,8 @@ public sealed record ProjectSaveManifest(
     IReadOnlyList<ProjectSaveParticipant> Participants,
     IReadOnlyList<ProjectSaveArtifact> Artifacts,
     ProjectSavePhase Phase,
-    DateTimeOffset CreatedAtUtc)
+    DateTimeOffset CreatedAtUtc,
+    ProjectSaveOperation Operation = ProjectSaveOperation.ExistingMutation)
 {
     public static ProjectSaveManifest Create(
         Guid saveId,
@@ -1013,7 +1466,8 @@ public sealed record ProjectSaveManifest(
         long toRevision,
         IReadOnlyList<ProjectSaveParticipant> participants,
         ProjectSavePhase phase,
-        IReadOnlyList<ProjectSaveArtifact> artifacts)
+        IReadOnlyList<ProjectSaveArtifact> artifacts,
+        ProjectSaveOperation operation = ProjectSaveOperation.ExistingMutation)
     {
         return new ProjectSaveManifest(
             1,
@@ -1024,7 +1478,8 @@ public sealed record ProjectSaveManifest(
             participants,
             artifacts,
             phase,
-            DateTimeOffset.UtcNow);
+            DateTimeOffset.UtcNow,
+            operation);
     }
 }
 
@@ -1033,10 +1488,22 @@ public sealed record ProjectSaveArtifact(
     long FromRevision,
     long ToRevision,
     long Length,
-    string Sha256)
+    string Sha256,
+    string? PreviousSha256 = null)
 {
-    public static ProjectSaveArtifact From(string name, long fromRevision, long toRevision, byte[] bytes) =>
-        new(name, fromRevision, toRevision, bytes.LongLength, ComputeSha256(bytes));
+    public static ProjectSaveArtifact From(
+        string name,
+        long fromRevision,
+        long toRevision,
+        byte[] bytes,
+        byte[]? previousBytes = null) =>
+        new(
+            name,
+            fromRevision,
+            toRevision,
+            bytes.LongLength,
+            ComputeSha256(bytes),
+            previousBytes == null ? null : ComputeSha256(previousBytes));
 
     private static string ComputeSha256(byte[] bytes)
     {
@@ -1058,6 +1525,12 @@ public enum ProjectSavePhase
     Prepared = 0,
     CommitIntended = 1,
     Completed = 2
+}
+
+public enum ProjectSaveOperation
+{
+    ExistingMutation = 0,
+    Create = 1
 }
 
 public enum ProjectAccessState
@@ -1151,12 +1624,22 @@ internal sealed class ProjectGate
 
 public sealed class ProjectAccessLease : IAsyncDisposable, IDisposable
 {
+    private readonly Guid _projectId;
     private readonly Action _release;
     private bool _disposed;
 
-    internal ProjectAccessLease(Action release)
+    internal ProjectAccessLease(Guid projectId, Action release)
     {
+        _projectId = projectId;
         _release = release;
+    }
+
+    internal void EnsureActiveFor(Guid projectId)
+    {
+        if (_disposed || projectId != _projectId)
+        {
+            throw new InvalidOperationException("PSV026: project access lease is missing, disposed, or belongs to another project.");
+        }
     }
 
     public void Dispose()
@@ -1187,7 +1670,10 @@ public enum ProjectSaveFailurePoint
     AfterProjectAssetsApply = 5,
     AfterFlowApply = 6,
     AfterVariableStateApply = 7,
-    BeforeComplete = 8
+    BeforeComplete = 8,
+    BeforeCommitIntent = 9,
+    BeforeCreateRollback = 10,
+    AfterCreateRollback = 11
 }
 
 public interface IProjectSaveFailureInjector
@@ -1226,7 +1712,12 @@ public sealed record ProjectCandidate(
     Dictionary<string, string> GlobalSettings,
     ProjectGlobalVariableSchema GlobalVariables,
     long FromRevision,
-    long ToRevision)
+    long ToRevision,
+    DateTime CreatedAt = default,
+    DateTime? ModifiedAt = null,
+    string? DatabaseFlowHash = null,
+    Guid? DatabaseFlowId = null,
+    string? DatabaseFlowName = null)
 {
     public static ProjectCandidate From(Project project, ProjectSaveRequest request, long fromRevision, long toRevision) =>
         new(
@@ -1237,7 +1728,25 @@ public sealed record ProjectCandidate(
             new Dictionary<string, string>(project.GlobalSettings),
             request.NextSchema,
             fromRevision,
-            toRevision);
+            toRevision,
+            project.CreatedAt,
+            project.ModifiedAt);
+
+    public static ProjectCandidate FromNew(Project project) =>
+        new(
+            project.Id,
+            project.Name,
+            project.Description,
+            project.Version,
+            new Dictionary<string, string>(project.GlobalSettings),
+            project.GlobalVariables,
+            -1,
+            project.PersistenceRevision,
+            project.CreatedAt,
+            project.ModifiedAt,
+            ExecutionFlowIdentity.ComputeFlowHash(project.Flow),
+            project.Flow.Id,
+            project.Flow.Name);
 }
 
 public sealed record VariableStateCandidate(
@@ -1246,7 +1755,10 @@ public sealed record VariableStateCandidate(
     string SchemaHash,
     string StateHash,
     long SchemaGeneration,
-    bool SessionWasLoaded)
+    bool SessionWasLoaded,
+    long? SourcePersistenceRevision = null,
+    string? SourceSchemaHash = null,
+    string? SourceStateHash = null)
 {
     public static VariableStateCandidate From(ProjectVariableSessionMigrationCandidate candidate) =>
         new(
@@ -1255,7 +1767,10 @@ public sealed record VariableStateCandidate(
             ProjectGlobalVariableSchemaValidator.ComputeSchemaHash(candidate.Schema),
             ProjectVariableStateHash.Compute(candidate.Schema, candidate.Snapshots),
             candidate.SchemaGeneration,
-            candidate.SessionWasLoaded);
+            candidate.SessionWasLoaded,
+            candidate.SourceMetadata?.PersistenceRevision,
+            candidate.SourceMetadata?.SchemaHash,
+            candidate.SourceMetadata?.StateHash);
 
     public ProjectVariableSessionMigrationCandidate ToMigrationCandidate() =>
         new(Schema, Snapshots, SchemaGeneration, SessionWasLoaded);

@@ -366,7 +366,10 @@ public class ProjectServiceTests
         string? persistedFlowJson = null;
         repository.AddAsync(Arg.Do<Project>(project => persistedProject = project))
             .Returns(callInfo => Task.FromResult(callInfo.Arg<Project>()));
-        storage.SaveFlowJsonAsync(Arg.Any<Guid>(), Arg.Do<string>(json => persistedFlowJson = json))
+        storage.SaveFlowJsonAsync(
+                Arg.Any<Guid>(),
+                Arg.Do<string>(json => persistedFlowJson = json),
+                Arg.Any<long>())
             .Returns(Task.CompletedTask);
         var service = new ProjectService(repository, storage, new OperatorFactory());
         var request = new CreateProjectRequest
@@ -447,7 +450,10 @@ public class ProjectServiceTests
         string? persistedFlowJson = null;
         repository.AddAsync(Arg.Do<Project>(project => persistedProject = project))
             .Returns(callInfo => Task.FromResult(callInfo.Arg<Project>()));
-        storage.SaveFlowJsonAsync(Arg.Any<Guid>(), Arg.Do<string>(json => persistedFlowJson = json))
+        storage.SaveFlowJsonAsync(
+                Arg.Any<Guid>(),
+                Arg.Do<string>(json => persistedFlowJson = json),
+                Arg.Any<long>())
             .Returns(Task.CompletedTask);
         var service = new ProjectService(repository, storage, new OperatorFactory());
         var request = new CreateProjectRequest
@@ -543,7 +549,10 @@ public class ProjectServiceTests
         string? persistedFlowJson = null;
         repository.AddAsync(Arg.Do<Project>(project => persistedProject = project))
             .Returns(callInfo => Task.FromResult(callInfo.Arg<Project>()));
-        storage.SaveFlowJsonAsync(Arg.Any<Guid>(), Arg.Do<string>(json => persistedFlowJson = json))
+        storage.SaveFlowJsonAsync(
+                Arg.Any<Guid>(),
+                Arg.Do<string>(json => persistedFlowJson = json),
+                Arg.Any<long>())
             .Returns(Task.CompletedTask);
         var service = new ProjectService(repository, storage, new OperatorFactory());
         var request = new CreateProjectRequest
@@ -633,7 +642,10 @@ public class ProjectServiceTests
         string? persistedFlowJson = null;
         repository.AddAsync(Arg.Do<Project>(project => persistedProject = project))
             .Returns(callInfo => Task.FromResult(callInfo.Arg<Project>()));
-        storage.SaveFlowJsonAsync(Arg.Any<Guid>(), Arg.Do<string>(json => persistedFlowJson = json))
+        storage.SaveFlowJsonAsync(
+                Arg.Any<Guid>(),
+                Arg.Do<string>(json => persistedFlowJson = json),
+                Arg.Any<long>())
             .Returns(Task.CompletedTask);
         var service = new ProjectService(repository, storage, new OperatorFactory());
         var request = new CreateProjectRequest
@@ -796,7 +808,7 @@ public class ProjectServiceTests
     }
 
     [Fact]
-    public async Task UpdateAsync_WhenCompatibleGlobalVariableSchemaChanges_ShouldMigrateCurrentValue()
+    public async Task UpdateGlobalVariablesAsync_WhenCompatibleSchemaChanges_ShouldMigrateCurrentValue()
     {
         var repository = Substitute.For<IProjectRepository>();
         var storage = Substitute.For<IProjectFlowStorage>();
@@ -817,10 +829,10 @@ public class ProjectServiceTests
 
         var sut = new ProjectService(repository, storage, factory, null, registry);
 
-        await sut.UpdateAsync(project.Id, new UpdateProjectRequest
+        await sut.UpdateGlobalVariablesAsync(project.Id, new UpdateProjectGlobalVariablesRequest
         {
-            Name = "demo",
-            GlobalVariables = CreateSchema(variableId, 3)
+            ExpectedPersistenceRevision = project.PersistenceRevision,
+            Schema = CreateSchema(variableId, 3)
         });
 
         var refreshedSession = registry.GetOrCreate(project.Id, project.GlobalVariables);
@@ -849,7 +861,11 @@ public class ProjectServiceTests
         oldSession.SetValue(variableId, 9L, ProjectVariableUpdatedBy.StudioManual);
         var sut = new ProjectService(repository, storage, new OperatorFactory(), null, registry);
 
-        var act = async () => await sut.UpdateGlobalVariablesAsync(project.Id, CreateSchema(variableId, 5));
+        var act = async () => await sut.UpdateGlobalVariablesAsync(project.Id, new UpdateProjectGlobalVariablesRequest
+        {
+            ExpectedPersistenceRevision = project.PersistenceRevision,
+            Schema = CreateSchema(variableId, 5)
+        });
 
         await act.Should().ThrowAsync<InvalidOperationException>().WithMessage("*save failed*");
         project.GlobalVariables.Variables.Single().InitialValue.GetInt64().Should().Be(1L);
@@ -875,7 +891,11 @@ public class ProjectServiceTests
         oldSession.SetValue(variableId, 9L, ProjectVariableUpdatedBy.StudioManual);
         var sut = new ProjectService(repository, storage, new OperatorFactory(), null, registry);
 
-        var act = async () => await sut.UpdateGlobalVariablesAsync(project.Id, CreateSchema(variableId, 5, "stats.renamed"));
+        var act = async () => await sut.UpdateGlobalVariablesAsync(project.Id, new UpdateProjectGlobalVariablesRequest
+        {
+            ExpectedPersistenceRevision = project.PersistenceRevision,
+            Schema = CreateSchema(variableId, 5, "stats.renamed")
+        });
 
         await act.Should().ThrowAsync<InvalidOperationException>().WithMessage("*PSV012*state failed*");
         project.GlobalVariables.Variables.Single().Name.Should().Be("stats.renamed");
@@ -888,7 +908,7 @@ public class ProjectServiceTests
     }
 
     [Fact]
-    public async Task UpdateAsync_WhenNewFlowReferencesNewSchemaVariable_ShouldSaveTogether()
+    public async Task DedicatedSchemaThenFlowPatch_WhenFlowReferencesNewVariable_ShouldSaveByRevision()
     {
         var repository = Substitute.For<IProjectRepository>();
         var storage = new RecordingProjectFlowStorage();
@@ -904,20 +924,24 @@ public class ProjectServiceTests
         var schema = CreateSchema(variableId, 3);
         var flow = CreateVariableReadFlow(variableId, "stats.count");
 
+        var schemaSaved = await sut.UpdateGlobalVariablesAsync(project.Id, new UpdateProjectGlobalVariablesRequest
+        {
+            ExpectedPersistenceRevision = project.PersistenceRevision,
+            Schema = schema
+        });
         var saved = await sut.UpdateAsync(project.Id, new UpdateProjectRequest
         {
-            Name = "demo",
+            ExpectedPersistenceRevision = schemaSaved.PersistenceRevision,
             Description = "updated",
-            Flow = flow,
-            GlobalVariables = schema
+            Flow = flow
         });
 
         saved.Flow.Should().NotBeNull();
         project.Description.Should().Be("updated");
         project.GlobalVariables.Variables.Single().Id.Should().Be(variableId);
         storage.LastSavedFlowJson.Should().Contain("VariableRead");
-        storage.LastPersistenceRevision.Should().Be(1);
-        await repository.Received(1).UpdateAsync(project);
+        storage.LastPersistenceRevision.Should().Be(2);
+        await repository.Received(2).UpdateAsync(project);
     }
 
     [Fact]
@@ -949,7 +973,7 @@ public class ProjectServiceTests
     }
 
     [Fact]
-    public async Task UpdateAsync_WhenExpectedPersistenceRevisionOmitted_ShouldUseCurrentRevisionForCompatibility()
+    public async Task UpdateAsync_WhenExpectedPersistenceRevisionOmitted_ShouldRejectPatch()
     {
         var repository = Substitute.For<IProjectRepository>();
         var storage = new RecordingProjectFlowStorage();
@@ -961,16 +985,17 @@ public class ProjectServiceTests
         repository.UpdateAsync(Arg.Any<Project>()).Returns(Task.CompletedTask);
         var sut = new ProjectService(repository, storage, factory);
 
-        var saved = await sut.UpdateAsync(project.Id, new UpdateProjectRequest
+        var act = async () => await sut.UpdateAsync(project.Id, new UpdateProjectRequest
         {
             Name = "renamed",
             Description = "compatible"
         });
 
-        saved.PersistenceRevision.Should().Be(3);
-        project.Name.Should().Be("renamed");
-        project.Description.Should().Be("compatible");
-        await repository.Received(1).UpdateAsync(project);
+        await act.Should().ThrowAsync<InvalidOperationException>().WithMessage("*PMU003*");
+        project.PersistenceRevision.Should().Be(2);
+        project.Name.Should().Be("demo");
+        project.Description.Should().BeNull();
+        await repository.DidNotReceive().UpdateAsync(project);
     }
 
     [Fact]
@@ -992,6 +1017,7 @@ public class ProjectServiceTests
 
         await sut.UpdateFlowAsync(project.Id, new UpdateFlowRequest
         {
+            ExpectedPersistenceRevision = project.PersistenceRevision,
             Operators =
             [
                 new OperatorDto
@@ -1328,7 +1354,7 @@ public class ProjectServiceTests
     }
 
     [Fact]
-    public async Task UpdateGlobalVariablesAsync_WhenVariableIsRenamed_ShouldNormalizeStoredFlowVariableName()
+    public async Task UpdateGlobalVariablesAsync_WhenVariableIsRenamed_ShouldNotRewriteStoredFlow()
     {
         var repository = Substitute.For<IProjectRepository>();
         var storage = new RecordingProjectFlowStorage();
@@ -1345,15 +1371,18 @@ public class ProjectServiceTests
         storage.Seed(project.Id, storedFlowJson, 0);
         var sut = new ProjectService(repository, storage, new OperatorFactory(), null, registry);
 
-        await sut.UpdateGlobalVariablesAsync(project.Id, CreateSchema(variableId, 1, "stats.current"));
+        await sut.UpdateGlobalVariablesAsync(project.Id, new UpdateProjectGlobalVariablesRequest
+        {
+            ExpectedPersistenceRevision = project.PersistenceRevision,
+            Schema = CreateSchema(variableId, 1, "stats.current")
+        });
 
-        storage.LastSavedFlowJson.Should().NotBeNull();
-        storage.LastSavedFlowJson.Should().Contain("stats.current");
-        storage.LastSavedFlowJson.Should().NotContain("stats.old");
+        storage.SaveCount.Should().Be(0);
+        storage.LastSavedFlowJson.Should().Be(storedFlowJson);
     }
 
     [Fact]
-    public async Task UpdateGlobalVariablesAsync_WhenStoredFlowUsesOnlyVariableName_ShouldNormalizeVariableId()
+    public async Task UpdateGlobalVariablesAsync_WhenStoredFlowUsesOnlyVariableName_ShouldNotOpportunisticallyAddVariableId()
     {
         var repository = Substitute.For<IProjectRepository>();
         var storage = new RecordingProjectFlowStorage();
@@ -1369,11 +1398,14 @@ public class ProjectServiceTests
         storage.Seed(project.Id, storedFlowJson, 0);
         var sut = new ProjectService(repository, storage, new OperatorFactory(), null, registry);
 
-        await sut.UpdateGlobalVariablesAsync(project.Id, CreateSchema(variableId, 1, "stats.count"));
+        await sut.UpdateGlobalVariablesAsync(project.Id, new UpdateProjectGlobalVariablesRequest
+        {
+            ExpectedPersistenceRevision = project.PersistenceRevision,
+            Schema = CreateSchema(variableId, 1, "stats.count")
+        });
 
-        storage.LastSavedFlowJson.Should().NotBeNull();
-        storage.LastSavedFlowJson.Should().Contain(variableId.ToString("D"));
-        storage.LastSavedFlowJson.Should().Contain("stats.count");
+        storage.SaveCount.Should().Be(0);
+        storage.LastSavedFlowJson.Should().Be(storedFlowJson);
     }
 
     [Fact]
@@ -1391,6 +1423,7 @@ public class ProjectServiceTests
         var sut = new ProjectService(repository, storage, new OperatorFactory(), null, registry);
         await sut.UpdateAsync(project.Id, new UpdateProjectRequest
         {
+            ExpectedPersistenceRevision = project.PersistenceRevision,
             Name = "demo",
             Flow = CreateVariableReadFlow(variableId, "stats.count")
         });
@@ -1398,7 +1431,11 @@ public class ProjectServiceTests
         storage.LastSavedFlowJson.Should().NotBeNull();
         repository.ClearReceivedCalls();
 
-        await sut.UpdateGlobalVariablesAsync(project.Id, CreateSchema(variableId, 1, "stats.count"));
+        await sut.UpdateGlobalVariablesAsync(project.Id, new UpdateProjectGlobalVariablesRequest
+        {
+            ExpectedPersistenceRevision = project.PersistenceRevision,
+            Schema = CreateSchema(variableId, 1, "stats.count")
+        });
 
         storage.SaveCount.Should().Be(saveCount);
         await repository.DidNotReceive().UpdateAsync(project);
@@ -1422,8 +1459,8 @@ public class ProjectServiceTests
 
         var act = async () => await sut.UpdateAsync(project.Id, new UpdateProjectRequest
         {
+            ExpectedPersistenceRevision = project.PersistenceRevision,
             Name = "demo",
-            GlobalVariables = schema,
             Flow = CreateVariableReadFlow(firstVariableId, "stats.second")
         });
 
@@ -1454,9 +1491,9 @@ public class ProjectServiceTests
 
         var act = async () => await sut.UpdateAsync(project.Id, new UpdateProjectRequest
         {
+            ExpectedPersistenceRevision = project.PersistenceRevision,
             Name = "renamed",
-            Flow = CreateVariableReadFlow(variableId, "stats.count"),
-            GlobalVariables = CreateSchema(variableId, 5)
+            Flow = CreateVariableReadFlow(variableId, "stats.count")
         });
 
         await act.Should().ThrowAsync<InvalidOperationException>().WithMessage("*db failed*");
@@ -1476,9 +1513,22 @@ public class ProjectServiceTests
         repository.GetByIdAsync(projectId).Returns(Task.FromResult<Project?>(null));
         var sut = new ProjectService(repository, storage, new OperatorFactory());
 
-        var update = async () => await sut.UpdateAsync(projectId, new UpdateProjectRequest { Name = "deleted" });
-        var updateFlow = async () => await sut.UpdateFlowAsync(projectId, new UpdateFlowRequest());
-        var updateGlobalVariables = async () => await sut.UpdateGlobalVariablesAsync(projectId, new ProjectGlobalVariableSchema());
+        var update = async () => await sut.UpdateAsync(projectId, new UpdateProjectRequest
+        {
+            ExpectedPersistenceRevision = 0,
+            Name = "deleted"
+        });
+        var updateFlow = async () => await sut.UpdateFlowAsync(projectId, new UpdateFlowRequest
+        {
+            ExpectedPersistenceRevision = 0
+        });
+        var updateGlobalVariables = async () => await sut.UpdateGlobalVariablesAsync(
+            projectId,
+            new UpdateProjectGlobalVariablesRequest
+            {
+                ExpectedPersistenceRevision = 0,
+                Schema = new ProjectGlobalVariableSchema()
+            });
 
         await update.Should().ThrowAsync<ProjectNotFoundException>();
         await updateFlow.Should().ThrowAsync<ProjectNotFoundException>();
