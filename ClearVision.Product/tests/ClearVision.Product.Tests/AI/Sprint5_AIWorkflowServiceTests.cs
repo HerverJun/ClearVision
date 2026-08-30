@@ -6,9 +6,12 @@
 
 using ClearVision.Product.Core.Entities;
 using ClearVision.Product.Core.Enums;
+using ClearVision.Product.Core.Services;
 using ClearVision.Product.Infrastructure.AI;
+using ClearVision.Product.Infrastructure.AI.DryRun;
 using ClearVision.Product.Infrastructure.Services;
 using FluentAssertions;
+using NSubstitute;
 using Xunit;
 
 namespace ClearVision.Product.Tests.AI;
@@ -283,6 +286,104 @@ public class Sprint5_AIWorkflowServiceTests
 
     #region Legacy AIWorkflowService Compatibility Tests
 
+    [Fact(DisplayName = "Legacy Compatibility - metrics failure must not reverse a completed workflow")]
+    public async Task AIWorkflowService_SuccessMetricsFailure_ShouldKeepCompletedWorkflowResult()
+    {
+        var llmConnector = Substitute.For<ILLMConnector>();
+        llmConnector.GenerateAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(new LLMResponse
+            {
+                Content = """
+                    {
+                      "flowName": "metrics-fail-soft",
+                      "operators": [
+                        {
+                          "id": "source",
+                          "name": "Image source",
+                          "type": "ImageAcquisition",
+                          "outputPorts": [
+                            { "id": "image", "name": "Image", "dataType": "Image" }
+                          ]
+                        }
+                      ],
+                      "connections": []
+                    }
+                    """,
+                Provider = "test-provider",
+                TokenUsage = 12
+            }));
+        var promptVersionManager = Substitute.For<IPromptVersionManager>();
+        promptVersionManager.GetActiveVersionAsync().Returns(Task.FromResult(new PromptVersion
+        {
+            Id = Guid.NewGuid(),
+            Name = "Prompt V1",
+            Content = "prompt"
+        }));
+        promptVersionManager.RecordMetricsAsync(
+                Arg.Any<Guid>(),
+                true,
+                Arg.Any<int>(),
+                Arg.Any<long>())
+            .Returns(Task.FromException(new IOException("metrics-write-failed")));
+        var flowVersionManager = Substitute.For<IAIGeneratedFlowVersionManager>();
+        flowVersionManager.SaveVersionAsync(
+                Arg.Any<OperatorFlow>(),
+                Arg.Any<string>(),
+                Arg.Any<PromptVersionInfo>(),
+                Arg.Any<string>(),
+                Arg.Any<WorkflowTelemetry>(),
+                Arg.Any<string>())
+            .Returns(Task.FromResult(new AIGeneratedFlowVersion()));
+        var sut = CreateLegacyWorkflowService(llmConnector, promptVersionManager, flowVersionManager);
+
+        var result = await sut.GenerateFlowAsync(
+            "generate a simple acquisition flow",
+            new AIWorkflowOptions { EnableDryRun = false });
+
+        result.IsSuccessful.Should().BeTrue(result.ErrorMessage);
+        result.Flow.Should().NotBeNull();
+        await flowVersionManager.Received(1).SaveVersionAsync(
+            Arg.Any<OperatorFlow>(),
+            Arg.Any<string>(),
+            Arg.Any<PromptVersionInfo>(),
+            Arg.Any<string>(),
+            Arg.Any<WorkflowTelemetry>(),
+            Arg.Any<string>());
+    }
+
+    [Fact(DisplayName = "Legacy Compatibility - metrics failure must not mask the original LLM failure")]
+    public async Task AIWorkflowService_FailureMetricsFailure_ShouldPreserveOriginalException()
+    {
+        var llmConnector = Substitute.For<ILLMConnector>();
+        llmConnector.GenerateAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromException<LLMResponse>(new InvalidOperationException("original-llm-failure")));
+        var promptVersionManager = Substitute.For<IPromptVersionManager>();
+        promptVersionManager.GetActiveVersionAsync().Returns(Task.FromResult(new PromptVersion
+        {
+            Id = Guid.NewGuid(),
+            Name = "Prompt V1",
+            Content = "prompt"
+        }));
+        promptVersionManager.RecordMetricsAsync(
+                Arg.Any<Guid>(),
+                false,
+                Arg.Any<int>(),
+                Arg.Any<long>())
+            .Returns(Task.FromException(new IOException("secondary-metrics-failure")));
+        var sut = CreateLegacyWorkflowService(
+            llmConnector,
+            promptVersionManager,
+            Substitute.For<IAIGeneratedFlowVersionManager>());
+
+        var result = await sut.GenerateFlowAsync(
+            "generate a simple acquisition flow",
+            new AIWorkflowOptions { EnableDryRun = false });
+
+        result.IsSuccessful.Should().BeFalse();
+        result.ErrorMessage.Should().Contain("original-llm-failure");
+        result.ErrorMessage.Should().NotContain("secondary-metrics-failure");
+    }
+
     [Fact(DisplayName = "Legacy Compatibility - AIWorkflowService 验证简单流程应成功")]
     public void AIWorkflowService_ValidateSimpleFlow_ShouldSucceed()
     {
@@ -327,6 +428,23 @@ public class Sprint5_AIWorkflowServiceTests
         // 第二条连接应抛出异常，因为形成了循环
         Assert.Throws<InvalidOperationException>(() =>
             flow.AddConnection(new ClearVision.Product.Core.ValueObjects.OperatorConnection(op2.Id, port3, op1.Id, port4)));
+    }
+
+    private static AIWorkflowService CreateLegacyWorkflowService(
+        ILLMConnector llmConnector,
+        IPromptVersionManager promptVersionManager,
+        IAIGeneratedFlowVersionManager flowVersionManager)
+    {
+        var linter = new FlowLinter();
+        return new AIWorkflowService(
+            new PromptBuilder(new OperatorFactory()),
+            new AIGeneratedFlowParser(linter),
+            linter,
+            new DryRunService(Substitute.For<IFlowExecutionService>()),
+            llmConnector,
+            promptVersionManager,
+            flowVersionManager,
+            Substitute.For<Microsoft.Extensions.Logging.ILogger<AIWorkflowService>>());
     }
 
     #endregion

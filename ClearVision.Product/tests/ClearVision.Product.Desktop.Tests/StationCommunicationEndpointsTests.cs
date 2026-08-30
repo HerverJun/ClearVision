@@ -101,6 +101,101 @@ public sealed class StationCommunicationEndpointsTests
         forbiddenResponse.StatusCode.Should().Be(HttpStatusCode.Forbidden);
     }
 
+    [Fact]
+    public async Task PutSettings_PersistencePermissionFailure_ShouldReturnStructured503WithoutFalseSuccess()
+    {
+        var fault = new ArmableFaultInjector();
+        fault.FailNext(
+            StationCommunicationPersistenceStage.StudioCandidateWrite,
+            static () => new UnauthorizedAccessException("injected endpoint permission failure"));
+        await using var host = await StationCommunicationTestHost.CreateAsync(
+            persistenceFaultInjector: fault);
+
+        using var response = await host.Client.PutAsync(
+            "/api/station-communication/settings",
+            JsonContent(new { mode = "LocalLoopback", port = 5040 }));
+
+        response.StatusCode.Should().Be(HttpStatusCode.ServiceUnavailable);
+        var payload = await response.Content.ReadAsStringAsync();
+        payload.Should().NotContain("injected endpoint permission failure");
+        payload.Should().NotContain(host.Store.StudioSettingsPath);
+        using var document = JsonDocument.Parse(payload);
+        var root = document.RootElement;
+        root.GetProperty("success").GetBoolean().Should().BeFalse();
+        root.GetProperty("errorCode").GetString().Should().Be("STATION_COMMUNICATION_PERMISSION_DENIED");
+        root.GetProperty("publicMessage").GetString().Should().NotBeNullOrWhiteSpace();
+        root.GetProperty("stage").GetString().Should().Be("candidate");
+        root.GetProperty("retryable").GetBoolean().Should().BeTrue();
+        root.GetProperty("settings").ValueKind.Should().Be(JsonValueKind.Null);
+        File.Exists(host.Store.StudioSettingsPath).Should().BeFalse();
+        File.Exists(host.Store.StationSyncSettingsPath).Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task RegenerateToken_PersistenceFailure_ShouldReturn503AndNotExposeCandidateToken()
+    {
+        var fault = new ArmableFaultInjector();
+        await using var host = await StationCommunicationTestHost.CreateAsync(
+            persistenceFaultInjector: fault);
+        using var saveResponse = await host.Client.PutAsync(
+            "/api/station-communication/settings",
+            JsonContent(new { mode = "LocalLoopback", port = 5041 }));
+        saveResponse.EnsureSuccessStatusCode();
+        using var revealResponse = await host.Client.PostAsync(
+            "/api/station-communication/token",
+            JsonContent(new { operation = "reveal" }));
+        using var revealDocument = JsonDocument.Parse(await revealResponse.Content.ReadAsStringAsync());
+        var previousToken = revealDocument.RootElement.GetProperty("token").GetString()!;
+
+        fault.FailNext(
+            StationCommunicationPersistenceStage.StationPublish,
+            static () => new IOException("injected endpoint publish failure"));
+        using var response = await host.Client.PostAsync(
+            "/api/station-communication/token",
+            JsonContent(new { operation = "regenerate" }));
+
+        response.StatusCode.Should().Be(HttpStatusCode.ServiceUnavailable);
+        var payload = await response.Content.ReadAsStringAsync();
+        payload.Should().NotContain("injected endpoint publish failure");
+        payload.Should().NotContain(previousToken);
+        using var document = JsonDocument.Parse(payload);
+        var root = document.RootElement;
+        root.GetProperty("success").GetBoolean().Should().BeFalse();
+        root.GetProperty("errorCode").GetString().Should().Be("STATION_COMMUNICATION_IO_FAILED");
+        root.GetProperty("publicMessage").GetString().Should().NotBeNullOrWhiteSpace();
+        root.GetProperty("stage").GetString().Should().Be("station-publish");
+        root.GetProperty("token").GetString().Should().BeEmpty();
+        root.GetProperty("tokenInfo").GetProperty("hasToken").GetBoolean().Should().BeFalse();
+
+        using var revealAfterFailure = await host.Client.PostAsync(
+            "/api/station-communication/token",
+            JsonContent(new { operation = "reveal" }));
+        using var revealAfterFailureDocument = JsonDocument.Parse(
+            await revealAfterFailure.Content.ReadAsStringAsync());
+        revealAfterFailureDocument.RootElement.GetProperty("token").GetString().Should().Be(previousToken);
+    }
+
+    [Fact]
+    public async Task GetSettings_MalformedAuthoritativeFile_ShouldReturnStructured503WithoutRewritingIt()
+    {
+        await using var host = await StationCommunicationTestHost.CreateAsync();
+        Directory.CreateDirectory(Path.GetDirectoryName(host.Store.StudioSettingsPath)!);
+        const string malformed = "{ malformed-station-settings";
+        File.WriteAllText(host.Store.StudioSettingsPath, malformed, Encoding.UTF8);
+
+        using var response = await host.Client.GetAsync("/api/station-communication/settings");
+
+        response.StatusCode.Should().Be(HttpStatusCode.ServiceUnavailable);
+        using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        var root = document.RootElement;
+        root.GetProperty("success").GetBoolean().Should().BeFalse();
+        root.GetProperty("errorCode").GetString().Should().Be("STATION_COMMUNICATION_RECOVERY_REQUIRED");
+        root.GetProperty("stage").GetString().Should().Be("authoritative-read");
+        root.GetProperty("metadataOnly").GetBoolean().Should().BeTrue();
+        File.ReadAllText(host.Store.StudioSettingsPath, Encoding.UTF8).Should().Be(malformed);
+        File.Exists(host.Store.StationSyncSettingsPath).Should().BeFalse();
+    }
+
     private static StringContent JsonContent(object payload)
     {
         return new StringContent(JsonSerializer.Serialize(payload), Encoding.UTF8, "application/json");
@@ -123,7 +218,9 @@ public sealed class StationCommunicationEndpointsTests
 
         public StationCommunicationSettingsStore Store { get; }
 
-        public static async Task<StationCommunicationTestHost> CreateAsync(string? role = "Admin")
+        public static async Task<StationCommunicationTestHost> CreateAsync(
+            string? role = "Admin",
+            IStationCommunicationPersistenceFaultInjector? persistenceFaultInjector = null)
         {
             var root = Path.Combine(
                 Path.GetTempPath(),
@@ -134,7 +231,14 @@ public sealed class StationCommunicationEndpointsTests
                 EnvironmentName = Environments.Development
             });
             builder.WebHost.UseTestServer();
-            builder.Services.AddSingleton(new StationCommunicationSettingsStore(root));
+            var defaultStore = new StationCommunicationSettingsStore(root);
+            var store = persistenceFaultInjector == null
+                ? defaultStore
+                : new StationCommunicationSettingsStore(
+                    defaultStore.StudioSettingsPath,
+                    defaultStore.StationSyncSettingsPath,
+                    persistenceFaultInjector);
+            builder.Services.AddSingleton(store);
             builder.Services.AddSingleton(Options.Create(new StationIngressOptions
             {
                 Enabled = false,
@@ -175,6 +279,43 @@ public sealed class StationCommunicationEndpointsTests
             if (Directory.Exists(_root))
             {
                 Directory.Delete(_root, recursive: true);
+            }
+        }
+    }
+
+    private sealed class ArmableFaultInjector : IStationCommunicationPersistenceFaultInjector
+    {
+        private readonly object _gate = new();
+        private StationCommunicationPersistenceStage? _stage;
+        private Func<Exception>? _exceptionFactory;
+
+        public void FailNext(
+            StationCommunicationPersistenceStage stage,
+            Func<Exception> exceptionFactory)
+        {
+            lock (_gate)
+            {
+                _stage = stage;
+                _exceptionFactory = exceptionFactory;
+            }
+        }
+
+        public void OnStage(StationCommunicationPersistenceStage stage, string generationId)
+        {
+            Func<Exception>? exceptionFactory = null;
+            lock (_gate)
+            {
+                if (_stage == stage)
+                {
+                    exceptionFactory = _exceptionFactory;
+                    _stage = null;
+                    _exceptionFactory = null;
+                }
+            }
+
+            if (exceptionFactory != null)
+            {
+                throw exceptionFactory();
             }
         }
     }

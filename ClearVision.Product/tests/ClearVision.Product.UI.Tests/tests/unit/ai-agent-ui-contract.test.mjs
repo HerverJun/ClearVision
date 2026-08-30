@@ -8353,6 +8353,20 @@ test('Vision Agent source guard has no legacy ClarificationPlanCard production p
   assert.doesNotMatch(workspaceSource, /clarification_\$\{index \+ 1\}|clarification_1/);
 });
 
+test('Vision Agent Plan source guard uses PlanRun only and has no ordinary Plan fallback route', () => {
+  const currentFile = fileURLToPath(import.meta.url);
+  const testProjectRoot = path.resolve(path.dirname(currentFile), '..', '..');
+  const productRoot = path.resolve(testProjectRoot, '..', '..');
+  const workspaceSource = fs.readFileSync(
+    path.resolve(productRoot, 'src', 'ClearVision.Product.Desktop', 'wwwroot', 'src', 'features', 'ai', 'aiPanelAgentWorkspace.js'),
+    'utf8'
+  );
+
+  assert.match(workspaceSource, /['"`]\/ai\/agent-plan-runs['"`]/);
+  assert.match(workspaceSource, /['"`]\/ai\/agent-plan\/readiness-preview['"`]/);
+  assert.doesNotMatch(workspaceSource, /['"`]\/ai\/agent-plan['"`]/);
+});
+
 test('Vision Agent workspace source guard enforces one reducer and one answer surface', () => {
   const currentFile = fileURLToPath(import.meta.url);
   const testProjectRoot = path.resolve(path.dirname(currentFile), '..', '..');

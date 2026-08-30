@@ -232,7 +232,14 @@ public static class SettingsEndpoints
             [FromServices] VisionDatabaseMaintenanceService databaseMaintenance,
             CancellationToken cancellationToken) =>
         {
-            return Results.Ok(await databaseMaintenance.GetStatusAsync(cancellationToken));
+            try
+            {
+                return Results.Ok(await databaseMaintenance.GetStatusAsync(cancellationToken));
+            }
+            catch (VisionDatabaseMaintenanceException ex)
+            {
+                return BuildDatabaseMaintenancePersistenceError(ex);
+            }
         })
         .RequireClearVisionPermission(ClearVisionPermissionPolicies.RequireAdmin);
 
@@ -249,6 +256,10 @@ public static class SettingsEndpoints
             try
             {
                 return Results.Ok(await databaseMaintenance.RepairAsync(cancellationToken));
+            }
+            catch (VisionDatabaseMaintenanceException ex)
+            {
+                return BuildDatabaseMaintenancePersistenceError(ex);
             }
             catch (Exception ex) when (IsDatabaseMaintenanceClientError(ex))
             {
@@ -270,6 +281,10 @@ public static class SettingsEndpoints
             try
             {
                 return Results.Ok(await databaseMaintenance.CreateBackupAsync("manual", cancellationToken));
+            }
+            catch (VisionDatabaseMaintenanceException ex)
+            {
+                return BuildDatabaseMaintenancePersistenceError(ex);
             }
             catch (Exception ex) when (IsDatabaseMaintenanceClientError(ex))
             {
@@ -298,6 +313,10 @@ public static class SettingsEndpoints
             {
                 return Results.Ok(await databaseMaintenance.RestoreBackupAsync(request.BackupPath, cancellationToken));
             }
+            catch (VisionDatabaseMaintenanceException ex)
+            {
+                return BuildDatabaseMaintenancePersistenceError(ex);
+            }
             catch (Exception ex) when (IsDatabaseMaintenanceClientError(ex))
             {
                 return BuildDatabaseMaintenanceError(ex);
@@ -323,6 +342,10 @@ public static class SettingsEndpoints
             try
             {
                 return Results.Ok(await databaseMaintenance.CleanupHistoryAsync(retentionDays, cancellationToken));
+            }
+            catch (VisionDatabaseMaintenanceException ex)
+            {
+                return BuildDatabaseMaintenancePersistenceError(ex);
             }
             catch (Exception ex) when (IsDatabaseMaintenanceClientError(ex))
             {
@@ -2313,6 +2336,17 @@ public static class SettingsEndpoints
 
         return Results.BadRequest(new { Error = ex.Message });
     }
+
+    private static IResult BuildDatabaseMaintenancePersistenceError(VisionDatabaseMaintenanceException ex) =>
+        Results.Json(new
+        {
+            errorCode = ex.ErrorCode,
+            publicMessage = ex.PublicMessage,
+            retryable = ex.Retryable,
+            recoveryRequired = ex.RecoveryRequired,
+            stage = ex.Stage,
+            metadataOnly = true
+        }, statusCode: StatusCodes.Status503ServiceUnavailable);
 
     private static bool IsDeveloperUiRequested(HttpContext context)
     {

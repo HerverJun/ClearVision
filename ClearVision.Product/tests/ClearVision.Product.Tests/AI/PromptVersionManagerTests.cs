@@ -57,8 +57,9 @@ public class PromptVersionManagerTests : IDisposable
         var tempDir = CreateTempDir();
         var faultInjector = new AiPersistenceTestFaultInjector();
         var health = new AiAuxiliaryPersistenceHealth();
-        var sut = new PromptVersionManager(tempDir, faultInjector, health);
-        var version = await sut.CreateVersionAsync("V1", "prompt", "baseline", "tester");
+        var firstManager = new PromptVersionManager(tempDir, faultInjector, health);
+        var secondManager = new PromptVersionManager(tempDir, faultInjector, health);
+        var version = await firstManager.CreateVersionAsync("V1", "prompt", "baseline", "tester");
         using var firstCandidateEntered = new ManualResetEventSlim(false);
         using var releaseFirstCandidate = new ManualResetEventSlim(false);
         var candidates = new List<string>();
@@ -82,9 +83,9 @@ public class PromptVersionManagerTests : IDisposable
             }
         });
 
-        var first = Task.Run(() => sut.RecordMetricsAsync(version.Id, true, 10, 20));
+        var first = Task.Run(() => firstManager.RecordMetricsAsync(version.Id, true, 10, 20));
         firstCandidateEntered.Wait(TimeSpan.FromSeconds(5)).Should().BeTrue();
-        var second = Task.Run(() => sut.RecordMetricsAsync(version.Id, false, 30, 40));
+        var second = Task.Run(() => secondManager.RecordMetricsAsync(version.Id, false, 30, 40));
         await Task.Delay(100);
         second.IsCompleted.Should().BeFalse();
         releaseFirstCandidate.Set();
@@ -97,6 +98,145 @@ public class PromptVersionManagerTests : IDisposable
         persisted.Metrics.TotalTokenUsage.Should().Be(40);
         persisted.Metrics.TotalLatencyMs.Should().Be(60);
         candidates.Should().OnlyHaveUniqueItems();
+    }
+
+    [Fact]
+    public async Task ConcurrentMetricsHealth_FailureThenSuccessAcrossManagers_ShouldRecoverInDurableOrder()
+    {
+        var tempDir = CreateTempDir();
+        var faultInjector = new AiPersistenceTestFaultInjector();
+        var health = new AiAuxiliaryPersistenceHealth();
+        var firstManager = new PromptVersionManager(tempDir, faultInjector, health);
+        var secondManager = new PromptVersionManager(tempDir, faultInjector, health);
+        var version = await firstManager.CreateVersionAsync("V1", "prompt", "baseline", "tester");
+        using var failedCandidateEntered = new ManualResetEventSlim(false);
+        using var releaseFailedCandidate = new ManualResetEventSlim(false);
+        using var successfulCandidateEntered = new ManualResetEventSlim(false);
+        using var releaseSuccessfulCandidate = new ManualResetEventSlim(false);
+        using var successfulWriteStarted = new ManualResetEventSlim(false);
+        var candidateCount = 0;
+        faultInjector.SetHandler((stage, authority, _) =>
+        {
+            if (stage != AiPersistenceStage.JsonCandidatePrepared || authority != "prompt_versions")
+            {
+                return;
+            }
+
+            var candidateNumber = Interlocked.Increment(ref candidateCount);
+            if (candidateNumber == 1)
+            {
+                failedCandidateEntered.Set();
+                releaseFailedCandidate.Wait(TimeSpan.FromSeconds(5)).Should().BeTrue();
+                throw new IOException("first metrics commit failed");
+            }
+
+            if (candidateNumber == 2)
+            {
+                successfulCandidateEntered.Set();
+                releaseSuccessfulCandidate.Wait(TimeSpan.FromSeconds(5)).Should().BeTrue();
+            }
+        });
+
+        var failedWrite = Task.Run(() => firstManager.RecordMetricsAsync(version.Id, false, 10, 20));
+        failedCandidateEntered.Wait(TimeSpan.FromSeconds(5)).Should().BeTrue();
+        var successfulWrite = Task.Run(async () =>
+        {
+            successfulWriteStarted.Set();
+            await secondManager.RecordMetricsAsync(version.Id, true, 30, 40);
+        });
+        successfulWriteStarted.Wait(TimeSpan.FromSeconds(5)).Should().BeTrue();
+        successfulCandidateEntered.IsSet.Should().BeFalse();
+        successfulWrite.IsCompleted.Should().BeFalse();
+
+        releaseFailedCandidate.Set();
+        successfulCandidateEntered.Wait(TimeSpan.FromSeconds(5)).Should().BeTrue();
+        await failedWrite;
+        health.GetSnapshot().Degraded.Should().BeTrue(
+            "the failed durable mutation must publish degradation before the later write can commit");
+
+        releaseSuccessfulCandidate.Set();
+        await successfulWrite;
+
+        health.GetSnapshot().Degraded.Should().BeFalse();
+        var persisted = await new PromptVersionManager(tempDir).GetVersionAsync(version.Id);
+        persisted!.Metrics.TotalCalls.Should().Be(1);
+        persisted.Metrics.SuccessCalls.Should().Be(1);
+        persisted.Metrics.TotalTokenUsage.Should().Be(30);
+        persisted.Metrics.TotalLatencyMs.Should().Be(40);
+    }
+
+    [Fact]
+    public async Task ConcurrentMetricsHealth_SuccessThenFailureAcrossManagers_ShouldRemainDegradedInDurableOrder()
+    {
+        var tempDir = CreateTempDir();
+        var faultInjector = new AiPersistenceTestFaultInjector();
+        var health = new AiAuxiliaryPersistenceHealth();
+        var firstManager = new PromptVersionManager(tempDir, faultInjector, health);
+        var secondManager = new PromptVersionManager(tempDir, faultInjector, health);
+        var version = await firstManager.CreateVersionAsync("V1", "prompt", "baseline", "tester");
+        faultInjector.FailOnce(
+            AiPersistenceStage.JsonCommitStarted,
+            static () => new IOException("seed degraded health"));
+        await firstManager.RecordMetricsAsync(version.Id, false, 1, 2);
+        health.GetSnapshot().Degraded.Should().BeTrue();
+
+        using var successfulCandidateEntered = new ManualResetEventSlim(false);
+        using var releaseSuccessfulCandidate = new ManualResetEventSlim(false);
+        using var failedCandidateEntered = new ManualResetEventSlim(false);
+        using var releaseFailedCandidate = new ManualResetEventSlim(false);
+        using var failedWriteStarted = new ManualResetEventSlim(false);
+        var candidateCount = 0;
+        faultInjector.SetHandler((stage, authority, _) =>
+        {
+            if (stage != AiPersistenceStage.JsonCandidatePrepared || authority != "prompt_versions")
+            {
+                return;
+            }
+
+            var candidateNumber = Interlocked.Increment(ref candidateCount);
+            if (candidateNumber == 1)
+            {
+                successfulCandidateEntered.Set();
+                releaseSuccessfulCandidate.Wait(TimeSpan.FromSeconds(5)).Should().BeTrue();
+                return;
+            }
+
+            if (candidateNumber == 2)
+            {
+                failedCandidateEntered.Set();
+                releaseFailedCandidate.Wait(TimeSpan.FromSeconds(5)).Should().BeTrue();
+                throw new IOException("later metrics commit failed");
+            }
+        });
+
+        var successfulWrite = Task.Run(() => firstManager.RecordMetricsAsync(version.Id, true, 50, 60));
+        successfulCandidateEntered.Wait(TimeSpan.FromSeconds(5)).Should().BeTrue();
+        var failedWrite = Task.Run(async () =>
+        {
+            failedWriteStarted.Set();
+            await secondManager.RecordMetricsAsync(version.Id, false, 70, 80);
+        });
+        failedWriteStarted.Wait(TimeSpan.FromSeconds(5)).Should().BeTrue();
+        failedCandidateEntered.IsSet.Should().BeFalse();
+        failedWrite.IsCompleted.Should().BeFalse();
+        health.GetSnapshot().Degraded.Should().BeTrue(
+            "health cannot recover before the successful candidate is durably committed");
+
+        releaseSuccessfulCandidate.Set();
+        failedCandidateEntered.Wait(TimeSpan.FromSeconds(5)).Should().BeTrue();
+        await successfulWrite;
+        health.GetSnapshot().Degraded.Should().BeFalse(
+            "the successful durable mutation must recover health before the later write starts committing");
+
+        releaseFailedCandidate.Set();
+        await failedWrite;
+
+        health.GetSnapshot().Degraded.Should().BeTrue();
+        var persisted = await new PromptVersionManager(tempDir).GetVersionAsync(version.Id);
+        persisted!.Metrics.TotalCalls.Should().Be(1);
+        persisted.Metrics.SuccessCalls.Should().Be(1);
+        persisted.Metrics.TotalTokenUsage.Should().Be(50);
+        persisted.Metrics.TotalLatencyMs.Should().Be(60);
     }
 
     [Fact]
@@ -131,6 +271,37 @@ public class PromptVersionManagerTests : IDisposable
         var persisted = await new PromptVersionManager(tempDir).GetVersionAsync(version.Id);
         persisted!.Metrics.TotalCalls.Should().Be(1);
         persisted.Metrics.TotalTokenUsage.Should().Be(5);
+    }
+
+    [Fact]
+    public async Task MetricsHealth_ShouldKeepRecentRetryableEventsBounded()
+    {
+        var tempDir = CreateTempDir();
+        var faultInjector = new AiPersistenceTestFaultInjector();
+        var health = new AiAuxiliaryPersistenceHealth();
+        var sut = new PromptVersionManager(tempDir, faultInjector, health);
+        var version = await sut.CreateVersionAsync("V1", "prompt", "baseline", "tester");
+        faultInjector.SetHandler((stage, authority, _) =>
+        {
+            if (stage == AiPersistenceStage.JsonCommitStarted && authority == "prompt_versions")
+            {
+                throw new IOException("repeatable metrics commit failure");
+            }
+        });
+
+        for (var index = 0; index < 40; index++)
+        {
+            await sut.RecordMetricsAsync(version.Id, false, index, index);
+        }
+
+        var snapshot = health.GetSnapshot();
+        snapshot.Degraded.Should().BeTrue();
+        snapshot.ActiveFailures.Should().ContainSingle();
+        snapshot.RecentRetryableEvents.Should().HaveCount(32);
+        snapshot.RecentRetryableEvents.Should().OnlyContain(item =>
+            item.Authority == "prompt_versions" &&
+            item.Operation == "record_metrics" &&
+            item.Retryable);
     }
 
     [Fact]

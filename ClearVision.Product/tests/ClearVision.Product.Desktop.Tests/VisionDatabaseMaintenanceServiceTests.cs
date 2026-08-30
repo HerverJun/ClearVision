@@ -5,6 +5,7 @@ using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
+using System.Text.Json;
 
 namespace ClearVision.Product.Desktop.Tests;
 
@@ -114,7 +115,531 @@ public sealed class VisionDatabaseMaintenanceServiceTests
         }
     }
 
-    private static ServiceProvider CreateProvider(string dbPath, string packageRoot, string backupRoot)
+    [Theory]
+    [InlineData("backup")]
+    [InlineData("cleanup")]
+    [InlineData("repair")]
+    [InlineData("status")]
+    public async Task MaintenanceGate_ShouldSerializeRestoreAgainstEveryCrossInstanceOperation(string operation)
+    {
+        var root = CreateTempRoot();
+        var dbPath = Path.Combine(root, "vision.db");
+        var packageRoot = Path.Combine(root, "packages");
+        var backupRoot = Path.Combine(root, "backups");
+        using var restoreEntered = new ManualResetEventSlim();
+        using var releaseRestore = new ManualResetEventSlim();
+        using var contenderEntered = new ManualResetEventSlim();
+        var restoreFaults = new ArmableMaintenanceFaultInjector();
+        var contenderFaults = new ArmableMaintenanceFaultInjector();
+
+        try
+        {
+            await using var restoreProvider = CreateProvider(dbPath, packageRoot, backupRoot, restoreFaults);
+            await using var contenderProvider = CreateProvider(dbPath, packageRoot, backupRoot, contenderFaults);
+            await InitializeDatabaseAsync(restoreProvider);
+            await WriteAuthoritativeStateAsync(restoreProvider, packageRoot, "new-state", "new-package");
+            var restoreService = restoreProvider.GetRequiredService<VisionDatabaseMaintenanceService>();
+            var backup = await restoreService.CreateBackupAsync("serialization-source");
+            await WriteAuthoritativeStateAsync(restoreProvider, packageRoot, "old-state", "old-package");
+
+            restoreFaults.Enqueue(
+                VisionDatabaseMaintenanceStage.DatabaseReplace,
+                (_, _) =>
+                {
+                    restoreEntered.Set();
+                    if (!releaseRestore.Wait(TimeSpan.FromSeconds(10)))
+                    {
+                        throw new TimeoutException("Restore barrier was not released.");
+                    }
+                });
+            restoreFaults.Arm();
+            contenderFaults.Enqueue(
+                VisionDatabaseMaintenanceStage.OperationEntered,
+                (_, _) => contenderEntered.Set());
+            contenderFaults.Arm();
+
+            var restoreTask = Task.Run(() => restoreService.RestoreBackupAsync(backup.BackupPath));
+            restoreEntered.Wait(TimeSpan.FromSeconds(10)).Should().BeTrue();
+
+            var contenderService = contenderProvider.GetRequiredService<VisionDatabaseMaintenanceService>();
+            Task contenderTask = operation switch
+            {
+                "backup" => Task.Run(async () => { await contenderService.CreateBackupAsync("contender"); }),
+                "cleanup" => Task.Run(async () => { await contenderService.CleanupHistoryAsync(30); }),
+                "repair" => Task.Run(async () => { await contenderService.RepairAsync(); }),
+                "status" => Task.Run(async () => { await contenderService.GetStatusAsync(); }),
+                _ => throw new ArgumentOutOfRangeException(nameof(operation), operation, null)
+            };
+
+            try
+            {
+                contenderEntered.Wait(TimeSpan.FromMilliseconds(250)).Should().BeFalse();
+                contenderTask.IsCompleted.Should().BeFalse();
+            }
+            finally
+            {
+                releaseRestore.Set();
+            }
+
+            await Task.WhenAll(restoreTask, contenderTask);
+            contenderEntered.IsSet.Should().BeTrue();
+        }
+        finally
+        {
+            releaseRestore.Set();
+            SqliteConnection.ClearAllPools();
+            DeleteDirectoryIfExists(root);
+        }
+    }
+
+    [Theory]
+    [InlineData((int)VisionDatabaseMaintenanceStage.BackupDatabaseCandidate)]
+    [InlineData((int)VisionDatabaseMaintenanceStage.BackupPackageCandidate)]
+    [InlineData((int)VisionDatabaseMaintenanceStage.BackupCommit)]
+    [InlineData((int)VisionDatabaseMaintenanceStage.RestoreExtract)]
+    [InlineData((int)VisionDatabaseMaintenanceStage.RestoreCandidateValidated)]
+    [InlineData((int)VisionDatabaseMaintenanceStage.SafetyBackupCreated)]
+    [InlineData((int)VisionDatabaseMaintenanceStage.DatabaseReplace)]
+    [InlineData((int)VisionDatabaseMaintenanceStage.PackageReplace)]
+    public async Task MaintenanceStages_ShouldMapPermissionFailuresToStableErrors(
+        int stageValue)
+    {
+        await AssertInjectedStageFailureAsync(
+            (VisionDatabaseMaintenanceStage)stageValue,
+            new UnauthorizedAccessException("sensitive permission failure"),
+            "DB_MAINTENANCE_PERMISSION_DENIED");
+    }
+
+    [Theory]
+    [InlineData((int)VisionDatabaseMaintenanceStage.BackupDatabaseCandidate)]
+    [InlineData((int)VisionDatabaseMaintenanceStage.BackupPackageCandidate)]
+    [InlineData((int)VisionDatabaseMaintenanceStage.BackupCommit)]
+    [InlineData((int)VisionDatabaseMaintenanceStage.RestoreExtract)]
+    [InlineData((int)VisionDatabaseMaintenanceStage.RestoreCandidateValidated)]
+    [InlineData((int)VisionDatabaseMaintenanceStage.SafetyBackupCreated)]
+    [InlineData((int)VisionDatabaseMaintenanceStage.DatabaseReplace)]
+    [InlineData((int)VisionDatabaseMaintenanceStage.PackageReplace)]
+    public async Task MaintenanceStages_ShouldMapIoFailuresToStableErrors(
+        int stageValue)
+    {
+        await AssertInjectedStageFailureAsync(
+            (VisionDatabaseMaintenanceStage)stageValue,
+            new IOException("sensitive I/O failure"),
+            "DB_MAINTENANCE_IO_FAILED");
+    }
+
+    [Theory]
+    [InlineData((int)VisionDatabaseMaintenanceStage.DatabaseReplaced)]
+    [InlineData((int)VisionDatabaseMaintenanceStage.PackageReplaced)]
+    public async Task OrdinaryPublishFailure_ShouldRestoreExactPriorDatabaseAndPackageSet(
+        int stageValue)
+    {
+        var stage = (VisionDatabaseMaintenanceStage)stageValue;
+        var root = CreateTempRoot();
+        var dbPath = Path.Combine(root, "vision.db");
+        var packageRoot = Path.Combine(root, "packages");
+        var backupRoot = Path.Combine(root, "backups");
+        var faults = new ArmableMaintenanceFaultInjector();
+
+        try
+        {
+            await using var provider = CreateProvider(dbPath, packageRoot, backupRoot, faults);
+            await InitializeDatabaseAsync(provider);
+            var service = provider.GetRequiredService<VisionDatabaseMaintenanceService>();
+            await WriteAuthoritativeStateAsync(provider, packageRoot, "new-state", "new-package");
+            var backup = await service.CreateBackupAsync("publish-failure-source");
+            await WriteAuthoritativeStateAsync(provider, packageRoot, "old-state", "old-package");
+            var expected = await ReadAuthoritativeStateAsync(provider, packageRoot);
+            faults.Enqueue(stage, (_, _) => throw new IOException("publish failed after replacement"));
+            faults.Arm();
+
+            var act = () => service.RestoreBackupAsync(backup.BackupPath);
+            var failure = (await act.Should().ThrowAsync<VisionDatabaseMaintenanceException>()).Which;
+
+            failure.RecoveryRequired.Should().BeFalse();
+            (await ReadAuthoritativeStateAsync(provider, packageRoot)).Should().BeEquivalentTo(expected);
+            File.Exists(dbPath + ".maintenance-recovery.json").Should().BeFalse();
+        }
+        finally
+        {
+            SqliteConnection.ClearAllPools();
+            DeleteDirectoryIfExists(root);
+        }
+    }
+
+    [Fact]
+    public async Task InterruptedAfterDatabaseReplacement_NewInstanceShouldRollbackPriorCompleteSet()
+    {
+        var root = CreateTempRoot();
+        var dbPath = Path.Combine(root, "vision.db");
+        var packageRoot = Path.Combine(root, "packages");
+        var backupRoot = Path.Combine(root, "backups");
+        var faults = new ArmableMaintenanceFaultInjector();
+
+        try
+        {
+            await using var interruptedProvider = CreateProvider(dbPath, packageRoot, backupRoot, faults);
+            await InitializeDatabaseAsync(interruptedProvider);
+            var interruptedService = interruptedProvider.GetRequiredService<VisionDatabaseMaintenanceService>();
+            await WriteAuthoritativeStateAsync(interruptedProvider, packageRoot, "new-state", "new-package");
+            var backup = await interruptedService.CreateBackupAsync("interrupted-source");
+            await WriteAuthoritativeStateAsync(interruptedProvider, packageRoot, "old-state", "old-package");
+            var expected = await ReadAuthoritativeStateAsync(interruptedProvider, packageRoot);
+            faults.Enqueue(
+                VisionDatabaseMaintenanceStage.DatabaseReplaced,
+                (_, _) => throw new VisionDatabaseMaintenanceInterruptionException("database-replaced"));
+            faults.Arm();
+
+            var act = () => interruptedService.RestoreBackupAsync(backup.BackupPath);
+            var interrupted = (await act.Should().ThrowAsync<VisionDatabaseMaintenanceException>()).Which;
+            interrupted.ErrorCode.Should().Be("DB_MAINTENANCE_INTERRUPTED");
+            File.Exists(dbPath + ".maintenance-recovery.json").Should().BeTrue();
+
+            await using var recoveryProvider = CreateProvider(dbPath, packageRoot, backupRoot);
+            var recovered = await recoveryProvider
+                .GetRequiredService<VisionDatabaseMaintenanceService>()
+                .GetStatusAsync();
+
+            recovered.State.Should().Be(VisionDatabaseState.Healthy);
+            (await ReadAuthoritativeStateAsync(recoveryProvider, packageRoot)).Should().BeEquivalentTo(expected);
+            File.Exists(dbPath + ".maintenance-recovery.json").Should().BeFalse();
+        }
+        finally
+        {
+            SqliteConnection.ClearAllPools();
+            DeleteDirectoryIfExists(root);
+        }
+    }
+
+    [Fact]
+    public async Task InterruptedAfterCompletedMarker_NewInstanceShouldKeepNewCompleteSet()
+    {
+        var root = CreateTempRoot();
+        var dbPath = Path.Combine(root, "vision.db");
+        var packageRoot = Path.Combine(root, "packages");
+        var backupRoot = Path.Combine(root, "backups");
+        var faults = new ArmableMaintenanceFaultInjector();
+
+        try
+        {
+            await using var interruptedProvider = CreateProvider(dbPath, packageRoot, backupRoot, faults);
+            await InitializeDatabaseAsync(interruptedProvider);
+            var interruptedService = interruptedProvider.GetRequiredService<VisionDatabaseMaintenanceService>();
+            await WriteAuthoritativeStateAsync(interruptedProvider, packageRoot, "new-state", "new-package");
+            var expected = await ReadAuthoritativeStateAsync(interruptedProvider, packageRoot);
+            var backup = await interruptedService.CreateBackupAsync("completed-source");
+            await WriteAuthoritativeStateAsync(interruptedProvider, packageRoot, "old-state", "old-package");
+            faults.Enqueue(
+                VisionDatabaseMaintenanceStage.RecoveryMarkerCompleted,
+                (_, _) => throw new VisionDatabaseMaintenanceInterruptionException("completed-marker"));
+            faults.Arm();
+
+            var act = () => interruptedService.RestoreBackupAsync(backup.BackupPath);
+            var interrupted = (await act.Should().ThrowAsync<VisionDatabaseMaintenanceException>()).Which;
+            interrupted.ErrorCode.Should().Be("DB_MAINTENANCE_INTERRUPTED");
+            File.Exists(dbPath + ".maintenance-recovery.json").Should().BeTrue();
+
+            await using var recoveryProvider = CreateProvider(dbPath, packageRoot, backupRoot);
+            var recovered = await recoveryProvider
+                .GetRequiredService<VisionDatabaseMaintenanceService>()
+                .GetStatusAsync();
+
+            recovered.State.Should().Be(VisionDatabaseState.Healthy);
+            (await ReadAuthoritativeStateAsync(recoveryProvider, packageRoot)).Should().BeEquivalentTo(expected);
+            File.Exists(dbPath + ".maintenance-recovery.json").Should().BeFalse();
+        }
+        finally
+        {
+            SqliteConnection.ClearAllPools();
+            DeleteDirectoryIfExists(root);
+        }
+    }
+
+    [Fact]
+    public async Task RollbackInterruption_ShouldFenceSameInstanceUntilCleanInstanceRecovers()
+    {
+        var root = CreateTempRoot();
+        var dbPath = Path.Combine(root, "vision.db");
+        var packageRoot = Path.Combine(root, "packages");
+        var backupRoot = Path.Combine(root, "backups");
+        var faults = new ArmableMaintenanceFaultInjector();
+
+        try
+        {
+            await using var fencedProvider = CreateProvider(dbPath, packageRoot, backupRoot, faults);
+            await InitializeDatabaseAsync(fencedProvider);
+            var fencedService = fencedProvider.GetRequiredService<VisionDatabaseMaintenanceService>();
+            await WriteAuthoritativeStateAsync(fencedProvider, packageRoot, "new-state", "new-package");
+            var backup = await fencedService.CreateBackupAsync("rollback-interruption-source");
+            await WriteAuthoritativeStateAsync(fencedProvider, packageRoot, "old-state", "old-package");
+            var expected = await ReadAuthoritativeStateAsync(fencedProvider, packageRoot);
+            faults.Enqueue(
+                VisionDatabaseMaintenanceStage.PackageReplaced,
+                (_, _) => throw new IOException("force ordinary restore failure"));
+            faults.Enqueue(
+                VisionDatabaseMaintenanceStage.RollbackPackage,
+                (_, _) => throw new VisionDatabaseMaintenanceInterruptionException("rollback-package"));
+            faults.Arm();
+
+            var restoreAct = () => fencedService.RestoreBackupAsync(backup.BackupPath);
+            var restoreFailure = (await restoreAct.Should().ThrowAsync<VisionDatabaseMaintenanceException>()).Which;
+            restoreFailure.RecoveryRequired.Should().BeTrue();
+            restoreFailure.ErrorCode.Should().Be("DB_MAINTENANCE_RECOVERY_REQUIRED");
+
+            var sameInstanceAct = () => fencedService.GetStatusAsync();
+            var fencedFailure = (await sameInstanceAct.Should().ThrowAsync<VisionDatabaseMaintenanceException>()).Which;
+            fencedFailure.RecoveryRequired.Should().BeTrue();
+
+            await using var recoveryProvider = CreateProvider(dbPath, packageRoot, backupRoot);
+            var recovered = await recoveryProvider
+                .GetRequiredService<VisionDatabaseMaintenanceService>()
+                .GetStatusAsync();
+
+            recovered.State.Should().Be(VisionDatabaseState.Healthy);
+            (await ReadAuthoritativeStateAsync(recoveryProvider, packageRoot)).Should().BeEquivalentTo(expected);
+        }
+        finally
+        {
+            SqliteConnection.ClearAllPools();
+            DeleteDirectoryIfExists(root);
+        }
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task MissingOrCorruptSafetyBackup_ShouldRemainRecoveryRequired(bool corruptInsteadOfDelete)
+    {
+        var root = CreateTempRoot();
+        var dbPath = Path.Combine(root, "vision.db");
+        var packageRoot = Path.Combine(root, "packages");
+        var backupRoot = Path.Combine(root, "backups");
+        var faults = new ArmableMaintenanceFaultInjector();
+
+        try
+        {
+            await using var interruptedProvider = CreateProvider(dbPath, packageRoot, backupRoot, faults);
+            await InitializeDatabaseAsync(interruptedProvider);
+            var interruptedService = interruptedProvider.GetRequiredService<VisionDatabaseMaintenanceService>();
+            await WriteAuthoritativeStateAsync(interruptedProvider, packageRoot, "new-state", "new-package");
+            var backup = await interruptedService.CreateBackupAsync("missing-safety-source");
+            await WriteAuthoritativeStateAsync(interruptedProvider, packageRoot, "old-state", "old-package");
+            faults.Enqueue(
+                VisionDatabaseMaintenanceStage.DatabaseReplaced,
+                (_, _) => throw new VisionDatabaseMaintenanceInterruptionException("leave-pending-marker"));
+            faults.Arm();
+            Func<Task> interruptedAct = () => interruptedService.RestoreBackupAsync(backup.BackupPath);
+            await interruptedAct.Should().ThrowAsync<VisionDatabaseMaintenanceException>();
+
+            var marker = await ReadRecoveryMarkerAsync(dbPath);
+            if (corruptInsteadOfDelete)
+            {
+                await File.AppendAllTextAsync(marker.SafetyBackupPath, "corrupt");
+            }
+            else
+            {
+                File.Delete(marker.SafetyBackupPath);
+            }
+
+            await using var recoveryProvider = CreateProvider(dbPath, packageRoot, backupRoot);
+            var recoveryService = recoveryProvider.GetRequiredService<VisionDatabaseMaintenanceService>();
+            var recoveryAct = () => recoveryService.GetStatusAsync();
+            var recoveryFailure = (await recoveryAct.Should().ThrowAsync<VisionDatabaseMaintenanceException>()).Which;
+            recoveryFailure.RecoveryRequired.Should().BeTrue();
+            recoveryFailure.ErrorCode.Should().Be("DB_MAINTENANCE_RECOVERY_REQUIRED");
+
+            var repeatedAct = () => recoveryService.GetStatusAsync();
+            (await repeatedAct.Should().ThrowAsync<VisionDatabaseMaintenanceException>())
+                .Which.RecoveryRequired.Should().BeTrue();
+        }
+        finally
+        {
+            SqliteConnection.ClearAllPools();
+            DeleteDirectoryIfExists(root);
+        }
+    }
+
+    [Theory]
+    [InlineData("database")]
+    [InlineData("packages")]
+    public async Task Restore_ShouldRevalidateStagedArtifactsBeforeDestructivePublish(string artifact)
+    {
+        var root = CreateTempRoot();
+        var dbPath = Path.Combine(root, "vision.db");
+        var packageRoot = Path.Combine(root, "packages");
+        var backupRoot = Path.Combine(root, "backups");
+        var faults = new ArmableMaintenanceFaultInjector();
+
+        try
+        {
+            await using var provider = CreateProvider(dbPath, packageRoot, backupRoot, faults);
+            await InitializeDatabaseAsync(provider);
+            var service = provider.GetRequiredService<VisionDatabaseMaintenanceService>();
+            await WriteAuthoritativeStateAsync(provider, packageRoot, "new-state", "new-package");
+            var backup = await service.CreateBackupAsync("tamper-source");
+            await WriteAuthoritativeStateAsync(provider, packageRoot, "old-state", "old-package");
+            var expected = await ReadAuthoritativeStateAsync(provider, packageRoot);
+            faults.Enqueue(
+                VisionDatabaseMaintenanceStage.RecoveryMarkerPrepared,
+                (_, operationId) =>
+                {
+                    var recoveryDirectory = Path.Combine(backupRoot, ".maintenance-recovery", operationId);
+                    var path = artifact == "database"
+                        ? Path.Combine(recoveryDirectory, "db", "vision.db")
+                        : Path.Combine(recoveryDirectory, "packages", "tampered.txt");
+                    File.AppendAllText(path, "tampered");
+                });
+            faults.Arm();
+
+            var act = () => service.RestoreBackupAsync(backup.BackupPath);
+            var failure = (await act.Should().ThrowAsync<VisionDatabaseMaintenanceException>()).Which;
+
+            failure.RecoveryRequired.Should().BeFalse();
+            (await ReadAuthoritativeStateAsync(provider, packageRoot)).Should().BeEquivalentTo(expected);
+        }
+        finally
+        {
+            SqliteConnection.ClearAllPools();
+            DeleteDirectoryIfExists(root);
+        }
+    }
+
+    [Fact]
+    public async Task RecoveryMarkerWithSafetyBackupOutsideCanonicalRoot_ShouldFailClosed()
+    {
+        var root = CreateTempRoot();
+        var dbPath = Path.Combine(root, "vision.db");
+        var packageRoot = Path.Combine(root, "packages");
+        var backupRoot = Path.Combine(root, "backups");
+        var faults = new ArmableMaintenanceFaultInjector();
+
+        try
+        {
+            await using var interruptedProvider = CreateProvider(dbPath, packageRoot, backupRoot, faults);
+            await InitializeDatabaseAsync(interruptedProvider);
+            var interruptedService = interruptedProvider.GetRequiredService<VisionDatabaseMaintenanceService>();
+            await WriteAuthoritativeStateAsync(interruptedProvider, packageRoot, "new-state", "new-package");
+            var backup = await interruptedService.CreateBackupAsync("outside-safety-source");
+            await WriteAuthoritativeStateAsync(interruptedProvider, packageRoot, "old-state", "old-package");
+            faults.Enqueue(
+                VisionDatabaseMaintenanceStage.DatabaseReplaced,
+                (_, _) => throw new VisionDatabaseMaintenanceInterruptionException("leave-marker"));
+            faults.Arm();
+            Func<Task> interruptedAct = () => interruptedService.RestoreBackupAsync(backup.BackupPath);
+            await interruptedAct.Should().ThrowAsync<VisionDatabaseMaintenanceException>();
+
+            var markerPath = dbPath + ".maintenance-recovery.json";
+            var marker = await ReadRecoveryMarkerAsync(dbPath);
+            var outsideSafetyPath = Path.Combine(root, "outside-safety.cvdbbak");
+            File.Copy(marker.SafetyBackupPath, outsideSafetyPath);
+            marker.SafetyBackupPath = outsideSafetyPath;
+            await File.WriteAllTextAsync(
+                markerPath,
+                JsonSerializer.Serialize(marker, VisionDatabaseMaintenance.JsonOptions));
+
+            await using var recoveryProvider = CreateProvider(dbPath, packageRoot, backupRoot);
+            var act = () => recoveryProvider
+                .GetRequiredService<VisionDatabaseMaintenanceService>()
+                .GetStatusAsync();
+            var failure = (await act.Should().ThrowAsync<VisionDatabaseMaintenanceException>()).Which;
+
+            failure.RecoveryRequired.Should().BeTrue();
+            failure.ErrorCode.Should().Be("DB_MAINTENANCE_RECOVERY_REQUIRED");
+        }
+        finally
+        {
+            SqliteConnection.ClearAllPools();
+            DeleteDirectoryIfExists(root);
+        }
+    }
+
+    [Fact]
+    public async Task MalformedRecoveryMarker_ShouldFailClosedWithoutOpeningDatabase()
+    {
+        var root = CreateTempRoot();
+        var dbPath = Path.Combine(root, "vision.db");
+        var packageRoot = Path.Combine(root, "packages");
+        var backupRoot = Path.Combine(root, "backups");
+
+        try
+        {
+            await using var provider = CreateProvider(dbPath, packageRoot, backupRoot);
+            await InitializeDatabaseAsync(provider);
+            await File.WriteAllTextAsync(dbPath + ".maintenance-recovery.json", "{not-json");
+            var service = provider.GetRequiredService<VisionDatabaseMaintenanceService>();
+
+            var act = () => service.GetStatusAsync();
+            var failure = (await act.Should().ThrowAsync<VisionDatabaseMaintenanceException>()).Which;
+
+            failure.RecoveryRequired.Should().BeTrue();
+            failure.ErrorCode.Should().Be("DB_MAINTENANCE_RECOVERY_REQUIRED");
+        }
+        finally
+        {
+            SqliteConnection.ClearAllPools();
+            DeleteDirectoryIfExists(root);
+        }
+    }
+
+    private static async Task AssertInjectedStageFailureAsync(
+        VisionDatabaseMaintenanceStage stage,
+        Exception injectedException,
+        string expectedErrorCode)
+    {
+        var root = CreateTempRoot();
+        var dbPath = Path.Combine(root, "vision.db");
+        var packageRoot = Path.Combine(root, "packages");
+        var backupRoot = Path.Combine(root, "backups");
+        var faults = new ArmableMaintenanceFaultInjector();
+
+        try
+        {
+            await using var provider = CreateProvider(dbPath, packageRoot, backupRoot, faults);
+            await InitializeDatabaseAsync(provider);
+            var service = provider.GetRequiredService<VisionDatabaseMaintenanceService>();
+            await WriteAuthoritativeStateAsync(provider, packageRoot, "source-state", "source-package");
+            VisionDatabaseBackupResult? restoreSource = null;
+            if (!IsBackupStage(stage))
+            {
+                restoreSource = await service.CreateBackupAsync("fault-source");
+                await WriteAuthoritativeStateAsync(provider, packageRoot, "prior-state", "prior-package");
+            }
+
+            faults.Enqueue(stage, (_, _) => throw injectedException);
+            faults.Arm();
+            Func<Task> act = IsBackupStage(stage)
+                ? async () => { await service.CreateBackupAsync("fault-target"); }
+                : async () => { await service.RestoreBackupAsync(restoreSource!.BackupPath); };
+
+            var failure = (await act.Should().ThrowAsync<VisionDatabaseMaintenanceException>()).Which;
+
+            failure.ErrorCode.Should().Be(expectedErrorCode);
+            failure.Retryable.Should().BeTrue();
+            failure.RecoveryRequired.Should().BeFalse();
+            failure.Message.Should().NotContain(injectedException.Message);
+            failure.PublicMessage.Should().NotContain(injectedException.Message);
+            failure.Stage.Should().NotBeNullOrWhiteSpace();
+        }
+        finally
+        {
+            SqliteConnection.ClearAllPools();
+            DeleteDirectoryIfExists(root);
+        }
+    }
+
+    private static bool IsBackupStage(VisionDatabaseMaintenanceStage stage)
+    {
+        return stage is VisionDatabaseMaintenanceStage.BackupStarted or
+            VisionDatabaseMaintenanceStage.BackupDatabaseCandidate or
+            VisionDatabaseMaintenanceStage.BackupPackageCandidate or
+            VisionDatabaseMaintenanceStage.BackupCommit;
+    }
+
+    private static ServiceProvider CreateProvider(
+        string dbPath,
+        string packageRoot,
+        string backupRoot,
+        IVisionDatabaseMaintenanceFaultInjector? faultInjector = null)
     {
         var services = new ServiceCollection();
         services.AddLogging();
@@ -126,7 +651,8 @@ public sealed class VisionDatabaseMaintenanceServiceTests
             {
                 PackageRootDirectory = packageRoot,
                 BackupRootDirectory = backupRoot
-            }));
+            },
+            faultInjector ?? NoOpVisionDatabaseMaintenanceFaultInjector.Instance));
         return services.BuildServiceProvider();
     }
 
@@ -159,6 +685,62 @@ public sealed class VisionDatabaseMaintenanceServiceTests
             CreatedAtUtc = DateTimeOffset.UtcNow
         });
         await db.SaveChangesAsync();
+    }
+
+    private static async Task WriteAuthoritativeStateAsync(
+        ServiceProvider provider,
+        string packageRoot,
+        string packageId,
+        string packageContent)
+    {
+        await DeleteStationPackageRecordsAsync(provider);
+        if (Directory.Exists(packageRoot))
+        {
+            Directory.Delete(packageRoot, recursive: true);
+        }
+
+        var packagePath = Path.Combine(packageRoot, "files", packageId, packageId + ".cvpkg");
+        Directory.CreateDirectory(Path.GetDirectoryName(packagePath)!);
+        await File.WriteAllTextAsync(packagePath, packageContent);
+        Directory.CreateDirectory(Path.Combine(packageRoot, "empty", packageId));
+        await InsertStationPackageRecordAsync(provider, packageId, packagePath);
+    }
+
+    private static async Task<MaintenanceSnapshot> ReadAuthoritativeStateAsync(
+        ServiceProvider provider,
+        string packageRoot)
+    {
+        await using var scope = provider.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<VisionDbContext>();
+        var packageIds = await db.StationPackageRecords
+            .AsNoTracking()
+            .OrderBy(record => record.PackageId)
+            .Select(record => record.PackageId)
+            .ToListAsync();
+        var packageFiles = Directory.Exists(packageRoot)
+            ? Directory.EnumerateFiles(packageRoot, "*", SearchOption.AllDirectories)
+                .OrderBy(path => Path.GetRelativePath(packageRoot, path), StringComparer.OrdinalIgnoreCase)
+                .ToDictionary(
+                    path => Path.GetRelativePath(packageRoot, path).Replace('\\', '/'),
+                    File.ReadAllText,
+                    StringComparer.OrdinalIgnoreCase)
+            : new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        var packageDirectories = Directory.Exists(packageRoot)
+            ? Directory.EnumerateDirectories(packageRoot, "*", SearchOption.AllDirectories)
+                .Select(path => Path.GetRelativePath(packageRoot, path).Replace('\\', '/'))
+                .OrderBy(path => path, StringComparer.OrdinalIgnoreCase)
+                .ToList()
+            : [];
+        return new MaintenanceSnapshot(packageIds, packageFiles, packageDirectories);
+    }
+
+    private static async Task<VisionDatabaseRecoveryMarker> ReadRecoveryMarkerAsync(string databasePath)
+    {
+        var marker = JsonSerializer.Deserialize<VisionDatabaseRecoveryMarker>(
+            await File.ReadAllTextAsync(databasePath + ".maintenance-recovery.json"),
+            VisionDatabaseMaintenance.JsonOptions);
+        marker.Should().NotBeNull();
+        return marker!;
     }
 
     private static async Task DeleteStationPackageRecordsAsync(ServiceProvider provider)
@@ -255,6 +837,59 @@ public sealed class VisionDatabaseMaintenanceServiceTests
         if (Directory.Exists(path))
         {
             Directory.Delete(path, recursive: true);
+        }
+    }
+
+    private sealed record MaintenanceSnapshot(
+        IReadOnlyList<string> PackageIds,
+        IReadOnlyDictionary<string, string> PackageFiles,
+        IReadOnlyList<string> PackageDirectories);
+
+    private sealed class ArmableMaintenanceFaultInjector : IVisionDatabaseMaintenanceFaultInjector
+    {
+        private readonly object _sync = new();
+        private readonly Dictionary<VisionDatabaseMaintenanceStage, Queue<Action<string, string>>> _actions = [];
+        private bool _armed;
+
+        public void Enqueue(
+            VisionDatabaseMaintenanceStage stage,
+            Action<string, string> action)
+        {
+            lock (_sync)
+            {
+                if (!_actions.TryGetValue(stage, out var queue))
+                {
+                    queue = new Queue<Action<string, string>>();
+                    _actions.Add(stage, queue);
+                }
+
+                queue.Enqueue(action);
+            }
+        }
+
+        public void Arm()
+        {
+            lock (_sync)
+            {
+                _armed = true;
+            }
+        }
+
+        public void OnStage(
+            VisionDatabaseMaintenanceStage stage,
+            string databasePath,
+            string operationId)
+        {
+            Action<string, string>? action = null;
+            lock (_sync)
+            {
+                if (_armed && _actions.TryGetValue(stage, out var queue) && queue.Count > 0)
+                {
+                    action = queue.Dequeue();
+                }
+            }
+
+            action?.Invoke(databasePath, operationId);
         }
     }
 }

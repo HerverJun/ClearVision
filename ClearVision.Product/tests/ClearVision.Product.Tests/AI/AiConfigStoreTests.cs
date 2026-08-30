@@ -517,6 +517,36 @@ public class AiConfigStoreTests : IDisposable
     }
 
     [Fact]
+    public void ResetToDefaults_WhenCommitFails_ShouldKeepCurrentMemoryAndDurableGeneration()
+    {
+        var faultInjector = new AiPersistenceTestFaultInjector();
+        var store = CreateStore(faultInjector);
+        store.Add(new AiModelConfig
+        {
+            Id = "reset-survivor",
+            Name = "Reset Survivor",
+            Provider = "OpenAI Compatible",
+            Model = "gpt-4o-mini",
+            ApiKey = "reset-survivor-secret"
+        });
+        store.SetActive("reset-survivor");
+        var beforeJson = File.ReadAllText(_testModelsFile);
+        faultInjector.FailOnce(
+            AiPersistenceStage.ModelCommitStarted,
+            static () => new IOException("reset commit fault"));
+
+        var error = Assert.Throws<AiConfigPersistenceException>(() => store.ResetToDefaults());
+
+        Assert.Equal("AI_MODEL_COMMIT_FAILED", error.ErrorCode);
+        Assert.Equal("commit", error.Stage);
+        Assert.Equal(beforeJson, File.ReadAllText(_testModelsFile));
+        Assert.Equal("reset-survivor-secret", store.GetById("reset-survivor")!.ApiKey);
+        var restarted = CreateStore();
+        Assert.Equal("reset-survivor-secret", restarted.GetById("reset-survivor")!.ApiKey);
+        Assert.True(restarted.GetById("reset-survivor")!.IsActive);
+    }
+
+    [Fact]
     public void Update_WithExplicitReplaceAndClearApiKey_ShouldApplyKeyOperation()
     {
         var store = CreateStore();
@@ -608,6 +638,40 @@ public class AiConfigStoreTests : IDisposable
         Assert.Equal(42, reloaded.LastTestLatencyMs);
         Assert.NotNull(reloaded.CreatedAt);
         Assert.NotNull(reloaded.UpdatedAt);
+    }
+
+    [Fact]
+    public void CandidateResidueCleanupFailure_ShouldBeFailSoftWithoutWeakeningAuthoritativeCandidateFailure()
+    {
+        var orphanDocument = _testModelsFile + ".orphan.candidate";
+        File.WriteAllText(orphanDocument, "orphan");
+
+        var faultInjector = new AiPersistenceTestFaultInjector();
+        faultInjector.FailOnce(
+            AiPersistenceStage.ModelCandidateCleanupStarted,
+            static () => new UnauthorizedAccessException("candidate residue enumeration denied"));
+
+        var store = CreateStore(faultInjector);
+
+        Assert.Single(store.GetAll());
+        Assert.True(File.Exists(orphanDocument));
+
+        faultInjector.FailOnce(
+            AiPersistenceStage.ModelDocumentPrepared,
+            static () => new IOException("authoritative candidate document fault"));
+        var error = Assert.Throws<AiConfigPersistenceException>(() => store.Add(new AiModelConfig
+        {
+            Id = "must-not-activate-after-authority-failure",
+            Name = "Must Not Activate After Authority Failure",
+            Provider = "OpenAI Compatible",
+            Model = "gpt-4o-mini",
+            ApiKey = "authority-failure-secret"
+        }));
+
+        Assert.Equal("AI_MODEL_CANDIDATE_PERSISTENCE_FAILED", error.ErrorCode);
+        Assert.Null(store.GetById("must-not-activate-after-authority-failure"));
+        Assert.Null(CreateStore().GetById("must-not-activate-after-authority-failure"));
+        Assert.False(File.Exists(orphanDocument));
     }
 
     [Fact]
@@ -883,6 +947,98 @@ public class AiConfigStoreTests : IDisposable
     }
 
     [Fact]
+    public void Cleanup_WhenPreviousDocumentIsTemporarilyUnreadable_ShouldPreserveItsSecretsForRecovery()
+    {
+        var store = CreateStore();
+        store.Add(new AiModelConfig
+        {
+            Id = "previous-recovery-anchor",
+            Name = "Previous Recovery Anchor",
+            Provider = "OpenAI Compatible",
+            Model = "gpt-4o-mini",
+            ApiKey = "previous-recovery-secret"
+        });
+        store.Add(new AiModelConfig
+        {
+            Id = "active-newer-model",
+            Name = "Active Newer Model",
+            Provider = "OpenAI Compatible",
+            Model = "gpt-4o-mini",
+            ApiKey = "active-newer-secret"
+        });
+
+        var previousPath = _testModelsFile + ".previous";
+        using var previousDocument = JsonDocument.Parse(File.ReadAllText(previousPath));
+        var previousGenerationId = previousDocument.RootElement.GetProperty("generationId").GetString()!;
+        var previousSecretDirectory = Path.Combine(_testDir, "ai_model_secrets", previousGenerationId);
+        Assert.True(Directory.Exists(previousSecretDirectory));
+
+        using (File.Open(previousPath, FileMode.Open, FileAccess.Read, FileShare.None))
+        {
+            // Loading the valid active generation triggers residue cleanup while `.previous`
+            // is transiently unavailable. Its secret generation must be treated as unknown,
+            // not as stale residue.
+            _ = CreateStore();
+            Assert.True(Directory.Exists(previousSecretDirectory));
+        }
+
+        File.WriteAllText(_testModelsFile, "{corrupt-active-after-transient-previous-read");
+
+        var recovered = CreateStore();
+
+        Assert.Equal(
+            "previous-recovery-secret",
+            recovered.GetById("previous-recovery-anchor")!.ApiKey);
+        Assert.Null(recovered.GetById("active-newer-model"));
+    }
+
+    [Fact]
+    public void Restart_WhenActiveAndPreviousLegacyListsCoexist_ShouldMigrateAuthoritativeActiveList()
+    {
+        var activeLegacyModel = new AiModelConfig
+        {
+            Id = "active-legacy-model",
+            Name = "Active Legacy Model",
+            Provider = "OpenAI Compatible",
+            Model = "gpt-4o-mini",
+            ApiKey = "active-legacy-secret",
+            IsActive = true,
+            IsEnabled = true
+        };
+        var previousLegacyModel = new AiModelConfig
+        {
+            Id = "previous-legacy-model",
+            Name = "Previous Legacy Model",
+            Provider = "OpenAI Compatible",
+            Model = "gpt-4o-mini",
+            ApiKey = "previous-legacy-secret",
+            IsActive = true,
+            IsEnabled = true
+        };
+        var legacyJsonOptions = new JsonSerializerOptions
+        {
+            PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+            WriteIndented = true
+        };
+        File.WriteAllText(_testModelsFile, JsonSerializer.Serialize(new[] { activeLegacyModel }, legacyJsonOptions));
+        File.WriteAllText(_testModelsFile + ".previous", JsonSerializer.Serialize(new[] { previousLegacyModel }, legacyJsonOptions));
+
+        var faultInjector = new AiPersistenceTestFaultInjector();
+        faultInjector.FailOnce(
+            AiPersistenceStage.ModelCommitStarted,
+            static () => new AiPersistenceInterruptionException("before_legacy_migration_commit"));
+
+        Assert.Throws<AiPersistenceInterruptionException>(() => CreateStore(faultInjector));
+
+        var restarted = CreateStore();
+
+        Assert.Equal("active-legacy-secret", restarted.GetById(activeLegacyModel.Id)!.ApiKey);
+        Assert.Null(restarted.GetById(previousLegacyModel.Id));
+        using var migratedDocument = JsonDocument.Parse(File.ReadAllText(_testModelsFile));
+        Assert.Equal(2, migratedDocument.RootElement.GetProperty("schemaVersion").GetInt32());
+    }
+
+    [Fact]
     public void Constructor_WhenActiveSecretGenerationIsMissing_ShouldRecoverCompleteLegacyBackup()
     {
         var legacyModel = new AiModelConfig
@@ -933,5 +1089,57 @@ public class AiConfigStoreTests : IDisposable
         Assert.Equal(2, document.RootElement.GetProperty("schemaVersion").GetInt32());
         var generationId = document.RootElement.GetProperty("generationId").GetString();
         Assert.True(Directory.Exists(Path.Combine(_testDir, "ai_model_secrets", generationId!)));
+    }
+
+    [Fact]
+    public void Constructor_WhenGenerationIdIsNotCanonicalGuid_ShouldFailWithoutPruningSecretGenerations()
+    {
+        var secretsRoot = Path.Combine(_testDir, "ai_model_secrets");
+        var sentinelGeneration = Guid.NewGuid().ToString("N");
+        var sentinelPath = Path.Combine(secretsRoot, sentinelGeneration, "sentinel.dpapi");
+        Directory.CreateDirectory(Path.GetDirectoryName(sentinelPath)!);
+        File.WriteAllText(sentinelPath, "must-survive-invalid-generation");
+
+        var invalidGenerationIds = new[]
+        {
+            ".",
+            "..",
+            "not-a-generation",
+            $"nested{Path.DirectorySeparatorChar}generation",
+            Path.GetFullPath(_testDir)
+        };
+
+        foreach (var invalidGenerationId in invalidGenerationIds)
+        {
+            File.WriteAllText(
+                _testModelsFile,
+                JsonSerializer.Serialize(new AiModelGenerationDocument
+                {
+                    GenerationId = invalidGenerationId,
+                    Models = new List<AiModelConfig>
+                    {
+                        new()
+                        {
+                            Id = "invalid-generation-model",
+                            Name = "Invalid Generation Model",
+                            Provider = "OpenAI Compatible",
+                            Model = "gpt-4o-mini",
+                            IsActive = true,
+                            IsEnabled = true
+                        }
+                    },
+                    SecretModelIds = new List<string>()
+                }, new JsonSerializerOptions
+                {
+                    PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+                    WriteIndented = true
+                }));
+
+            var failure = Assert.Throws<AiConfigPersistenceException>(() => CreateStore());
+
+            Assert.Equal("AI_MODEL_RECOVERY_FAILED", failure.ErrorCode);
+            Assert.True(File.Exists(sentinelPath));
+            Assert.Equal("must-survive-invalid-generation", File.ReadAllText(sentinelPath));
+        }
     }
 }

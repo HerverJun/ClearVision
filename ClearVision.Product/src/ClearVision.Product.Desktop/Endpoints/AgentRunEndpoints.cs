@@ -230,10 +230,12 @@ public static class AgentRunEndpoints
         request = request with { SessionId = session.SessionId };
 
         var runId = BuildPlanRunId(ownerHash, session.SessionId, request.ClientMutationId);
+        var requestFingerprint = ConversationalFlowService.ComputePlanRunRequestFingerprint(request);
         var initialPersistence = conversationService.TryInitializeWorkspaceSnapshot(ownerHash, session.SessionId, new VisionAgentWorkspaceSnapshotUpdate
         {
             ExpectedRevision = request.WorkspaceExpectedRevision,
             ClientMutationId = BuildPlanInitialMutationId(request.ClientMutationId),
+            MutationPayloadFingerprint = requestFingerprint,
             RequireExpectedRevisionWhenWorkspaceExists = true,
             LifecycleState = "planning",
             PlanRunId = runId,

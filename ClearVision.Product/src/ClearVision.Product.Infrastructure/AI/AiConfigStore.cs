@@ -370,6 +370,17 @@ public class AiConfigStore
                 return active;
             }
 
+            if (TryLoadLegacyModelList(_modelsFilePath, out var legacyModels, out var legacyError))
+            {
+                var generationId = PersistGeneration(legacyModels, "migrate_legacy_model_list");
+                CleanupSecretGenerationResidue(generationId);
+                _logger.LogInformation(
+                    "[AiConfigStore] Migrated {Count} legacy AI models into generation {GenerationId}",
+                    legacyModels.Count,
+                    generationId);
+                return new AiModelLoadResult(legacyModels, generationId);
+            }
+
             Exception? backupGenerationError = null;
             if (File.Exists(_modelsBackupFilePath) &&
                 TryLoadGenerationDocument(_modelsBackupFilePath, out var recovered, out backupGenerationError))
@@ -398,25 +409,14 @@ public class AiConfigStore
                 return new AiModelLoadResult(legacyBackupModels, generationId);
             }
 
-            if (TryLoadLegacyModelList(_modelsFilePath, out var legacyModels, out var legacyError))
-            {
-                var generationId = PersistGeneration(legacyModels, "migrate_legacy_model_list");
-                CleanupSecretGenerationResidue(generationId);
-                _logger.LogInformation(
-                    "[AiConfigStore] Migrated {Count} legacy AI models into generation {GenerationId}",
-                    legacyModels.Count,
-                    generationId);
-                return new AiModelLoadResult(legacyModels, generationId);
-            }
-
             throw new AiConfigPersistenceException(
                 "AI_MODEL_RECOVERY_FAILED",
                 "load",
                 new AggregateException(
                     activeError ?? new InvalidDataException("Active AI model document is invalid."),
+                    legacyError ?? new InvalidDataException("Legacy AI model document is invalid."),
                     backupGenerationError ?? new InvalidDataException("Previous AI model generation is invalid."),
-                    legacyBackupError ?? new InvalidDataException("Previous legacy AI model document is invalid."),
-                    legacyError ?? new InvalidDataException("Legacy AI model document is invalid.")));
+                    legacyBackupError ?? new InvalidDataException("Previous legacy AI model document is invalid.")));
         }
 
         if (File.Exists(_legacyConfigFilePath))
@@ -657,16 +657,23 @@ public class AiConfigStore
             var document = JsonSerializer.Deserialize<AiModelGenerationDocument>(json, JsonOptions)
                 ?? throw new JsonException("AI model generation document deserialized to null.");
             if (document.SchemaVersion != 2 ||
-                string.IsNullOrWhiteSpace(document.GenerationId) ||
-                document.Models.Count == 0)
+                document.Models == null ||
+                document.Models.Count == 0 ||
+                document.SecretModelIds == null)
             {
                 throw new InvalidDataException("AI model generation document is incomplete.");
             }
 
-            var secretDirectory = Path.Combine(_secretsRoot, document.GenerationId);
+            var generationId = NormalizeGenerationId(document.GenerationId);
+            var secretDirectory = ResolveSecretGenerationDirectory(generationId);
             if (!Directory.Exists(secretDirectory))
             {
                 throw new DirectoryNotFoundException("The referenced AI secret generation is unavailable.");
+            }
+
+            if ((File.GetAttributes(secretDirectory) & FileAttributes.ReparsePoint) != 0)
+            {
+                throw new InvalidDataException("The referenced AI secret generation directory is not authoritative.");
             }
 
             EnsureUniqueModelIds(document.Models);
@@ -702,7 +709,7 @@ public class AiConfigStore
                 model.ApiKey = apiKey;
             }
 
-            result = new AiModelLoadResult(document.Models, document.GenerationId);
+            result = new AiModelLoadResult(document.Models, generationId);
             error = null;
             return true;
         }
@@ -712,6 +719,31 @@ public class AiConfigStore
             error = ex;
             return false;
         }
+    }
+
+    private static string NormalizeGenerationId(string? generationId)
+    {
+        if (string.IsNullOrWhiteSpace(generationId) ||
+            !Guid.TryParseExact(generationId.Trim(), "N", out var parsed))
+        {
+            throw new InvalidDataException("AI model generation identifier is invalid.");
+        }
+
+        return parsed.ToString("N");
+    }
+
+    private string ResolveSecretGenerationDirectory(string generationId)
+    {
+        var canonicalRoot = Path.GetFullPath(_secretsRoot)
+            .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+        var candidate = Path.GetFullPath(Path.Combine(canonicalRoot, generationId));
+        var requiredPrefix = canonicalRoot + Path.DirectorySeparatorChar;
+        if (!candidate.StartsWith(requiredPrefix, StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidDataException("AI model secret generation path escaped its authority root.");
+        }
+
+        return candidate;
     }
 
     private bool TryLoadLegacyModelList(
@@ -776,20 +808,33 @@ public class AiConfigStore
 
     private void CleanupCandidateResidue()
     {
-        var storageDirectory = Path.GetDirectoryName(_modelsFilePath)!;
-        foreach (var path in Directory.EnumerateFiles(storageDirectory, "ai_models.json.*.candidate"))
+        try
         {
-            AiPersistenceFileOperations.TryDeleteFile(path);
-        }
+            var storageDirectory = Path.GetDirectoryName(_modelsFilePath)!;
+            _faultInjector.OnStage(
+                AiPersistenceStage.ModelCandidateCleanupStarted,
+                "ai_models",
+                storageDirectory);
+            foreach (var path in Directory.EnumerateFiles(storageDirectory, "ai_models.json.*.candidate"))
+            {
+                AiPersistenceFileOperations.TryDeleteFile(path);
+            }
 
-        if (!Directory.Exists(_secretsRoot))
-        {
-            return;
-        }
+            if (!Directory.Exists(_secretsRoot))
+            {
+                return;
+            }
 
-        foreach (var path in Directory.EnumerateDirectories(_secretsRoot, ".candidate-*"))
+            foreach (var path in Directory.EnumerateDirectories(_secretsRoot, ".candidate-*"))
+            {
+                AiPersistenceFileOperations.TryDeleteDirectory(path);
+            }
+        }
+        catch (Exception ex)
         {
-            AiPersistenceFileOperations.TryDeleteDirectory(path);
+            _logger.LogWarning(
+                ex,
+                "[AiConfigStore] Non-authoritative AI model candidate cleanup will be retried on a later mutation or restart.");
         }
     }
 
@@ -799,10 +844,31 @@ public class AiConfigStore
         {
             _faultInjector.OnStage(AiPersistenceStage.CleanupStarted, "ai_models", _secretsRoot);
             string? backupGenerationId = null;
-            if (File.Exists(_modelsBackupFilePath) &&
-                TryLoadGenerationDocument(_modelsBackupFilePath, out var backup, out _))
+            if (File.Exists(_modelsBackupFilePath))
             {
-                backupGenerationId = backup.GenerationId;
+                if (TryLoadGenerationDocument(
+                    _modelsBackupFilePath,
+                    out var backup,
+                    out var backupGenerationError))
+                {
+                    backupGenerationId = backup.GenerationId;
+                }
+                else if (!TryLoadLegacyModelList(
+                    _modelsBackupFilePath,
+                    out _,
+                    out var legacyBackupError))
+                {
+                    // A transient sharing/permission/DPAPI failure must not turn an otherwise
+                    // recoverable previous document into a permanently mixed generation by
+                    // deleting the secrets it may still reference. Defer all generation pruning
+                    // until the previous document can be classified and validated again.
+                    _logger.LogWarning(
+                        new AggregateException(
+                            backupGenerationError ?? new InvalidDataException("Previous AI model generation is not readable."),
+                            legacyBackupError ?? new InvalidDataException("Previous legacy AI model document is not readable.")),
+                        "[AiConfigStore] Deferred secret generation cleanup because the previous AI model document could not be verified.");
+                    return;
+                }
             }
 
             foreach (var path in Directory.EnumerateDirectories(_secretsRoot))

@@ -144,13 +144,17 @@ public class AIGeneratedFlowVersionManagerTests : IDisposable
     public async Task ConcurrentFlowSaves_ShouldPersistEveryVersionWithUniqueMonotonicNumber()
     {
         var tempDir = CreateTempDir();
-        var sut = new AIGeneratedFlowVersionManager(tempDir);
+        var managers = new[]
+        {
+            new AIGeneratedFlowVersionManager(tempDir),
+            new AIGeneratedFlowVersionManager(tempDir)
+        };
         var flow = new OperatorFlow("Concurrent AI Flow");
         var prompt = new PromptVersionInfo { VersionId = Guid.NewGuid(), Name = "Prompt V1" };
         var telemetry = new WorkflowTelemetry { TotalTimeMs = 5, LLMTokenUsage = 3 };
 
         var tasks = Enumerable.Range(1, 24)
-            .Select(index => Task.Run(() => sut.SaveVersionAsync(
+            .Select(index => Task.Run(() => managers[index % managers.Length].SaveVersionAsync(
                 flow,
                 $"req-{index}",
                 prompt,
@@ -172,11 +176,15 @@ public class AIGeneratedFlowVersionManagerTests : IDisposable
     public async Task ConcurrentScenarioSaves_ShouldLoseNoRecordsAndKeepExactlyOneActiveArtifact()
     {
         var tempDir = CreateTempDir();
-        var sut = new AIGeneratedFlowVersionManager(tempDir);
+        var managers = new[]
+        {
+            new AIGeneratedFlowVersionManager(tempDir),
+            new AIGeneratedFlowVersionManager(tempDir)
+        };
         const string scenarioKey = "concurrent-scenario";
 
         var tasks = Enumerable.Range(1, 16)
-            .Select(index => Task.Run(() => sut.SaveScenarioArtifactVersionAsync(
+            .Select(index => Task.Run(() => managers[index % managers.Length].SaveScenarioArtifactVersionAsync(
                 scenarioKey,
                 ScenarioArtifactType.Model,
                 "shared-model",
@@ -197,8 +205,9 @@ public class AIGeneratedFlowVersionManagerTests : IDisposable
     {
         var tempDir = CreateTempDir();
         var faultInjector = new AiPersistenceTestFaultInjector();
-        var sut = new AIGeneratedFlowVersionManager(tempDir, faultInjector);
-        var first = await sut.SaveScenarioArtifactVersionAsync(
+        var activationManager = new AIGeneratedFlowVersionManager(tempDir, faultInjector);
+        var saveManager = new AIGeneratedFlowVersionManager(tempDir);
+        var first = await activationManager.SaveScenarioArtifactVersionAsync(
             "barrier-scenario",
             ScenarioArtifactType.Model,
             "model",
@@ -206,6 +215,7 @@ public class AIGeneratedFlowVersionManagerTests : IDisposable
             "models/one.onnx");
         using var candidateEntered = new ManualResetEventSlim(false);
         using var releaseCandidate = new ManualResetEventSlim(false);
+        using var saveStarted = new ManualResetEventSlim(false);
         var blocked = 0;
         faultInjector.SetHandler((stage, authority, _) =>
         {
@@ -218,15 +228,19 @@ public class AIGeneratedFlowVersionManagerTests : IDisposable
             }
         });
 
-        var activate = Task.Run(() => sut.MarkScenarioArtifactActiveAsync(first.Id));
+        var activate = Task.Run(() => activationManager.MarkScenarioArtifactActiveAsync(first.Id));
         candidateEntered.Wait(TimeSpan.FromSeconds(5)).Should().BeTrue();
-        var save = Task.Run(() => sut.SaveScenarioArtifactVersionAsync(
-            "barrier-scenario",
-            ScenarioArtifactType.Model,
-            "model",
-            "1.1.0",
-            "models/two.onnx"));
-        await Task.Delay(100);
+        var save = Task.Run(async () =>
+        {
+            saveStarted.Set();
+            await saveManager.SaveScenarioArtifactVersionAsync(
+                "barrier-scenario",
+                ScenarioArtifactType.Model,
+                "model",
+                "1.1.0",
+                "models/two.onnx");
+        });
+        saveStarted.Wait(TimeSpan.FromSeconds(5)).Should().BeTrue();
         save.IsCompleted.Should().BeFalse();
         releaseCandidate.Set();
         await Task.WhenAll(activate, save);
@@ -259,6 +273,42 @@ public class AIGeneratedFlowVersionManagerTests : IDisposable
         File.ReadAllText(filePath).Should().Be(before);
         var history = await new AIGeneratedFlowVersionManager(tempDir).GetFlowHistoryAsync(flow.Id);
         history.Should().ContainSingle(item => item.UserRequirement == "baseline");
+        Directory.EnumerateFiles(tempDir, "ai_flow_versions.json.*.candidate").Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task Restart_AroundFlowCommitInterruption_ShouldChooseCompleteOldOrNewDocument()
+    {
+        var tempDir = CreateTempDir();
+        var beforeCommitFault = new AiPersistenceTestFaultInjector();
+        var flow = new OperatorFlow("Interrupted Flow");
+        var prompt = new PromptVersionInfo { VersionId = Guid.NewGuid(), Name = "Prompt" };
+        var telemetry = new WorkflowTelemetry();
+        var firstManager = new AIGeneratedFlowVersionManager(tempDir, beforeCommitFault);
+        var baseline = await firstManager.SaveVersionAsync(flow, "baseline", prompt, "OpenAI", telemetry);
+        beforeCommitFault.FailOnce(
+            AiPersistenceStage.JsonCommitStarted,
+            static () => new AiPersistenceInterruptionException("before_flow_commit"));
+
+        var beforeAct = () => firstManager.SaveVersionAsync(flow, "candidate", prompt, "OpenAI", telemetry);
+        await beforeAct.Should().ThrowAsync<AiPersistenceInterruptionException>();
+        var oldRestart = new AIGeneratedFlowVersionManager(tempDir);
+        (await oldRestart.GetFlowHistoryAsync(flow.Id)).Should().ContainSingle(item => item.Id == baseline.Id);
+
+        var afterCommitFault = new AiPersistenceTestFaultInjector();
+        var secondManager = new AIGeneratedFlowVersionManager(tempDir, afterCommitFault);
+        afterCommitFault.FailOnce(
+            AiPersistenceStage.JsonCommitCompleted,
+            static () => new AiPersistenceInterruptionException("after_flow_commit"));
+        var afterAct = () => secondManager.SaveVersionAsync(flow, "committed", prompt, "OpenAI", telemetry);
+        await afterAct.Should().ThrowAsync<AiPersistenceInterruptionException>();
+
+        var newRestart = new AIGeneratedFlowVersionManager(tempDir);
+        var history = await newRestart.GetFlowHistoryAsync(flow.Id);
+        history.Should().HaveCount(2);
+        history.Select(item => item.VersionNumber).Should().Equal(2, 1);
+        history.Should().ContainSingle(item => item.Id == baseline.Id);
+        history.Should().ContainSingle(item => item.UserRequirement == "committed");
         Directory.EnumerateFiles(tempDir, "ai_flow_versions.json.*.candidate").Should().BeEmpty();
     }
 

@@ -1,10 +1,13 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Data;
 using System.Data.Common;
 using System.IO;
 using System.IO.Compression;
 using System.Linq;
+using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
@@ -17,11 +20,111 @@ using Microsoft.Extensions.Logging;
 
 namespace ClearVision.Product.Desktop.Data;
 
+internal enum VisionDatabaseMaintenanceStage
+{
+    OperationEntered,
+    StatusRead,
+    BackupStarted,
+    BackupDatabaseCandidate,
+    BackupPackageCandidate,
+    BackupCommit,
+    RestoreExtract,
+    RestoreCandidateValidated,
+    SafetyBackupCreated,
+    RecoveryMarkerWrite,
+    RecoveryMarkerPrepared,
+    DatabaseReplace,
+    DatabaseReplaced,
+    PackageReplace,
+    PackagePreviousMoved,
+    PackageReplaced,
+    RestoreVerified,
+    RecoveryMarkerCompleted,
+    RollbackStarted,
+    RollbackDatabase,
+    RollbackPackage,
+    RollbackCompleted,
+    RepairStarted,
+    CleanupStarted
+}
+
+internal interface IVisionDatabaseMaintenanceFaultInjector
+{
+    void OnStage(VisionDatabaseMaintenanceStage stage, string databasePath, string operationId);
+}
+
+internal sealed class NoOpVisionDatabaseMaintenanceFaultInjector : IVisionDatabaseMaintenanceFaultInjector
+{
+    public static NoOpVisionDatabaseMaintenanceFaultInjector Instance { get; } = new();
+
+    private NoOpVisionDatabaseMaintenanceFaultInjector()
+    {
+    }
+
+    public void OnStage(VisionDatabaseMaintenanceStage stage, string databasePath, string operationId)
+    {
+    }
+}
+
+internal sealed class VisionDatabaseMaintenanceInterruptionException : IOException
+{
+    public VisionDatabaseMaintenanceInterruptionException(string stage)
+        : base($"Simulated database maintenance interruption at {stage}.")
+    {
+    }
+}
+
+public sealed class VisionDatabaseMaintenanceException : Exception
+{
+    internal VisionDatabaseMaintenanceException(
+        string errorCode,
+        string stage,
+        bool retryable,
+        bool recoveryRequired,
+        bool interruption,
+        Exception innerException)
+        : base("Vision database maintenance could not complete safely.", innerException)
+    {
+        ErrorCode = errorCode;
+        Stage = stage;
+        Retryable = retryable;
+        RecoveryRequired = recoveryRequired;
+        Interruption = interruption;
+    }
+
+    public string ErrorCode { get; }
+
+    public string Stage { get; }
+
+    public bool Retryable { get; }
+
+    public bool RecoveryRequired { get; }
+
+    public string PublicMessage => RecoveryRequired
+        ? "Database maintenance recovery is required. No further maintenance operation will access the uncertain database until recovery succeeds."
+        : "Database maintenance did not complete. The previous durable database and package set remains authoritative unless recovery is reported as required.";
+
+    internal bool Interruption { get; }
+}
+
 public sealed class VisionDatabaseMaintenanceService
 {
+    private const int RecoveryMarkerSchemaVersion = 1;
+    private const string RecoveryStatePrepared = "Prepared";
+    private const string RecoveryStateDatabaseReplaced = "DatabaseReplaced";
+    private const string RecoveryStatePackageReplaced = "PackageReplaced";
+    private const string RecoveryStateCompleted = "Completed";
+    private const string RecoveryStateRecoveryRequired = "RecoveryRequired";
+
+    private static readonly ConcurrentDictionary<string, SemaphoreSlim> MaintenanceGates =
+        new(StringComparer.OrdinalIgnoreCase);
+
     private readonly IServiceScopeFactory _scopeFactory;
     private readonly ILogger<VisionDatabaseMaintenanceService> _logger;
     private readonly VisionDatabaseMaintenanceOptions _options;
+    private readonly IVisionDatabaseMaintenanceFaultInjector _faultInjector;
+    private readonly ConcurrentDictionary<string, byte> _locallyFencedDatabasePaths =
+        new(StringComparer.OrdinalIgnoreCase);
 
     public VisionDatabaseMaintenanceService(
         IServiceScopeFactory scopeFactory,
@@ -34,49 +137,84 @@ public sealed class VisionDatabaseMaintenanceService
         IServiceScopeFactory scopeFactory,
         ILogger<VisionDatabaseMaintenanceService> logger,
         VisionDatabaseMaintenanceOptions options)
+        : this(scopeFactory, logger, options, NoOpVisionDatabaseMaintenanceFaultInjector.Instance)
+    {
+    }
+
+    internal VisionDatabaseMaintenanceService(
+        IServiceScopeFactory scopeFactory,
+        ILogger<VisionDatabaseMaintenanceService> logger,
+        VisionDatabaseMaintenanceOptions options,
+        IVisionDatabaseMaintenanceFaultInjector faultInjector)
     {
         _scopeFactory = scopeFactory;
         _logger = logger;
         _options = options;
+        _faultInjector = faultInjector;
     }
 
     public async Task<VisionDatabaseStatus> GetStatusAsync(CancellationToken cancellationToken = default)
     {
-        await using var scope = _scopeFactory.CreateAsyncScope();
-        var dbContext = scope.ServiceProvider.GetRequiredService<VisionDbContext>();
-
-        try
-        {
-            return await BuildStatusAsync(dbContext, runIntegrityCheck: true, cancellationToken);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogWarning(ex, "Failed to build Vision database status.");
-            return new VisionDatabaseStatus
-            {
-                DatabasePath = VisionDatabaseMaintenance.GetDatabasePath(dbContext.Database.GetDbConnection()),
-                Exists = false,
-                State = VisionDatabaseState.Error,
-                Issues = [ex.Message],
-                CurrentSchemaVersion = VisionDatabaseMaintenance.CurrentSqliteSchemaVersion
-            };
-        }
+        return await ExecuteUnderMaintenanceGateAsync(
+            (databasePath, token) => GetStatusCoreAsync(databasePath, token),
+            cancellationToken);
     }
 
     public async Task<VisionDatabaseBackupResult> CreateBackupAsync(
         string? reason = null,
         CancellationToken cancellationToken = default)
     {
+        return await ExecuteUnderMaintenanceGateAsync(
+            (databasePath, token) => CreateBackupCoreAsync(databasePath, reason, token),
+            cancellationToken);
+    }
+
+    private async Task<VisionDatabaseStatus> GetStatusCoreAsync(
+        string databasePath,
+        CancellationToken cancellationToken)
+    {
         await using var scope = _scopeFactory.CreateAsyncScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<VisionDbContext>();
-        var databasePath = VisionDatabaseMaintenance.GetDatabasePath(dbContext.Database.GetDbConnection());
-        ValidateFileBackedDatabase(databasePath);
+        try
+        {
+            return await RunStageAsync(
+                VisionDatabaseMaintenanceStage.StatusRead,
+                databasePath,
+                string.Empty,
+                () => BuildStatusAsync(dbContext, runIntegrityCheck: true, cancellationToken));
+        }
+        catch (VisionDatabaseMaintenanceException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to build Vision database status.");
+            throw CreateMaintenanceException(VisionDatabaseMaintenanceStage.StatusRead, ex);
+        }
+    }
 
-        Directory.CreateDirectory(_options.BackupRootDirectory);
+    private async Task<VisionDatabaseBackupResult> CreateBackupCoreAsync(
+        string databasePath,
+        string? reason,
+        CancellationToken cancellationToken)
+    {
+        ValidateFileBackedDatabase(databasePath);
+        var operationId = Guid.NewGuid().ToString("N");
+
+        RunStage(
+            VisionDatabaseMaintenanceStage.BackupStarted,
+            databasePath,
+            operationId,
+            () =>
+            {
+                Directory.CreateDirectory(_options.BackupRootDirectory);
+            });
         var timestamp = DateTimeOffset.UtcNow;
         var backupPath = Path.Combine(
             _options.BackupRootDirectory,
             $"clearvision-db-{timestamp:yyyyMMdd-HHmmss}-{Guid.NewGuid():N}.cvdbbak");
+        var backupCandidatePath = backupPath + "." + Guid.NewGuid().ToString("N") + ".candidate";
         var tempRoot = Path.Combine(Path.GetTempPath(), "ClearVisionDatabaseBackups", Guid.NewGuid().ToString("N"));
 
         try
@@ -86,14 +224,22 @@ public sealed class VisionDatabaseMaintenanceService
             Directory.CreateDirectory(tempDatabaseDirectory);
             var tempDatabasePath = Path.Combine(tempDatabaseDirectory, "vision.db");
 
-            await BackupSqliteDatabaseAsync(databasePath, tempDatabasePath, cancellationToken);
+            await RunVoidStageAsync(
+                VisionDatabaseMaintenanceStage.BackupDatabaseCandidate,
+                databasePath,
+                operationId,
+                () => BackupSqliteDatabaseAsync(databasePath, tempDatabasePath, cancellationToken));
 
             var packageFileCount = 0;
             var packageBytes = 0L;
             if (Directory.Exists(_options.PackageRootDirectory))
             {
                 var packageBackupDirectory = Path.Combine(tempRoot, "packages");
-                CopyDirectory(_options.PackageRootDirectory, packageBackupDirectory);
+                RunStage(
+                    VisionDatabaseMaintenanceStage.BackupPackageCandidate,
+                    databasePath,
+                    operationId,
+                    () => CopyDirectory(_options.PackageRootDirectory, packageBackupDirectory));
                 foreach (var file in Directory.EnumerateFiles(packageBackupDirectory, "*", SearchOption.AllDirectories))
                 {
                     cancellationToken.ThrowIfCancellationRequested();
@@ -110,14 +256,32 @@ public sealed class VisionDatabaseMaintenanceService
                 SchemaVersion = await VisionDatabaseMaintenance.GetUserVersionForPathAsync(tempDatabasePath, cancellationToken),
                 CurrentSchemaVersion = VisionDatabaseMaintenance.CurrentSqliteSchemaVersion,
                 PackageRootDirectory = _options.PackageRootDirectory,
+                PackageRootExisted = Directory.Exists(_options.PackageRootDirectory),
                 PackageFileCount = packageFileCount
             };
-            await File.WriteAllTextAsync(
-                Path.Combine(tempRoot, "manifest.json"),
-                JsonSerializer.Serialize(manifest, VisionDatabaseMaintenance.JsonOptions),
-                cancellationToken);
+            RunStage(
+                VisionDatabaseMaintenanceStage.BackupPackageCandidate,
+                databasePath,
+                operationId,
+                () => WriteAllBytesDurable(
+                    Path.Combine(tempRoot, "manifest.json"),
+                    JsonSerializer.SerializeToUtf8Bytes(manifest, VisionDatabaseMaintenance.JsonOptions)));
 
-            ZipFile.CreateFromDirectory(tempRoot, backupPath, CompressionLevel.Optimal, includeBaseDirectory: false);
+            RunStage(
+                VisionDatabaseMaintenanceStage.BackupCommit,
+                databasePath,
+                operationId,
+                () =>
+                {
+                    ZipFile.CreateFromDirectory(
+                        tempRoot,
+                        backupCandidatePath,
+                        CompressionLevel.Optimal,
+                        includeBaseDirectory: false);
+                    FlushExistingFile(backupCandidatePath);
+                    File.Move(backupCandidatePath, backupPath);
+                    FlushExistingFile(backupPath);
+                });
             var backupFile = new FileInfo(backupPath);
             return new VisionDatabaseBackupResult
             {
@@ -129,9 +293,22 @@ public sealed class VisionDatabaseMaintenanceService
                 PackageBytes = packageBytes
             };
         }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (VisionDatabaseMaintenanceException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            throw CreateMaintenanceException(VisionDatabaseMaintenanceStage.BackupStarted, ex);
+        }
         finally
         {
-            DeleteDirectoryIfExists(tempRoot);
+            TryDeleteDirectory(tempRoot);
+            TryDeleteFile(backupCandidatePath);
         }
     }
 
@@ -150,38 +327,69 @@ public sealed class VisionDatabaseMaintenanceService
             throw new FileNotFoundException("Database backup file was not found.", fullBackupPath);
         }
 
-        await using var scope = _scopeFactory.CreateAsyncScope();
-        var dbContext = scope.ServiceProvider.GetRequiredService<VisionDbContext>();
-        var databasePath = VisionDatabaseMaintenance.GetDatabasePath(dbContext.Database.GetDbConnection());
-        ValidateFileBackedDatabase(databasePath);
+        return await ExecuteUnderMaintenanceGateAsync(
+            (databasePath, token) => RestoreBackupCoreAsync(databasePath, fullBackupPath, token),
+            cancellationToken);
+    }
 
-        var tempRoot = Path.Combine(Path.GetTempPath(), "ClearVisionDatabaseRestore", Guid.NewGuid().ToString("N"));
+    private async Task<VisionDatabaseRestoreResult> RestoreBackupCoreAsync(
+        string databasePath,
+        string fullBackupPath,
+        CancellationToken cancellationToken)
+    {
+        ValidateFileBackedDatabase(databasePath);
+        if (!File.Exists(fullBackupPath))
+        {
+            throw new FileNotFoundException("Database backup file was not found.", fullBackupPath);
+        }
+
+        if (PathsReferToSameFile(fullBackupPath, databasePath))
+        {
+            throw new InvalidOperationException("Cannot restore the live database file onto itself.");
+        }
+
+        var operationId = Guid.NewGuid().ToString("N");
+        var recoveryDirectory = GetRecoveryDirectory(operationId);
+        VisionDatabaseRecoveryMarker? marker = null;
+        var markerPersisted = false;
+        var commitCompleted = false;
+        var completed = false;
 
         try
         {
-            Directory.CreateDirectory(tempRoot);
+            Directory.CreateDirectory(recoveryDirectory);
             var extension = Path.GetExtension(fullBackupPath);
             string restoredDatabasePath;
             string? restoredPackagesRoot = null;
+            var replacePackages = false;
 
             if (string.Equals(extension, ".db", StringComparison.OrdinalIgnoreCase) ||
                 string.Equals(extension, ".sqlite", StringComparison.OrdinalIgnoreCase))
             {
-                if (PathsReferToSameFile(fullBackupPath, databasePath))
-                {
-                    throw new InvalidOperationException("Cannot restore the live database file onto itself.");
-                }
-
-                var tempDatabaseDirectory = Path.Combine(tempRoot, "db");
+                var tempDatabaseDirectory = Path.Combine(recoveryDirectory, "db");
                 Directory.CreateDirectory(tempDatabaseDirectory);
                 restoredDatabasePath = Path.Combine(tempDatabaseDirectory, "vision.db");
-                await BackupSqliteDatabaseAsync(fullBackupPath, restoredDatabasePath, cancellationToken);
+                Checkpoint(VisionDatabaseMaintenanceStage.RestoreExtract, databasePath, operationId);
+                try
+                {
+                    await BackupSqliteDatabaseAsync(fullBackupPath, restoredDatabasePath, cancellationToken);
+                }
+                catch (SqliteException ex)
+                {
+                    throw new InvalidDataException("The database backup is not a readable SQLite database.", ex);
+                }
             }
             else
             {
-                ExtractZipSafely(fullBackupPath, tempRoot);
-                restoredDatabasePath = Path.Combine(tempRoot, "db", "vision.db");
-                restoredPackagesRoot = Path.Combine(tempRoot, "packages");
+                Checkpoint(VisionDatabaseMaintenanceStage.RestoreExtract, databasePath, operationId);
+                ExtractZipSafely(fullBackupPath, recoveryDirectory);
+                restoredDatabasePath = Path.Combine(recoveryDirectory, "db", "vision.db");
+                restoredPackagesRoot = Path.Combine(recoveryDirectory, "packages");
+                replacePackages = true;
+                if (!Directory.Exists(restoredPackagesRoot))
+                {
+                    Directory.CreateDirectory(restoredPackagesRoot);
+                }
             }
 
             if (!File.Exists(restoredDatabasePath))
@@ -189,51 +397,136 @@ public sealed class VisionDatabaseMaintenanceService
                 throw new InvalidOperationException("Backup does not contain db/vision.db.");
             }
 
-            var safetyBackup = await CreateBackupAsync("pre-restore", cancellationToken);
-            await dbContext.Database.CloseConnectionAsync();
-            SqliteConnection.ClearAllPools();
+            await ValidateRestoreCandidateAsync(restoredDatabasePath, cancellationToken);
+            Checkpoint(VisionDatabaseMaintenanceStage.RestoreCandidateValidated, databasePath, operationId);
 
-            foreach (var path in VisionDatabaseMaintenance.GetSqliteDatabaseFiles(databasePath))
+            var packageRootExisted = Directory.Exists(_options.PackageRootDirectory);
+            var safetyBackup = await CreateBackupCoreAsync(databasePath, "pre-restore", cancellationToken);
+            Checkpoint(VisionDatabaseMaintenanceStage.SafetyBackupCreated, databasePath, operationId);
+
+            marker = new VisionDatabaseRecoveryMarker
             {
-                cancellationToken.ThrowIfCancellationRequested();
-                if (File.Exists(path))
-                {
-                    File.Delete(path);
-                }
-            }
+                SchemaVersion = RecoveryMarkerSchemaVersion,
+                OperationId = operationId,
+                State = RecoveryStatePrepared,
+                DatabasePath = Path.GetFullPath(databasePath),
+                PackageRootDirectory = Path.GetFullPath(_options.PackageRootDirectory),
+                BackupRootDirectory = Path.GetFullPath(_options.BackupRootDirectory),
+                SourceBackupPath = fullBackupPath,
+                SourceBackupSha256 = ComputeFileSha256(fullBackupPath),
+                SafetyBackupPath = Path.GetFullPath(safetyBackup.BackupPath),
+                SafetyBackupSha256 = ComputeFileSha256(safetyBackup.BackupPath),
+                CandidateDatabaseSha256 = ComputeFileSha256(restoredDatabasePath),
+                CandidatePackagesSha256 = ComputeDirectorySha256(restoredPackagesRoot),
+                ReplacePackages = replacePackages,
+                PreviousPackageRootExisted = packageRootExisted,
+                PreparedAtUtc = DateTimeOffset.UtcNow
+            };
+            PersistRecoveryMarkerNoLock(marker, databasePath, VisionDatabaseMaintenanceStage.RecoveryMarkerWrite);
+            markerPersisted = true;
+            Checkpoint(VisionDatabaseMaintenanceStage.RecoveryMarkerPrepared, databasePath, operationId);
 
-            Directory.CreateDirectory(Path.GetDirectoryName(databasePath)!);
-            File.Copy(restoredDatabasePath, databasePath, overwrite: true);
+            RunStage(
+                VisionDatabaseMaintenanceStage.DatabaseReplace,
+                databasePath,
+                operationId,
+                () => EnsureFileHash(restoredDatabasePath, marker.CandidateDatabaseSha256),
+                injectFault: false);
+            PublishDatabaseCandidateNoLock(
+                restoredDatabasePath,
+                databasePath,
+                operationId,
+                marker.CandidateDatabaseSha256,
+                VisionDatabaseMaintenanceStage.DatabaseReplace,
+                injectFault: true);
+            marker.State = RecoveryStateDatabaseReplaced;
+            PersistRecoveryMarkerNoLock(marker, databasePath, VisionDatabaseMaintenanceStage.RecoveryMarkerWrite);
+            Checkpoint(VisionDatabaseMaintenanceStage.DatabaseReplaced, databasePath, operationId);
 
             var restoredPackageFileCount = 0;
-            if (!string.IsNullOrWhiteSpace(restoredPackagesRoot) && Directory.Exists(restoredPackagesRoot))
+            if (replacePackages)
             {
-                Directory.CreateDirectory(_options.PackageRootDirectory);
-                CopyDirectory(restoredPackagesRoot, _options.PackageRootDirectory);
+                RunStage(
+                    VisionDatabaseMaintenanceStage.PackageReplace,
+                    databasePath,
+                    operationId,
+                    () => EnsureDirectoryHash(restoredPackagesRoot!, marker.CandidatePackagesSha256),
+                    injectFault: false);
+                ReplacePackageRootNoLock(
+                    restoredPackagesRoot!,
+                    _options.PackageRootDirectory,
+                    databasePath,
+                    operationId,
+                    marker.CandidatePackagesSha256,
+                    VisionDatabaseMaintenanceStage.PackageReplace,
+                    injectFault: true);
                 restoredPackageFileCount = Directory
                     .EnumerateFiles(restoredPackagesRoot, "*", SearchOption.AllDirectories)
                     .Count();
             }
 
-            SqliteConnection.ClearAllPools();
-            await using (var verifyScope = _scopeFactory.CreateAsyncScope())
-            {
-                var verifyContext = verifyScope.ServiceProvider.GetRequiredService<VisionDbContext>();
-                await VisionDatabaseInitializer.InitializeAsync(verifyContext, cancellationToken);
-            }
+            marker.State = RecoveryStatePackageReplaced;
+            PersistRecoveryMarkerNoLock(marker, databasePath, VisionDatabaseMaintenanceStage.RecoveryMarkerWrite);
+            Checkpoint(VisionDatabaseMaintenanceStage.PackageReplaced, databasePath, operationId);
 
-            return new VisionDatabaseRestoreResult
+            var status = await VerifyPublishedDatabaseAsync(databasePath, cancellationToken);
+            Checkpoint(VisionDatabaseMaintenanceStage.RestoreVerified, databasePath, operationId);
+
+            marker.State = RecoveryStateCompleted;
+            marker.CompletedAtUtc = DateTimeOffset.UtcNow;
+            PersistRecoveryMarkerNoLock(marker, databasePath, VisionDatabaseMaintenanceStage.RecoveryMarkerWrite);
+            commitCompleted = true;
+            Checkpoint(VisionDatabaseMaintenanceStage.RecoveryMarkerCompleted, databasePath, operationId);
+            completed = true;
+
+            var result = new VisionDatabaseRestoreResult
             {
                 RestoredDatabasePath = databasePath,
                 BackupPath = fullBackupPath,
                 SafetyBackupPath = safetyBackup.BackupPath,
                 RestoredPackageFileCount = restoredPackageFileCount,
-                Status = await GetStatusAsync(cancellationToken)
+                Status = status
             };
+
+            CleanupCompletedRecoveryNoThrow(marker);
+            return result;
+        }
+        catch (Exception ex) when (!markerPersisted && IsDatabaseMaintenanceClientError(ex))
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            var failure = ToMaintenanceException(VisionDatabaseMaintenanceStage.RestoreVerified, ex);
+            if (!markerPersisted || marker == null || failure.Interruption || commitCompleted)
+            {
+                if (commitCompleted && !failure.Interruption)
+                {
+                    CleanupCompletedRecoveryNoThrow(marker!);
+                }
+
+                throw failure;
+            }
+
+            try
+            {
+                await RollbackFromSafetyBackupNoLock(marker, injectFault: true, CancellationToken.None);
+            }
+            catch (Exception rollbackFailure)
+            {
+                TryFenceRecoveryNoThrow(marker, databasePath);
+                _locallyFencedDatabasePaths.TryAdd(databasePath, 0);
+                throw CreateRecoveryRequiredException(rollbackFailure);
+            }
+
+            throw failure;
         }
         finally
         {
-            DeleteDirectoryIfExists(tempRoot);
+            if (!markerPersisted || completed)
+            {
+                TryDeleteDirectory(recoveryDirectory);
+            }
         }
     }
 
@@ -241,84 +534,958 @@ public sealed class VisionDatabaseMaintenanceService
         int retentionDays,
         CancellationToken cancellationToken = default)
     {
-        var normalizedRetentionDays = Math.Clamp(retentionDays, 1, 3650);
-        var cutoffUtc = DateTimeOffset.UtcNow.AddDays(-normalizedRetentionDays);
+        return await ExecuteUnderMaintenanceGateAsync(
+            (databasePath, token) => CleanupHistoryCoreAsync(databasePath, retentionDays, token),
+            cancellationToken);
+    }
 
-        await using var scope = _scopeFactory.CreateAsyncScope();
-        var dbContext = scope.ServiceProvider.GetRequiredService<VisionDbContext>();
-        var connection = dbContext.Database.GetDbConnection();
-        var shouldClose = connection.State != ConnectionState.Open;
-        if (shouldClose)
-        {
-            await connection.OpenAsync(cancellationToken);
-        }
-
+    private async Task<VisionDatabaseCleanupResult> CleanupHistoryCoreAsync(
+        string databasePath,
+        int retentionDays,
+        CancellationToken cancellationToken)
+    {
+        Checkpoint(VisionDatabaseMaintenanceStage.CleanupStarted, databasePath, string.Empty);
         try
         {
-            var deletedRows = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
-            deletedRows["Defects"] = await ExecuteDeleteAsync(
-                connection,
-                """
-                DELETE FROM "Defects"
-                WHERE "InspectionResultId" IN (
-                    SELECT "Id" FROM "InspectionResults" WHERE "InspectionTime" < $cutoffDateTime
-                );
-                """,
-                cutoffUtc,
-                cancellationToken);
-            deletedRows["InspectionResults"] = await ExecuteDeleteAsync(
-                connection,
-                """DELETE FROM "InspectionResults" WHERE "InspectionTime" < $cutoffDateTime;""",
-                cutoffUtc,
-                cancellationToken);
-            deletedRows["StationResultSummaries"] = await ExecuteDeleteAsync(
-                connection,
-                """DELETE FROM "StationResultSummaries" WHERE "CompletedAtUtc" < $cutoffDateTimeOffset;""",
-                cutoffUtc,
-                cancellationToken);
-            deletedRows["StationHealthSnapshots"] = await ExecuteDeleteAsync(
-                connection,
-                """DELETE FROM "StationHealthSnapshots" WHERE "CreatedAtUtc" < $cutoffDateTimeOffset;""",
-                cutoffUtc,
-                cancellationToken);
-            deletedRows["StationLogSummaries"] = await ExecuteDeleteAsync(
-                connection,
-                """DELETE FROM "StationLogSummaries" WHERE "TimestampUtc" < $cutoffDateTimeOffset;""",
-                cutoffUtc,
-                cancellationToken);
-            deletedRows["StationConnectionEvents"] = await ExecuteDeleteAsync(
-                connection,
-                """DELETE FROM "StationConnectionEvents" WHERE "CreatedAtUtc" < $cutoffDateTimeOffset;""",
-                cutoffUtc,
-                cancellationToken);
+            var normalizedRetentionDays = Math.Clamp(retentionDays, 1, 3650);
+            var cutoffUtc = DateTimeOffset.UtcNow.AddDays(-normalizedRetentionDays);
 
-            if (dbContext.Database.IsSqlite())
-            {
-                await dbContext.Database.ExecuteSqlRawAsync("PRAGMA wal_checkpoint(TRUNCATE);", cancellationToken);
-            }
-
-            return new VisionDatabaseCleanupResult
-            {
-                RetentionDays = normalizedRetentionDays,
-                CutoffUtc = cutoffUtc,
-                DeletedRows = deletedRows
-            };
-        }
-        finally
-        {
+            await using var scope = _scopeFactory.CreateAsyncScope();
+            var dbContext = scope.ServiceProvider.GetRequiredService<VisionDbContext>();
+            var connection = dbContext.Database.GetDbConnection();
+            var shouldClose = connection.State != ConnectionState.Open;
             if (shouldClose)
             {
-                await connection.CloseAsync();
+                await connection.OpenAsync(cancellationToken);
             }
+
+            try
+            {
+                var deletedRows = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+                deletedRows["Defects"] = await ExecuteDeleteAsync(
+                    connection,
+                    """
+                    DELETE FROM "Defects"
+                    WHERE "InspectionResultId" IN (
+                        SELECT "Id" FROM "InspectionResults" WHERE "InspectionTime" < $cutoffDateTime
+                    );
+                    """,
+                    cutoffUtc,
+                    cancellationToken);
+                deletedRows["InspectionResults"] = await ExecuteDeleteAsync(
+                    connection,
+                    """DELETE FROM "InspectionResults" WHERE "InspectionTime" < $cutoffDateTime;""",
+                    cutoffUtc,
+                    cancellationToken);
+                deletedRows["StationResultSummaries"] = await ExecuteDeleteAsync(
+                    connection,
+                    """DELETE FROM "StationResultSummaries" WHERE "CompletedAtUtc" < $cutoffDateTimeOffset;""",
+                    cutoffUtc,
+                    cancellationToken);
+                deletedRows["StationHealthSnapshots"] = await ExecuteDeleteAsync(
+                    connection,
+                    """DELETE FROM "StationHealthSnapshots" WHERE "CreatedAtUtc" < $cutoffDateTimeOffset;""",
+                    cutoffUtc,
+                    cancellationToken);
+                deletedRows["StationLogSummaries"] = await ExecuteDeleteAsync(
+                    connection,
+                    """DELETE FROM "StationLogSummaries" WHERE "TimestampUtc" < $cutoffDateTimeOffset;""",
+                    cutoffUtc,
+                    cancellationToken);
+                deletedRows["StationConnectionEvents"] = await ExecuteDeleteAsync(
+                    connection,
+                    """DELETE FROM "StationConnectionEvents" WHERE "CreatedAtUtc" < $cutoffDateTimeOffset;""",
+                    cutoffUtc,
+                    cancellationToken);
+
+                if (dbContext.Database.IsSqlite())
+                {
+                    await dbContext.Database.ExecuteSqlRawAsync("PRAGMA wal_checkpoint(TRUNCATE);", cancellationToken);
+                }
+
+                return new VisionDatabaseCleanupResult
+                {
+                    RetentionDays = normalizedRetentionDays,
+                    CutoffUtc = cutoffUtc,
+                    DeletedRows = deletedRows
+                };
+            }
+            finally
+            {
+                if (shouldClose)
+                {
+                    await connection.CloseAsync();
+                }
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (VisionDatabaseMaintenanceException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            throw CreateMaintenanceException(VisionDatabaseMaintenanceStage.CleanupStarted, ex);
         }
     }
 
     public async Task<VisionDatabaseStatus> RepairAsync(CancellationToken cancellationToken = default)
     {
+        return await ExecuteUnderMaintenanceGateAsync(
+            (databasePath, token) => RepairCoreAsync(databasePath, token),
+            cancellationToken);
+    }
+
+    private async Task<VisionDatabaseStatus> RepairCoreAsync(
+        string databasePath,
+        CancellationToken cancellationToken)
+    {
+        Checkpoint(VisionDatabaseMaintenanceStage.RepairStarted, databasePath, string.Empty);
         await using var scope = _scopeFactory.CreateAsyncScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<VisionDbContext>();
-        await VisionDatabaseInitializer.InitializeAsync(dbContext, cancellationToken);
-        return await GetStatusAsync(cancellationToken);
+        await RunVoidStageAsync(
+            VisionDatabaseMaintenanceStage.RepairStarted,
+            databasePath,
+            string.Empty,
+            () => VisionDatabaseInitializer.InitializeAsync(dbContext, cancellationToken));
+        return await GetStatusCoreAsync(databasePath, cancellationToken);
+    }
+
+    private async Task<T> ExecuteUnderMaintenanceGateAsync<T>(
+        Func<string, CancellationToken, Task<T>> operation,
+        CancellationToken cancellationToken)
+    {
+        var databasePath = Path.GetFullPath(ResolveDatabasePath());
+        ValidateFileBackedDatabase(databasePath);
+        var gate = MaintenanceGates.GetOrAdd(databasePath, static _ => new SemaphoreSlim(1, 1));
+        await gate.WaitAsync(cancellationToken);
+        try
+        {
+            if (_locallyFencedDatabasePaths.ContainsKey(databasePath))
+            {
+                throw CreateRecoveryRequiredException(
+                    new InvalidOperationException("This maintenance service instance is fenced pending restart recovery."));
+            }
+
+            Checkpoint(VisionDatabaseMaintenanceStage.OperationEntered, databasePath, string.Empty);
+            await RecoverPendingMaintenanceNoLock(databasePath, CancellationToken.None);
+            return await operation(databasePath, cancellationToken);
+        }
+        finally
+        {
+            gate.Release();
+        }
+    }
+
+    private string ResolveDatabasePath()
+    {
+        using var scope = _scopeFactory.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<VisionDbContext>();
+        return VisionDatabaseMaintenance.GetDatabasePath(dbContext.Database.GetDbConnection());
+    }
+
+    private async Task RecoverPendingMaintenanceNoLock(
+        string databasePath,
+        CancellationToken cancellationToken)
+    {
+        VisionDatabaseRecoveryMarker? marker;
+        try
+        {
+            marker = ReadRecoveryMarkerNoLock(databasePath);
+        }
+        catch
+        {
+            _locallyFencedDatabasePaths.TryAdd(databasePath, 0);
+            throw;
+        }
+
+        if (marker == null)
+        {
+            return;
+        }
+
+        if (string.Equals(marker.State, RecoveryStateCompleted, StringComparison.Ordinal))
+        {
+            CleanupCompletedRecoveryNoThrow(marker);
+            return;
+        }
+
+        try
+        {
+            await RollbackFromSafetyBackupNoLock(marker, injectFault: true, cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            TryFenceRecoveryNoThrow(marker, databasePath);
+            _locallyFencedDatabasePaths.TryAdd(databasePath, 0);
+            throw CreateRecoveryRequiredException(ex);
+        }
+    }
+
+    private async Task RollbackFromSafetyBackupNoLock(
+        VisionDatabaseRecoveryMarker marker,
+        bool injectFault,
+        CancellationToken cancellationToken)
+    {
+        Checkpoint(
+            VisionDatabaseMaintenanceStage.RollbackStarted,
+            marker.DatabasePath,
+            marker.OperationId,
+            injectFault);
+        EnsureFileHash(marker.SafetyBackupPath, marker.SafetyBackupSha256);
+
+        var rollbackDirectory = Path.Combine(
+            GetRecoveryDirectory(marker.OperationId),
+            "rollback-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            Directory.CreateDirectory(rollbackDirectory);
+            RunStage(
+                VisionDatabaseMaintenanceStage.RollbackStarted,
+                marker.DatabasePath,
+                marker.OperationId,
+                () => ExtractZipSafely(marker.SafetyBackupPath, rollbackDirectory),
+                injectFault);
+            var rollbackDatabasePath = Path.Combine(rollbackDirectory, "db", "vision.db");
+            if (!File.Exists(rollbackDatabasePath))
+            {
+                throw new InvalidDataException("Safety backup does not contain a database candidate.");
+            }
+
+            await ValidateRestoreCandidateAsync(rollbackDatabasePath, cancellationToken);
+            var rollbackDatabaseSha256 = ComputeFileSha256(rollbackDatabasePath);
+            PublishDatabaseCandidateNoLock(
+                rollbackDatabasePath,
+                marker.DatabasePath,
+                marker.OperationId,
+                rollbackDatabaseSha256,
+                VisionDatabaseMaintenanceStage.RollbackDatabase,
+                injectFault);
+
+            var rollbackPackagesPath = Path.Combine(rollbackDirectory, "packages");
+            if (marker.PreviousPackageRootExisted)
+            {
+                if (!Directory.Exists(rollbackPackagesPath))
+                {
+                    Directory.CreateDirectory(rollbackPackagesPath);
+                }
+
+                ReplacePackageRootNoLock(
+                    rollbackPackagesPath,
+                    marker.PackageRootDirectory,
+                    marker.DatabasePath,
+                    marker.OperationId,
+                    ComputeDirectorySha256(rollbackPackagesPath),
+                    VisionDatabaseMaintenanceStage.RollbackPackage,
+                    injectFault);
+            }
+            else
+            {
+                RemovePackageRootNoLock(
+                    marker.PackageRootDirectory,
+                    marker.DatabasePath,
+                    marker.OperationId,
+                    injectFault);
+            }
+
+            await VerifyPublishedDatabaseAsync(marker.DatabasePath, cancellationToken);
+            Checkpoint(
+                VisionDatabaseMaintenanceStage.RollbackCompleted,
+                marker.DatabasePath,
+                marker.OperationId,
+                injectFault);
+            RunStage(
+                VisionDatabaseMaintenanceStage.RollbackCompleted,
+                marker.DatabasePath,
+                marker.OperationId,
+                () =>
+                {
+                    var markerPath = GetRecoveryMarkerPath(marker.DatabasePath);
+                    if (File.Exists(markerPath))
+                    {
+                        File.Delete(markerPath);
+                    }
+                },
+                injectFault);
+            TryDeleteDirectory(GetRecoveryDirectory(marker.OperationId));
+        }
+        finally
+        {
+            TryDeleteDirectory(rollbackDirectory);
+        }
+    }
+
+    private async Task ValidateRestoreCandidateAsync(
+        string candidateDatabasePath,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            await using var connection = new SqliteConnection(
+                VisionDatabaseMaintenance.CreateSqliteConnectionString(candidateDatabasePath, pooling: false));
+            await connection.OpenAsync(cancellationToken);
+            var integrity = await VisionDatabaseMaintenance.RunIntegrityCheckAsync(connection, cancellationToken);
+            if (!string.Equals(integrity, "ok", StringComparison.OrdinalIgnoreCase))
+            {
+                throw new InvalidDataException("The backup database failed its integrity check.");
+            }
+        }
+        catch (InvalidDataException)
+        {
+            throw;
+        }
+        catch (SqliteException ex)
+        {
+            throw new InvalidDataException("The backup database is not a valid SQLite database.", ex);
+        }
+    }
+
+    private async Task<VisionDatabaseStatus> VerifyPublishedDatabaseAsync(
+        string databasePath,
+        CancellationToken cancellationToken)
+    {
+        SqliteConnection.ClearAllPools();
+        await using (var scope = _scopeFactory.CreateAsyncScope())
+        {
+            var context = scope.ServiceProvider.GetRequiredService<VisionDbContext>();
+            await RunVoidStageAsync(
+                VisionDatabaseMaintenanceStage.RestoreVerified,
+                databasePath,
+                string.Empty,
+                () => VisionDatabaseInitializer.InitializeAsync(context, cancellationToken),
+                injectFault: false);
+        }
+
+        var status = await GetStatusCoreAsync(databasePath, cancellationToken);
+        if (!string.Equals(status.State, VisionDatabaseState.Healthy, StringComparison.Ordinal))
+        {
+            throw new InvalidDataException("The published database did not verify as healthy.");
+        }
+
+        return status;
+    }
+
+    private void PublishDatabaseCandidateNoLock(
+        string candidateDatabasePath,
+        string databasePath,
+        string operationId,
+        string expectedCandidateSha256,
+        VisionDatabaseMaintenanceStage stage,
+        bool injectFault)
+    {
+        var bytes = File.ReadAllBytes(candidateDatabasePath);
+        var tempPath = databasePath + ".maintenance-" + operationId + "." + Guid.NewGuid().ToString("N") + ".candidate";
+        try
+        {
+            RunStage(
+                stage,
+                databasePath,
+                operationId,
+                () =>
+                {
+                    Directory.CreateDirectory(Path.GetDirectoryName(databasePath)!);
+                    WriteAllBytesDurable(tempPath, bytes);
+                    EnsureFileHash(tempPath, expectedCandidateSha256);
+                    SqliteConnection.ClearAllPools();
+                    foreach (var sidecarPath in VisionDatabaseMaintenance
+                        .GetSqliteDatabaseFiles(databasePath)
+                        .Where(path => !string.Equals(path, databasePath, StringComparison.OrdinalIgnoreCase)))
+                    {
+                        if (File.Exists(sidecarPath))
+                        {
+                            File.Delete(sidecarPath);
+                        }
+                    }
+
+                    File.Move(tempPath, databasePath, overwrite: true);
+                    FlushExistingFile(databasePath);
+                },
+                injectFault);
+        }
+        finally
+        {
+            TryDeleteFile(tempPath);
+        }
+    }
+
+    private void ReplacePackageRootNoLock(
+        string candidateRoot,
+        string packageRoot,
+        string databasePath,
+        string operationId,
+        string expectedCandidateSha256,
+        VisionDatabaseMaintenanceStage stage,
+        bool injectFault)
+    {
+        var normalizedPackageRoot = Path.GetFullPath(packageRoot);
+        var stagedRoot = normalizedPackageRoot + ".maintenance-" + operationId + ".candidate";
+        var previousRoot = normalizedPackageRoot + ".maintenance-" + operationId + ".previous";
+        var movedPrevious = false;
+        try
+        {
+            RunStage(
+                stage,
+                databasePath,
+                operationId,
+                () =>
+                {
+                    DeleteDirectoryIfExists(stagedRoot);
+                    if (Directory.Exists(previousRoot))
+                    {
+                        if (!Directory.Exists(normalizedPackageRoot))
+                        {
+                            Directory.Move(previousRoot, normalizedPackageRoot);
+                        }
+                        else
+                        {
+                            Directory.Delete(previousRoot, recursive: true);
+                        }
+                    }
+
+                    CopyDirectory(candidateRoot, stagedRoot);
+                    EnsureDirectoryHash(stagedRoot, expectedCandidateSha256);
+                    if (Directory.Exists(normalizedPackageRoot))
+                    {
+                        Directory.Move(normalizedPackageRoot, previousRoot);
+                        movedPrevious = true;
+                    }
+
+                    Checkpoint(
+                        VisionDatabaseMaintenanceStage.PackagePreviousMoved,
+                        databasePath,
+                        operationId,
+                        injectFault);
+                    Directory.Move(stagedRoot, normalizedPackageRoot);
+                },
+                injectFault);
+            DeleteDirectoryIfExists(previousRoot);
+        }
+        catch (Exception ex)
+        {
+            var failure = ToMaintenanceException(stage, ex);
+            if (!failure.Interruption &&
+                movedPrevious &&
+                !Directory.Exists(normalizedPackageRoot) &&
+                Directory.Exists(previousRoot))
+            {
+                Directory.Move(previousRoot, normalizedPackageRoot);
+            }
+
+            throw failure;
+        }
+        finally
+        {
+            TryDeleteDirectory(stagedRoot);
+        }
+    }
+
+    private void RemovePackageRootNoLock(
+        string packageRoot,
+        string databasePath,
+        string operationId,
+        bool injectFault)
+    {
+        var normalizedPackageRoot = Path.GetFullPath(packageRoot);
+        var previousRoot = normalizedPackageRoot + ".maintenance-" + operationId + ".previous";
+        RunStage(
+            VisionDatabaseMaintenanceStage.RollbackPackage,
+            databasePath,
+            operationId,
+            () =>
+            {
+                if (Directory.Exists(normalizedPackageRoot))
+                {
+                    DeleteDirectoryIfExists(previousRoot);
+                    Directory.Move(normalizedPackageRoot, previousRoot);
+                    Checkpoint(
+                        VisionDatabaseMaintenanceStage.PackagePreviousMoved,
+                        databasePath,
+                        operationId,
+                        injectFault);
+                    Directory.Delete(previousRoot, recursive: true);
+                }
+                else
+                {
+                    DeleteDirectoryIfExists(previousRoot);
+                }
+            },
+            injectFault);
+    }
+
+    private VisionDatabaseRecoveryMarker? ReadRecoveryMarkerNoLock(string databasePath)
+    {
+        var markerPath = GetRecoveryMarkerPath(databasePath);
+        if (!File.Exists(markerPath))
+        {
+            return null;
+        }
+
+        try
+        {
+            var marker = JsonSerializer.Deserialize<VisionDatabaseRecoveryMarker>(
+                File.ReadAllBytes(markerPath),
+                VisionDatabaseMaintenance.JsonOptions)
+                ?? throw new InvalidDataException("Database maintenance recovery marker is null.");
+            ValidateRecoveryMarker(marker, databasePath);
+            return marker;
+        }
+        catch (Exception ex)
+        {
+            throw CreateRecoveryRequiredException(ex);
+        }
+    }
+
+    private void PersistRecoveryMarkerNoLock(
+        VisionDatabaseRecoveryMarker marker,
+        string databasePath,
+        VisionDatabaseMaintenanceStage stage,
+        bool injectFault = true)
+    {
+        ValidateRecoveryMarker(marker, databasePath);
+        var markerPath = GetRecoveryMarkerPath(databasePath);
+        var tempPath = markerPath + "." + marker.OperationId + "." + Guid.NewGuid().ToString("N") + ".candidate";
+        var bytes = JsonSerializer.SerializeToUtf8Bytes(marker, VisionDatabaseMaintenance.JsonOptions);
+        try
+        {
+            RunStage(
+                stage,
+                databasePath,
+                marker.OperationId,
+                () =>
+                {
+                    Directory.CreateDirectory(Path.GetDirectoryName(markerPath)!);
+                    WriteAllBytesDurable(tempPath, bytes);
+                    File.Move(tempPath, markerPath, overwrite: true);
+                    FlushExistingFile(markerPath);
+                },
+                injectFault);
+        }
+        finally
+        {
+            TryDeleteFile(tempPath);
+        }
+    }
+
+    private void ValidateRecoveryMarker(VisionDatabaseRecoveryMarker marker, string databasePath)
+    {
+        var validState = marker.State is RecoveryStatePrepared or
+            RecoveryStateDatabaseReplaced or
+            RecoveryStatePackageReplaced or
+            RecoveryStateCompleted or
+            RecoveryStateRecoveryRequired;
+        if (marker.SchemaVersion != RecoveryMarkerSchemaVersion ||
+            !Guid.TryParseExact(marker.OperationId, "N", out _) ||
+            !validState ||
+            !PathsReferToSameFile(marker.DatabasePath, databasePath) ||
+            !PathsReferToSameFile(marker.PackageRootDirectory, _options.PackageRootDirectory) ||
+            !PathsReferToSameFile(marker.BackupRootDirectory, _options.BackupRootDirectory) ||
+            !IsSha256(marker.SourceBackupSha256) ||
+            !IsSha256(marker.SafetyBackupSha256) ||
+            !IsSha256(marker.CandidateDatabaseSha256) ||
+            (marker.ReplacePackages && !IsSha256(marker.CandidatePackagesSha256)))
+        {
+            throw new InvalidDataException("Database maintenance recovery marker is invalid.");
+        }
+
+        var recoveryDirectory = Path.GetFullPath(GetRecoveryDirectory(marker.OperationId));
+        var recoveryRoot = EnsureTrailingSeparator(Path.GetFullPath(GetRecoveryRootDirectory()));
+        if (!EnsureTrailingSeparator(recoveryDirectory).StartsWith(recoveryRoot, StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidDataException("Database maintenance recovery directory is invalid.");
+        }
+
+        var safetyBackupPath = Path.GetFullPath(marker.SafetyBackupPath);
+        var backupRoot = Path.GetFullPath(_options.BackupRootDirectory);
+        if (!IsPathWithinDirectory(safetyBackupPath, backupRoot) ||
+            !string.Equals(Path.GetExtension(safetyBackupPath), ".cvdbbak", StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidDataException("Database maintenance safety backup path is invalid.");
+        }
+    }
+
+    private void TryFenceRecoveryNoThrow(VisionDatabaseRecoveryMarker marker, string databasePath)
+    {
+        try
+        {
+            marker.State = RecoveryStateRecoveryRequired;
+            marker.LastFailureAtUtc = DateTimeOffset.UtcNow;
+            PersistRecoveryMarkerNoLock(
+                marker,
+                databasePath,
+                VisionDatabaseMaintenanceStage.RecoveryMarkerWrite,
+                injectFault: false);
+        }
+        catch
+        {
+            // The existing non-completed marker remains a fail-closed recovery signal.
+        }
+    }
+
+    private void CleanupCompletedRecoveryNoThrow(VisionDatabaseRecoveryMarker marker)
+    {
+        try
+        {
+            var markerPath = GetRecoveryMarkerPath(marker.DatabasePath);
+            if (File.Exists(markerPath))
+            {
+                File.Delete(markerPath);
+            }
+        }
+        catch
+        {
+            // Completed-state residue is non-authoritative; a later status/operation retries cleanup.
+            return;
+        }
+
+        TryDeleteDirectory(GetRecoveryDirectory(marker.OperationId));
+        TryDeleteDirectory(marker.PackageRootDirectory + ".maintenance-" + marker.OperationId + ".candidate");
+        TryDeleteDirectory(marker.PackageRootDirectory + ".maintenance-" + marker.OperationId + ".previous");
+    }
+
+    private string GetRecoveryRootDirectory()
+    {
+        return Path.Combine(Path.GetFullPath(_options.BackupRootDirectory), ".maintenance-recovery");
+    }
+
+    private string GetRecoveryDirectory(string operationId)
+    {
+        if (!Guid.TryParseExact(operationId, "N", out _))
+        {
+            throw new InvalidDataException("Database maintenance operation identifier is invalid.");
+        }
+
+        return Path.Combine(GetRecoveryRootDirectory(), operationId);
+    }
+
+    private static string GetRecoveryMarkerPath(string databasePath)
+    {
+        return Path.GetFullPath(databasePath) + ".maintenance-recovery.json";
+    }
+
+    private static void WriteAllBytesDurable(string path, byte[] bytes)
+    {
+        using var stream = new FileStream(
+            path,
+            FileMode.CreateNew,
+            FileAccess.Write,
+            FileShare.None,
+            bufferSize: 16 * 1024,
+            FileOptions.WriteThrough);
+        stream.Write(bytes);
+        stream.Flush(flushToDisk: true);
+    }
+
+    private static void FlushExistingFile(string path)
+    {
+        using var stream = new FileStream(
+            path,
+            FileMode.Open,
+            FileAccess.ReadWrite,
+            FileShare.Read,
+            bufferSize: 1,
+            FileOptions.WriteThrough);
+        stream.Flush(flushToDisk: true);
+    }
+
+    private static string ComputeFileSha256(string path)
+    {
+        using var stream = File.OpenRead(path);
+        return Convert.ToHexString(SHA256.HashData(stream));
+    }
+
+    private static string ComputeDirectorySha256(string? directoryPath)
+    {
+        if (string.IsNullOrWhiteSpace(directoryPath) || !Directory.Exists(directoryPath))
+        {
+            return Convert.ToHexString(SHA256.HashData(Array.Empty<byte>()));
+        }
+
+        var builder = new StringBuilder();
+        foreach (var directory in Directory
+            .EnumerateDirectories(directoryPath, "*", SearchOption.AllDirectories)
+            .OrderBy(path => Path.GetRelativePath(directoryPath, path), StringComparer.OrdinalIgnoreCase))
+        {
+            builder.Append("D:");
+            builder.Append(Path.GetRelativePath(directoryPath, directory).Replace('\\', '/'));
+            builder.Append('\n');
+        }
+
+        foreach (var file in Directory
+            .EnumerateFiles(directoryPath, "*", SearchOption.AllDirectories)
+            .OrderBy(path => Path.GetRelativePath(directoryPath, path), StringComparer.OrdinalIgnoreCase))
+        {
+            builder.Append("F:");
+            builder.Append(Path.GetRelativePath(directoryPath, file).Replace('\\', '/'));
+            builder.Append('\n');
+            builder.Append(ComputeFileSha256(file));
+            builder.Append('\n');
+        }
+
+        return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(builder.ToString())));
+    }
+
+    private static void EnsureFileHash(string path, string expectedSha256)
+    {
+        if (!File.Exists(path) ||
+            !string.Equals(ComputeFileSha256(path), expectedSha256, StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidDataException("Database maintenance durable artifact hash mismatch.");
+        }
+    }
+
+    private static void EnsureDirectoryHash(string path, string expectedSha256)
+    {
+        if (!Directory.Exists(path) ||
+            !string.Equals(ComputeDirectorySha256(path), expectedSha256, StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidDataException("Database maintenance durable artifact hash mismatch.");
+        }
+    }
+
+    private static bool IsPathWithinDirectory(string path, string directoryPath)
+    {
+        var fullPath = Path.GetFullPath(path);
+        var directoryRoot = EnsureTrailingSeparator(Path.GetFullPath(directoryPath));
+        return fullPath.StartsWith(directoryRoot, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool IsSha256(string? value)
+    {
+        return value?.Length == 64 && value.All(Uri.IsHexDigit);
+    }
+
+    private void Checkpoint(
+        VisionDatabaseMaintenanceStage stage,
+        string databasePath,
+        string operationId,
+        bool injectFault = true)
+    {
+        RunStage(stage, databasePath, operationId, static () => { }, injectFault);
+    }
+
+    private T RunStage<T>(
+        VisionDatabaseMaintenanceStage stage,
+        string databasePath,
+        string operationId,
+        Func<T> operation,
+        bool injectFault = true)
+    {
+        try
+        {
+            if (injectFault)
+            {
+                _faultInjector.OnStage(stage, databasePath, operationId);
+            }
+
+            return operation();
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (VisionDatabaseMaintenanceException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            throw CreateMaintenanceException(stage, ex);
+        }
+    }
+
+    private void RunStage(
+        VisionDatabaseMaintenanceStage stage,
+        string databasePath,
+        string operationId,
+        Action operation,
+        bool injectFault = true)
+    {
+        RunStage(
+            stage,
+            databasePath,
+            operationId,
+            () =>
+            {
+                operation();
+                return true;
+            },
+            injectFault);
+    }
+
+    private async Task<T> RunStageAsync<T>(
+        VisionDatabaseMaintenanceStage stage,
+        string databasePath,
+        string operationId,
+        Func<Task<T>> operation,
+        bool injectFault = true)
+    {
+        try
+        {
+            if (injectFault)
+            {
+                _faultInjector.OnStage(stage, databasePath, operationId);
+            }
+
+            return await operation();
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (VisionDatabaseMaintenanceException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            throw CreateMaintenanceException(stage, ex);
+        }
+    }
+
+    private async Task RunVoidStageAsync(
+        VisionDatabaseMaintenanceStage stage,
+        string databasePath,
+        string operationId,
+        Func<Task> operation,
+        bool injectFault = true)
+    {
+        await RunStageAsync(
+            stage,
+            databasePath,
+            operationId,
+            async () =>
+            {
+                await operation();
+                return true;
+            },
+            injectFault);
+    }
+
+    private static VisionDatabaseMaintenanceException ToMaintenanceException(
+        VisionDatabaseMaintenanceStage stage,
+        Exception exception)
+    {
+        return exception as VisionDatabaseMaintenanceException
+            ?? CreateMaintenanceException(stage, exception);
+    }
+
+    private static VisionDatabaseMaintenanceException CreateMaintenanceException(
+        VisionDatabaseMaintenanceStage stage,
+        Exception exception)
+    {
+        var interruption = ContainsException<VisionDatabaseMaintenanceInterruptionException>(exception);
+        var errorCode = interruption
+            ? "DB_MAINTENANCE_INTERRUPTED"
+            : ContainsException<UnauthorizedAccessException>(exception)
+                ? "DB_MAINTENANCE_PERMISSION_DENIED"
+                : ContainsException<IOException>(exception) || ContainsException<SqliteException>(exception)
+                    ? "DB_MAINTENANCE_IO_FAILED"
+                    : "DB_MAINTENANCE_PERSISTENCE_FAILED";
+        return new VisionDatabaseMaintenanceException(
+            errorCode,
+            GetPublicStage(stage),
+            retryable: true,
+            recoveryRequired: false,
+            interruption: interruption,
+            innerException: exception);
+    }
+
+    private static VisionDatabaseMaintenanceException CreateRecoveryRequiredException(Exception exception)
+    {
+        return new VisionDatabaseMaintenanceException(
+            "DB_MAINTENANCE_RECOVERY_REQUIRED",
+            "recovery",
+            retryable: true,
+            recoveryRequired: true,
+            interruption: false,
+            innerException: exception);
+    }
+
+    private static bool ContainsException<T>(Exception exception)
+        where T : Exception
+    {
+        if (exception is T)
+        {
+            return true;
+        }
+
+        if (exception is AggregateException aggregate &&
+            aggregate.InnerExceptions.Any(inner => ContainsException<T>(inner)))
+        {
+            return true;
+        }
+
+        return exception.InnerException != null && ContainsException<T>(exception.InnerException);
+    }
+
+    private static string GetPublicStage(VisionDatabaseMaintenanceStage stage)
+    {
+        return stage switch
+        {
+            VisionDatabaseMaintenanceStage.StatusRead => "status",
+            VisionDatabaseMaintenanceStage.BackupStarted or
+            VisionDatabaseMaintenanceStage.BackupDatabaseCandidate or
+            VisionDatabaseMaintenanceStage.BackupPackageCandidate or
+            VisionDatabaseMaintenanceStage.BackupCommit => "backup",
+            VisionDatabaseMaintenanceStage.RestoreExtract or
+            VisionDatabaseMaintenanceStage.RestoreCandidateValidated => "restore-candidate",
+            VisionDatabaseMaintenanceStage.SafetyBackupCreated => "safety-backup",
+            VisionDatabaseMaintenanceStage.RecoveryMarkerWrite or
+            VisionDatabaseMaintenanceStage.RecoveryMarkerPrepared or
+            VisionDatabaseMaintenanceStage.RecoveryMarkerCompleted => "recovery-marker",
+            VisionDatabaseMaintenanceStage.DatabaseReplace or
+            VisionDatabaseMaintenanceStage.DatabaseReplaced => "database-replace",
+            VisionDatabaseMaintenanceStage.PackageReplace or
+            VisionDatabaseMaintenanceStage.PackagePreviousMoved or
+            VisionDatabaseMaintenanceStage.PackageReplaced => "package-replace",
+            VisionDatabaseMaintenanceStage.RollbackStarted or
+            VisionDatabaseMaintenanceStage.RollbackDatabase or
+            VisionDatabaseMaintenanceStage.RollbackPackage or
+            VisionDatabaseMaintenanceStage.RollbackCompleted => "rollback",
+            VisionDatabaseMaintenanceStage.RepairStarted => "repair",
+            VisionDatabaseMaintenanceStage.CleanupStarted => "cleanup",
+            _ => "maintenance"
+        };
+    }
+
+    private static bool IsDatabaseMaintenanceClientError(Exception ex)
+    {
+        return ex is ArgumentException
+            or InvalidOperationException
+            or FileNotFoundException
+            or DirectoryNotFoundException
+            or InvalidDataException
+            or OperationCanceledException;
+    }
+
+    private static void TryDeleteFile(string path)
+    {
+        try
+        {
+            if (File.Exists(path))
+            {
+                File.Delete(path);
+            }
+        }
+        catch
+        {
+            // Unique candidates are non-authoritative residue.
+        }
+    }
+
+    private static void TryDeleteDirectory(string path)
+    {
+        try
+        {
+            DeleteDirectoryIfExists(path);
+        }
+        catch
+        {
+            // Unique candidates and completed-operation residue are non-authoritative.
+        }
     }
 
     private async Task<VisionDatabaseStatus> BuildStatusAsync(
@@ -551,6 +1718,47 @@ public sealed class VisionDatabaseMaintenanceService
     }
 }
 
+internal sealed class VisionDatabaseRecoveryMarker
+{
+    public VisionDatabaseRecoveryMarker()
+    {
+    }
+
+    public int SchemaVersion { get; set; }
+
+    public string OperationId { get; set; } = string.Empty;
+
+    public string State { get; set; } = string.Empty;
+
+    public string DatabasePath { get; set; } = string.Empty;
+
+    public string PackageRootDirectory { get; set; } = string.Empty;
+
+    public string BackupRootDirectory { get; set; } = string.Empty;
+
+    public string SourceBackupPath { get; set; } = string.Empty;
+
+    public string SourceBackupSha256 { get; set; } = string.Empty;
+
+    public string SafetyBackupPath { get; set; } = string.Empty;
+
+    public string SafetyBackupSha256 { get; set; } = string.Empty;
+
+    public string CandidateDatabaseSha256 { get; set; } = string.Empty;
+
+    public string CandidatePackagesSha256 { get; set; } = string.Empty;
+
+    public bool ReplacePackages { get; set; }
+
+    public bool PreviousPackageRootExisted { get; set; }
+
+    public DateTimeOffset PreparedAtUtc { get; set; }
+
+    public DateTimeOffset? CompletedAtUtc { get; set; }
+
+    public DateTimeOffset? LastFailureAtUtc { get; set; }
+}
+
 internal sealed class VisionDatabaseMaintenanceOptions
 {
     public string BackupRootDirectory { get; init; } = string.Empty;
@@ -665,6 +1873,8 @@ public sealed class VisionDatabaseBackupManifest
     public int CurrentSchemaVersion { get; init; }
 
     public string PackageRootDirectory { get; init; } = string.Empty;
+
+    public bool PackageRootExisted { get; init; }
 
     public int PackageFileCount { get; init; }
 }

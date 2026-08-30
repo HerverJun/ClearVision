@@ -6,6 +6,7 @@ namespace ClearVision.Product.Infrastructure.AI;
 
 internal enum AiPersistenceStage
 {
+    ModelCandidateCleanupStarted,
     ModelCandidateStarted,
     ModelSecretCandidateWrite,
     ModelSecretsPrepared,

@@ -64,6 +64,7 @@ public class PromptVersionManager : IPromptVersionManager
     };
 
     private readonly AiJsonMutationAuthority<PromptVersionList> _authority;
+    private readonly object _mutationGate;
     private readonly AiAuxiliaryPersistenceHealth _persistenceHealth;
 
     public PromptVersionManager(string? baseDirectory = null)
@@ -84,9 +85,11 @@ public class PromptVersionManager : IPromptVersionManager
             Directory.CreateDirectory(appData);
 
         _persistenceHealth = persistenceHealth ?? new AiAuxiliaryPersistenceHealth();
+        var filePath = Path.Combine(appData, "prompt_versions.json");
+        _mutationGate = AiPersistenceFileOperations.GetMutationGate(filePath);
         _authority = new AiJsonMutationAuthority<PromptVersionList>(
             AuthorityName,
-            Path.Combine(appData, "prompt_versions.json"),
+            filePath,
             static () => new PromptVersionList(),
             JsonOptions,
             faultInjector);
@@ -206,32 +209,39 @@ Always respond with valid JSON that matches the ClearVision flow schema.";
 
     public Task RecordMetricsAsync(Guid versionId, bool success, int tokenUsage, long latencyMs)
     {
-        try
+        // Keep the health transition ordered with the durable mutation. The authority uses
+        // this same path-keyed monitor, so its nested lock is reentrant rather than a second
+        // lock in the ordering graph. This prevents an older operation from publishing a
+        // late recovery/degradation after a newer metrics commit has already completed.
+        lock (_mutationGate)
         {
-            var persisted = _authority.Mutate("record_metrics", data =>
+            try
             {
-                var version = data.Versions.FirstOrDefault(v => v.Id == versionId);
-                if (version == null)
+                var persisted = _authority.Mutate("record_metrics", data =>
                 {
-                    return AiJsonMutation<bool>.NoChange(false);
-                }
+                    var version = data.Versions.FirstOrDefault(v => v.Id == versionId);
+                    if (version == null)
+                    {
+                        return AiJsonMutation<bool>.NoChange(false);
+                    }
 
-                version.Metrics ??= new PromptMetrics();
-                version.Metrics.TotalCalls++;
-                if (success)
-                    version.Metrics.SuccessCalls++;
-                version.Metrics.TotalTokenUsage += tokenUsage;
-                version.Metrics.TotalLatencyMs += latencyMs;
-                return AiJsonMutation<bool>.Persist(true);
-            });
-            if (persisted)
-            {
-                _persistenceHealth.ReportRecovered(AuthorityName);
+                    version.Metrics ??= new PromptMetrics();
+                    version.Metrics.TotalCalls++;
+                    if (success)
+                        version.Metrics.SuccessCalls++;
+                    version.Metrics.TotalTokenUsage += tokenUsage;
+                    version.Metrics.TotalLatencyMs += latencyMs;
+                    return AiJsonMutation<bool>.Persist(true);
+                });
+                if (persisted)
+                {
+                    _persistenceHealth.ReportRecovered(AuthorityName);
+                }
             }
-        }
-        catch (AiAuxiliaryPersistenceException ex)
-        {
-            _persistenceHealth.ReportDegraded(AuthorityName, "record_metrics", ex.ErrorCode);
+            catch (AiAuxiliaryPersistenceException ex)
+            {
+                _persistenceHealth.ReportDegraded(AuthorityName, "record_metrics", ex.ErrorCode);
+            }
         }
 
         return Task.CompletedTask;

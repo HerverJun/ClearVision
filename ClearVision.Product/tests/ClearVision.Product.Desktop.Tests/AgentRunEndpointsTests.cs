@@ -153,6 +153,23 @@ public sealed class AgentRunEndpointsTests
         host.GetSession("agent-ui-contract").Should().BeNull();
     }
 
+    [Fact(DisplayName = "POST legacy ordinary Agent plan route is retired")]
+    public async Task CreateLegacyOrdinaryPlan_ShouldReturnNotFoundWithoutCreatingState()
+    {
+        await using var host = await AgentRunEndpointTestHost.CreateAsync();
+
+        using var response = await host.Client.PostAsJsonAsync("/api/ai/agent-plan", new
+        {
+            description = "legacy ordinary plan must stay retired",
+            sessionId = "session-legacy-plan-route"
+        });
+
+        response.StatusCode.Should().Be(HttpStatusCode.NotFound);
+        host.StreamService.ReplayLatest(string.Empty).Should().BeNull();
+        host.Generation.LastCommand.Should().BeNull();
+        host.GetSession("session-legacy-plan-route").Should().BeNull();
+    }
+
     [Fact(DisplayName = "POST Agent intent router returns public route decision")]
     public async Task CreateIntentRouter_ShouldReturnPublicRouteDecision()
     {
@@ -624,6 +641,60 @@ public sealed class AgentRunEndpointsTests
             .Should().Be(1);
     }
 
+    [Fact(DisplayName = "POST PlanRun rejects the same mutation id with a different planning payload")]
+    public async Task CreatePlanRun_DuplicateMutationWithDifferentPayload_ShouldConflictWithoutOverwrite()
+    {
+        var plannerCalls = 0;
+        var plannerEntered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var releasePlanner = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        await using var host = await AgentRunEndpointTestHost.CreateAsync(planHandler: async (_, baseline, ct) =>
+        {
+            Interlocked.Increment(ref plannerCalls);
+            plannerEntered.TrySetResult();
+            await releasePlanner.Task.WaitAsync(ct);
+            return baseline;
+        });
+        var request = new VisionAgentPlanModeRequest
+        {
+            Description = "payload fingerprint plan request",
+            OriginalUserPrompt = "payload fingerprint plan request",
+            SessionId = "session-plan-payload-conflict",
+            CurrentFlowSnapshot = "{\"operators\":[{\"id\":\"original\"}]}",
+            PlanningBudgetMs = 90_000,
+            WorkspaceExpectedRevision = 0,
+            ClientMutationId = "plan-payload-conflict-mutation"
+        };
+
+        using var first = await host.Client.PostAsJsonAsync("/api/ai/agent-plan-runs", request);
+        await plannerEntered.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        using var firstDocument = JsonDocument.Parse(await first.Content.ReadAsStringAsync());
+        var appliedRevision = firstDocument.RootElement
+            .GetProperty("workspaceSnapshot")
+            .GetProperty("revision")
+            .GetInt64();
+
+        using var conflicting = await host.Client.PostAsJsonAsync("/api/ai/agent-plan-runs", request with
+        {
+            CurrentFlowSnapshot = "{\"operators\":[{\"id\":\"different\"}]}"
+        });
+
+        first.StatusCode.Should().Be(HttpStatusCode.OK);
+        conflicting.StatusCode.Should().Be(HttpStatusCode.Conflict);
+        using var conflictDocument = JsonDocument.Parse(await conflicting.Content.ReadAsStringAsync());
+        conflictDocument.RootElement.GetProperty("errorCode").GetString()
+            .Should().Be("workspace_mutation_id_conflict");
+        conflictDocument.RootElement.TryGetProperty("runId", out _).Should().BeFalse();
+        plannerCalls.Should().Be(1);
+        var persisted = host.GetSession("session-plan-payload-conflict")!;
+        persisted.WorkspaceSnapshot!.Revision.Should().Be(appliedRevision);
+        persisted.WorkspaceSnapshot.LifecycleState.Should().Be("planning");
+        persisted.History.Should().ContainSingle(turn => turn.Message == request.Description);
+
+        releasePlanner.SetResult();
+        var runId = firstDocument.RootElement.GetProperty("runId").GetString()!;
+        await host.WaitForTerminalAsync(runId);
+    }
+
     [Fact(DisplayName = "POST PlanRun delayed duplicate keeps the original terminal CAS revision")]
     public async Task CreatePlanRun_DelayedDuplicateAfterUserSave_ShouldNotAdoptNewerRevision()
     {
@@ -636,6 +707,14 @@ public sealed class AgentRunEndpointsTests
         const string sessionId = "session-plan-delayed-duplicate";
         const string clientMutationId = "plan-delayed-duplicate";
         const string description = "delayed duplicate plan";
+        var request = new VisionAgentPlanModeRequest
+        {
+            Description = description,
+            OriginalUserPrompt = description,
+            SessionId = sessionId,
+            WorkspaceExpectedRevision = 0,
+            ClientMutationId = clientMutationId
+        };
         var identity = string.Join(
             "\n",
             host.OwnerHash.Trim(),
@@ -648,6 +727,7 @@ public sealed class AgentRunEndpointsTests
         {
             ExpectedRevision = 0,
             ClientMutationId = $"plan-start:{clientMutationId}",
+            MutationPayloadFingerprint = ConversationalFlowService.ComputePlanRunRequestFingerprint(request),
             RequireExpectedRevisionWhenWorkspaceExists = true,
             LifecycleState = "planning",
             PlanRunId = runId,
@@ -670,14 +750,7 @@ public sealed class AgentRunEndpointsTests
         });
         userSave.Success.Should().BeTrue();
 
-        using var response = await host.Client.PostAsJsonAsync("/api/ai/agent-plan-runs", new VisionAgentPlanModeRequest
-        {
-            Description = description,
-            OriginalUserPrompt = description,
-            SessionId = sessionId,
-            WorkspaceExpectedRevision = 0,
-            ClientMutationId = clientMutationId
-        });
+        using var response = await host.Client.PostAsJsonAsync("/api/ai/agent-plan-runs", request);
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         using var responseDoc = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
         responseDoc.RootElement.GetProperty("runId").GetString().Should().Be(runId);

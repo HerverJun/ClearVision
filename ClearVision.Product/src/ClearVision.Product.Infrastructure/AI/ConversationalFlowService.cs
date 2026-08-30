@@ -117,6 +117,7 @@ public sealed class VisionAgentWorkspaceSnapshotUpdate
 {
     public long? ExpectedRevision { get; set; }
     public string? ClientMutationId { get; set; }
+    public string? MutationPayloadFingerprint { get; set; }
     public string? ProjectId { get; set; }
     public string? LifecycleState { get; set; }
     public VisionAgentPlanModeResult? PendingPlanSnapshot { get; set; }
@@ -1306,6 +1307,11 @@ public class ConversationalFlowService : IConversationalFlowService
 
     public static string ComputeWorkspaceMutationFingerprint(VisionAgentWorkspaceSnapshotUpdate update)
     {
+        if (!string.IsNullOrWhiteSpace(update.MutationPayloadFingerprint))
+        {
+            return update.MutationPayloadFingerprint.Trim();
+        }
+
         var normalizedSelections = update.PlanQuestionSelections?
             .Where(pair => !string.IsNullOrWhiteSpace(pair.Key))
             .OrderBy(pair => pair.Key, StringComparer.OrdinalIgnoreCase)
@@ -1372,6 +1378,32 @@ public class ConversationalFlowService : IConversationalFlowService
             update.SubmittedBuildFingerprint,
             update.UserTurnId,
             update.UserMessage
+        });
+    }
+
+    public static string ComputePlanRunRequestFingerprint(VisionAgentPlanModeRequest request)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        return ComputeJsonFingerprint(new
+        {
+            SchemaVersion = 1,
+            MutationKind = "vision_agent_plan_run",
+            request.Description,
+            request.OriginalUserPrompt,
+            request.AdditionalContext,
+            request.SessionId,
+            request.Mode,
+            request.CurrentFlowSnapshot,
+            request.CurrentResultSnapshot,
+            request.TemplateSelection,
+            request.AttachmentSummary,
+            request.HistorySummary,
+            request.SemanticExtraction,
+            request.RequirementMode,
+            request.ConfirmedPlanAnswers,
+            request.ResolvedPlanFields,
+            request.RemainingPlanFields,
+            request.PlanningBudgetMs
         });
     }
 
