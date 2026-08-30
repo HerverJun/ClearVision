@@ -314,6 +314,142 @@ public class AiModelEndpointsTests
     }
 
     [Fact]
+    public async Task CreateAiModel_SecretPersistenceFailure_ShouldReturnStructured503WithoutActivatingCandidate()
+    {
+        const string secret = "create-endpoint-secret-never-leak";
+        var fault = new EndpointPersistenceFaultInjector();
+        await using var host = await AiModelEndpointTestHost.CreateAsync(persistenceFaultInjector: fault);
+        fault.FailingStage = AiPersistenceStage.ModelSecretCandidateWrite;
+        fault.SensitiveFailureMessage = $"secret write failed: {secret}";
+
+        using var response = await host.Client.PostAsync(
+            "/api/ai/models",
+            JsonContent(new
+            {
+                name = "Failed Candidate",
+                provider = "OpenAI Compatible",
+                model = "gpt-4o-mini",
+                baseUrl = "https://api.openai.com/v1",
+                apiKey = secret
+            }));
+
+        var responseJson = await response.Content.ReadAsStringAsync();
+        response.StatusCode.Should().Be(HttpStatusCode.ServiceUnavailable, responseJson);
+        responseJson.Should().NotContain(secret);
+        using var document = JsonDocument.Parse(responseJson);
+        var root = document.RootElement;
+        root.GetProperty("errorCode").GetString().Should().Be("AI_MODEL_SECRET_PERSISTENCE_FAILED");
+        root.GetProperty("retryable").GetBoolean().Should().BeTrue();
+        root.GetProperty("stage").GetString().Should().Be("candidate_secrets");
+        root.GetProperty("metadataOnly").GetBoolean().Should().BeTrue();
+        host.AiConfigStore.GetAll().Should().NotContain(model => model.Name == "Failed Candidate");
+        host.CreateReloadedStore().GetAll().Should().NotContain(model => model.Name == "Failed Candidate");
+    }
+
+    [Fact]
+    public async Task ActivateAndDefaultModel_PersistenceFailure_ShouldReturnStructured503AndKeepOldGeneration()
+    {
+        const string sensitiveFault = "activation-default-secret-never-leak";
+        var fault = new EndpointPersistenceFaultInjector();
+        await using var host = await AiModelEndpointTestHost.CreateAsync(persistenceFaultInjector: fault);
+        host.AiConfigStore.Add(new AiModelConfig
+        {
+            Id = "old-planner",
+            Name = "Old Planner",
+            Provider = "OpenAI Compatible",
+            Model = "gpt-4o-mini",
+            RoleBindings = [AiModelConfig.RolePlanner]
+        });
+        host.AiConfigStore.Add(new AiModelConfig
+        {
+            Id = "candidate-planner",
+            Name = "Candidate Planner",
+            Provider = "OpenAI Compatible",
+            Model = "gpt-4o-mini",
+            RoleBindings = [AiModelConfig.RoleGeneration]
+        });
+        var activeBefore = host.AiConfigStore.GetAll().Single(model => model.IsActive).Id;
+        fault.FailingStage = AiPersistenceStage.ModelDocumentPrepared;
+        fault.SensitiveFailureMessage = sensitiveFault;
+
+        using var activate = await host.Client.PostAsync(
+            "/api/ai/models/candidate-planner/activate",
+            JsonContent(new { }));
+        using var makeDefault = await host.Client.PostAsync(
+            "/api/ai/models/candidate-planner/default-planner",
+            JsonContent(new { }));
+
+        foreach (var response in new[] { activate, makeDefault })
+        {
+            var responseJson = await response.Content.ReadAsStringAsync();
+            response.StatusCode.Should().Be(HttpStatusCode.ServiceUnavailable, responseJson);
+            responseJson.Should().NotContain(sensitiveFault);
+            using var document = JsonDocument.Parse(responseJson);
+            document.RootElement.GetProperty("errorCode").GetString().Should().Be("AI_MODEL_CANDIDATE_PERSISTENCE_FAILED");
+            document.RootElement.GetProperty("retryable").GetBoolean().Should().BeTrue();
+            document.RootElement.GetProperty("stage").GetString().Should().Be("candidate_document");
+            document.RootElement.GetProperty("metadataOnly").GetBoolean().Should().BeTrue();
+        }
+
+        var inMemory = host.AiConfigStore.GetAll();
+        inMemory.Single(model => model.IsActive).Id.Should().Be(activeBefore);
+        inMemory.Single(model => model.Id == "old-planner").RoleBindings.Should().Contain(AiModelConfig.RolePlanner);
+        inMemory.Single(model => model.Id == "candidate-planner").RoleBindings.Should().NotContain(AiModelConfig.RolePlanner);
+        var reloaded = host.CreateReloadedStore().GetAll();
+        reloaded.Single(model => model.IsActive).Id.Should().Be(activeBefore);
+        reloaded.Single(model => model.Id == "old-planner").RoleBindings.Should().Contain(AiModelConfig.RolePlanner);
+        reloaded.Single(model => model.Id == "candidate-planner").RoleBindings.Should().NotContain(AiModelConfig.RolePlanner);
+    }
+
+    [Fact]
+    public async Task TestAiModel_StatusPersistenceFailure_ShouldReturnStructured503AndKeepUntestedState()
+    {
+        const string apiKey = "test-status-secret-never-leak";
+        var fault = new EndpointPersistenceFaultInjector();
+        await using var host = await AiModelEndpointTestHost.CreateAsync(
+            (_, _) => Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent(
+                    "{\"choices\":[{\"message\":{\"content\":\"{\\\"ok\\\":true}\"}}]}",
+                    Encoding.UTF8,
+                    "application/json")
+            }),
+            persistenceFaultInjector: fault);
+        host.AiConfigStore.Add(new AiModelConfig
+        {
+            Id = "test-status-candidate",
+            Name = "Test Status Candidate",
+            Provider = "OpenAI Compatible",
+            Model = "gpt-4o-mini",
+            BaseUrl = "https://api.openai.com/v1",
+            ApiKey = apiKey
+        });
+        fault.FailingStage = AiPersistenceStage.ModelCommitStarted;
+        fault.SensitiveFailureMessage = $"test status commit failed: {apiKey}";
+
+        using var response = await host.Client.PostAsync(
+            "/api/ai/models/test-status-candidate/test",
+            JsonContent(new { }));
+
+        var responseJson = await response.Content.ReadAsStringAsync();
+        response.StatusCode.Should().Be(HttpStatusCode.ServiceUnavailable, responseJson);
+        responseJson.Should().NotContain(apiKey);
+        using var document = JsonDocument.Parse(responseJson);
+        document.RootElement.GetProperty("errorCode").GetString().Should().Be("AI_MODEL_COMMIT_FAILED");
+        document.RootElement.GetProperty("retryable").GetBoolean().Should().BeTrue();
+        document.RootElement.GetProperty("stage").GetString().Should().Be("commit");
+        document.RootElement.GetProperty("metadataOnly").GetBoolean().Should().BeTrue();
+        var inMemory = host.AiConfigStore.GetById("test-status-candidate")!;
+        inMemory.LastTestStatus.Should().Be("untested");
+        inMemory.LastTestAt.Should().BeNull();
+        inMemory.LastTestLatencyMs.Should().BeNull();
+        var reloaded = host.CreateReloadedStore().GetById("test-status-candidate")!;
+        reloaded.LastTestStatus.Should().Be("untested");
+        reloaded.LastTestAt.Should().BeNull();
+        reloaded.LastTestLatencyMs.Should().BeNull();
+    }
+
+    [Fact]
     public async Task UpdateAiModel_ShouldKeepReplaceClearKeyAndRoutePlannerShadowRoles()
     {
         await using var host = await AiModelEndpointTestHost.CreateAsync();
@@ -1535,7 +1671,8 @@ public class AiModelEndpointsTests
         public static async Task<AiModelEndpointTestHost> CreateAsync(
             Func<HttpRequestMessage, CancellationToken, Task<HttpResponseMessage>>? aiSendAsync = null,
             AppConfig? appConfig = null,
-            string userRole = "Admin")
+            string userRole = "Admin",
+            IAiPersistenceFaultInjector? persistenceFaultInjector = null)
         {
             var builder = WebApplication.CreateBuilder(new WebApplicationOptions
             {
@@ -1572,6 +1709,7 @@ public class AiModelEndpointsTests
             builder.Services.AddSingleton<RuntimePreviewStationCompatibilityDryRunService>();
             builder.Services.AddSingleton<RuntimePreviewPreReleaseReviewService>();
             builder.Services.AddSingleton<RuntimePreviewAgentExplanationService>();
+            builder.Services.AddSingleton<AiAuxiliaryPersistenceHealth>();
 
             var aiConfigStore = new AiConfigStore(
                 Options.Create(new AiGenerationOptions
@@ -1583,7 +1721,8 @@ public class AiModelEndpointsTests
                     TimeoutSeconds = 90
                 }),
                 NullLogger<AiConfigStore>.Instance,
-                storageDirectory);
+                storageDirectory,
+                persistenceFaultInjector);
             builder.Services.AddSingleton(aiConfigStore);
             var httpClient = aiSendAsync == null
                 ? new HttpClient()
@@ -1634,6 +1773,21 @@ public class AiModelEndpointsTests
                 CancellationToken cancellationToken)
             {
                 return _sendAsync(request, cancellationToken);
+            }
+        }
+    }
+
+    private sealed class EndpointPersistenceFaultInjector : IAiPersistenceFaultInjector
+    {
+        public AiPersistenceStage? FailingStage { get; set; }
+
+        public string SensitiveFailureMessage { get; set; } = "endpoint persistence fault";
+
+        public void OnStage(AiPersistenceStage stage, string authority, string path)
+        {
+            if (FailingStage == stage)
+            {
+                throw new IOException(SensitiveFailureMessage);
             }
         }
     }

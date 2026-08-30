@@ -159,7 +159,9 @@ public sealed class VisionAgentWorkspaceSnapshotMutationResult
     public string PublicMessage { get; set; } = string.Empty;
     public VisionAgentWorkspaceSnapshot? Snapshot { get; set; }
     public long Revision => Snapshot?.Revision ?? 0;
+    public long AppliedRevision { get; set; }
     public ConversationPersistenceStatus PersistenceStatus { get; set; } = new();
+    public bool IdempotentReplay { get; set; }
 }
 
 public sealed class ConversationSessionAccessException : Exception
@@ -846,7 +848,8 @@ public class ConversationalFlowService : IConversationalFlowService
                         current,
                         current.WorkspaceSnapshot,
                         _lastPersistenceStatus,
-                        idempotentReplay: true)
+                        idempotentReplay: true,
+                        appliedRevision: receipt.AppliedRevision)
                     .ToWorkspaceMutationResult();
             }
 
@@ -1045,7 +1048,8 @@ public class ConversationalFlowService : IConversationalFlowService
                         current,
                         current.WorkspaceSnapshot,
                         _lastPersistenceStatus,
-                        idempotentReplay: true);
+                        idempotentReplay: true,
+                        appliedRevision: receipt.AppliedRevision);
                 }
             }
 
@@ -1103,6 +1107,7 @@ public class ConversationalFlowService : IConversationalFlowService
         public string PublicMessage { get; private init; } = string.Empty;
         public ConversationSession? Session { get; private init; }
         public VisionAgentWorkspaceSnapshot? Snapshot { get; private init; }
+        public long AppliedRevision { get; private init; }
         public ConversationPersistenceStatus PersistenceStatus { get; private init; } = new();
         public bool IdempotentReplay { get; private init; }
 
@@ -1110,12 +1115,14 @@ public class ConversationalFlowService : IConversationalFlowService
             ConversationSession session,
             VisionAgentWorkspaceSnapshot? snapshot,
             ConversationPersistenceStatus persistenceStatus,
-            bool idempotentReplay) =>
+            bool idempotentReplay,
+            long? appliedRevision = null) =>
             new()
             {
                 Success = true,
                 Session = CloneSession(session),
                 Snapshot = CloneWorkspaceSnapshot(snapshot),
+                AppliedRevision = appliedRevision ?? snapshot?.Revision ?? 0,
                 PersistenceStatus = ClonePersistenceStatus(persistenceStatus),
                 IdempotentReplay = idempotentReplay
             };
@@ -1166,7 +1173,9 @@ public class ConversationalFlowService : IConversationalFlowService
                 ErrorCode = ErrorCode,
                 PublicMessage = PublicMessage,
                 Snapshot = CloneWorkspaceSnapshot(Snapshot),
-                PersistenceStatus = ClonePersistenceStatus(PersistenceStatus)
+                AppliedRevision = AppliedRevision,
+                PersistenceStatus = ClonePersistenceStatus(PersistenceStatus),
+                IdempotentReplay = IdempotentReplay
             };
     }
 

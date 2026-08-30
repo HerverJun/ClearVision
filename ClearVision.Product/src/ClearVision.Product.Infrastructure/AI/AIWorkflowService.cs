@@ -82,7 +82,16 @@ public class AIWorkflowService
 
             if (activeVersion != null)
             {
-                await _promptVersionManager.RecordMetricsAsync(activeVersion.Id, true, telemetry.LLMTokenUsage, telemetry.LLMCallTimeMs);
+                try
+                {
+                    await _promptVersionManager.RecordMetricsAsync(activeVersion.Id, true, telemetry.LLMTokenUsage, telemetry.LLMCallTimeMs);
+                }
+                catch (Exception metricsEx)
+                {
+                    _logger.LogWarning(
+                        metricsEx,
+                        "Prompt metrics persistence degraded after a completed legacy LLM call; workflow processing continues.");
+                }
             }
 
             // Step 3: 解析生成的流程
@@ -185,7 +194,16 @@ public class AIWorkflowService
             if (activeVersion != null)
             {
                 long latencyToRecord = telemetry.LLMCallTimeMs > 0 ? telemetry.LLMCallTimeMs : stopwatch.ElapsedMilliseconds;
-                await _promptVersionManager.RecordMetricsAsync(activeVersion.Id, false, telemetry.LLMTokenUsage, latencyToRecord);
+                try
+                {
+                    await _promptVersionManager.RecordMetricsAsync(activeVersion.Id, false, telemetry.LLMTokenUsage, latencyToRecord);
+                }
+                catch (Exception metricsEx)
+                {
+                    _logger.LogWarning(
+                        metricsEx,
+                        "Prompt metrics persistence degraded while handling a legacy workflow failure; the original exception remains authoritative.");
+                }
             }
 
             return AIWorkflowResult.Failure($"工作流执行失败: {ex.Message}", telemetry);

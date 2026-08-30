@@ -8,6 +8,19 @@ using Microsoft.Extensions.Options;
 
 namespace ClearVision.Product.Infrastructure.AI;
 
+internal sealed class AiModelGenerationDocument
+{
+    public int SchemaVersion { get; set; } = 2;
+
+    public string GenerationId { get; set; } = string.Empty;
+
+    public List<AiModelConfig> Models { get; set; } = new();
+
+    public List<string> SecretModelIds { get; set; } = new();
+}
+
+internal sealed record AiModelLoadResult(List<AiModelConfig> Models, string GenerationId);
+
 /// <summary>
 /// Runtime store for AI model profiles.
 /// Persists models to ai_models.json and migrates old ai_config.json on first load.
@@ -15,12 +28,14 @@ namespace ClearVision.Product.Infrastructure.AI;
 public class AiConfigStore
 {
     private readonly Microsoft.Extensions.Logging.ILogger<AiConfigStore> _logger;
-    private readonly object _lock = new();
-    private List<AiModelConfig> _models;
+    private readonly object _lock;
+    private List<AiModelConfig> _models = new();
     private readonly AiGenerationOptions _initialOptions;
     private readonly string _modelsFilePath;
+    private readonly string _modelsBackupFilePath;
     private readonly string _legacyConfigFilePath;
-    private readonly IAiApiKeySecretStore _apiKeySecretStore;
+    private readonly string _secretsRoot;
+    private readonly IAiPersistenceFaultInjector _faultInjector;
 
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
@@ -46,6 +61,15 @@ public class AiConfigStore
         IOptions<AiGenerationOptions> initialOptions,
         Microsoft.Extensions.Logging.ILogger<AiConfigStore> logger,
         string storageDirectory)
+        : this(initialOptions, logger, storageDirectory, null)
+    {
+    }
+
+    internal AiConfigStore(
+        IOptions<AiGenerationOptions> initialOptions,
+        Microsoft.Extensions.Logging.ILogger<AiConfigStore> logger,
+        string storageDirectory,
+        IAiPersistenceFaultInjector? faultInjector)
     {
         _logger = logger;
         _initialOptions = CloneOptions(initialOptions.Value);
@@ -54,9 +78,18 @@ public class AiConfigStore
 
         Directory.CreateDirectory(storageDirectory);
         _modelsFilePath = Path.Combine(storageDirectory, "ai_models.json");
+        _modelsBackupFilePath = _modelsFilePath + ".previous";
+        _lock = AiPersistenceFileOperations.GetMutationGate(_modelsFilePath);
         _legacyConfigFilePath = Path.Combine(storageDirectory, "ai_config.json");
-        _apiKeySecretStore = new DpapiFileAiApiKeySecretStore(Path.Combine(storageDirectory, "ai_model_secrets"));
-        _models = LoadOrMigrate(_initialOptions);
+        _secretsRoot = Path.Combine(storageDirectory, "ai_model_secrets");
+        _faultInjector = faultInjector ?? NoOpAiPersistenceFaultInjector.Instance;
+        Directory.CreateDirectory(_secretsRoot);
+
+        lock (_lock)
+        {
+            var loaded = LoadOrMigrate(_initialOptions);
+            _models = loaded.Models;
+        }
     }
 
     public List<AiModelConfig> GetAll()
@@ -95,31 +128,37 @@ public class AiConfigStore
 
     public AiModelConfig Add(AiModelConfig model)
     {
+        AiModelConfig committed;
         lock (_lock)
         {
-            if (string.IsNullOrWhiteSpace(model.Id))
+            ReloadAuthoritativeModelsLocked();
+            var candidateModels = _models.Select(CloneModel).ToList();
+            var candidateModel = CloneModel(model);
+            if (string.IsNullOrWhiteSpace(candidateModel.Id))
             {
-                model.Id = $"model_{Guid.NewGuid():N}";
+                candidateModel.Id = $"model_{Guid.NewGuid():N}";
             }
 
-            if (_models.Any(x => string.Equals(x.Id, model.Id, StringComparison.OrdinalIgnoreCase)))
+            if (candidateModels.Any(x => string.Equals(x.Id, candidateModel.Id, StringComparison.OrdinalIgnoreCase)))
             {
-                throw new InvalidOperationException($"AI model id already exists: {model.Id}");
+                throw new InvalidOperationException($"AI model id already exists: {candidateModel.Id}");
             }
 
-            StampNewModel(model);
-            model.ValidateReasoningConfiguration();
-            model.Capabilities = (model.Capabilities?.Clone() ?? AiModelCapabilities.Infer(model.Provider, model.Model)).Normalize();
+            StampNewModel(candidateModel);
+            candidateModel.ValidateReasoningConfiguration();
+            candidateModel.Capabilities = (candidateModel.Capabilities?.Clone() ?? AiModelCapabilities.Infer(candidateModel.Provider, candidateModel.Model)).Normalize();
 
-            if (_models.Count == 0)
-                model.IsActive = true;
+            if (candidateModels.Count == 0)
+                candidateModel.IsActive = true;
 
-            _models.Add(model);
+            candidateModels.Add(candidateModel);
+            CommitAndActivateCandidateLocked(candidateModels, "add");
+            committed = CloneModel(candidateModel);
         }
 
-        Save();
-        _logger.LogInformation("[AiConfigStore] 新增模型: {Name} ({Id})", SanitizeLogValue(model.Name), SanitizeLogValue(model.Id));
-        return model;
+        model.Id = committed.Id;
+        _logger.LogInformation("[AiConfigStore] 新增模型: {Name} ({Id})", SanitizeLogValue(committed.Name), SanitizeLogValue(committed.Id));
+        return committed;
     }
 
     /// <summary>
@@ -132,43 +171,50 @@ public class AiConfigStore
 
     public AiModelConfig? Update(string id, AiModelConfig updated, AiApiKeyUpdateMode apiKeyUpdateMode)
     {
+        AiModelConfig? committed;
         lock (_lock)
         {
-            var index = _models.FindIndex(x => x.Id == id);
+            ReloadAuthoritativeModelsLocked();
+            var candidateModels = _models.Select(CloneModel).ToList();
+            var index = candidateModels.FindIndex(x => x.Id == id);
             if (index < 0)
                 return null;
 
-            var candidate = CloneModel(_models[index]);
+            var candidate = CloneModel(candidateModels[index]);
             ApplyUpdatedValues(candidate, updated, apiKeyUpdateMode);
             candidate.UpdatedAt = DateTimeOffset.UtcNow;
             candidate.ValidateReasoningConfiguration();
             candidate.NormalizeAdvancedFields();
-            _models[index] = candidate;
+            candidateModels[index] = candidate;
+            CommitAndActivateCandidateLocked(candidateModels, "update");
+            committed = CloneModel(candidate);
         }
 
-        Save();
         _logger.LogInformation("[AiConfigStore] 更新模型: {Name} ({Id})", SanitizeLogValue(updated.Name), SanitizeLogValue(id));
-        return GetById(id);
+        return committed;
     }
 
     public bool Delete(string id)
     {
         lock (_lock)
         {
-            if (_models.Count <= 1)
+            ReloadAuthoritativeModelsLocked();
+            var candidateModels = _models.Select(CloneModel).ToList();
+            if (candidateModels.Count <= 1)
                 throw new InvalidOperationException("至少需保留一个模型配置");
 
-            var removed = _models.RemoveAll(x => x.Id == id);
+            var removed = candidateModels.RemoveAll(x => x.Id == id);
             if (removed == 0)
                 return false;
 
-            if (!_models.Any(x => x.IsActive) && _models.Count > 0)
+            if (!candidateModels.Any(x => x.IsActive) && candidateModels.Count > 0)
             {
-                _models[0].IsActive = true;
+                candidateModels[0].IsActive = true;
             }
+
+            CommitAndActivateCandidateLocked(candidateModels, "delete");
         }
 
-        Save();
         _logger.LogInformation("[AiConfigStore] 删除模型: {Id}", SanitizeLogValue(id));
         return true;
     }
@@ -177,17 +223,20 @@ public class AiConfigStore
     {
         lock (_lock)
         {
-            var target = _models.FirstOrDefault(x => x.Id == id);
+            ReloadAuthoritativeModelsLocked();
+            var candidateModels = _models.Select(CloneModel).ToList();
+            var target = candidateModels.FirstOrDefault(x => x.Id == id);
             if (target == null)
                 return false;
 
-            foreach (var model in _models)
+            foreach (var model in candidateModels)
                 model.IsActive = model.Id == id;
             target.IsEnabled = true;
             target.UpdatedAt = DateTimeOffset.UtcNow;
+
+            CommitAndActivateCandidateLocked(candidateModels, "activate");
         }
 
-        Save();
         _logger.LogInformation("[AiConfigStore] 激活模型切换为: {Id}", SanitizeLogValue(id));
         return true;
     }
@@ -197,11 +246,13 @@ public class AiConfigStore
         var normalizedRole = AiModelConfig.NormalizeRoleName(role);
         lock (_lock)
         {
-            var target = _models.FirstOrDefault(x => x.Id == id);
+            ReloadAuthoritativeModelsLocked();
+            var candidateModels = _models.Select(CloneModel).ToList();
+            var target = candidateModels.FirstOrDefault(x => x.Id == id);
             if (target == null)
                 return false;
 
-            foreach (var model in _models)
+            foreach (var model in candidateModels)
             {
                 model.RoleBindings = AiModelConfig
                     .NormalizeRoleBindings(model.RoleBindings)
@@ -227,9 +278,10 @@ public class AiConfigStore
             target.IsEnabled = true;
             target.UpdatedAt = DateTimeOffset.UtcNow;
             target.NormalizeAdvancedFields();
+
+            CommitAndActivateCandidateLocked(candidateModels, "set_default_role");
         }
 
-        Save();
         _logger.LogInformation("[AiConfigStore] Set default model role {Role}: {Id}", SanitizeLogValue(normalizedRole), SanitizeLogValue(id));
         return true;
     }
@@ -240,9 +292,12 @@ public class AiConfigStore
         DateTimeOffset testedAt,
         int? latencyMs)
     {
+        AiModelConfig? committed;
         lock (_lock)
         {
-            var model = _models.FirstOrDefault(x => x.Id == id);
+            ReloadAuthoritativeModelsLocked();
+            var candidateModels = _models.Select(CloneModel).ToList();
+            var model = candidateModels.FirstOrDefault(x => x.Id == id);
             if (model == null)
                 return null;
 
@@ -251,10 +306,11 @@ public class AiConfigStore
             model.LastTestLatencyMs = latencyMs;
             model.UpdatedAt = DateTimeOffset.UtcNow;
             model.NormalizeAdvancedFields();
+            CommitAndActivateCandidateLocked(candidateModels, "update_test_status");
+            committed = CloneModel(model);
         }
 
-        Save();
-        return GetById(id);
+        return committed;
     }
 
     public List<AiModelConfig> ResetToDefaults()
@@ -262,11 +318,10 @@ public class AiConfigStore
         List<AiModelConfig> resetModels;
         lock (_lock)
         {
-            _models = CreateDefaultModels(_initialOptions);
-            resetModels = _models.Select(CloneModel).ToList();
+            var candidateModels = CreateDefaultModels(_initialOptions);
+            CommitAndActivateCandidateLocked(candidateModels, "reset");
+            resetModels = candidateModels.Select(CloneModel).ToList();
         }
-
-        Save();
 
         try
         {
@@ -299,34 +354,69 @@ public class AiConfigStore
         }
     }
 
-    private List<AiModelConfig> LoadOrMigrate(AiGenerationOptions fallback)
+    private AiModelLoadResult LoadOrMigrate(AiGenerationOptions fallback)
     {
+        CleanupCandidateResidue();
+
         if (File.Exists(_modelsFilePath))
         {
-            try
+            if (TryLoadGenerationDocument(_modelsFilePath, out var active, out var activeError))
             {
-                var json = File.ReadAllText(_modelsFilePath);
-                var models = JsonSerializer.Deserialize<List<AiModelConfig>>(json, JsonOptions);
-                if (models is { Count: > 0 })
-                {
-                    EnsureUniqueModelIds(models);
-                    EnsureOneActive(models);
-                    EnsureCapabilities(models);
-                    EnsureAdvancedFields(models);
-                    var hadInlineKeys = ImportOrHydrateApiKeys(models);
-                    _models = models;
-                    if (hadInlineKeys)
-                    {
-                        Save();
-                    }
-                    _logger.LogInformation("[AiConfigStore] 从 ai_models.json 加载 {Count} 个模型配置", models.Count);
-                    return models;
-                }
+                CleanupSecretGenerationResidue(active.GenerationId);
+                _logger.LogInformation(
+                    "[AiConfigStore] Loaded {Count} AI models from generation {GenerationId}",
+                    active.Models.Count,
+                    active.GenerationId);
+                return active;
             }
-            catch (Exception ex)
+
+            Exception? backupGenerationError = null;
+            if (File.Exists(_modelsBackupFilePath) &&
+                TryLoadGenerationDocument(_modelsBackupFilePath, out var recovered, out backupGenerationError))
             {
-                _logger.LogWarning("[AiConfigStore] 读取 ai_models.json 失败: {Message}", ex.Message);
+                RestoreBackupDocument();
+                CleanupSecretGenerationResidue(recovered.GenerationId);
+                _logger.LogWarning(
+                    "[AiConfigStore] Recovered AI model generation {GenerationId} from the previous durable document.",
+                    recovered.GenerationId);
+                return recovered;
             }
+
+            Exception? legacyBackupError = null;
+            if (File.Exists(_modelsBackupFilePath) &&
+                TryLoadLegacyModelList(_modelsBackupFilePath, out var legacyBackupModels, out legacyBackupError))
+            {
+                // Restore the complete legacy generation first. If migration is interrupted,
+                // restart can still read this active legacy document and retry safely.
+                RestoreBackupDocument();
+                var generationId = PersistGeneration(legacyBackupModels, "recover_legacy_model_backup");
+                CleanupSecretGenerationResidue(generationId);
+                _logger.LogWarning(
+                    "[AiConfigStore] Recovered {Count} AI models from the previous legacy generation into {GenerationId}.",
+                    legacyBackupModels.Count,
+                    generationId);
+                return new AiModelLoadResult(legacyBackupModels, generationId);
+            }
+
+            if (TryLoadLegacyModelList(_modelsFilePath, out var legacyModels, out var legacyError))
+            {
+                var generationId = PersistGeneration(legacyModels, "migrate_legacy_model_list");
+                CleanupSecretGenerationResidue(generationId);
+                _logger.LogInformation(
+                    "[AiConfigStore] Migrated {Count} legacy AI models into generation {GenerationId}",
+                    legacyModels.Count,
+                    generationId);
+                return new AiModelLoadResult(legacyModels, generationId);
+            }
+
+            throw new AiConfigPersistenceException(
+                "AI_MODEL_RECOVERY_FAILED",
+                "load",
+                new AggregateException(
+                    activeError ?? new InvalidDataException("Active AI model document is invalid."),
+                    backupGenerationError ?? new InvalidDataException("Previous AI model generation is invalid."),
+                    legacyBackupError ?? new InvalidDataException("Previous legacy AI model document is invalid."),
+                    legacyError ?? new InvalidDataException("Legacy AI model document is invalid.")));
         }
 
         if (File.Exists(_legacyConfigFilePath))
@@ -334,51 +424,53 @@ public class AiConfigStore
             try
             {
                 var json = File.ReadAllText(_legacyConfigFilePath);
-                var legacy = JsonSerializer.Deserialize<AiGenerationOptions>(json, JsonOptions);
-                if (legacy != null)
+                var legacy = JsonSerializer.Deserialize<AiGenerationOptions>(json, JsonOptions)
+                    ?? throw new JsonException("Legacy AI configuration deserialized to null.");
+                _logger.LogInformation("[AiConfigStore] Migrating legacy ai_config.json");
+                var migrated = new AiModelConfig
                 {
-                    _logger.LogInformation("[AiConfigStore] 从旧版 ai_config.json 迁移配置");
-                    var migrated = new AiModelConfig
-                    {
-                        Id = "model_migrated",
-                        Name = "系统默认模型",
-                        DisplayName = "Legacy default model",
-                        Provider = legacy.Provider,
-                        Protocol = AiModelConfig.NormalizeProtocol(null, legacy.Provider),
-                        WireApi = AiModelConfig.NormalizeWireApi(legacy.WireApi),
-                        AuthMode = AiModelConfig.NormalizeAuthMode(null, AiModelConfig.NormalizeProtocol(null, legacy.Provider)),
-                        ApiKey = legacy.ApiKey,
-                        Model = legacy.Model,
-                        BaseUrl = legacy.BaseUrl,
-                        TimeoutMs = legacy.TimeoutSeconds * 1000,
-                        RoleBindings = new List<string> { AiModelConfig.RoleGeneration, AiModelConfig.RolePlanner },
-                        ModelRole = AiModelConfig.RoleGeneration,
-                        Priority = 100,
-                        Capabilities = AiModelCapabilities.Infer(legacy.Provider, legacy.Model),
-                        Reasoning = new AiReasoningSettings(),
-                        IsActive = true,
-                        IsEnabled = true
-                    };
-                    migrated.NormalizeAdvancedFields();
+                    Id = "model_migrated",
+                    Name = "系统默认模型",
+                    DisplayName = "Legacy default model",
+                    Provider = legacy.Provider,
+                    Protocol = AiModelConfig.NormalizeProtocol(null, legacy.Provider),
+                    WireApi = AiModelConfig.NormalizeWireApi(legacy.WireApi),
+                    AuthMode = AiModelConfig.NormalizeAuthMode(null, AiModelConfig.NormalizeProtocol(null, legacy.Provider)),
+                    ApiKey = legacy.ApiKey,
+                    Model = legacy.Model,
+                    BaseUrl = legacy.BaseUrl,
+                    TimeoutMs = legacy.TimeoutSeconds * 1000,
+                    RoleBindings = new List<string> { AiModelConfig.RoleGeneration, AiModelConfig.RolePlanner },
+                    ModelRole = AiModelConfig.RoleGeneration,
+                    Priority = 100,
+                    Capabilities = AiModelCapabilities.Infer(legacy.Provider, legacy.Model),
+                    Reasoning = new AiReasoningSettings(),
+                    IsActive = true,
+                    IsEnabled = true
+                };
+                migrated.NormalizeAdvancedFields();
 
-                    var models = new List<AiModelConfig> { migrated };
-                    _models = models;
-                    Save();
-                    TryDeleteLegacyConfigFile();
-                    return models;
-                }
+                var models = new List<AiModelConfig> { migrated };
+                var generationId = PersistGeneration(models, "migrate_legacy_config");
+                TryDeleteLegacyConfigFile();
+                CleanupSecretGenerationResidue(generationId);
+                return new AiModelLoadResult(models, generationId);
+            }
+            catch (AiConfigPersistenceException)
+            {
+                throw;
             }
             catch (Exception ex)
             {
-                _logger.LogWarning("[AiConfigStore] 迁移旧配置失败: {Message}", ex.Message);
+                throw new AiConfigPersistenceException("AI_MODEL_MIGRATION_FAILED", "migration", ex);
             }
         }
 
-        _logger.LogInformation("[AiConfigStore] 使用 appsettings.json 默认值初始化");
+        _logger.LogInformation("[AiConfigStore] Initializing AI models from appsettings defaults");
         var result = CreateDefaultModels(fallback);
-        _models = result;
-        Save();
-        return result;
+        var initialGenerationId = PersistGeneration(result, "initialize");
+        CleanupSecretGenerationResidue(initialGenerationId);
+        return new AiModelLoadResult(result, initialGenerationId);
     }
 
     private static void EnsureOneActive(List<AiModelConfig> models)
@@ -429,68 +521,316 @@ public class AiConfigStore
         model.NormalizeAdvancedFields();
     }
 
-    private void Save()
+    private void CommitAndActivateCandidateLocked(List<AiModelConfig> candidateModels, string operation)
     {
+        var durableGenerationId = PersistGeneration(candidateModels, operation);
+        _models = candidateModels.Select(CloneModel).ToList();
+        CleanupSecretGenerationResidue(durableGenerationId);
+    }
+
+    private void ReloadAuthoritativeModelsLocked()
+    {
+        var loaded = LoadOrMigrate(_initialOptions);
+        _models = loaded.Models;
+    }
+
+    private string PersistGeneration(IReadOnlyList<AiModelConfig> models, string operation)
+    {
+        var generationId = Guid.NewGuid().ToString("N");
+        var candidateSecretDirectory = Path.Combine(_secretsRoot, $".candidate-{generationId}");
+        var finalSecretDirectory = Path.Combine(_secretsRoot, generationId);
+        var candidateDocumentPath = $"{_modelsFilePath}.{generationId}.candidate";
+        var stage = "candidate_start";
+        var committed = false;
+        var interrupted = false;
+
         try
         {
-            List<AiModelConfig> snapshot;
-            lock (_lock)
+            Directory.CreateDirectory(candidateSecretDirectory);
+            _faultInjector.OnStage(
+                AiPersistenceStage.ModelCandidateStarted,
+                "ai_models",
+                candidateSecretDirectory);
+
+            stage = "candidate_secrets";
+            var candidateSecretStore = new DpapiFileAiApiKeySecretStore(candidateSecretDirectory);
+            var secretModelIds = new List<string>();
+            foreach (var model in models.Where(item => !string.IsNullOrWhiteSpace(item.ApiKey)))
             {
-                snapshot = _models.Select(CloneModel).ToList();
+                _faultInjector.OnStage(
+                    AiPersistenceStage.ModelSecretCandidateWrite,
+                    "ai_models",
+                    candidateSecretDirectory);
+                candidateSecretStore.Save(model.Id, model.ApiKey);
+                secretModelIds.Add(model.Id);
             }
 
-            PersistApiKeys(snapshot);
-            _apiKeySecretStore.PruneExcept(snapshot.Select(model => model.Id));
+            _faultInjector.OnStage(
+                AiPersistenceStage.ModelSecretsPrepared,
+                "ai_models",
+                candidateSecretDirectory);
 
-            var persistedModels = snapshot.Select(CloneModelForPersistence).ToList();
-            var json = JsonSerializer.Serialize(persistedModels, JsonOptions);
-            File.WriteAllText(_modelsFilePath, json);
+            stage = "candidate_document";
+            var document = new AiModelGenerationDocument
+            {
+                SchemaVersion = 2,
+                GenerationId = generationId,
+                Models = models.Select(CloneModelForPersistence).ToList(),
+                SecretModelIds = secretModelIds
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .OrderBy(item => item, StringComparer.OrdinalIgnoreCase)
+                    .ToList()
+            };
+            var json = JsonSerializer.Serialize(document, JsonOptions);
+            AiPersistenceFileOperations.WriteAllTextDurable(candidateDocumentPath, json);
+            _faultInjector.OnStage(
+                AiPersistenceStage.ModelDocumentPrepared,
+                "ai_models",
+                candidateDocumentPath);
+
+            Directory.Move(candidateSecretDirectory, finalSecretDirectory);
+
+            stage = "commit";
+            _faultInjector.OnStage(
+                AiPersistenceStage.ModelCommitStarted,
+                "ai_models",
+                _modelsFilePath);
+            AiPersistenceFileOperations.CommitCandidate(
+                candidateDocumentPath,
+                _modelsFilePath,
+                _modelsBackupFilePath);
+            committed = true;
+            _faultInjector.OnStage(
+                AiPersistenceStage.ModelCommitCompleted,
+                "ai_models",
+                _modelsFilePath);
+
+            return generationId;
+        }
+        catch (AiPersistenceInterruptionException)
+        {
+            interrupted = true;
+            throw;
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "[AiConfigStore] 持久化失败: {Message}", ex.Message);
+            if (committed)
+            {
+                _logger.LogWarning(
+                    ex,
+                    "[AiConfigStore] Post-commit observation failed for generation {GenerationId}; the durable commit remains authoritative.",
+                    generationId);
+                return generationId;
+            }
+
+            var errorCode = stage == "candidate_secrets"
+                ? "AI_MODEL_SECRET_PERSISTENCE_FAILED"
+                : stage == "commit"
+                    ? "AI_MODEL_COMMIT_FAILED"
+                    : "AI_MODEL_CANDIDATE_PERSISTENCE_FAILED";
+            _logger.LogError(
+                ex,
+                "[AiConfigStore] Durable model mutation failed at stage {Stage} during {Operation}.",
+                stage,
+                operation);
+            throw new AiConfigPersistenceException(errorCode, stage, ex);
+        }
+        finally
+        {
+            if (!committed && !interrupted)
+            {
+                AiPersistenceFileOperations.TryDeleteFile(candidateDocumentPath);
+                AiPersistenceFileOperations.TryDeleteDirectory(candidateSecretDirectory);
+                AiPersistenceFileOperations.TryDeleteDirectory(finalSecretDirectory);
+            }
         }
     }
 
-    private bool ImportOrHydrateApiKeys(List<AiModelConfig> models)
+    private bool TryLoadGenerationDocument(
+        string documentPath,
+        out AiModelLoadResult result,
+        out Exception? error)
     {
-        var hadInlineKeys = false;
-        foreach (var model in models)
+        try
         {
-            if (string.IsNullOrWhiteSpace(model.Id))
-                continue;
-
-            if (!string.IsNullOrWhiteSpace(model.ApiKey))
+            var json = File.ReadAllText(documentPath);
+            var document = JsonSerializer.Deserialize<AiModelGenerationDocument>(json, JsonOptions)
+                ?? throw new JsonException("AI model generation document deserialized to null.");
+            if (document.SchemaVersion != 2 ||
+                string.IsNullOrWhiteSpace(document.GenerationId) ||
+                document.Models.Count == 0)
             {
-                _apiKeySecretStore.Save(model.Id, model.ApiKey);
-                hadInlineKeys = true;
-                continue;
+                throw new InvalidDataException("AI model generation document is incomplete.");
             }
 
-            if (_apiKeySecretStore.TryRead(model.Id, out var apiKey))
+            var secretDirectory = Path.Combine(_secretsRoot, document.GenerationId);
+            if (!Directory.Exists(secretDirectory))
             {
+                throw new DirectoryNotFoundException("The referenced AI secret generation is unavailable.");
+            }
+
+            EnsureUniqueModelIds(document.Models);
+            EnsureOneActive(document.Models);
+            EnsureCapabilities(document.Models);
+            EnsureAdvancedFields(document.Models);
+
+            var modelIds = document.Models
+                .Select(model => model.Id)
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+            var secretIds = document.SecretModelIds
+                .Where(id => !string.IsNullOrWhiteSpace(id))
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+            if (!secretIds.IsSubsetOf(modelIds))
+            {
+                throw new InvalidDataException("The AI secret generation references an unknown model.");
+            }
+
+            var secretStore = new DpapiFileAiApiKeySecretStore(secretDirectory);
+            foreach (var model in document.Models)
+            {
+                model.ApiKey = string.Empty;
+                if (!secretIds.Contains(model.Id))
+                {
+                    continue;
+                }
+
+                if (!secretStore.TryRead(model.Id, out var apiKey))
+                {
+                    throw new InvalidDataException("The referenced AI secret generation is incomplete.");
+                }
+
                 model.ApiKey = apiKey;
             }
-        }
 
-        return hadInlineKeys;
+            result = new AiModelLoadResult(document.Models, document.GenerationId);
+            error = null;
+            return true;
+        }
+        catch (Exception ex)
+        {
+            result = new AiModelLoadResult(new List<AiModelConfig>(), string.Empty);
+            error = ex;
+            return false;
+        }
     }
 
-    private void PersistApiKeys(IEnumerable<AiModelConfig> models)
+    private bool TryLoadLegacyModelList(
+        string documentPath,
+        out List<AiModelConfig> models,
+        out Exception? error)
     {
-        foreach (var model in models)
+        try
         {
-            if (string.IsNullOrWhiteSpace(model.Id))
-                continue;
+            var json = File.ReadAllText(documentPath);
+            models = JsonSerializer.Deserialize<List<AiModelConfig>>(json, JsonOptions)
+                ?? throw new JsonException("Legacy AI model list deserialized to null.");
+            if (models.Count == 0)
+            {
+                throw new InvalidDataException("Legacy AI model list is empty.");
+            }
 
-            if (string.IsNullOrWhiteSpace(model.ApiKey))
+            EnsureUniqueModelIds(models);
+            EnsureOneActive(models);
+            EnsureCapabilities(models);
+            EnsureAdvancedFields(models);
+
+            var legacySecretStore = new DpapiFileAiApiKeySecretStore(_secretsRoot);
+            foreach (var model in models.Where(model => string.IsNullOrWhiteSpace(model.ApiKey)))
             {
-                _apiKeySecretStore.Delete(model.Id);
+                if (legacySecretStore.TryRead(model.Id, out var apiKey))
+                {
+                    model.ApiKey = apiKey;
+                }
             }
-            else
+
+            error = null;
+            return true;
+        }
+        catch (Exception ex)
+        {
+            models = new List<AiModelConfig>();
+            error = ex;
+            return false;
+        }
+    }
+
+    private void RestoreBackupDocument()
+    {
+        var candidatePath = $"{_modelsFilePath}.{Guid.NewGuid():N}.recovery.candidate";
+        try
+        {
+            AiPersistenceFileOperations.WriteAllTextDurable(
+                candidatePath,
+                File.ReadAllText(_modelsBackupFilePath));
+            File.Move(candidatePath, _modelsFilePath, overwrite: true);
+        }
+        catch (Exception ex)
+        {
+            throw new AiConfigPersistenceException("AI_MODEL_RECOVERY_COMMIT_FAILED", "recovery", ex);
+        }
+        finally
+        {
+            AiPersistenceFileOperations.TryDeleteFile(candidatePath);
+        }
+    }
+
+    private void CleanupCandidateResidue()
+    {
+        var storageDirectory = Path.GetDirectoryName(_modelsFilePath)!;
+        foreach (var path in Directory.EnumerateFiles(storageDirectory, "ai_models.json.*.candidate"))
+        {
+            AiPersistenceFileOperations.TryDeleteFile(path);
+        }
+
+        if (!Directory.Exists(_secretsRoot))
+        {
+            return;
+        }
+
+        foreach (var path in Directory.EnumerateDirectories(_secretsRoot, ".candidate-*"))
+        {
+            AiPersistenceFileOperations.TryDeleteDirectory(path);
+        }
+    }
+
+    private void CleanupSecretGenerationResidue(string activeGenerationId)
+    {
+        try
+        {
+            _faultInjector.OnStage(AiPersistenceStage.CleanupStarted, "ai_models", _secretsRoot);
+            string? backupGenerationId = null;
+            if (File.Exists(_modelsBackupFilePath) &&
+                TryLoadGenerationDocument(_modelsBackupFilePath, out var backup, out _))
             {
-                _apiKeySecretStore.Save(model.Id, model.ApiKey);
+                backupGenerationId = backup.GenerationId;
             }
+
+            foreach (var path in Directory.EnumerateDirectories(_secretsRoot))
+            {
+                var name = Path.GetFileName(path);
+                if (name.Equals(activeGenerationId, StringComparison.OrdinalIgnoreCase) ||
+                    (!string.IsNullOrWhiteSpace(backupGenerationId) &&
+                     name.Equals(backupGenerationId, StringComparison.OrdinalIgnoreCase)))
+                {
+                    continue;
+                }
+
+                AiPersistenceFileOperations.TryDeleteDirectory(path);
+            }
+
+            if (!string.IsNullOrWhiteSpace(backupGenerationId))
+            {
+                foreach (var legacySecretPath in Directory.EnumerateFiles(_secretsRoot, "*.dpapi"))
+                {
+                    AiPersistenceFileOperations.TryDeleteFile(legacySecretPath);
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(
+                ex,
+                "[AiConfigStore] Non-authoritative AI model generation cleanup will be retried on a later mutation or restart.");
         }
     }
 

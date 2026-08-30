@@ -399,9 +399,11 @@ public class AiFlowGenerationService : IAiFlowGenerationService
                             tokenUsage: 0,
                             latencyMs: (long)llmStopwatch.Elapsed.TotalMilliseconds);
                     }
-                    catch
+                    catch (Exception metricsEx)
                     {
-                        // Never let metrics recording mask the original LLM exception
+                        _logger.LogWarning(
+                            metricsEx,
+                            "Prompt metrics persistence degraded after an LLM failure; the original LLM exception remains authoritative.");
                     }
 
                     // 尝试备用模型（仅当存在独立的 fallback 绑定时）
@@ -472,12 +474,21 @@ public class AiFlowGenerationService : IAiFlowGenerationService
                     "LLM call completed. Model={Model}, InputTokens={InputTokens}, OutputTokens={OutputTokens}, LatencyMs={LatencyMs}",
                     activeModel.Model, estimatedInputTokens, estimatedOutputTokens, (long)llmStopwatch.Elapsed.TotalMilliseconds);
 
-                // 记录 Prompt 版本指标
-                await _promptVersionManager.RecordMetricsAsync(
-                    activePromptVersion.Id,
-                    success: true,
-                    tokenUsage: estimatedInputTokens + estimatedOutputTokens,
-                    latencyMs: (long)llmStopwatch.Elapsed.TotalMilliseconds);
+                // Metrics are auxiliary evidence. Their persistence must never reverse a completed LLM result.
+                try
+                {
+                    await _promptVersionManager.RecordMetricsAsync(
+                        activePromptVersion.Id,
+                        success: true,
+                        tokenUsage: estimatedInputTokens + estimatedOutputTokens,
+                        latencyMs: (long)llmStopwatch.Elapsed.TotalMilliseconds);
+                }
+                catch (Exception metricsEx)
+                {
+                    _logger.LogWarning(
+                        metricsEx,
+                        "Prompt metrics persistence degraded after a completed LLM call; generation continues with the original result.");
+                }
 
                 // 回填 token 估算到 promptTrace
                 if (promptTrace != null)

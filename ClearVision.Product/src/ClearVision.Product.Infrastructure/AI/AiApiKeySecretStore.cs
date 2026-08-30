@@ -42,7 +42,9 @@ internal sealed class DpapiFileAiApiKeySecretStore : IAiApiKeySecretStore
         Directory.CreateDirectory(_directory);
         var bytes = Encoding.UTF8.GetBytes(apiKey);
         var protectedBytes = Protect(bytes);
-        File.WriteAllText(GetSecretPath(modelId), Convert.ToBase64String(protectedBytes));
+        AiPersistenceFileOperations.WriteAllTextDurable(
+            GetSecretPath(modelId),
+            Convert.ToBase64String(protectedBytes));
     }
 
     public bool TryRead(string modelId, out string apiKey)

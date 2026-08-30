@@ -87,15 +87,22 @@ public interface IAIGeneratedFlowVersionManager
 
 public class AIGeneratedFlowVersionManager : IAIGeneratedFlowVersionManager
 {
-    private readonly string _filePath;
-    private readonly object _lock = new();
-    private readonly JsonSerializerOptions _jsonOptions = new()
+    private const string AuthorityName = "ai_flow_versions";
+    private static readonly JsonSerializerOptions JsonOptions = new()
     {
         PropertyNameCaseInsensitive = true,
         WriteIndented = true
     };
+    private readonly AiJsonMutationAuthority<FlowVersionList> _authority;
 
     public AIGeneratedFlowVersionManager(string? baseDirectory = null)
+        : this(baseDirectory, null)
+    {
+    }
+
+    internal AIGeneratedFlowVersionManager(
+        string? baseDirectory,
+        IAiPersistenceFaultInjector? faultInjector)
     {
         var appData = string.IsNullOrWhiteSpace(baseDirectory)
             ? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "ClearVision")
@@ -104,37 +111,12 @@ public class AIGeneratedFlowVersionManager : IAIGeneratedFlowVersionManager
         if (!Directory.Exists(appData))
             Directory.CreateDirectory(appData);
 
-        _filePath = Path.Combine(appData, "ai_flow_versions.json");
-    }
-
-    private FlowVersionList LoadData()
-    {
-        lock (_lock)
-        {
-            if (!File.Exists(_filePath))
-            {
-                return new FlowVersionList();
-            }
-
-            try
-            {
-                var json = File.ReadAllText(_filePath);
-                return JsonSerializer.Deserialize<FlowVersionList>(json, _jsonOptions) ?? new FlowVersionList();
-            }
-            catch
-            {
-                return new FlowVersionList();
-            }
-        }
-    }
-
-    private void SaveData(FlowVersionList data)
-    {
-        lock (_lock)
-        {
-            var json = JsonSerializer.Serialize(data, _jsonOptions);
-            File.WriteAllText(_filePath, json);
-        }
+        _authority = new AiJsonMutationAuthority<FlowVersionList>(
+            AuthorityName,
+            Path.Combine(appData, "ai_flow_versions.json"),
+            static () => new FlowVersionList(),
+            JsonOptions,
+            faultInjector);
     }
 
     public Task<AIGeneratedFlowVersion> SaveVersionAsync(
@@ -145,72 +127,71 @@ public class AIGeneratedFlowVersionManager : IAIGeneratedFlowVersionManager
         WorkflowTelemetry telemetry,
         string createdBy = "System")
     {
-        var data = LoadData();
-
-        var flowId = flow.Id;
-        // 自动计算版本号：取相同 FlowId 的历史最大版本号 + 1
-        var history = data.Versions.Where(v => v.FlowId == flowId).ToList();
-        int nextVersion = history.Count > 0 ? history.Max(v => v.VersionNumber) + 1 : 1;
-
-        var newVersion = new AIGeneratedFlowVersion
+        var newVersion = _authority.Mutate("save_flow_version", data =>
         {
-            Id = Guid.NewGuid(),
-            FlowId = flowId,
-            FlowName = flow.Name,
-            VersionNumber = nextVersion,
-            VersionName = $"V{nextVersion}.0",
-            Description = $"自动生成版本 V{nextVersion}.0",
-            UserRequirement = userRequirement,
-            Flow = flow,
-            UsedPrompt = promptInfo,
-            UsedProvider = provider,
-            GeneratedAt = DateTime.UtcNow,
-            GeneratedBy = createdBy,
-            Telemetry = telemetry,
-            IsDeployed = false
-        };
+            var flowId = flow.Id;
+            var history = data.Versions.Where(v => v.FlowId == flowId).ToList();
+            var nextVersion = history.Count > 0 ? history.Max(v => v.VersionNumber) + 1 : 1;
+            var candidate = new AIGeneratedFlowVersion
+            {
+                Id = Guid.NewGuid(),
+                FlowId = flowId,
+                FlowName = flow.Name,
+                VersionNumber = nextVersion,
+                VersionName = $"V{nextVersion}.0",
+                Description = $"自动生成版本 V{nextVersion}.0",
+                UserRequirement = userRequirement,
+                Flow = flow,
+                UsedPrompt = promptInfo,
+                UsedProvider = provider,
+                GeneratedAt = DateTime.UtcNow,
+                GeneratedBy = createdBy,
+                Telemetry = telemetry,
+                IsDeployed = false
+            };
 
-        data.Versions.Add(newVersion);
-        SaveData(data);
+            data.Versions.Add(candidate);
+            return AiJsonMutation<AIGeneratedFlowVersion>.Persist(candidate);
+        });
 
         return Task.FromResult(newVersion);
     }
 
     public Task<AIGeneratedFlowVersion?> GetVersionAsync(Guid versionId)
     {
-        var data = LoadData();
-        var version = data.Versions.FirstOrDefault(v => v.Id == versionId);
+        var version = _authority.Read(data => data.Versions.FirstOrDefault(v => v.Id == versionId));
         return Task.FromResult(version);
     }
 
     public Task<List<AIGeneratedFlowVersion>> GetFlowHistoryAsync(Guid flowId)
     {
-        var data = LoadData();
-        var history = data.Versions
+        var history = _authority.Read(data => data.Versions
             .Where(v => v.FlowId == flowId)
             .OrderByDescending(v => v.VersionNumber)
-            .ToList();
+            .ToList());
         return Task.FromResult(history);
     }
 
     public Task MarkAsDeployedAsync(Guid versionId)
     {
-        var data = LoadData();
-        var version = data.Versions.FirstOrDefault(v => v.Id == versionId);
-        if (version != null)
+        _authority.Mutate("mark_deployed", data =>
         {
+            var version = data.Versions.FirstOrDefault(v => v.Id == versionId);
+            if (version == null)
+            {
+                return AiJsonMutation<bool>.NoChange(false);
+            }
+
             version.IsDeployed = true;
             version.DeployedAt = DateTime.UtcNow;
-
-            // 可以选择将该流程先前的已部署版本标为未部署，以保证同一时间只有一个生效版本
             var others = data.Versions.Where(v => v.FlowId == version.FlowId && v.Id != versionId && v.IsDeployed);
             foreach (var other in others)
             {
                 other.IsDeployed = false;
             }
 
-            SaveData(data);
-        }
+            return AiJsonMutation<bool>.Persist(true);
+        });
         return Task.CompletedTask;
     }
 
@@ -239,38 +220,42 @@ public class AIGeneratedFlowVersionManager : IAIGeneratedFlowVersionManager
         var normalizedArtifactVersion = artifactVersion.Trim();
         var normalizedRelativePath = NormalizeRelativePath(relativePath);
 
-        var data = LoadData();
-        var existingActive = data.ScenarioArtifactVersions
-            .Where(item =>
-                item.IsActive &&
-                item.ScenarioKey.Equals(normalizedScenarioKey, StringComparison.OrdinalIgnoreCase) &&
-                item.ArtifactType == artifactType &&
-                item.ArtifactName.Equals(normalizedArtifactName, StringComparison.OrdinalIgnoreCase))
-            .ToList();
-
-        foreach (var activeVersion in existingActive)
+        var artifactRecord = _authority.Mutate("save_scenario_artifact", data =>
         {
-            activeVersion.IsActive = false;
-        }
+            var existingActive = data.ScenarioArtifactVersions
+                .Where(item =>
+                    item.IsActive &&
+                    item.ScenarioKey.Equals(normalizedScenarioKey, StringComparison.OrdinalIgnoreCase) &&
+                    item.ArtifactType == artifactType &&
+                    item.ArtifactName.Equals(normalizedArtifactName, StringComparison.OrdinalIgnoreCase))
+                .ToList();
 
-        var artifactRecord = new ScenarioArtifactVersionRecord
-        {
-            Id = Guid.NewGuid(),
-            ScenarioKey = normalizedScenarioKey,
-            ArtifactType = artifactType,
-            ArtifactName = normalizedArtifactName,
-            ArtifactVersion = normalizedArtifactVersion,
-            RelativePath = normalizedRelativePath,
-            SourceFlowVersionId = sourceFlowVersionId,
-            ChecksumSha256 = string.IsNullOrWhiteSpace(checksumSha256) ? null : checksumSha256.Trim(),
-            CreatedAtUtc = DateTime.UtcNow,
-            CreatedBy = createdBy,
-            IsActive = true,
-            Metadata = metadata ?? new Dictionary<string, string>()
-        };
+            foreach (var activeVersion in existingActive)
+            {
+                activeVersion.IsActive = false;
+            }
 
-        data.ScenarioArtifactVersions.Add(artifactRecord);
-        SaveData(data);
+            var candidate = new ScenarioArtifactVersionRecord
+            {
+                Id = Guid.NewGuid(),
+                ScenarioKey = normalizedScenarioKey,
+                ArtifactType = artifactType,
+                ArtifactName = normalizedArtifactName,
+                ArtifactVersion = normalizedArtifactVersion,
+                RelativePath = normalizedRelativePath,
+                SourceFlowVersionId = sourceFlowVersionId,
+                ChecksumSha256 = string.IsNullOrWhiteSpace(checksumSha256) ? null : checksumSha256.Trim(),
+                CreatedAtUtc = DateTime.UtcNow,
+                CreatedBy = createdBy,
+                IsActive = true,
+                Metadata = metadata == null
+                    ? new Dictionary<string, string>()
+                    : new Dictionary<string, string>(metadata)
+            };
+
+            data.ScenarioArtifactVersions.Add(candidate);
+            return AiJsonMutation<ScenarioArtifactVersionRecord>.Persist(candidate);
+        });
 
         return Task.FromResult(artifactRecord);
     }
@@ -281,37 +266,40 @@ public class AIGeneratedFlowVersionManager : IAIGeneratedFlowVersionManager
             return Task.FromResult(new List<ScenarioArtifactVersionRecord>());
 
         var normalizedScenarioKey = scenarioKey.Trim();
-        var data = LoadData();
-        var query = data.ScenarioArtifactVersions
-            .Where(item => item.ScenarioKey.Equals(normalizedScenarioKey, StringComparison.OrdinalIgnoreCase));
-
-        if (artifactType.HasValue)
+        var result = _authority.Read(data =>
         {
-            query = query.Where(item => item.ArtifactType == artifactType.Value);
-        }
+            var query = data.ScenarioArtifactVersions
+                .Where(item => item.ScenarioKey.Equals(normalizedScenarioKey, StringComparison.OrdinalIgnoreCase));
+            if (artifactType.HasValue)
+            {
+                query = query.Where(item => item.ArtifactType == artifactType.Value);
+            }
 
-        var result = query
-            .OrderByDescending(item => item.CreatedAtUtc)
-            .ToList();
+            return query.OrderByDescending(item => item.CreatedAtUtc).ToList();
+        });
         return Task.FromResult(result);
     }
 
     public Task MarkScenarioArtifactActiveAsync(Guid artifactVersionId)
     {
-        var data = LoadData();
-        var target = data.ScenarioArtifactVersions.FirstOrDefault(item => item.Id == artifactVersionId);
-        if (target == null)
-            return Task.CompletedTask;
-
-        foreach (var candidate in data.ScenarioArtifactVersions.Where(item =>
-                     item.ScenarioKey.Equals(target.ScenarioKey, StringComparison.OrdinalIgnoreCase) &&
-                     item.ArtifactType == target.ArtifactType &&
-                     item.ArtifactName.Equals(target.ArtifactName, StringComparison.OrdinalIgnoreCase)))
+        _authority.Mutate("activate_scenario_artifact", data =>
         {
-            candidate.IsActive = candidate.Id == target.Id;
-        }
+            var target = data.ScenarioArtifactVersions.FirstOrDefault(item => item.Id == artifactVersionId);
+            if (target == null)
+            {
+                return AiJsonMutation<bool>.NoChange(false);
+            }
 
-        SaveData(data);
+            foreach (var candidate in data.ScenarioArtifactVersions.Where(item =>
+                         item.ScenarioKey.Equals(target.ScenarioKey, StringComparison.OrdinalIgnoreCase) &&
+                         item.ArtifactType == target.ArtifactType &&
+                         item.ArtifactName.Equals(target.ArtifactName, StringComparison.OrdinalIgnoreCase)))
+            {
+                candidate.IsActive = candidate.Id == target.Id;
+            }
+
+            return AiJsonMutation<bool>.Persist(true);
+        });
         return Task.CompletedTask;
     }
 
@@ -326,11 +314,10 @@ public class AIGeneratedFlowVersionManager : IAIGeneratedFlowVersionManager
             return Task.FromResult<ScenarioPackageManifest?>(null);
 
         var normalizedScenarioKey = scenarioKey.Trim();
-        var data = LoadData();
-        var activeRecords = data.ScenarioArtifactVersions
+        var activeRecords = _authority.Read(data => data.ScenarioArtifactVersions
             .Where(item => item.IsActive && item.ScenarioKey.Equals(normalizedScenarioKey, StringComparison.OrdinalIgnoreCase))
             .OrderByDescending(item => item.CreatedAtUtc)
-            .ToList();
+            .ToList());
 
         if (activeRecords.Count == 0)
             return Task.FromResult<ScenarioPackageManifest?>(null);

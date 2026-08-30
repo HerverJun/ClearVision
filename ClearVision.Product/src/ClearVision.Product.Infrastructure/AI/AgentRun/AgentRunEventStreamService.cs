@@ -8,7 +8,11 @@ namespace ClearVision.Product.Infrastructure.AI.AgentRun;
 
 public interface IAgentRunEventStreamService
 {
-    AgentRunCreateResult CreateRun(string description, object? payload = null, string? ownerHash = null);
+    AgentRunCreateResult CreateRun(
+        string description,
+        object? payload = null,
+        string? ownerHash = null,
+        string? requestedRunId = null);
     AgentRunEvent? Append(string? runId, AgentRunEventDraft draft);
     AgentRunTerminalReservationResult TryReserveTerminal(string? runId, string terminalStatus);
     AgentRunTerminalIntentRecord? PrepareTerminalIntent(
@@ -74,11 +78,26 @@ public sealed class AgentRunEventStreamService : IAgentRunEventStreamService
 
     public string HostInstanceId { get; } = Guid.NewGuid().ToString("N");
 
-    public AgentRunCreateResult CreateRun(string description, object? payload = null, string? ownerHash = null)
+    public AgentRunCreateResult CreateRun(
+        string description,
+        object? payload = null,
+        string? ownerHash = null,
+        string? requestedRunId = null)
     {
-        var runId = $"ar_{Guid.NewGuid():N}";
+        var runId = string.IsNullOrWhiteSpace(requestedRunId)
+            ? $"ar_{Guid.NewGuid():N}"
+            : requestedRunId.Trim();
+        var restored = GetOrRestoreState(runId);
+        if (restored != null)
+        {
+            return BuildExistingCreateResult(restored, description, ownerHash);
+        }
+
         var state = new AgentRunState(runId, UtcNowProvider(), ownerHash);
-        _runs[runId] = state;
+        if (!_runs.TryAdd(runId, state))
+        {
+            return BuildExistingCreateResult(_runs[runId], description, ownerHash);
+        }
 
         var brief = BuildBrief(description);
         var events = new List<AgentRunEvent>();
@@ -106,7 +125,28 @@ public sealed class AgentRunEventStreamService : IAgentRunEventStreamService
             }
         })!);
 
-        return new AgentRunCreateResult(runId, brief, events);
+        return new AgentRunCreateResult(runId, brief, events, Created: true);
+    }
+
+    private static AgentRunCreateResult BuildExistingCreateResult(
+        AgentRunState state,
+        string description,
+        string? ownerHash)
+    {
+        var normalizedOwner = NormalizeOwnerHash(ownerHash);
+        lock (state.Gate)
+        {
+            if (!string.Equals(state.OwnerHash, normalizedOwner, StringComparison.Ordinal))
+            {
+                throw new InvalidOperationException("The requested Agent run id belongs to another owner.");
+            }
+
+            return new AgentRunCreateResult(
+                state.RunId,
+                BuildBrief(description),
+                state.Events.OrderBy(evt => evt.Sequence).ToArray(),
+                Created: false);
+        }
     }
 
     public AgentRunEvent? Append(string? runId, AgentRunEventDraft draft)

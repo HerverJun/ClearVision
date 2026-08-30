@@ -26,6 +26,42 @@ async function api(url, options = {}) {
   return text ? JSON.parse(text) : null;
 }
 
+async function createPlanEnvelope(request) {
+  const planRequest = {
+    ...request,
+    workspaceExpectedRevision: Math.max(0, Number(request?.workspaceExpectedRevision) || 0),
+    clientMutationId: String(request?.clientMutationId || `p1-plan-${Date.now()}`).trim(),
+  };
+  const created = await api('/api/ai/agent-plan-runs', {
+    method: 'POST',
+    body: JSON.stringify(planRequest),
+  });
+  const runId = String(created?.runId || '').trim();
+  assert(runId, 'Plan Run creation did not return runId.');
+
+  for (let attempt = 0; attempt < 120; attempt += 1) {
+    const replay = await api(`/api/ai/agent-runs/${encodeURIComponent(runId)}`);
+    const completed = (replay?.events || []).find(event =>
+      String(event?.eventType || '').toLowerCase() === 'run.completed');
+    if (completed?.payload?.planResult) {
+      return {
+        sessionId: created.sessionId,
+        planResult: completed.payload.planResult,
+        workspaceSnapshot: completed.payload.workspaceSnapshot || null,
+        persistenceStatus: completed.payload.persistenceStatus || null,
+      };
+    }
+
+    const terminal = String(replay?.summary?.status || '').toLowerCase();
+    if (terminal === 'failed' || terminal === 'cancelled') {
+      throw new Error(`Plan Run ${runId} ended as ${terminal}.`);
+    }
+    await new Promise(resolve => setTimeout(resolve, 250));
+  }
+
+  throw new Error(`Plan Run ${runId} did not complete within 30 seconds.`);
+}
+
 async function screenshot(page, name, theme) {
   await page.evaluate(value => { document.documentElement.dataset.theme = value; }, theme);
   await page.waitForTimeout(120);
@@ -107,14 +143,11 @@ async function main() {
   await page.waitForFunction(() => Boolean(window.aiPanel && !window.aiPanel._disposed));
   await page.setViewportSize({ width: 1920, height: 1080 });
 
-  const planEnvelope = await api('/api/ai/agent-plan', {
-    method: 'POST',
-    body: JSON.stringify({
-      description: 'Inspect packaging surface damage with a station camera; visible damage is NG; keep output local.',
-      sessionId: 'p1-after-webview2',
-      requirementMode: 'strict',
-      metadataOnly: true,
-    }),
+  const planEnvelope = await createPlanEnvelope({
+    description: 'Inspect packaging surface damage with a station camera; visible damage is NG; keep output local.',
+    sessionId: `p1-after-webview2-${Date.now()}`,
+    requirementMode: 'strict',
+    metadataOnly: true,
   });
 
   const readinessRequest = await page.evaluate(envelope => {

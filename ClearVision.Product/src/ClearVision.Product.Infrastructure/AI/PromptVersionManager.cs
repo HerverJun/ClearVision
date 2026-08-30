@@ -56,10 +56,25 @@ public interface IPromptVersionManager
 // 提示词版本管理器
 public class PromptVersionManager : IPromptVersionManager
 {
-    private readonly string _filePath;
-    private readonly object _lock = new();
+    private const string AuthorityName = "prompt_versions";
+    private static readonly JsonSerializerOptions JsonOptions = new()
+    {
+        PropertyNameCaseInsensitive = true,
+        WriteIndented = true
+    };
+
+    private readonly AiJsonMutationAuthority<PromptVersionList> _authority;
+    private readonly AiAuxiliaryPersistenceHealth _persistenceHealth;
 
     public PromptVersionManager(string? baseDirectory = null)
+        : this(baseDirectory, null, null)
+    {
+    }
+
+    internal PromptVersionManager(
+        string? baseDirectory,
+        IAiPersistenceFaultInjector? faultInjector,
+        AiAuxiliaryPersistenceHealth? persistenceHealth)
     {
         var appData = string.IsNullOrWhiteSpace(baseDirectory)
             ? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "ClearVision")
@@ -68,148 +83,157 @@ public class PromptVersionManager : IPromptVersionManager
         if (!Directory.Exists(appData))
             Directory.CreateDirectory(appData);
 
-        _filePath = Path.Combine(appData, "prompt_versions.json");
-    }
-
-    private PromptVersionList LoadData()
-    {
-        lock (_lock)
-        {
-            if (!File.Exists(_filePath))
-            {
-                return new PromptVersionList();
-            }
-
-            try
-            {
-                var json = File.ReadAllText(_filePath);
-                return JsonSerializer.Deserialize<PromptVersionList>(json, new JsonSerializerOptions { PropertyNameCaseInsensitive = true }) ?? new PromptVersionList();
-            }
-            catch
-            {
-                return new PromptVersionList();
-            }
-        }
-    }
-
-    private void SaveData(PromptVersionList data)
-    {
-        lock (_lock)
-        {
-            var json = JsonSerializer.Serialize(data, new JsonSerializerOptions { WriteIndented = true });
-            File.WriteAllText(_filePath, json);
-        }
+        _persistenceHealth = persistenceHealth ?? new AiAuxiliaryPersistenceHealth();
+        _authority = new AiJsonMutationAuthority<PromptVersionList>(
+            AuthorityName,
+            Path.Combine(appData, "prompt_versions.json"),
+            static () => new PromptVersionList(),
+            JsonOptions,
+            faultInjector);
     }
 
     public Task<PromptVersion> CreateVersionAsync(string name, string content, string description, string createdBy = "System")
     {
-        var data = LoadData();
-        var version = new PromptVersion
+        var version = _authority.Mutate("create_version", data =>
         {
-            Id = Guid.NewGuid(),
-            Name = name,
-            Description = description,
-            Content = content,
-            CreatedAt = DateTime.UtcNow,
-            CreatedBy = createdBy,
-            Metrics = new PromptMetrics()
-        };
+            var candidate = new PromptVersion
+            {
+                Id = Guid.NewGuid(),
+                Name = name,
+                Description = description,
+                Content = content,
+                CreatedAt = DateTime.UtcNow,
+                CreatedBy = createdBy,
+                Metrics = new PromptMetrics()
+            };
 
-        data.Versions.Add(version);
+            data.Versions.Add(candidate);
+            if (data.Versions.Count == 1)
+            {
+                data.ActiveVersionId = candidate.Id;
+            }
 
-        // 如果是第一个版本，自动激活
-        if (data.Versions.Count == 1)
-        {
-            data.ActiveVersionId = version.Id;
-        }
-
-        SaveData(data);
+            return AiJsonMutation<PromptVersion>.Persist(candidate);
+        });
         return Task.FromResult(version);
     }
 
     public Task<PromptVersion?> GetVersionAsync(Guid id)
     {
-        var data = LoadData();
-        var version = data.Versions.FirstOrDefault(v => v.Id == id);
+        var version = _authority.Read(data => data.Versions.FirstOrDefault(v => v.Id == id));
         return Task.FromResult(version);
     }
 
     public Task<List<PromptVersion>> ListVersionsAsync()
     {
-        var data = LoadData();
-        return Task.FromResult(data.Versions);
+        return Task.FromResult(_authority.Read(data => data.Versions.ToList()));
     }
 
     public Task ActivateVersionAsync(Guid id)
     {
-        var data = LoadData();
-        if (data.Versions.Any(v => v.Id == id))
+        _authority.Mutate("activate_version", data =>
         {
+            if (!data.Versions.Any(v => v.Id == id))
+            {
+                throw new ArgumentException("指定的提示词版本不存在。");
+            }
+
+            if (data.ActiveVersionId == id)
+            {
+                return AiJsonMutation<bool>.NoChange(true);
+            }
+
             data.ActiveVersionId = id;
-            SaveData(data);
-        }
-        else
-        {
-            throw new ArgumentException("指定的提示词版本不存在。");
-        }
+            return AiJsonMutation<bool>.Persist(true);
+        });
         return Task.CompletedTask;
     }
 
     public Task DeleteVersionAsync(Guid id)
     {
-        var data = LoadData();
-        var version = data.Versions.FirstOrDefault(v => v.Id == id);
-        if (version != null)
+        _authority.Mutate("delete_version", data =>
         {
-            data.Versions.Remove(version);
+            var version = data.Versions.FirstOrDefault(v => v.Id == id);
+            if (version == null)
+            {
+                return AiJsonMutation<bool>.NoChange(false);
+            }
 
-            // 如果删除的是激活的版本，则重置激活状态
+            data.Versions.Remove(version);
             if (data.ActiveVersionId == id)
             {
                 data.ActiveVersionId = data.Versions.OrderByDescending(v => v.CreatedAt).FirstOrDefault()?.Id;
             }
 
-            SaveData(data);
-        }
+            return AiJsonMutation<bool>.Persist(true);
+        });
         return Task.CompletedTask;
     }
 
-    public async Task<PromptVersion> GetActiveVersionAsync()
+    public Task<PromptVersion> GetActiveVersionAsync()
     {
-        var data = LoadData();
-        if (data.ActiveVersionId.HasValue)
+        var active = _authority.Mutate("initialize_active_version", data =>
         {
-            var activeVersion = data.Versions.FirstOrDefault(v => v.Id == data.ActiveVersionId.Value);
-            if (activeVersion != null)
+            if (data.ActiveVersionId.HasValue)
             {
-                return activeVersion;
+                var existing = data.Versions.FirstOrDefault(v => v.Id == data.ActiveVersionId.Value);
+                if (existing != null)
+                {
+                    return AiJsonMutation<PromptVersion>.NoChange(existing);
+                }
             }
-        }
 
-        // 如果没有任何激活的版本，则自动初始化一个默认的基线版本
-        var defaultPrompt = @"You are a professional industrial vision inspection flow generation assistant for ClearVision platform.
+            var defaultPrompt = @"You are a professional industrial vision inspection flow generation assistant for ClearVision platform.
 Your task is to convert natural language requirements into structured JSON flow definitions.
 Always respond with valid JSON that matches the ClearVision flow schema.";
+            var newVersion = new PromptVersion
+            {
+                Id = Guid.NewGuid(),
+                Name = "V1.0 - Baseline",
+                Description = "系统初始默认提示词",
+                Content = defaultPrompt,
+                CreatedAt = DateTime.UtcNow,
+                CreatedBy = "System",
+                Metrics = new PromptMetrics()
+            };
+            data.Versions.Add(newVersion);
+            data.ActiveVersionId = newVersion.Id;
+            return AiJsonMutation<PromptVersion>.Persist(newVersion);
+        });
 
-        var newVersion = await CreateVersionAsync("V1.0 - Baseline", defaultPrompt, "系统初始默认提示词");
-        await ActivateVersionAsync(newVersion.Id);
-        return newVersion;
+        return Task.FromResult(active);
     }
 
     public Task RecordMetricsAsync(Guid versionId, bool success, int tokenUsage, long latencyMs)
     {
-        var data = LoadData();
-        var version = data.Versions.FirstOrDefault(v => v.Id == versionId);
-        if (version != null)
+        try
         {
-            version.Metrics.TotalCalls++;
-            if (success)
-                version.Metrics.SuccessCalls++;
-            version.Metrics.TotalTokenUsage += tokenUsage;
-            version.Metrics.TotalLatencyMs += latencyMs;
+            var persisted = _authority.Mutate("record_metrics", data =>
+            {
+                var version = data.Versions.FirstOrDefault(v => v.Id == versionId);
+                if (version == null)
+                {
+                    return AiJsonMutation<bool>.NoChange(false);
+                }
 
-            SaveData(data);
+                version.Metrics ??= new PromptMetrics();
+                version.Metrics.TotalCalls++;
+                if (success)
+                    version.Metrics.SuccessCalls++;
+                version.Metrics.TotalTokenUsage += tokenUsage;
+                version.Metrics.TotalLatencyMs += latencyMs;
+                return AiJsonMutation<bool>.Persist(true);
+            });
+            if (persisted)
+            {
+                _persistenceHealth.ReportRecovered(AuthorityName);
+            }
         }
+        catch (AiAuxiliaryPersistenceException ex)
+        {
+            _persistenceHealth.ReportDegraded(AuthorityName, "record_metrics", ex.ErrorCode);
+        }
+
         return Task.CompletedTask;
     }
 }

@@ -132,7 +132,8 @@ public sealed record AgentRunTerminalIntentDraft
 public sealed record AgentRunCreateResult(
     string RunId,
     string Brief,
-    IReadOnlyList<AgentRunEvent> Events);
+    IReadOnlyList<AgentRunEvent> Events,
+    bool Created = true);
 
 public sealed record AgentRunReplaySnapshot
 {

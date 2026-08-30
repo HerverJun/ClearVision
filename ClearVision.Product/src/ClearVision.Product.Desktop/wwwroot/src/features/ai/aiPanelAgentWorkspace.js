@@ -2149,7 +2149,8 @@ export const aiPanelAgentWorkspaceMixin = {
             userMessage,
             attachmentPaths,
             templateSelection,
-            semanticExtraction
+            semanticExtraction,
+            clientMutationId: planRequestId
         });
         this._requestBackendVisionPlanLive(planRequest, {
             planRequestId,
@@ -2254,7 +2255,8 @@ export const aiPanelAgentWorkspaceMixin = {
         userMessage = '',
         attachmentPaths = [],
         templateSelection = null,
-        semanticExtraction = null
+        semanticExtraction = null,
+        clientMutationId = null
     }) {
         const normalizedTemplateSelection = this._normalizeTemplateSelection?.(templateSelection) || null;
         const currentFlowSnapshot = this._hasCurrentFlowContext?.()
@@ -2276,6 +2278,8 @@ export const aiPanelAgentWorkspaceMixin = {
             confirmedPlanAnswers: this._buildConfirmedPlanAnswers(this.pendingVisionPlan),
             resolvedPlanFields: this._getResolvedPlanFields(this.pendingVisionPlan),
             remainingPlanFields: this._getRemainingPlanFields(this.pendingVisionPlan),
+            workspaceExpectedRevision: Math.max(0, Number(this.workspaceSnapshotRevision) || 0),
+            clientMutationId: String(clientMutationId || '').trim() || this._createPlanRequestId(),
             planningBudgetMs: this._getPlanningBackendRemainingMs?.() || PLANNING_DEADLINE_FALLBACK.totalBudgetMs
         };
     },
@@ -2336,50 +2340,7 @@ export const aiPanelAgentWorkspaceMixin = {
             .join(' / ') || null;
     },
 
-    async _requestBackendVisionPlan(request) {
-        const response = await httpClient.post('/ai/agent-plan', request);
-        const sessionId = String(response?.sessionId || response?.SessionId || '').trim();
-        if (sessionId) {
-            this._adoptCanonicalSessionId?.(sessionId, { reason: 'plan_response' });
-        }
-        this._applyWorkspaceSnapshotSummary?.(response?.workspaceSnapshot || response?.WorkspaceSnapshot || null);
-        this._handleWorkspacePersistenceStatus?.(response?.persistenceStatus || response?.PersistenceStatus || null);
-        const result = response?.planResult || response?.PlanResult || response?.planModeResult || response?.PlanModeResult || response;
-        return this._mergePlanResponsePersistenceEnvelope(result, response);
-    },
-
-    _mergePlanResponsePersistenceEnvelope(result, response) {
-        if (!result || typeof result !== 'object' || !response || typeof response !== 'object' || result === response) {
-            return result;
-        }
-
-        const workspaceSnapshot = response.workspaceSnapshot || response.WorkspaceSnapshot || null;
-        const persistenceStatus = response.persistenceStatus || response.PersistenceStatus || null;
-        const persistenceWarning = response.persistenceWarning || response.PersistenceWarning || null;
-        return {
-            ...result,
-            ...(workspaceSnapshot ? { workspaceSnapshot, WorkspaceSnapshot: workspaceSnapshot } : {}),
-            ...(persistenceStatus ? { persistenceStatus, PersistenceStatus: persistenceStatus } : {}),
-            ...(persistenceWarning ? { persistenceWarning, PersistenceWarning: persistenceWarning } : {})
-        };
-    },
-
-    _shouldUsePlanRunEventStream() {
-        return typeof window !== 'undefined' && typeof fetch === 'function';
-    },
-
     async _requestBackendVisionPlanLive(request, { planRequestId, turn, fallbackDescription = '' } = {}) {
-        if (!this._shouldUsePlanRunEventStream()) {
-            this._setAssistantTurnStatus(turn, '普通规划请求', 'warning');
-            this._setAssistantSectionText(
-                turn,
-                'reply',
-                '事件流不可用，已切换为普通规划请求。'
-            );
-            this._setResultStatusNote('事件流不可用，已切换为普通规划请求。', 'warning');
-            return await this._requestBackendVisionPlan(request);
-        }
-
         return await this._requestBackendVisionPlanRun(request, {
             planRequestId,
             turn,

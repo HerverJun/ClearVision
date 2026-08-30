@@ -112,6 +112,92 @@ public class AiFlowGenerationServiceManualRetryTests : IDisposable
         validator.Received(1).Validate(Arg.Any<AiGeneratedFlowJson>());
     }
 
+    [Fact]
+    public async Task GenerateFlowAsync_WhenSuccessMetricsPersistenceThrows_ShouldKeepCompletedGenerationResult()
+    {
+        var connector = Substitute.For<IAiConnector>();
+        connector.StreamCompleteAsync(
+                Arg.Any<string>(),
+                Arg.Any<List<ChatMessage>>(),
+                Arg.Any<Action<AiStreamChunk>>(),
+                Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(new AiCompletionResult
+            {
+                Content = BuildSuccessfulFlowJson(),
+                TokenUsage = new AiTokenUsage
+                {
+                    InputTokens = 12,
+                    OutputTokens = 8
+                }
+            }));
+        var validator = Substitute.For<IAiFlowValidator>();
+        validator.Validate(Arg.Any<AiGeneratedFlowJson>()).Returns(new AiValidationResult());
+        var promptVersionManager = Substitute.For<IPromptVersionManager>();
+        promptVersionManager.GetActiveVersionAsync().Returns(Task.FromResult(new PromptVersion
+        {
+            Id = Guid.NewGuid(),
+            Name = "Metrics Fault",
+            Content = "prompt"
+        }));
+        promptVersionManager.RecordMetricsAsync(
+                Arg.Any<Guid>(),
+                true,
+                Arg.Any<int>(),
+                Arg.Any<long>())
+            .Returns(Task.FromException(new IOException("metrics evidence unavailable")));
+        var service = CreateService(
+            connector,
+            validator,
+            new ConversationalFlowService(_tempRoot),
+            useRealOperatorFactory: true,
+            promptVersionManager: promptVersionManager);
+
+        var result = await service.GenerateFlowAsync(new AiFlowGenerationRequest(
+            "Generate a basic inspection flow.",
+            SessionId: "success-metrics-fault"));
+
+        result.Success.Should().BeTrue("auxiliary metrics must not reverse a completed LLM result: {0}", result.ErrorMessage);
+        result.Flow.Should().NotBeNull();
+    }
+
+    [Fact]
+    public async Task GenerateFlowAsync_WhenFailureMetricsPersistenceThrows_ShouldPreserveOriginalLlmException()
+    {
+        var connector = Substitute.For<IAiConnector>();
+        connector.StreamCompleteAsync(
+                Arg.Any<string>(),
+                Arg.Any<List<ChatMessage>>(),
+                Arg.Any<Action<AiStreamChunk>>(),
+                Arg.Any<CancellationToken>())
+            .Returns(Task.FromException<AiCompletionResult>(new InvalidOperationException("original-llm-failure")));
+        var promptVersionManager = Substitute.For<IPromptVersionManager>();
+        promptVersionManager.GetActiveVersionAsync().Returns(Task.FromResult(new PromptVersion
+        {
+            Id = Guid.NewGuid(),
+            Name = "Metrics Fault",
+            Content = "prompt"
+        }));
+        promptVersionManager.RecordMetricsAsync(
+                Arg.Any<Guid>(),
+                false,
+                Arg.Any<int>(),
+                Arg.Any<long>())
+            .Returns(Task.FromException(new IOException("secondary-metrics-failure")));
+        var service = CreateService(
+            connector,
+            Substitute.For<IAiFlowValidator>(),
+            new ConversationalFlowService(_tempRoot),
+            promptVersionManager: promptVersionManager);
+
+        var result = await service.GenerateFlowAsync(new AiFlowGenerationRequest(
+            "Generate a basic inspection flow.",
+            SessionId: "failure-metrics-fault"));
+
+        result.Success.Should().BeFalse();
+        result.ErrorMessage.Should().Contain("original-llm-failure");
+        result.ErrorMessage.Should().NotContain("secondary-metrics-failure");
+    }
+
     [Fact(DisplayName = "GenerateFlowAsync should extract a complete JSON object with trailing text")]
     public async Task GenerateFlowAsync_ResponseWithTrailingText_ShouldExtractCompleteJsonObject()
     {
@@ -1621,16 +1707,19 @@ public class AiFlowGenerationServiceManualRetryTests : IDisposable
         AiRequirementBrief? requirementBrief = null,
         IReadOnlyList<ScenarioMatchResult>? scenarioMatches = null,
         IRequirementBriefExtractor? requirementBriefExtractor = null,
-        bool useRealOperatorFactory = false)
+        bool useRealOperatorFactory = false,
+        IPromptVersionManager? promptVersionManager = null)
     {
         var modelSelector = Substitute.For<IAiModelSelector>();
-        modelSelector.SelectGenerationModel().Returns(new AiModelConfig
+        var selectedModel = new AiModelConfig
         {
             Name = "Test Model",
             Provider = "OpenAI Compatible",
             Model = "test-model",
             TimeoutMs = 30_000
-        });
+        };
+        modelSelector.SelectGenerationModel().Returns(selectedModel);
+        modelSelector.SelectModelForRole(Arg.Any<string>()).Returns(selectedModel);
 
         var connectorFactory = Substitute.For<IAiConnectorFactory>();
         connectorFactory.CreateConnector(Arg.Any<AiModelConfig>()).Returns(connector);
@@ -1677,7 +1766,7 @@ public class AiFlowGenerationServiceManualRetryTests : IDisposable
         var hostEnvironment = Substitute.For<IHostEnvironment>();
         hostEnvironment.EnvironmentName.Returns("Production");
 
-        var promptVersionManager = Substitute.For<ClearVision.Product.Infrastructure.AI.IPromptVersionManager>();
+        promptVersionManager ??= Substitute.For<ClearVision.Product.Infrastructure.AI.IPromptVersionManager>();
         promptVersionManager.GetActiveVersionAsync().Returns(Task.FromResult(new PromptVersion
         {
             Id = Guid.NewGuid(),

@@ -302,6 +302,8 @@ public sealed record VisionAgentPlanModeRequest
     public List<VisionAgentPlanAnswer> ConfirmedPlanAnswers { get; init; } = [];
     public List<string> ResolvedPlanFields { get; init; } = [];
     public List<string> RemainingPlanFields { get; init; } = [];
+    public long? WorkspaceExpectedRevision { get; init; }
+    public string? ClientMutationId { get; init; }
     public int PlanningBudgetMs { get; init; }
 }
 

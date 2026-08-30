@@ -115,182 +115,6 @@ public sealed class AgentRunEndpointsTests
         host.GetSession(sessionId)!.History.Should().HaveCount(1);
     }
 
-    [Fact(DisplayName = "POST Agent plan returns backend structured scenario-specific PlanModeResult")]
-    public async Task CreatePlan_ShouldReturnScenarioSpecificStructuredPlan()
-    {
-        await using var host = await AgentRunEndpointTestHost.CreateAsync();
-
-        using var scratchResponse = await host.Client.PostAsJsonAsync("/api/ai/agent-plan", new
-        {
-            description = "帮我做一个金属表面划痕检测流程",
-            originalUserPrompt = "帮我做一个金属表面划痕检测流程",
-            currentFlowSnapshot = "{\"operators\":[{\"id\":\"camera\"}]}",
-            templateSelection = new
-            {
-                mode = "catalog_lock",
-                templateId = "tmpl-scratch",
-                scenarioKey = "scratch"
-            },
-            attachmentSummary = new
-            {
-                count = 1,
-                resourceKinds = new[] { "sample_image_metadata" },
-                pathsRedacted = true
-            }
-        });
-        using var wireResponse = await host.Client.PostAsJsonAsync("/api/ai/agent-plan", new
-        {
-            description = "做一个线序检测流程",
-            originalUserPrompt = "做一个线序检测流程"
-        });
-
-        scratchResponse.StatusCode.Should().Be(HttpStatusCode.OK);
-        wireResponse.StatusCode.Should().Be(HttpStatusCode.OK);
-        using var scratchDoc = JsonDocument.Parse(await scratchResponse.Content.ReadAsStringAsync());
-        using var wireDoc = JsonDocument.Parse(await wireResponse.Content.ReadAsStringAsync());
-        var scratchEnvelope = scratchDoc.RootElement;
-        var wireEnvelope = wireDoc.RootElement;
-        var scratch = scratchEnvelope.GetProperty("planResult");
-        var wire = wireEnvelope.GetProperty("planResult");
-
-        scratchEnvelope.GetProperty("sessionId").GetString().Should().NotBeNullOrWhiteSpace();
-        scratchEnvelope.GetProperty("workspaceSnapshot").GetProperty("revision").GetInt64().Should().BeGreaterThan(0);
-        scratchEnvelope.GetProperty("persistenceStatus").GetProperty("primaryStoreSaved").GetBoolean().Should().BeTrue();
-        scratchEnvelope.GetProperty("metadataOnly").GetBoolean().Should().BeTrue();
-
-        scratch.GetProperty("intent").GetString().Should().Be("surface_defect");
-        scratch.GetProperty("recommendedRoute").GetProperty("routeId").GetString().Should().Be("surface_defect_detection");
-        scratch.GetProperty("contextSummary").GetProperty("hasCurrentFlow").GetBoolean().Should().BeTrue();
-        scratch.GetProperty("planHash").GetString().Should().StartWith("sha256:");
-        scratch.GetProperty("templateSelection").GetProperty("mode").GetString().Should().Be("catalog_lock");
-        scratch.GetProperty("templateSelection").GetProperty("templateId").GetString().Should().Be("tmpl-scratch");
-        scratch.GetProperty("templateSelection").GetProperty("scenarioKey").GetString().Should().Be("scratch");
-        scratch.GetProperty("clarificationQuestions").EnumerateArray()
-            .Select(question => question.GetProperty("id").GetString())
-            .Should()
-            .Contain("q_fallback_image_source")
-            .And.Contain("q_fallback_acceptance_criteria")
-            .And.NotContain("sequence_rule");
-        scratch.GetProperty("clarificationQuestions").EnumerateArray()
-            .Should()
-            .OnlyContain(question => question.GetProperty("options").EnumerateArray()
-                .Any(option =>
-                    option.GetProperty("recommended").GetBoolean() &&
-                    option.GetProperty("value").GetString()!.EndsWith("_pending", StringComparison.OrdinalIgnoreCase) &&
-                    !string.IsNullOrWhiteSpace(option.GetProperty("label").GetString()) &&
-                    !string.IsNullOrWhiteSpace(option.GetProperty("description").GetString()) &&
-                    !string.IsNullOrWhiteSpace(option.GetProperty("impact").GetString())));
-        scratch.GetProperty("metadataOnly").GetBoolean().Should().BeTrue();
-        var recovered = new ConversationalFlowService(Path.Combine(host.RootDirectory, "sessions"));
-        var recoveredSession = recovered.GetSession(
-            host.OwnerHash,
-            scratchEnvelope.GetProperty("sessionId").GetString()!);
-        recoveredSession.Should().NotBeNull();
-        recoveredSession!.History.Should().ContainSingle(turn => turn.Role == "user");
-        recoveredSession.WorkspaceSnapshot.Should().NotBeNull();
-        recoveredSession.WorkspaceSnapshot!.PendingPlanSnapshot.Should().NotBeNull();
-        recoveredSession.WorkspaceSnapshot.PlanRunStatus.Should().Be(AgentRunEventStatuses.Completed);
-
-        wire.GetProperty("intent").GetString().Should().Be("wire_sequence");
-        wire.GetProperty("clarificationQuestions").EnumerateArray()
-            .Select(question => question.GetProperty("id").GetString())
-            .Should()
-            .Contain("q_fallback_inspection_object")
-            .And.NotContain("defect_definition");
-        wire.GetProperty("clarificationQuestions").EnumerateArray()
-            .Where(question => question.GetProperty("id").GetString()!.StartsWith("q_fallback_", StringComparison.Ordinal))
-            .Should()
-            .OnlyContain(question => question.GetProperty("options").EnumerateArray()
-                .Any(option =>
-                    option.GetProperty("recommended").GetBoolean() &&
-                    option.GetProperty("value").GetString()!.EndsWith("_pending", StringComparison.OrdinalIgnoreCase) &&
-                    !string.IsNullOrWhiteSpace(option.GetProperty("label").GetString()) &&
-                    !string.IsNullOrWhiteSpace(option.GetProperty("description").GetString()) &&
-                    !string.IsNullOrWhiteSpace(option.GetProperty("impact").GetString())));
-        wire.GetProperty("clarificationQuestions").EnumerateArray()
-            .Should()
-            .OnlyContain(question => question.GetProperty("options").EnumerateArray()
-                .Any(option =>
-                    option.GetProperty("recommended").GetBoolean() &&
-                    !string.IsNullOrWhiteSpace(option.GetProperty("label").GetString()) &&
-                    !string.IsNullOrWhiteSpace(option.GetProperty("description").GetString()) &&
-                    !string.IsNullOrWhiteSpace(option.GetProperty("impact").GetString())));
-    }
-
-    [Fact(DisplayName = "POST Agent plan primary persistence failure returns 503 before planner executes")]
-    public async Task CreatePlan_PrimaryPersistenceFailure_ShouldReturn503AndNotExecutePlanner()
-    {
-        var plannerCalled = false;
-        await using var host = await AgentRunEndpointTestHost.CreateAsync(planHandler: (_, baseline, _) =>
-        {
-            plannerCalled = true;
-            return Task.FromResult(baseline);
-        });
-        host.ConcreteConversationService.PrimaryStoreWriteFaultInjector = () => throw new IOException("primary failed");
-
-        using var response = await host.Client.PostAsJsonAsync("/api/ai/agent-plan", new VisionAgentPlanModeRequest
-        {
-            Description = "detect scratches on metal",
-            OriginalUserPrompt = "detect scratches on metal",
-            SessionId = "session-plan-create-primary-fail"
-        });
-
-        response.StatusCode.Should().Be(HttpStatusCode.ServiceUnavailable);
-        using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
-        var root = document.RootElement;
-        root.GetProperty("errorCode").GetString().Should().Be("session_persistence_failed");
-        root.GetProperty("publicMessage").GetString().Should().Contain("模型规划未启动");
-        root.GetProperty("persistenceStatus").GetProperty("primaryStoreSaved").GetBoolean().Should().BeFalse();
-        root.GetProperty("metadataOnly").GetBoolean().Should().BeTrue();
-        plannerCalled.Should().BeFalse();
-        host.GetSession("session-plan-create-primary-fail").Should().BeNull();
-    }
-
-    [Fact(DisplayName = "POST Agent plan terminal persistence failure returns plan with warning")]
-    public async Task CreatePlan_TerminalPersistenceFailure_ShouldReturnPlanWithWarning()
-    {
-        var plannerStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        var releasePlanner = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        var plannerCalled = false;
-        await using var host = await AgentRunEndpointTestHost.CreateAsync(planHandler: async (_, baseline, ct) =>
-        {
-            plannerCalled = true;
-            plannerStarted.TrySetResult();
-            await releasePlanner.Task.WaitAsync(ct);
-            return baseline with
-            {
-                PlanSource = "planner",
-                FallbackReason = string.Empty,
-                Goal = "terminal warning plan"
-            };
-        });
-
-        var responseTask = host.Client.PostAsJsonAsync("/api/ai/agent-plan", new VisionAgentPlanModeRequest
-        {
-            Description = "detect scratches on metal",
-            OriginalUserPrompt = "detect scratches on metal",
-            SessionId = "session-plan-create-terminal-fail"
-        });
-        await plannerStarted.Task.WaitAsync(TimeSpan.FromSeconds(5));
-        host.ConcreteConversationService.PrimaryStoreWriteFaultInjector = () => throw new IOException("terminal primary failed");
-        releasePlanner.SetResult();
-        using var response = await responseTask;
-
-        response.StatusCode.Should().Be(HttpStatusCode.OK);
-        using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
-        var root = document.RootElement;
-        root.GetProperty("planResult").GetProperty("goal").GetString().Should().Be("terminal warning plan");
-        root.GetProperty("persistenceStatus").GetProperty("primaryStoreSaved").GetBoolean().Should().BeFalse();
-        root.GetProperty("persistenceWarning").GetProperty("code").GetString().Should().Be("primary_store_save_failed");
-        root.GetProperty("workspaceSnapshot").GetProperty("lifecycleState").GetString().Should().Be("planning");
-        plannerCalled.Should().BeTrue();
-        host.GetSession("session-plan-create-terminal-fail")!
-            .WorkspaceSnapshot!
-            .PendingPlanSnapshot
-            .Should()
-            .BeNull();
-    }
-
     [Fact(DisplayName = "POST Agent plan readiness preview returns canonical readiness without creating AgentRun")]
     public async Task PreviewPlanReadiness_ShouldNotCreateRunOrProjectSession()
     {
@@ -402,28 +226,6 @@ public sealed class AgentRunEndpointsTests
         root.GetProperty("stage").GetString().Should().Be("intent_router");
     }
 
-    [Fact(DisplayName = "POST Agent plan maps total budget exhaustion to explicit 504")]
-    public async Task CreatePlan_DeadlineExceeded_ShouldReturnGatewayTimeout()
-    {
-        await using var host = await AgentRunEndpointTestHost.CreateAsync(planHandler: (_, _, _) =>
-            Task.FromException<VisionAgentPlanModeResult>(
-                new VisionAgentPlanningDeadlineExceededException("plan_orchestration")));
-
-        using var response = await host.Client.PostAsJsonAsync("/api/ai/agent-plan", new VisionAgentPlanModeRequest
-        {
-            Description = "detect scratches",
-            OriginalUserPrompt = "detect scratches",
-            SessionId = "session-plan-deadline"
-        });
-
-        response.StatusCode.Should().Be(HttpStatusCode.GatewayTimeout);
-        using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
-        var root = document.RootElement;
-        root.GetProperty("errorCode").GetString().Should().Be("planning_deadline_exceeded");
-        root.GetProperty("timeoutKind").GetString().Should().Be("total_budget_exceeded");
-        root.GetProperty("stage").GetString().Should().Be("plan_orchestration");
-    }
-
     [Fact(DisplayName = "POST Agent plan run streams public Plan events before completed")]
     public async Task CreatePlanRun_ShouldStreamPublicEventsBeforeCompleted()
     {
@@ -450,6 +252,8 @@ public sealed class AgentRunEndpointsTests
             description = "stream plan progress",
             originalUserPrompt = "stream plan progress",
             currentFlowSnapshot = "{\"operators\":[]}",
+            workspaceExpectedRevision = 0,
+            clientMutationId = "plan-stream-progress",
             attachmentSummary = new
             {
                 count = 1,
@@ -545,6 +349,8 @@ public sealed class AgentRunEndpointsTests
         {
             Description = "classify strawberry maturity",
             OriginalUserPrompt = "classify strawberry maturity",
+            WorkspaceExpectedRevision = 0,
+            ClientMutationId = "plan-semantic-extraction",
             SemanticExtraction = semantic
         });
 
@@ -589,6 +395,8 @@ public sealed class AgentRunEndpointsTests
         {
             Description = "detect scratches on metal",
             OriginalUserPrompt = "detect scratches on metal",
+            WorkspaceExpectedRevision = 0,
+            ClientMutationId = "plan-canonical-workspace",
             RequirementMode = AiRequirementModes.Draft
         });
 
@@ -644,7 +452,9 @@ public sealed class AgentRunEndpointsTests
         {
             Description = "detect scratches on metal",
             OriginalUserPrompt = "detect scratches on metal",
-            SessionId = "session-plan-primary-fail"
+            SessionId = "session-plan-primary-fail",
+            WorkspaceExpectedRevision = 0,
+            ClientMutationId = "plan-primary-failure"
         });
 
         response.StatusCode.Should().Be(HttpStatusCode.ServiceUnavailable);
@@ -652,13 +462,9 @@ public sealed class AgentRunEndpointsTests
         var root = document.RootElement;
         root.GetProperty("errorCode").GetString().Should().Be("session_persistence_failed");
         root.GetProperty("publicMessage").GetString().Should().Contain("模型规划未启动");
-        var runId = root.GetProperty("runId").GetString()!;
-        root.GetProperty("events").EnumerateArray()
-            .Should()
-            .Contain(evt => evt.GetProperty("eventType").GetString() == AgentRunEventTypes.RunFailed);
-        JsonSerializer.Serialize(root.GetProperty("events")).Should().Contain("session_persistence_failed");
+        root.TryGetProperty("runId", out _).Should().BeFalse();
+        root.TryGetProperty("events", out _).Should().BeFalse();
         plannerCalled.Should().BeFalse();
-        host.StreamService.Replay(runId)!.Summary.Status.Should().Be(AgentRunEventStatuses.Failed);
         host.GetSession("session-plan-primary-fail").Should().BeNull();
     }
 
@@ -676,7 +482,9 @@ public sealed class AgentRunEndpointsTests
         {
             Description = "detect scratches on metal",
             OriginalUserPrompt = "detect scratches on metal",
-            SessionId = "session-plan-terminal-fail"
+            SessionId = "session-plan-terminal-fail",
+            WorkspaceExpectedRevision = 0,
+            ClientMutationId = "plan-terminal-failure"
         });
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         using var createDoc = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
@@ -706,6 +514,257 @@ public sealed class AgentRunEndpointsTests
             .WorkspaceSnapshot!
             .PlanRunStatus
             .Should().Be(AgentRunEventStatuses.Running);
+    }
+
+    [Fact(DisplayName = "POST PlanRun requires workspace expected revision and client mutation id")]
+    public async Task CreatePlanRun_MissingCasContract_ShouldNotCreateRunOrExecutePlanner()
+    {
+        var plannerCalls = 0;
+        await using var host = await AgentRunEndpointTestHost.CreateAsync(planHandler: (_, baseline, _) =>
+        {
+            Interlocked.Increment(ref plannerCalls);
+            return Task.FromResult(baseline);
+        });
+
+        using var missingRevision = await host.Client.PostAsJsonAsync("/api/ai/agent-plan-runs", new VisionAgentPlanModeRequest
+        {
+            Description = "missing revision",
+            ClientMutationId = "plan-missing-revision"
+        });
+        using var missingMutationId = await host.Client.PostAsJsonAsync("/api/ai/agent-plan-runs", new VisionAgentPlanModeRequest
+        {
+            Description = "missing mutation id",
+            WorkspaceExpectedRevision = 0
+        });
+
+        missingRevision.StatusCode.Should().Be(HttpStatusCode.Conflict);
+        missingMutationId.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        (await missingRevision.Content.ReadAsStringAsync()).Should().Contain("workspace_revision_required");
+        (await missingMutationId.Content.ReadAsStringAsync()).Should().Contain("workspace_mutation_id_required");
+        plannerCalls.Should().Be(0);
+        host.ListSessions().Should().BeEmpty();
+    }
+
+    [Fact(DisplayName = "POST PlanRun rejects stale initial workspace revision without creating a run")]
+    public async Task CreatePlanRun_StaleInitialRevision_ShouldConflictWithoutOverwrite()
+    {
+        var plannerCalls = 0;
+        await using var host = await AgentRunEndpointTestHost.CreateAsync(planHandler: (_, baseline, _) =>
+        {
+            Interlocked.Increment(ref plannerCalls);
+            return Task.FromResult(baseline);
+        });
+        var initial = host.InitializeWorkspaceSnapshot("session-plan-stale-initial", new VisionAgentWorkspaceSnapshotUpdate
+        {
+            LifecycleState = "user_saved",
+            WorkspaceViewMode = "build"
+        });
+
+        using var response = await host.Client.PostAsJsonAsync("/api/ai/agent-plan-runs", new VisionAgentPlanModeRequest
+        {
+            Description = "stale plan request",
+            SessionId = "session-plan-stale-initial",
+            WorkspaceExpectedRevision = initial.Revision - 1,
+            ClientMutationId = "plan-stale-initial"
+        });
+
+        response.StatusCode.Should().Be(HttpStatusCode.Conflict);
+        using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        document.RootElement.GetProperty("errorCode").GetString().Should().Be("workspace_revision_conflict");
+        document.RootElement.TryGetProperty("runId", out _).Should().BeFalse();
+        plannerCalls.Should().Be(0);
+        var persisted = host.GetSession("session-plan-stale-initial")!.WorkspaceSnapshot!;
+        persisted.Revision.Should().Be(initial.Revision);
+        persisted.LifecycleState.Should().Be("user_saved");
+        persisted.WorkspaceViewMode.Should().Be("build");
+        persisted.PlanRunId.Should().BeNull();
+    }
+
+    [Fact(DisplayName = "POST PlanRun duplicate client mutation reuses one run and executes planner once")]
+    public async Task CreatePlanRun_DuplicateMutation_ShouldBeIdempotent()
+    {
+        var plannerCalls = 0;
+        var plannerEntered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var releasePlanner = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        await using var host = await AgentRunEndpointTestHost.CreateAsync(planHandler: async (_, baseline, ct) =>
+        {
+            Interlocked.Increment(ref plannerCalls);
+            plannerEntered.TrySetResult();
+            await releasePlanner.Task.WaitAsync(ct);
+            return baseline;
+        });
+        var request = new VisionAgentPlanModeRequest
+        {
+            Description = "idempotent plan request",
+            OriginalUserPrompt = "idempotent plan request",
+            SessionId = "session-plan-idempotent",
+            WorkspaceExpectedRevision = 0,
+            ClientMutationId = "plan-idempotent-mutation"
+        };
+
+        using var first = await host.Client.PostAsJsonAsync("/api/ai/agent-plan-runs", request);
+        await plannerEntered.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        using var duplicate = await host.Client.PostAsJsonAsync("/api/ai/agent-plan-runs", request);
+
+        first.StatusCode.Should().Be(HttpStatusCode.OK);
+        duplicate.StatusCode.Should().Be(HttpStatusCode.OK);
+        using var firstDoc = JsonDocument.Parse(await first.Content.ReadAsStringAsync());
+        using var duplicateDoc = JsonDocument.Parse(await duplicate.Content.ReadAsStringAsync());
+        var runId = firstDoc.RootElement.GetProperty("runId").GetString()!;
+        duplicateDoc.RootElement.GetProperty("runId").GetString().Should().Be(runId);
+        duplicateDoc.RootElement.GetProperty("idempotentReplay").GetBoolean().Should().BeTrue();
+        plannerCalls.Should().Be(1);
+
+        releasePlanner.SetResult();
+        await host.WaitForTerminalAsync(runId);
+        var session = host.GetSession("session-plan-idempotent")!;
+        session.History.Should().ContainSingle(turn => turn.TurnId == $"plan:{runId}:user");
+        session.WorkspaceSnapshot!.Revision.Should().Be(2);
+        host.StreamService.Replay(runId)!.Events.Count(evt => evt.EventType == AgentRunEventTypes.RunStarted)
+            .Should().Be(1);
+    }
+
+    [Fact(DisplayName = "POST PlanRun delayed duplicate keeps the original terminal CAS revision")]
+    public async Task CreatePlanRun_DelayedDuplicateAfterUserSave_ShouldNotAdoptNewerRevision()
+    {
+        var plannerCalls = 0;
+        await using var host = await AgentRunEndpointTestHost.CreateAsync(planHandler: (_, baseline, _) =>
+        {
+            Interlocked.Increment(ref plannerCalls);
+            return Task.FromResult(baseline with { Goal = "stale duplicate result", PlanSource = "planner" });
+        });
+        const string sessionId = "session-plan-delayed-duplicate";
+        const string clientMutationId = "plan-delayed-duplicate";
+        const string description = "delayed duplicate plan";
+        var identity = string.Join(
+            "\n",
+            host.OwnerHash.Trim(),
+            sessionId.ToUpperInvariant(),
+            clientMutationId.ToUpperInvariant());
+        var digest = SHA256.HashData(Encoding.UTF8.GetBytes(identity));
+        var runId = $"ar_plan_{Convert.ToHexString(digest).ToLowerInvariant()[..32]}";
+
+        var initial = host.InitializeWorkspaceSnapshot(sessionId, new VisionAgentWorkspaceSnapshotUpdate
+        {
+            ExpectedRevision = 0,
+            ClientMutationId = $"plan-start:{clientMutationId}",
+            RequireExpectedRevisionWhenWorkspaceExists = true,
+            LifecycleState = "planning",
+            PlanRunId = runId,
+            PlanRunStatus = AgentRunEventStatuses.Running,
+            RequirementMode = AiRequirementModes.Strict,
+            ConfirmedPlanAnswers = [],
+            UserTurnId = $"plan:{runId}:user",
+            UserMessage = description
+        });
+        initial.Success.Should().BeTrue();
+        initial.AppliedRevision.Should().Be(initial.Revision);
+
+        var userSave = host.TryUpdateWorkspaceSnapshot(sessionId, new VisionAgentWorkspaceSnapshotUpdate
+        {
+            ExpectedRevision = initial.Revision,
+            ClientMutationId = "user-save-before-delayed-duplicate",
+            LifecycleState = "user_saved_before_duplicate",
+            WorkspaceViewMode = "build",
+            PlanQuestionSelections = new Dictionary<string, string> { ["preserve"] = "new" }
+        });
+        userSave.Success.Should().BeTrue();
+
+        using var response = await host.Client.PostAsJsonAsync("/api/ai/agent-plan-runs", new VisionAgentPlanModeRequest
+        {
+            Description = description,
+            OriginalUserPrompt = description,
+            SessionId = sessionId,
+            WorkspaceExpectedRevision = 0,
+            ClientMutationId = clientMutationId
+        });
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        using var responseDoc = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        responseDoc.RootElement.GetProperty("runId").GetString().Should().Be(runId);
+        responseDoc.RootElement.GetProperty("idempotentReplay").GetBoolean().Should().BeTrue();
+
+        await host.WaitForTerminalAsync(runId);
+        plannerCalls.Should().Be(1);
+        var persisted = host.GetSession(sessionId)!.WorkspaceSnapshot!;
+        persisted.Revision.Should().Be(userSave.Revision);
+        persisted.LifecycleState.Should().Be("user_saved_before_duplicate");
+        persisted.WorkspaceViewMode.Should().Be("build");
+        persisted.PlanQuestionSelections.Should().Contain("preserve", "new");
+        persisted.PendingPlanSnapshot.Should().BeNull();
+
+        var replay = host.StreamService.Replay(runId)!;
+        JsonSerializer.Serialize(replay.Events.Last(evt => evt.EventType == AgentRunEventTypes.RunCompleted))
+            .Should().Contain("workspace_revision_conflict");
+    }
+
+    [Fact(DisplayName = "POST PlanRun terminal CAS preserves a newer workspace save")]
+    public async Task CreatePlanRun_ConcurrentWorkspaceSave_ShouldConflictWithoutTerminalOverwrite()
+    {
+        var plannerEntered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var releasePlanner = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        await using var host = await AgentRunEndpointTestHost.CreateAsync(planHandler: async (_, baseline, ct) =>
+        {
+            plannerEntered.TrySetResult();
+            await releasePlanner.Task.WaitAsync(ct);
+            return baseline with { Goal = "stale generated goal", PlanSource = "planner" };
+        });
+        const string sessionId = "session-plan-terminal-cas";
+        var initial = host.InitializeWorkspaceSnapshot(sessionId, new VisionAgentWorkspaceSnapshotUpdate
+        {
+            LifecycleState = "plan_draft",
+            WorkspaceViewMode = "plan",
+            PlanQuestionSelections = new Dictionary<string, string> { ["preserve"] = "old" }
+        });
+
+        using var create = await host.Client.PostAsJsonAsync("/api/ai/agent-plan-runs", new VisionAgentPlanModeRequest
+        {
+            Description = "long running stale plan",
+            OriginalUserPrompt = "long running stale plan",
+            SessionId = sessionId,
+            WorkspaceExpectedRevision = initial.Revision,
+            ClientMutationId = "plan-terminal-cas"
+        });
+        create.StatusCode.Should().Be(HttpStatusCode.OK);
+        using var createDoc = JsonDocument.Parse(await create.Content.ReadAsStringAsync());
+        var runId = createDoc.RootElement.GetProperty("runId").GetString()!;
+        var planningRevision = createDoc.RootElement
+            .GetProperty("workspaceSnapshot")
+            .GetProperty("revision")
+            .GetInt64();
+        await plannerEntered.Task.WaitAsync(TimeSpan.FromSeconds(5));
+
+        using var save = await host.Client.PostAsJsonAsync(
+            $"/api/ai/sessions/{sessionId}/workspace-snapshot",
+            new VisionAgentWorkspaceSnapshotDeltaRequest
+            {
+                ExpectedRevision = planningRevision,
+                ClientMutationId = "user-save-during-plan",
+                LifecycleState = "user_saved_during_plan",
+                WorkspaceViewMode = "build",
+                PlanQuestionSelections = new Dictionary<string, string> { ["preserve"] = "new" }
+            });
+        save.StatusCode.Should().Be(HttpStatusCode.OK);
+        using var saveDoc = JsonDocument.Parse(await save.Content.ReadAsStringAsync());
+        var savedRevision = saveDoc.RootElement.GetProperty("snapshot").GetProperty("revision").GetInt64();
+
+        releasePlanner.SetResult();
+        await host.WaitForTerminalAsync(runId);
+
+        var persisted = host.GetSession(sessionId)!.WorkspaceSnapshot!;
+        persisted.Revision.Should().Be(savedRevision);
+        persisted.LifecycleState.Should().Be("user_saved_during_plan");
+        persisted.WorkspaceViewMode.Should().Be("build");
+        persisted.PlanQuestionSelections.Should().Contain("preserve", "new");
+        persisted.PendingPlanSnapshot.Should().BeNull();
+        persisted.PlanRunStatus.Should().Be(AgentRunEventStatuses.Running);
+
+        var replay = host.StreamService.Replay(runId)!;
+        replay.Events.Any(evt =>
+            evt.Stage == "workspace_persistence" &&
+            JsonSerializer.Serialize(evt.Payload).Contains("workspace_revision_conflict", StringComparison.Ordinal))
+            .Should().BeTrue();
+        JsonSerializer.Serialize(replay.Events.Last(evt => evt.EventType == AgentRunEventTypes.RunCompleted))
+            .Should().Contain("workspace_revision_conflict");
     }
 
     [Fact(DisplayName = "Plan run timeout emits timeout and fallback before completed PlanResult")]
@@ -2247,7 +2306,9 @@ public sealed class AgentRunEndpointsTests
         {
             Description = "forge owner A plan session",
             OriginalUserPrompt = "forge owner A plan session",
-            SessionId = sessionId
+            SessionId = sessionId,
+            WorkspaceExpectedRevision = ownerARevision,
+            ClientMutationId = "plan-owner-forgery"
         });
         using var mutation = await host.Client.PostAsJsonAsync(
             $"/api/ai/sessions/{sessionId}/workspace-snapshot",
@@ -2767,11 +2828,16 @@ public sealed class AgentRunEndpointsTests
 
         public async Task<string> CreatePlanRunAsync(string description, string? sessionId = null)
         {
+            var expectedRevision = string.IsNullOrWhiteSpace(sessionId)
+                ? 0
+                : GetSession(sessionId)?.WorkspaceSnapshot?.Revision ?? 0;
             using var response = await Client.PostAsJsonAsync("/api/ai/agent-plan-runs", new VisionAgentPlanModeRequest
             {
                 Description = description,
                 OriginalUserPrompt = description,
-                SessionId = sessionId
+                SessionId = sessionId,
+                WorkspaceExpectedRevision = expectedRevision,
+                ClientMutationId = $"plan-test:{Guid.NewGuid():N}"
             });
             response.EnsureSuccessStatusCode();
             using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync());

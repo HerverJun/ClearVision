@@ -151,7 +151,25 @@ public static class SettingsEndpoints
             }
 
             var defaultConfig = reset.Mutation!.Config!;
-            var defaultModels = aiConfigStore.ResetToDefaults();
+            List<AiModelConfig> defaultModels;
+            try
+            {
+                defaultModels = aiConfigStore.ResetToDefaults();
+            }
+            catch (AiConfigPersistenceException ex)
+            {
+                return Results.Json(new
+                {
+                    errorCode = ex.ErrorCode,
+                    publicMessage = ex.PublicMessage,
+                    retryable = ex.Retryable,
+                    stage = ex.Stage,
+                    appConfigCommitted = true,
+                    appConfigRevision = defaultConfig.Revision,
+                    metadataOnly = true
+                }, statusCode: StatusCodes.Status503ServiceUnavailable);
+            }
+
             return Results.Ok(new
             {
                 message = "系统配置和 AI 模型配置已恢复默认值",
@@ -325,6 +343,17 @@ public static class SettingsEndpoints
             return Results.Ok(result);
         });
 
+        app.MapGet("/api/ai/persistence-health", ([FromServices] AiAuxiliaryPersistenceHealth health, HttpContext context) =>
+        {
+            if (!IsAdmin(context))
+            {
+                return Results.Forbid();
+            }
+
+            return Results.Ok(health.GetSnapshot());
+        })
+        .RequireClearVisionPermission(ClearVisionPermissionPolicies.RequireAdmin);
+
         app.MapPost("/api/ai/reasoning-support", (AiReasoningSupportRequest request) =>
         {
             var support = AiReasoningModelFamilyCatalog.Resolve(
@@ -374,6 +403,10 @@ public static class SettingsEndpoints
                 configStore.Add(model);
                 return Results.Ok(new { Message = "模型已创建", model.Id });
             }
+            catch (AiConfigPersistenceException ex)
+            {
+                return BuildAiConfigPersistenceError(ex);
+            }
             catch (Exception ex)
             {
                 return Results.BadRequest(new { Error = ex.Message });
@@ -421,6 +454,10 @@ public static class SettingsEndpoints
 
                 return Results.Ok(new { Message = "模型已更新" });
             }
+            catch (AiConfigPersistenceException ex)
+            {
+                return BuildAiConfigPersistenceError(ex);
+            }
             catch (Exception ex)
             {
                 return Results.BadRequest(new { Error = ex.Message });
@@ -443,6 +480,10 @@ public static class SettingsEndpoints
                     ? Results.Ok(new { Message = "模型已删除" })
                     : Results.NotFound(new { Error = $"模型 {id} 不存在" });
             }
+            catch (AiConfigPersistenceException ex)
+            {
+                return BuildAiConfigPersistenceError(ex);
+            }
             catch (Exception ex)
             {
                 return Results.BadRequest(new { Error = ex.Message });
@@ -458,10 +499,17 @@ public static class SettingsEndpoints
                 return Results.Forbid();
             }
 
-            var ok = configStore.SetActive(id);
-            return ok
-                ? Results.Ok(new { Message = "已切换激活模型" })
-                : Results.NotFound(new { Error = $"模型 {id} 不存在" });
+            try
+            {
+                var ok = configStore.SetActive(id);
+                return ok
+                    ? Results.Ok(new { Message = "已切换激活模型" })
+                    : Results.NotFound(new { Error = $"模型 {id} 不存在" });
+            }
+            catch (AiConfigPersistenceException ex)
+            {
+                return BuildAiConfigPersistenceError(ex);
+            }
         })
         .RequireClearVisionPermission(ClearVisionPermissionPolicies.RequireAdmin);
 
@@ -473,10 +521,17 @@ public static class SettingsEndpoints
                 return Results.Forbid();
             }
 
-            var ok = configStore.SetDefaultForRole(id, AiModelConfig.RolePlanner);
-            return ok
-                ? Results.Ok(new { Message = "Default planner model updated.", role = AiModelConfig.RolePlanner })
-                : Results.NotFound(new { Error = $"Model {id} not found." });
+            try
+            {
+                var ok = configStore.SetDefaultForRole(id, AiModelConfig.RolePlanner);
+                return ok
+                    ? Results.Ok(new { Message = "Default planner model updated.", role = AiModelConfig.RolePlanner })
+                    : Results.NotFound(new { Error = $"Model {id} not found." });
+            }
+            catch (AiConfigPersistenceException ex)
+            {
+                return BuildAiConfigPersistenceError(ex);
+            }
         })
         .RequireClearVisionPermission(ClearVisionPermissionPolicies.RequireAdmin);
 
@@ -487,10 +542,17 @@ public static class SettingsEndpoints
                 return Results.Forbid();
             }
 
-            var ok = configStore.SetDefaultForRole(id, AiModelConfig.RoleShadowEval);
-            return ok
-                ? Results.Ok(new { Message = "Default shadow eval model updated.", role = AiModelConfig.RoleShadowEval })
-                : Results.NotFound(new { Error = $"Model {id} not found." });
+            try
+            {
+                var ok = configStore.SetDefaultForRole(id, AiModelConfig.RoleShadowEval);
+                return ok
+                    ? Results.Ok(new { Message = "Default shadow eval model updated.", role = AiModelConfig.RoleShadowEval })
+                    : Results.NotFound(new { Error = $"Model {id} not found." });
+            }
+            catch (AiConfigPersistenceException ex)
+            {
+                return BuildAiConfigPersistenceError(ex);
+            }
         })
         .RequireClearVisionPermission(ClearVisionPermissionPolicies.RequireAdmin);
 
@@ -517,11 +579,19 @@ public static class SettingsEndpoints
             }
 
             var testResult = await TestAiModelConnectionAsync(model, apiClient, context.RequestAborted);
-            configStore.UpdateTestStatus(
-                id,
-                testResult.ConnectionOk ? "ok" : "failed",
-                DateTimeOffset.UtcNow,
-                testResult.LatencyMs);
+            try
+            {
+                configStore.UpdateTestStatus(
+                    id,
+                    testResult.ConnectionOk ? "ok" : "failed",
+                    DateTimeOffset.UtcNow,
+                    testResult.LatencyMs);
+            }
+            catch (AiConfigPersistenceException ex)
+            {
+                return BuildAiConfigPersistenceError(ex);
+            }
+
             return Results.Ok(testResult);
         })
         .RequireClearVisionPermission(ClearVisionPermissionPolicies.RequireAdmin);
@@ -2219,6 +2289,16 @@ public static class SettingsEndpoints
             or DirectoryNotFoundException
             or InvalidDataException;
     }
+
+    private static IResult BuildAiConfigPersistenceError(AiConfigPersistenceException ex) =>
+        Results.Json(new
+        {
+            errorCode = ex.ErrorCode,
+            publicMessage = ex.PublicMessage,
+            retryable = ex.Retryable,
+            stage = ex.Stage,
+            metadataOnly = true
+        }, statusCode: StatusCodes.Status503ServiceUnavailable);
 
     private static IResult BuildDatabaseMaintenanceError(Exception ex)
     {

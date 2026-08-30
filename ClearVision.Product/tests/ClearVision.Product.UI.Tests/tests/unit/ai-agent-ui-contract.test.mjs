@@ -2414,8 +2414,7 @@ test('ordinary send runs Intent Router before Plan planner', async () => {
       metadataOnly: true
     };
   };
-  panel._shouldUsePlanRunEventStream = () => false;
-  panel._requestBackendVisionPlan = async request => {
+  panel._requestBackendVisionPlanLive = async request => {
     calls.push({ type: 'plan', request });
     return backendPlanResult({ goal: 'router then plan' });
   };
@@ -2532,6 +2531,8 @@ test('Intent Router semanticExtraction is passed to PlanRun and rendered from Pl
 
   const createRequestBody = JSON.parse(requests[0].options.body);
   assert.match(requests[0].url, /\/api\/ai\/agent-plan-runs$/);
+  assert.equal(createRequestBody.workspaceExpectedRevision, 0);
+  assert.match(createRequestBody.clientMutationId, /^plan-/);
   assert.equal(createRequestBody.semanticExtraction.source, 'model');
   assert.equal(createRequestBody.semanticExtraction.taskType, 'attribute_classification');
   assert.equal(createRequestBody.semanticExtraction.inspectionObject, 'strawberry');
@@ -3035,7 +3036,7 @@ test('casual Intent Router result replies without opening Plan', async () => {
     routerSource: 'model_router',
     metadataOnly: true
   });
-  panel._requestBackendVisionPlan = async () => {
+  panel._requestBackendVisionPlanLive = async () => {
     throw new Error('casual chat should not request Plan');
   };
 
@@ -3124,7 +3125,7 @@ test('help Intent Router result replies without opening Plan', async () => {
     routerSource: 'model_router',
     metadataOnly: true
   });
-  panel._requestBackendVisionPlan = async () => {
+  panel._requestBackendVisionPlanLive = async () => {
     throw new Error('help should not request Plan');
   };
 
@@ -3169,7 +3170,7 @@ test('ambiguous Intent Router result obeys canonical shouldOpenPlan=false withou
     routerSource: 'model_router',
     metadataOnly: true
   });
-  panel._requestBackendVisionPlan = async () => {
+  panel._requestBackendVisionPlanLive = async () => {
     throw new Error('canonical shouldOpenPlan=false must not request Plan');
   };
 
@@ -3226,8 +3227,7 @@ test('abstract visual goal with canonical shouldOpenPlan enters requirement deco
     metadataOnly: true
   });
   let planRequest = null;
-  panel._shouldUsePlanRunEventStream = () => false;
-  panel._requestBackendVisionPlan = async request => {
+  panel._requestBackendVisionPlanLive = async request => {
     planRequest = request;
     return backendPlanResult({
       planId: 'plan_abstract',
@@ -3278,9 +3278,8 @@ test('Intent Router failure delegates to backend Plan without local business rou
     '#ai-result-status-note': createFakeElement()
   });
   panel._requestBackendIntentRouterRun = async () => { throw new Error('router unavailable'); };
-  panel._shouldUsePlanRunEventStream = () => false;
   let planCalls = 0;
-  panel._requestBackendVisionPlan = async request => {
+  panel._requestBackendVisionPlanLive = async request => {
     planCalls += 1;
     assert.equal(request.description, '检测目标是外星人');
     return backendPlanResult({ goal: 'backend planner decides' });
@@ -3304,8 +3303,7 @@ test('Plan Mode renders one canonical clarification workspace without starting B
     '#ai-build-workspace': createFakeElement(),
     '#ai-result-status-note': createFakeElement()
   });
-  panel._shouldUsePlanRunEventStream = () => false;
-  panel._requestBackendVisionPlan = async () => backendPlanResult({ goal: 'metal scratch inspection workflow' });
+  panel._requestBackendVisionPlanLive = async () => backendPlanResult({ goal: 'metal scratch inspection workflow' });
   panel._dispatchGenerateRequest({ description: '帮我做一个金属表面划痕检测流程', userMessage: '帮我做一个金属表面划痕检测流程' });
   await flushAsync();
   assert.equal(panel.activeAgentRunId, null);
@@ -3328,8 +3326,7 @@ test('Plan Mode diagnostics show planner failure code and rule fallback caveat',
     '#ai-build-workspace': createFakeElement(),
     '#ai-result-status-note': createFakeElement()
   });
-  panel._shouldUsePlanRunEventStream = () => false;
-  panel._requestBackendVisionPlan = async () => backendPlanResult({
+  panel._requestBackendVisionPlanLive = async () => backendPlanResult({
     goal: 'planner json fallback plan',
     plannerFailureStage: 'json_parse',
     plannerFailureCode: 'planner_json_parse_failed',
@@ -3363,8 +3360,7 @@ test('Plan Mode diagnostics redact sensitive planner failure details', async () 
     '#ai-result-status-note': createFakeElement()
   });
   const unsafe = `token=abc123 api_key=secret baseUrl=https://planner.example.invalid/v1 C:\\factory\\model.onnx 192.168.1.10 DB1.DBX0.0 plc://line1 data:image/png;base64,${'A'.repeat(120)}`;
-  panel._shouldUsePlanRunEventStream = () => false;
-  panel._requestBackendVisionPlan = async () => backendPlanResult({
+  panel._requestBackendVisionPlanLive = async () => backendPlanResult({
     goal: 'redacted fallback plan',
     plannerFailureStage: 'completion_request',
     plannerFailureCode: 'completion_request_failed',
@@ -3424,8 +3420,7 @@ test('Plan Mode request failure redacts unsafe assistant reply and status note',
     sectionTexts.push(String(text || ''));
     return originalSetAssistantSectionText.call(panel, turn, field, text, options);
   };
-  panel._shouldUsePlanRunEventStream = () => false;
-  panel._requestBackendVisionPlan = async () => {
+  panel._requestBackendVisionPlanLive = async () => {
     throw new Error(`Planner request failed ${unsafe}`);
   };
 
@@ -3551,8 +3546,7 @@ test('ordinary build prompt stays Plan-first', async () => {
     '#ai-result-status-note': createFakeElement()
   });
   let capturedPlanRequest = null;
-  panel._shouldUsePlanRunEventStream = () => false;
-  panel._requestBackendVisionPlan = async request => {
+  panel._requestBackendVisionPlanLive = async request => {
     capturedPlanRequest = request;
     return backendPlanResult({
       goal: 'packaging box appearance inspection workflow',
@@ -4280,7 +4274,7 @@ test('Plan Mode timeout stream shows rule fallback copy', async () => {
   assert.match(panel.pendingVisionPlan.fallbackReason, /模型规划超时/);
 });
 
-test('Plan Mode falls back to ordinary POST only when PlanRun event mode is unavailable before request', async () => {
+test('PlanRun terminal persistence warning stays visible after plan confirmation prompt', async () => {
   const { AiPanel } = await loadAiPanel();
   const panel = createPanel(AiPanel, { developer: false, enabled: true });
   panel.container = createContainer({
@@ -4291,59 +4285,38 @@ test('Plan Mode falls back to ordinary POST only when PlanRun event mode is unav
     '#ai-build-workspace': createFakeElement(),
     '#ai-result-status-note': createFakeElement()
   });
-  panel._shouldUsePlanRunEventStream = () => false;
-  let fallbackCalls = 0;
-  panel._requestBackendVisionPlan = async () => {
-    fallbackCalls += 1;
-    return backendPlanResult({ planId: 'plan_fallback_post', goal: 'ordinary fallback plan' });
-  };
-  const originalFetch = global.fetch;
-  global.fetch = () => {
-    throw new Error('PlanRun fetch should not start when event mode is unavailable');
-  };
-
-  try {
-    panel._dispatchGenerateRequest({ description: 'fallback to post', userMessage: 'fallback to post' });
-    const turn = panel.activeAssistantTurn;
-    await waitFor(() => panel.pendingVisionPlan?.planId === 'plan_fallback_post', 'ordinary plan fallback');
-
-    assert.equal(fallbackCalls, 1);
-    assert.match(turn.replyBody.textContent, /规划已完成|已使用规则兜底方案/);
-    assert.match(panel.lastResultStatusNote.text, /规划模式等待确认/);
-  } finally {
-    global.fetch = originalFetch;
-  }
-});
-
-test('ordinary Plan terminal persistence warning stays visible after plan confirmation prompt', async () => {
-  const { AiPanel } = await loadAiPanel();
-  const panel = createPanel(AiPanel, { developer: false, enabled: true });
-  panel.container = createContainer({
-    '#ai-input': createFakeElement(),
-    '#ai-chat-container': createFakeElement(),
-    '#ai-agent-workspace-overview': createFakeElement(),
-    '#ai-plan-workspace': createFakeElement(),
-    '#ai-build-workspace': createFakeElement(),
-    '#ai-result-status-note': createFakeElement()
-  });
-  panel._shouldUsePlanRunEventStream = () => false;
   panel._requestPlanReadinessPreview = () => null;
   const warningMessage = '规划结果已生成，但本次 Plan 工作台状态未能保存。';
+  const planResult = backendPlanResult({
+    planId: 'plan_run_warning',
+    goal: 'PlanRun warning plan',
+    canPlan: true,
+    canBuild: false
+  });
   installFetchStream([
     {
       json: {
-        sessionId: 'session-ordinary-warning',
-        planResult: backendPlanResult({
-          planId: 'plan_ordinary_warning',
-          goal: 'ordinary warning plan',
-          canPlan: true,
-          canBuild: false
-        }),
+        runId: 'ar_plan_warning',
+        sessionId: 'session-plan-run-warning',
+        events: [],
         workspaceSnapshot: {
-          revision: 44,
-          lifecycleState: 'plan_ready',
-          planRunStatus: 'completed'
+          revision: 43,
+          lifecycleState: 'planning',
+          planRunStatus: 'running'
         },
+        persistenceStatus: {
+          primaryStoreSaved: true,
+          recoveryBackupSaved: true
+        },
+        metadataOnly: true
+      }
+    },
+    {
+      body: encodeSseEvent(planRunCompletedEvent({
+        runId: 'ar_plan_warning',
+        sequence: 1,
+        planResult,
+        revision: 44,
         persistenceStatus: {
           primaryStoreSaved: false,
           recoveryBackupSaved: true,
@@ -4353,18 +4326,17 @@ test('ordinary Plan terminal persistence warning stays visible after plan confir
         persistenceWarning: {
           code: 'primary_store_save_failed',
           message: warningMessage
-        },
-        metadataOnly: true
-      }
+        }
+      }))
     }
   ]);
 
   panel._enterPlanModeFromPrompt({
-    description: 'ordinary warning plan',
-    userMessage: 'ordinary warning plan',
+    description: 'PlanRun warning plan',
+    userMessage: 'PlanRun warning plan',
     clearInput: false
   });
-  await waitFor(() => panel.pendingVisionPlan?.planId === 'plan_ordinary_warning', 'ordinary warning plan');
+  await waitFor(() => panel.pendingVisionPlan?.planId === 'plan_run_warning', 'PlanRun warning plan');
 
   assert.equal(panel.workspaceSnapshotRevision, 44);
   assert.equal(panel.pendingVisionPlan.rawPlanSnapshot.workspaceSnapshot.revision, 44);
@@ -4389,11 +4361,6 @@ test('PlanRun create 503 keeps Plan input and does not fall back to ordinary Pla
     '#ai-build-workspace': createFakeElement(),
     '#ai-result-status-note': createFakeElement()
   });
-  let fallbackCalls = 0;
-  panel._requestBackendVisionPlan = async () => {
-    fallbackCalls += 1;
-    throw new Error('ordinary Plan must not be called after PlanRun create failure');
-  };
   const requests = installFetchStream([
     {
       status: 503,
@@ -4413,7 +4380,6 @@ test('PlanRun create 503 keeps Plan input and does not fall back to ordinary Pla
   const turn = panel.activeAssistantTurn;
   await waitFor(() => panel.isGenerating === false, 'PlanRun create failure handled');
 
-  assert.equal(fallbackCalls, 0);
   assert.equal(requests.length, 1);
   assert.match(requests[0].url, /\/api\/ai\/agent-plan-runs$/);
   assert.doesNotMatch(requests[0].url, /\/api\/ai\/agent-plan$/);
@@ -5708,8 +5674,7 @@ test('Plan Mode ignores stale backend response when a newer Plan request wins', 
   const first = deferred();
   const second = deferred();
   let calls = 0;
-  panel._shouldUsePlanRunEventStream = () => false;
-  panel._requestBackendVisionPlan = () => {
+  panel._requestBackendVisionPlanLive = () => {
     calls += 1;
     return calls === 1 ? first.promise : second.promise;
   };

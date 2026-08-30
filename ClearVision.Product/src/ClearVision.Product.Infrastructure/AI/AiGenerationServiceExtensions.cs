@@ -159,8 +159,14 @@ public static class AiGenerationServiceExtensions
         });
 
         services.AddSingleton<ILLMConfigurationStore, JsonLLMConfigurationStore>();
-        services.AddSingleton<IPromptVersionManager, PromptVersionManager>();
-        services.AddSingleton<IAIGeneratedFlowVersionManager, AIGeneratedFlowVersionManager>();
+        services.AddSingleton<AiAuxiliaryPersistenceHealth>();
+        services.AddSingleton<IPromptVersionManager>(serviceProvider =>
+            new PromptVersionManager(
+                baseDirectory: null,
+                faultInjector: null,
+                persistenceHealth: serviceProvider.GetRequiredService<AiAuxiliaryPersistenceHealth>()));
+        services.AddSingleton<IAIGeneratedFlowVersionManager>(_ =>
+            new AIGeneratedFlowVersionManager(baseDirectory: null, faultInjector: null));
         services.AddScoped<LLMConnectorFactory>();
         services.AddScoped<ILLMConnector, DynamicLLMConnector>();
 
