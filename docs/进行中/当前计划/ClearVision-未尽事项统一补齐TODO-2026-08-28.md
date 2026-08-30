@@ -272,25 +272,31 @@ Wave 2A 关闭 Project authority/create，Wave 2B 关闭 AppConfig mutation/appl
 
 这些 ID 只能在源文档补齐当前事实和证据后转 `CLOSED`。其中 `CV-AUDIT-094` 的关闭依据是全局 Profile/TcpDeviceManager 已实现真实 TCP Server；node-local UX 是派生项，不占用该 ID。
 
-### 5.2 仍开放（50）
+### 5.2 仍开放（44）
 
 | 唯一治理线 | ID |
 | --- | --- |
-| U09 持久化/apply/recovery | `CV-AUDIT-009, CV-AUDIT-021, CV-AUDIT-029, CV-AUDIT-040, CV-AUDIT-041, CV-AUDIT-042, CV-AUDIT-069, CV-AUDIT-070, CV-AUDIT-079, CV-AUDIT-080, CV-AUDIT-082, CV-AUDIT-083` |
+| U09 持久化/apply/recovery | `CV-AUDIT-040, CV-AUDIT-041, CV-AUDIT-069, CV-AUDIT-070, CV-AUDIT-079, CV-AUDIT-080, CV-AUDIT-082` |
 | U10 execution authority/state | `CV-AUDIT-032, CV-AUDIT-048, CV-AUDIT-049, CV-AUDIT-050, CV-AUDIT-051, CV-AUDIT-052, CV-AUDIT-053, CV-AUDIT-055, CV-AUDIT-056, CV-AUDIT-065, CV-AUDIT-072, CV-AUDIT-102` |
-| U11 长进程资源/保留 | `CV-AUDIT-057, CV-AUDIT-058, CV-AUDIT-059, CV-AUDIT-060, CV-AUDIT-063, CV-AUDIT-066, CV-AUDIT-067, CV-AUDIT-068, CV-AUDIT-071, CV-AUDIT-081, CV-AUDIT-084, CV-AUDIT-086, CV-AUDIT-087, CV-AUDIT-090, CV-AUDIT-093` |
+| U11 长进程资源/保留 | `CV-AUDIT-057, CV-AUDIT-058, CV-AUDIT-059, CV-AUDIT-060, CV-AUDIT-063, CV-AUDIT-066, CV-AUDIT-067, CV-AUDIT-068, CV-AUDIT-071, CV-AUDIT-081, CV-AUDIT-086, CV-AUDIT-087, CV-AUDIT-090, CV-AUDIT-093` |
 | U12 查询/发布/导出 | `CV-AUDIT-001, CV-AUDIT-003, CV-AUDIT-074, CV-AUDIT-075, CV-AUDIT-076, CV-AUDIT-078, CV-AUDIT-088` |
 | U13 算子契约 | `CV-AUDIT-095, CV-AUDIT-096, CV-AUDIT-097, CV-AUDIT-098` |
 
-部分已关闭子范围不得回退：`021` 非 Admin 主题写入、`057` OnnxPatch cache、`071` 原时间 TTL 诉求、`086` replay fail-soft P0、`102` Studio formal/realtime/node preview admission。剩余动作仍按对应源 ID 独立验收。
+部分已关闭子范围不得回退：`057` OnnxPatch cache、`071` 原时间 TTL 诉求、`086` replay fail-soft P0、`102` Studio formal/realtime/node preview admission。剩余动作仍按对应源 ID 独立验收；`021` 已在 Wave 2B 连同 stale RMW/revision 子范围整体关闭。
 
-### 5.3 已关闭（21）
+### 5.3 已关闭（27）
 
 | ID | 关闭证据 |
 | --- | --- |
 | `CV-AUDIT-006` | Project authority SHA `c4e51619ced47572e5530c303ae1935b1c3a6871`；Wave 2A integration/evidence SHA `57aef33aa3f11db158ca1858a26ceccb31a092ee`；metadata-only flow bytes/metadata 不变、实际 flow diff 的运行态 lease、no-op revision 与 stale CAS focused acceptance 通过。 |
 | `CV-AUDIT-012` | revisioned patch SHA `6892d84c69d6087814bb6f05092312519009d963`；integration/evidence SHA 同上；专用 schema patch、同 revision 竞争最多一成功、404/409/422/200、冲突刷新并保留草稿，以及 metadata/flow 不丢更新矩阵通过。 |
 | `CV-AUDIT-089` | staged create implementation/integration/evidence SHA `57aef33aa3f11db158ca1858a26ceccb31a092ee`；DB/flow body+metadata/manifest/commit marker/rollback interruption fault injection、同名并发、API 失败即时与重启后不可见矩阵通过。 |
+| `CV-AUDIT-009` | Wave 2B implementation/integration/evidence SHA `5372fd011694b51a6e31fdeb323030efe67f0b3b`；reset 复用相机 operation authority，AppConfig durable commit 后同步 CameraManager/串口触发并清退 provider，no-op 也执行 reconciliation；Desktop focused `96/96`、Desktop endpoints `403/403`。 |
+| `CV-AUDIT-021` | Wave 2B implementation/integration/evidence SHA `5372fd011694b51a6e31fdeb323030efe67f0b3b`；剩余 stale RMW 收敛为 `expectedRevision` CAS 与 absent-preserving patch，覆盖 409/no-op/+1 revision、刷新 authoritative revision 并保留 UI 草稿；Product focused `25/25`、UI unit `1020/1020`、定向 Playwright `5/5`。 |
+| `CV-AUDIT-029` | Wave 2B implementation/integration/evidence SHA `5372fd011694b51a6e31fdeb323030efe67f0b3b`；AppConfig mutation surface 收敛单一 async authority，production `SaveAsync`、锁外 `LoadAsync→SaveAsync` 与 PLC 二次 `/api/settings` 写入均为 0；Desktop focused `96/96`。 |
+| `CV-AUDIT-042` | Wave 2B implementation/integration/evidence SHA `5372fd011694b51a6e31fdeb323030efe67f0b3b`；仅 missing 初始化，malformed/empty/权限/锁定/I/O 保留 active bytes/cache/revision，last-good/unavailable 均结构化 503；Product focused `25/25` 覆盖 candidate/replace failure。 |
+| `CV-AUDIT-083` | Wave 2B implementation/integration/evidence SHA `5372fd011694b51a6e31fdeb323030efe67f0b3b`；固定 camera gate → AppConfig gate 与 validate/prepare → persist → apply，覆盖 persist/apply/rollback/fence、活动流冲突、竞争与重启收敛；Desktop focused `96/96`。 |
+| `CV-AUDIT-084` | Wave 2B implementation/integration/evidence SHA `5372fd011694b51a6e31fdeb323030efe67f0b3b`；删除/换 SerialNumber 停止 idle stream 并 close/dispose 无引用 provider，共享 serial 保留，活动流冲突零副作用，reset 同路径；Desktop focused `96/96`、Desktop endpoints `403/403`。 |
 | `CV-AUDIT-044` | Wave 0 implementation/evidence SHA `1e2342c3909cb1f157d902aef1338e92f1ac44a3`。 |
 | `CV-AUDIT-011` | capability implementation SHA `6a476939b143a62a104ebfd4e655979d117f15b2`；Wave 1B1 integration/evidence SHA `139e9a062102feab7e6d2a0fdef6085f5b078e34`；Station UI/handler capability gate 与非视觉零 mutation 请求验收通过。 |
 | `CV-AUDIT-014` | 同上；设置、PLC、相机 mutation 与实际 Admin/`CanOperateHardware` policy 对齐，缺失 capability 时 fail closed。 |
