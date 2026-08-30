@@ -6,6 +6,7 @@ using ClearVision.Product.Application.Services;
 using ClearVision.Product.Core.Entities;
 using ClearVision.Product.Core.Enums;
 using ClearVision.Product.Core.Interfaces;
+using ClearVision.Product.Infrastructure.Services;
 using FluentAssertions;
 using NSubstitute;
 
@@ -15,15 +16,30 @@ namespace ClearVision.Product.Tests.Integration;
 /// DemoProjectService 集成测试
 /// </summary>
 [TestClassification(TestDomain.General, TestPurpose.Integration, TestLane.Nightly, TestEvidenceType.IntegrationEvidence, TestOracleType.Contract, TestResourceRequirement.None, TestExpectedDuration.Medium, TestFlakyPolicy.Blocking, "product")]
-public class DemoProjectServiceIntegrationTests
+public class DemoProjectServiceIntegrationTests : IDisposable
 {
     private readonly IProjectRepository _projectRepository;
     private readonly DemoProjectService _demoService;
+    private readonly string _tempRoot;
 
     public DemoProjectServiceIntegrationTests()
     {
+        _tempRoot = Path.Combine(Path.GetTempPath(), "ClearVision.DemoProjectServiceTests", Guid.NewGuid().ToString("N"));
         _projectRepository = Substitute.For<IProjectRepository>();
-        _demoService = new DemoProjectService(_projectRepository);
+        var flowStorage = new JsonFileProjectFlowStorage(Path.Combine(_tempRoot, "flows"));
+        var saveCoordinator = new ProjectSaveCoordinator(
+            _projectRepository,
+            flowStorage,
+            transactionRoot: Path.Combine(_tempRoot, "transactions"));
+        _demoService = new DemoProjectService(saveCoordinator);
+    }
+
+    public void Dispose()
+    {
+        if (Directory.Exists(_tempRoot))
+        {
+            Directory.Delete(_tempRoot, recursive: true);
+        }
     }
 
     [Fact]
@@ -65,6 +81,9 @@ public class DemoProjectServiceIntegrationTests
         await _projectRepository.Received(1).AddAsync(Arg.Any<Project>());
         capturedProject.Should().NotBeNull();
         capturedProject!.Name.Should().Be("PCB缺陷检测演示");
+        capturedProject.Flow.Operators.Should().HaveCount(6,
+            "the staged DB project must retain the authoritative aggregate flow");
+        capturedProject.Flow.Connections.Should().HaveCount(5);
     }
 
     [Fact]
@@ -108,6 +127,12 @@ public class DemoProjectServiceIntegrationTests
         result.Flow.Connections.Should().HaveCount(1);
 
         await _projectRepository.Received(1).AddAsync(Arg.Any<Project>());
+        var persisted = _projectRepository.ReceivedCalls()
+            .Select(call => call.GetArguments().FirstOrDefault())
+            .OfType<Project>()
+            .Single();
+        persisted.Flow.Operators.Should().HaveCount(2);
+        persisted.Flow.Connections.Should().ContainSingle();
     }
 
     [Fact]

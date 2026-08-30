@@ -142,8 +142,11 @@ public sealed class JsonFileProjectAssetStorage : IProjectAssetStorage
         try
         {
             File.Delete(GetFilePath(projectId));
+            File.Delete(GetFilePath(projectId) + ".tmp");
+            File.Delete(GetFilePath(projectId) + ".corrupt");
             File.Delete(GetLastGoodPath(projectId));
             File.Delete(GetMetadataPath(projectId));
+            File.Delete(GetMetadataPath(projectId) + ".tmp");
         }
         finally
         {

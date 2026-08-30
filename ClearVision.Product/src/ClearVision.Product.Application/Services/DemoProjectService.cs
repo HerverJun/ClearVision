@@ -7,6 +7,7 @@ using ClearVision.Product.Core.Entities;
 using ClearVision.Product.Core.Enums;
 using ClearVision.Product.Core.Interfaces;
 using ClearVision.Product.Core.ValueObjects;
+using System.Text.Json;
 
 namespace ClearVision.Product.Application.Services;
 
@@ -15,11 +16,21 @@ namespace ClearVision.Product.Application.Services;
 /// </summary>
 public class DemoProjectService
 {
-    private readonly IProjectRepository _projectRepository;
-
-    public DemoProjectService(IProjectRepository projectRepository)
+    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web)
     {
-        _projectRepository = projectRepository;
+        WriteIndented = true,
+        Converters = { new System.Text.Json.Serialization.JsonStringEnumConverter() }
+    };
+
+    private readonly ProjectSaveCoordinator _saveCoordinator;
+    private readonly IProjectAssetStorage? _projectAssetStorage;
+
+    public DemoProjectService(
+        ProjectSaveCoordinator saveCoordinator,
+        IProjectAssetStorage? projectAssetStorage = null)
+    {
+        _saveCoordinator = saveCoordinator ?? throw new ArgumentNullException(nameof(saveCoordinator));
+        _projectAssetStorage = projectAssetStorage;
     }
 
     /// <summary>
@@ -165,10 +176,7 @@ public class DemoProjectService
             contourOp.Id, contourOutputPort.Id,
             outputOp.Id, outputInputPort.Id));
 
-        // 保存工程
-        await _projectRepository.AddAsync(project);
-
-        return MapProjectToDto(project);
+        return await PersistDemoProjectAsync(project);
     }
 
     /// <summary>
@@ -209,9 +217,7 @@ public class DemoProjectService
             acquisitionOp.Id, acqPort.Id,
             outputOp.Id, outputPort.Id));
 
-        await _projectRepository.AddAsync(project);
-
-        return MapProjectToDto(project);
+        return await PersistDemoProjectAsync(project);
     }
 
     /// <summary>
@@ -264,7 +270,20 @@ public class DemoProjectService
         };
     }
 
-    private ProjectDto MapProjectToDto(Project project)
+    private async Task<ProjectDto> PersistDemoProjectAsync(Project project)
+    {
+        var flow = MapProjectToDto(project).Flow!;
+        var saved = await _saveCoordinator.CreateProjectAsync(new ProjectCreateSaveRequest(
+            project,
+            flow,
+            JsonSerializer.Serialize(flow, JsonOptions),
+            _projectAssetStorage == null ? null : new ProjectAssetsDto()));
+        var dto = MapProjectToDto(saved.Project);
+        dto.Flow = flow;
+        return dto;
+    }
+
+    private static ProjectDto MapProjectToDto(Project project)
     {
         return new ProjectDto
         {
@@ -272,10 +291,12 @@ public class DemoProjectService
             Name = project.Name,
             Description = project.Description,
             Version = project.Version,
+            PersistenceRevision = project.PersistenceRevision,
             CreatedAt = project.CreatedAt,
             ModifiedAt = project.ModifiedAt,
             LastOpenedAt = project.LastOpenedAt,
             GlobalSettings = project.GlobalSettings,
+            GlobalVariables = project.GlobalVariables,
             Flow = new OperatorFlowDto
             {
                 Id = project.Flow.Id,
