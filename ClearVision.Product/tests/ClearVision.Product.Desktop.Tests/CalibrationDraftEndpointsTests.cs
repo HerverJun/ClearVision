@@ -2,6 +2,7 @@ using System.Text;
 using System.Net;
 using System.Net.Http.Json;
 using System.Linq.Expressions;
+using System.Security.Claims;
 using ClearVision.Product.Application.DTOs;
 using ClearVision.Product.Application.Services;
 using ClearVision.Product.Core.Entities;
@@ -91,7 +92,7 @@ public sealed class CalibrationDraftEndpointsTests
             .BeEquivalentTo(
                 "calibration-draft-session.v1",
                 "calibration-sample-table.v1",
-                "calibration-candidate-bundle.v1");
+                "calibration-solve-provenance.v1");
         response.Artifacts.Should().OnlyContain(artifact => artifact.ContentType == "application/json");
         response.Artifacts.Should().OnlyContain(artifact => artifact.Length <= 512 * 1024);
 
@@ -110,16 +111,18 @@ public sealed class CalibrationDraftEndpointsTests
     public async Task FormalSaveEndpoint_WhenCandidateIsAccepted_ShouldPersistProjectAsset()
     {
         await using var host = await CalibrationEndpointHost.CreateAsync();
+        var solveArtifactId = await SolveAcceptedArtifactAsync(host);
 
         var response = await host.Client.PostAsJsonAsync(
             $"/api/projects/{host.Project.Id:D}/calibration-assets/from-draft",
             new
             {
                 expectedPersistenceRevision = 0,
+                assetId = "npoint-asset",
                 sessionId = "draft-1",
                 targetNodeId = Guid.Parse("22222222-2222-2222-2222-222222222222"),
                 imageIdentity = "image-hash",
-                candidateBundleJson = CreateAcceptedBundleJson()
+                solveArtifactId
             });
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
@@ -127,6 +130,7 @@ public sealed class CalibrationDraftEndpointsTests
         body.Should().NotBeNull();
         body!.ProjectId.Should().Be(host.Project.Id);
         body.PersistenceRevision.Should().Be(1);
+        body.Asset.AssetId.Should().Be("npoint-asset");
         body.Asset.SourceDraftSessionId.Should().Be("draft-1");
         body.Asset.ProjectRevision.Should().Be(1);
         body.Assets.CalibrationAssets.Should().ContainSingle();
@@ -134,7 +138,7 @@ public sealed class CalibrationDraftEndpointsTests
     }
 
     [Fact]
-    public async Task FormalSaveEndpoint_WhenChecksumMismatches_ShouldReturnPsv019WithoutWritingAsset()
+    public async Task FormalSaveEndpoint_LegacyCandidateAndClientHash_ShouldNotBeAuthority()
     {
         await using var host = await CalibrationEndpointHost.CreateAsync();
 
@@ -148,10 +152,10 @@ public sealed class CalibrationDraftEndpointsTests
                 expectedContentHash = "sha256:0000"
             });
 
-        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        response.StatusCode.Should().Be(HttpStatusCode.NotFound);
         var body = await response.Content.ReadFromJsonAsync<Dictionary<string, string>>();
         body.Should().NotBeNull();
-        body!["code"].Should().Be("PSV019");
+        body!["code"].Should().Be("not-found");
         host.Project.PersistenceRevision.Should().Be(0);
         host.AssetStorage.Metadata.Should().BeNull();
     }
@@ -169,10 +173,212 @@ public sealed class CalibrationDraftEndpointsTests
                 sessionId = "draft-1",
                 targetNodeId = Guid.Parse("22222222-2222-2222-2222-222222222222"),
                 imageIdentity = "image-hash",
-                candidateBundleJson = CreateAcceptedBundleJson()
+                solveArtifactId = new string('A', 43)
             });
 
         response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        host.AssetStorage.Metadata.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task FormalSaveEndpoint_ForgedArtifactId_ShouldReturnOpaqueNotFoundWithoutLeaseOrSave()
+    {
+        await using var host = await CalibrationEndpointHost.CreateAsync();
+
+        var response = await PostFormalSaveAsync(host, new string('A', 43));
+
+        await AssertOpaqueNotFoundWithoutSaveAsync(host, response);
+        await host.RuntimeCoordinator.DidNotReceiveWithAnyArgs().TryAcquireMutationLeaseAsync(
+            Arg.Any<Guid>(),
+            Arg.Any<string>(),
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task FormalSaveEndpoint_WrongOwner_ShouldReturnOpaqueNotFoundWithoutSaving()
+    {
+        await using var host = await CalibrationEndpointHost.CreateAsync(userId: "user-a");
+        var solveArtifactId = await SolveAcceptedArtifactAsync(host);
+        host.SetUser("user-b", UserRole.Engineer.ToString());
+
+        var response = await PostFormalSaveAsync(host, solveArtifactId);
+
+        await AssertOpaqueNotFoundWithoutSaveAsync(host, response);
+    }
+
+    [Fact]
+    public async Task FormalSaveEndpoint_WrongProject_ShouldReturnOpaqueNotFoundWithoutSaving()
+    {
+        await using var host = await CalibrationEndpointHost.CreateAsync();
+        var solveArtifactId = await SolveAcceptedArtifactAsync(host);
+
+        var response = await PostFormalSaveAsync(host, solveArtifactId, projectId: Guid.NewGuid());
+
+        await AssertOpaqueNotFoundWithoutSaveAsync(host, response);
+    }
+
+    [Fact]
+    public async Task FormalSaveEndpoint_ExpiredArtifact_ShouldReturnOpaqueNotFoundWithoutSaving()
+    {
+        var clock = new FakePreviewArtifactClock(
+            new DateTimeOffset(2026, 8, 30, 0, 0, 0, TimeSpan.Zero));
+        await using var host = await CalibrationEndpointHost.CreateAsync(clock: clock);
+        var solveArtifactId = await SolveAcceptedArtifactAsync(host);
+        clock.Advance(TimeSpan.FromMinutes(2));
+
+        var response = await PostFormalSaveAsync(host, solveArtifactId);
+
+        await AssertOpaqueNotFoundWithoutSaveAsync(host, response);
+        host.ArtifactStore.TryReadScoped(
+                solveArtifactId,
+                host.CurrentUser.UserId,
+                host.Project.Id,
+                "calibrationSolveBundle",
+                out _)
+            .Should()
+            .BeFalse();
+    }
+
+    [Theory]
+    [InlineData("wrong-session", "22222222-2222-2222-2222-222222222222", "image-hash")]
+    [InlineData("draft-1", "33333333-3333-3333-3333-333333333333", "image-hash")]
+    [InlineData("draft-1", "22222222-2222-2222-2222-222222222222", "wrong-image")]
+    public async Task FormalSaveEndpoint_WrongSolveContext_ShouldReturnOpaqueNotFound(
+        string sessionId,
+        string targetNodeId,
+        string imageIdentity)
+    {
+        await using var host = await CalibrationEndpointHost.CreateAsync();
+        var solveArtifactId = await SolveAcceptedArtifactAsync(host);
+
+        var response = await PostFormalSaveAsync(
+            host,
+            solveArtifactId,
+            sessionId: sessionId,
+            targetNodeId: Guid.Parse(targetNodeId),
+            imageIdentity: imageIdentity);
+
+        await AssertOpaqueNotFoundWithoutSaveAsync(host, response);
+    }
+
+    [Fact]
+    public async Task FormalSaveEndpoint_UnacceptedServerBundle_ShouldReturn422WithoutSaving()
+    {
+        await using var host = await CalibrationEndpointHost.CreateAsync();
+        var solveArtifactId = await SolveArtifactAsync(host, minInlierCount: 10);
+
+        var response = await PostFormalSaveAsync(host, solveArtifactId);
+
+        response.StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity);
+        var body = await response.Content.ReadFromJsonAsync<Dictionary<string, string>>();
+        body!["code"].Should().Be("validation-error");
+        host.Project.PersistenceRevision.Should().Be(0);
+        host.AssetStorage.Metadata.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task FormalSaveEndpoint_RevisionConflict_ShouldReturn409WithoutSaving()
+    {
+        await using var host = await CalibrationEndpointHost.CreateAsync();
+        var solveArtifactId = await SolveAcceptedArtifactAsync(host);
+
+        var response = await PostFormalSaveAsync(host, solveArtifactId, expectedRevision: 99);
+
+        response.StatusCode.Should().Be(HttpStatusCode.Conflict);
+        host.Project.PersistenceRevision.Should().Be(0);
+        host.AssetStorage.Metadata.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task FormalSaveEndpoint_MissingRevision_ShouldReturn422BeforeArtifactRead()
+    {
+        await using var host = await CalibrationEndpointHost.CreateAsync();
+
+        var response = await host.Client.PostAsJsonAsync(
+            $"/api/projects/{host.Project.Id:D}/calibration-assets/from-draft",
+            new
+            {
+                sessionId = "draft-1",
+                targetNodeId = Guid.Parse("22222222-2222-2222-2222-222222222222"),
+                imageIdentity = "image-hash",
+                solveArtifactId = new string('A', 43)
+            });
+
+        response.StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity);
+        var body = await response.Content.ReadFromJsonAsync<Dictionary<string, string>>();
+        body!["code"].Should().Be("validation-error");
+        host.AssetStorage.Metadata.Should().BeNull();
+    }
+
+    private static Task<string> SolveAcceptedArtifactAsync(CalibrationEndpointHost host) =>
+        SolveArtifactAsync(host, minInlierCount: 4);
+
+    private static async Task<string> SolveArtifactAsync(
+        CalibrationEndpointHost host,
+        int minInlierCount)
+    {
+        var response = await host.Client.PostAsJsonAsync(
+            "/api/calibration/npoint-draft/solve",
+            new NPointCalibrationDraftSolveRequest
+            {
+                SessionId = "draft-1",
+                ProjectId = host.Project.Id,
+                TargetNodeId = Guid.Parse("22222222-2222-2222-2222-222222222222"),
+                DebugSessionId = Guid.Parse("33333333-3333-3333-3333-333333333333"),
+                ClientRequestSequence = 1,
+                FlowRevision = 0,
+                ImageIdentity = "image-hash",
+                Mode = "Affine",
+                Unit = "mm",
+                SolverOptions = new NPointCalibrationDraftSolverOptionsDto
+                {
+                    MaxAcceptedReprojectionError = 0.05,
+                    MinInlierCount = minInlierCount,
+                    MinInlierRatio = 1.0
+                },
+                Samples =
+                [
+                    CreateSample("s1", 1, 0, 0, 5, -4),
+                    CreateSample("s2", 2, 10, 0, 25, -4),
+                    CreateSample("s3", 3, 0, 20, 5, 56),
+                    CreateSample("s4", 4, 10, 20, 25, 56)
+                ]
+            });
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var body = await response.Content.ReadFromJsonAsync<NPointCalibrationDraftSolveResponse>();
+        body.Should().NotBeNull();
+        var artifact = body!.Artifacts.Single(item => item.Kind == "calibrationSolveBundle");
+        return artifact.ArtifactId;
+    }
+
+    private static Task<HttpResponseMessage> PostFormalSaveAsync(
+        CalibrationEndpointHost host,
+        string solveArtifactId,
+        Guid? projectId = null,
+        long expectedRevision = 0,
+        string sessionId = "draft-1",
+        Guid? targetNodeId = null,
+        string imageIdentity = "image-hash") =>
+        host.Client.PostAsJsonAsync(
+            $"/api/projects/{projectId ?? host.Project.Id:D}/calibration-assets/from-draft",
+            new
+            {
+                expectedPersistenceRevision = expectedRevision,
+                assetId = "npoint-asset",
+                sessionId,
+                targetNodeId = targetNodeId ?? Guid.Parse("22222222-2222-2222-2222-222222222222"),
+                imageIdentity,
+                solveArtifactId
+            });
+
+    private static async Task AssertOpaqueNotFoundWithoutSaveAsync(
+        CalibrationEndpointHost host,
+        HttpResponseMessage response)
+    {
+        response.StatusCode.Should().Be(HttpStatusCode.NotFound);
+        var body = await response.Content.ReadFromJsonAsync<Dictionary<string, string>>();
+        body!["code"].Should().Be("not-found");
+        host.Project.PersistenceRevision.Should().Be(0);
         host.AssetStorage.Metadata.Should().BeNull();
     }
 
@@ -234,11 +440,17 @@ public sealed class CalibrationDraftEndpointsTests
         private CalibrationEndpointHost(
             WebApplication app,
             Project project,
-            RecordingProjectAssetStorage assetStorage)
+            RecordingProjectAssetStorage assetStorage,
+            PreviewArtifactStore artifactStore,
+            IInspectionRuntimeCoordinator runtimeCoordinator,
+            UserSession currentUser)
         {
             _app = app;
             Project = project;
             AssetStorage = assetStorage;
+            ArtifactStore = artifactStore;
+            RuntimeCoordinator = runtimeCoordinator;
+            CurrentUser = currentUser;
             Client = app.GetTestClient();
         }
 
@@ -248,7 +460,16 @@ public sealed class CalibrationDraftEndpointsTests
 
         public RecordingProjectAssetStorage AssetStorage { get; }
 
-        public static async Task<CalibrationEndpointHost> CreateAsync(string role = "Engineer")
+        public PreviewArtifactStore ArtifactStore { get; }
+
+        public IInspectionRuntimeCoordinator RuntimeCoordinator { get; }
+
+        public UserSession CurrentUser { get; }
+
+        public static async Task<CalibrationEndpointHost> CreateAsync(
+            string role = "Engineer",
+            string? userId = null,
+            FakePreviewArtifactClock? clock = null)
         {
             ProjectSaveCoordinator.ResetStaticStateForTests();
             var project = new Project("demo");
@@ -261,6 +482,19 @@ public sealed class CalibrationDraftEndpointsTests
                 .TryAcquireMutationLeaseAsync(project.Id, Arg.Any<string>(), Arg.Any<CancellationToken>())
                 .Returns(_ => Task.FromResult<ProjectMutationLease?>(
                     new ProjectMutationLease(project.Id, "test", () => ValueTask.CompletedTask)));
+            var artifactStore = new PreviewArtifactStore(new PreviewArtifactStoreOptions
+            {
+                Ttl = TimeSpan.FromMinutes(1),
+                MaxEntries = 64,
+                MaxTotalBytes = 4 * 1024 * 1024,
+                MaxEntryBytes = 512 * 1024
+            }, clock);
+            var currentUser = new UserSession
+            {
+                UserId = userId ?? role.ToLowerInvariant(),
+                Username = userId ?? role.ToLowerInvariant(),
+                Role = role
+            };
 
             var builder = WebApplication.CreateBuilder(new WebApplicationOptions
             {
@@ -275,23 +509,37 @@ public sealed class CalibrationDraftEndpointsTests
             builder.Services.AddSingleton(runtimeCoordinator);
             builder.Services.AddSingleton(Options.Create(new StudioOptions { NPointCalibrationWorkbenchEnabled = true }));
             builder.Services.AddSingleton(NullLogger<ProjectService>.Instance);
-            builder.Services.AddSingleton<PreviewArtifactStore>();
+            builder.Services.AddSingleton(artifactStore);
             builder.Services.AddScoped<ProjectSaveCoordinator>();
             builder.Services.AddScoped<ProjectService>();
             var app = builder.Build();
             app.Use(async (context, next) =>
             {
-                context.Items["CurrentUser"] = new UserSession
-                {
-                    UserId = role.ToLowerInvariant(),
-                    Username = role.ToLowerInvariant(),
-                    Role = role
-                };
+                context.Items["CurrentUser"] = currentUser;
+                context.User = new ClaimsPrincipal(new ClaimsIdentity(
+                [
+                    new Claim(ClaimTypes.NameIdentifier, currentUser.UserId),
+                    new Claim(ClaimTypes.Name, currentUser.Username),
+                    new Claim(ClaimTypes.Role, currentUser.Role)
+                ], "CalibrationEndpointTests"));
                 await next();
             });
             app.MapCalibrationDraftEndpoints();
             await app.StartAsync();
-            return new CalibrationEndpointHost(app, project, assetStorage);
+            return new CalibrationEndpointHost(
+                app,
+                project,
+                assetStorage,
+                artifactStore,
+                runtimeCoordinator,
+                currentUser);
+        }
+
+        public void SetUser(string userId, string role)
+        {
+            CurrentUser.UserId = userId;
+            CurrentUser.Username = userId;
+            CurrentUser.Role = role;
         }
 
         public async ValueTask DisposeAsync()
@@ -349,6 +597,13 @@ public sealed class CalibrationDraftEndpointsTests
         public Task<Project?> GetWithFlowAsync(Guid id) => GetByIdAsync(id);
 
         public Task UpdateFlowAsync(Project project) => Task.CompletedTask;
+    }
+
+    public sealed class FakePreviewArtifactClock(DateTimeOffset utcNow) : IPreviewArtifactClock
+    {
+        public DateTimeOffset UtcNow { get; private set; } = utcNow;
+
+        public void Advance(TimeSpan elapsed) => UtcNow = UtcNow.Add(elapsed);
     }
 
     public sealed class RecordingProjectAssetStorage : IProjectAssetStorage

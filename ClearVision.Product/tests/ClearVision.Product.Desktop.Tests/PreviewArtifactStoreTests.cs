@@ -426,6 +426,49 @@ public sealed class PreviewArtifactStoreTests
         read!.Bytes.Should().Equal(7, 7, 7);
     }
 
+    [Fact]
+    public void Store_ScopedReadRequiresUserProjectKindAndRevalidatesContentHash()
+    {
+        using var store = new PreviewArtifactStore();
+        var owner = CreateOwner();
+        var reference = AddArtifact(store, owner, [1, 2, 3]);
+
+        store.TryReadScoped(
+                reference.ArtifactId,
+                owner.UserId,
+                owner.ProjectId,
+                "binary",
+                out var valid)
+            .Should()
+            .BeTrue();
+        valid!.Bytes.Should().Equal(1, 2, 3);
+        store.TryReadScoped(reference.ArtifactId, "wrong-user", owner.ProjectId, "binary", out _)
+            .Should()
+            .BeFalse();
+        store.TryReadScoped(reference.ArtifactId, owner.UserId, Guid.NewGuid(), "binary", out _)
+            .Should()
+            .BeFalse();
+        store.TryReadScoped(reference.ArtifactId, owner.UserId, owner.ProjectId, "wrong-kind", out _)
+            .Should()
+            .BeFalse();
+
+        var entriesField = typeof(PreviewArtifactStore).GetField(
+            "_entries",
+            BindingFlags.Instance | BindingFlags.NonPublic)!;
+        var entries = (Dictionary<string, PreviewArtifactEntry>)entriesField.GetValue(store)!;
+        entries[reference.ArtifactId].Bytes[0] = 0xFF;
+
+        store.TryReadScoped(
+                reference.ArtifactId,
+                owner.UserId,
+                owner.ProjectId,
+                "binary",
+                out _)
+            .Should()
+            .BeFalse();
+        store.Count.Should().Be(0);
+    }
+
     private static PreviewArtifactReferenceV1 AddArtifact(
         PreviewArtifactStore store,
         PreviewArtifactOwnerScope owner,

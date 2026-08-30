@@ -53,11 +53,14 @@ public static class CalibrationDraftEndpoints
                 cancellationToken,
                 context.User.FindFirstValue(ClaimTypes.NameIdentifier) ?? string.Empty);
             return Results.Ok(response);
-        });
+        })
+        .RequireClearVisionPermission(ClearVisionPermissionPolicies.RequireAuthenticated);
 
         app.MapPost("/api/projects/{projectId:guid}/calibration-assets/from-draft", async (
             Guid projectId,
             NPointCalibrationFormalSaveRequest request,
+            HttpContext context,
+            PreviewArtifactStore artifactStore,
             ProjectService projectService,
             IInspectionRuntimeCoordinator runtimeCoordinator,
             IOptions<StudioOptions> studioOptions,
@@ -72,9 +75,29 @@ public static class CalibrationDraftEndpoints
                 });
             }
 
-            if (!TryBuildFormalSavePayload(request, out var payload, out var version, out var error))
+            if (request.ExpectedPersistenceRevision is null)
             {
-                return Results.BadRequest(new { Code = "PSV025", Error = error });
+                return Results.UnprocessableEntity(new
+                {
+                    Code = "validation-error",
+                    Error = "expectedPersistenceRevision is required."
+                });
+            }
+
+            var userId = context.User.FindFirstValue(ClaimTypes.NameIdentifier) ?? string.Empty;
+            if (!TryBuildFormalSavePayload(
+                    projectId,
+                    request,
+                    userId,
+                    artifactStore,
+                    out var provenance,
+                    out var payload,
+                    out var version,
+                    out var error))
+            {
+                return string.Equals(error, "not_found", StringComparison.Ordinal)
+                    ? Results.NotFound(new { Code = "not-found", Error = "Solve artifact not found." })
+                    : Results.UnprocessableEntity(new { Code = "validation-error", Error = error });
             }
 
             await using var mutationLease = await runtimeCoordinator.TryAcquireMutationLeaseAsync(
@@ -96,10 +119,10 @@ public static class CalibrationDraftEndpoints
                         AssetId = request.AssetId,
                         Version = version,
                         Producer = "NPointCalibrationDraftWorkbench",
-                        SourceDraftSessionId = request.SessionId,
-                        TargetNodeId = request.TargetNodeId,
-                        ImageIdentity = request.ImageIdentity,
-                        ExpectedContentHash = request.ExpectedContentHash,
+                        SourceDraftSessionId = provenance!.SessionId,
+                        TargetNodeId = provenance.TargetNodeId,
+                        ImageIdentity = provenance.ImageIdentity,
+                        ExpectedContentHash = ProjectAssetJson.ComputePayloadHash(payload),
                         Payload = payload
                     });
 
@@ -230,35 +253,59 @@ public static class CalibrationDraftEndpoints
     }
 
     private static bool TryBuildFormalSavePayload(
+        Guid projectId,
         NPointCalibrationFormalSaveRequest request,
+        string userId,
+        PreviewArtifactStore artifactStore,
+        out NPointCalibrationSolveArtifactV1? provenance,
         out JsonElement payload,
         out string? version,
         out string error)
     {
+        provenance = null;
         payload = default;
         version = null;
         error = string.Empty;
-        CalibrationBundleV2 bundle;
-        if (!string.IsNullOrWhiteSpace(request.CandidateBundleJson))
+        if (!artifactStore.TryReadScoped(
+                request.SolveArtifactId,
+                userId,
+                projectId,
+                "calibrationSolveBundle",
+                out var artifact) ||
+            artifact == null)
         {
-            if (!CalibrationBundleV2Json.TryDeserialize(request.CandidateBundleJson, out bundle, out error))
-            {
-                return false;
-            }
-        }
-        else if (request.CandidateBundle != null)
-        {
-            bundle = request.CandidateBundle;
-            if (!CalibrationBundleV2Json.TryValidateBase(bundle, out error))
-            {
-                return false;
-            }
-        }
-        else
-        {
-            error = "Calibration candidate bundle is required.";
+            error = "not_found";
             return false;
         }
+
+        try
+        {
+            provenance = JsonSerializer.Deserialize<NPointCalibrationSolveArtifactV1>(artifact.Bytes, JsonOptions);
+        }
+        catch (JsonException)
+        {
+            error = "Solve artifact payload is invalid.";
+            return false;
+        }
+
+        if (provenance?.Bundle == null ||
+            !string.Equals(
+                artifact.Reference.Role,
+                "calibration-solve-provenance.v1",
+                StringComparison.Ordinal) ||
+            !string.Equals(provenance.SchemaVersion, "calibration-solve-provenance.v1", StringComparison.Ordinal) ||
+            !string.Equals(provenance.SolveKind, "npoint", StringComparison.Ordinal) ||
+            provenance.ProjectId != projectId ||
+            provenance.TargetNodeId != artifact.Owner.TargetNodeId ||
+            !string.Equals(request.SessionId?.Trim() ?? string.Empty, provenance.SessionId, StringComparison.Ordinal) ||
+            request.TargetNodeId != provenance.TargetNodeId ||
+            !string.Equals(request.ImageIdentity?.Trim() ?? string.Empty, provenance.ImageIdentity, StringComparison.Ordinal))
+        {
+            error = "not_found";
+            return false;
+        }
+
+        var bundle = provenance.Bundle;
 
         if (!CalibrationBundleV2Json.TryRequireAccepted(bundle, out error))
         {
@@ -278,10 +325,10 @@ public static class CalibrationDraftEndpoints
         {
             return string.Equals(code, "PSV011", StringComparison.Ordinal)
                 ? Results.Conflict(new { Code = code, Error = message })
-                : Results.BadRequest(new { Code = code, Error = message });
+                : Results.UnprocessableEntity(new { Code = code, Error = message });
         }
 
-        return Results.BadRequest(new { Error = ex.Message });
+        return Results.UnprocessableEntity(new { Code = "validation-error", Error = ex.Message });
     }
 
     private static bool TryParseStableError(string? message, out string code, out string error)
@@ -504,10 +551,19 @@ public static class CalibrationDraftEndpoints
                 batch,
                 artifacts,
                 diagnostics,
-                "calibrationCandidateBundle",
-                "calibration-candidate-bundle.v1",
-                "$.CalibrationDraft.CandidateBundle",
-                JsonSerializer.Deserialize<JsonElement>(candidateBundleJson),
+                "calibrationSolveBundle",
+                "calibration-solve-provenance.v1",
+                "$.CalibrationDraft.SolveProvenance",
+                new NPointCalibrationSolveArtifactV1
+                {
+                    ProjectId = request.ProjectId,
+                    TargetNodeId = request.TargetNodeId,
+                    SessionId = sessionId,
+                    ImageIdentity = request.ImageIdentity ?? string.Empty,
+                    Bundle = JsonSerializer.Deserialize<CalibrationBundleV2>(
+                        candidateBundleJson,
+                        CalibrationBundleV2Json.DefaultOptions)
+                },
                 cancellationToken);
         }
 
@@ -710,11 +766,18 @@ public sealed class NPointCalibrationFormalSaveRequest
 
     public string? ImageIdentity { get; init; }
 
-    public string? CandidateBundleJson { get; init; }
+    public string? SolveArtifactId { get; init; }
+}
 
-    public CalibrationBundleV2? CandidateBundle { get; init; }
-
-    public string? ExpectedContentHash { get; init; }
+internal sealed class NPointCalibrationSolveArtifactV1
+{
+    public string SchemaVersion { get; init; } = "calibration-solve-provenance.v1";
+    public string SolveKind { get; init; } = "npoint";
+    public Guid ProjectId { get; init; }
+    public Guid TargetNodeId { get; init; }
+    public string SessionId { get; init; } = string.Empty;
+    public string ImageIdentity { get; init; } = string.Empty;
+    public CalibrationBundleV2? Bundle { get; init; }
 }
 
 public sealed class NPointCalibrationDraftSolverOptionsDto

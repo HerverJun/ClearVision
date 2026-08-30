@@ -4,8 +4,9 @@
  *
  * Step 1: 采集标定点
  * Step 2: 验证与求解
- * Step 3: 保存标定文件
+ * Step 3: 保存工程标定资产
  */
+import webMessageBridge from '../messaging/webMessageBridge.js';
 
 const MIN_ACCEPTED_POINT_COUNT = 3;
 
@@ -14,9 +15,22 @@ export class PlanarScaleOffsetCalibWizard {
         this.cameraManager = cameraManager;
         this.captureFrame = typeof options.captureFrame === 'function' ? options.captureFrame : null;
         this.getCameraBindingId = typeof options.getCameraBindingId === 'function' ? options.getCameraBindingId : null;
+        this.getProjectId = typeof options.getProjectId === 'function' ? options.getProjectId : null;
+        this.projectId = options.projectId ?? null;
+        this.getExpectedPersistenceRevision = typeof options.getExpectedPersistenceRevision === 'function'
+            ? options.getExpectedPersistenceRevision
+            : null;
+        this.expectedPersistenceRevision = options.expectedPersistenceRevision ?? null;
+        this.getSessionId = typeof options.getSessionId === 'function' ? options.getSessionId : null;
+        this.sessionId = options.sessionId ?? null;
+        this.assetId = typeof options.assetId === 'string' && options.assetId.trim()
+            ? options.assetId.trim()
+            : 'planar-scale-offset';
         this.currentStep = 1;
         this.points = [];
         this.solveResult = null;
+        this.solveArtifact = null;
+        this.solveContext = null;
         this.overlay = null;
         this.els = null;
         this._boundRenderFrame = null;
@@ -54,7 +68,7 @@ export class PlanarScaleOffsetCalibWizard {
                 </div>
                 <div class="calib-step" id="calib-step-3-indic">
                     <div class="calib-step-circle">3</div>
-                    <div class="calib-step-label">保存标定文件</div>
+                    <div class="calib-step-label">保存工程资产</div>
                 </div>
             </div>
             <div class="calib-wizard-body">
@@ -155,13 +169,14 @@ export class PlanarScaleOffsetCalibWizard {
                         <div class="calib-save-icon">✓</div>
                         <h3 style="margin: 0; font-size: 20px; color: var(--text-primary);">标定数据已就绪</h3>
                         <p style="color: var(--text-secondary); font-size: 14px; margin: 0 0 10px 0;">
-                            保存后，您可以通过 CalibrationLoader 将该二维平面标定结果接入 CoordinateTransform 或 PixelToWorldTransform。
+                            正式保存会使用本次服务端解算凭据写入当前工程；没有工程上下文时仍可查看结果，但不能保存。
                         </p>
 
                         <div class="calib-save-input-group">
-                            <label>保存标定文件:</label>
-                            <input type="text" id="calib-filename" value="planar_scale_offset_calib.json">
+                            <label>工程标定资产 ID:</label>
+                            <input type="text" id="calib-asset-id" value="planar-scale-offset" autocomplete="off">
                         </div>
+                        <p id="calib-save-context-hint" class="calib-quality-hint"></p>
                     </div>
                 </div>
             </div>
@@ -206,8 +221,10 @@ export class PlanarScaleOffsetCalibWizard {
             valOy: this.overlay.querySelector('#calib-res-oy'),
             badge: this.overlay.querySelector('#calib-status-badge'),
             qualityHint: this.overlay.querySelector('#calib-quality-hint'),
-            inpFilename: this.overlay.querySelector('#calib-filename')
+            inpAssetId: this.overlay.querySelector('#calib-asset-id'),
+            saveContextHint: this.overlay.querySelector('#calib-save-context-hint')
         };
+        this.els.inpAssetId.value = this.assetId;
     }
 
     attachEvents() {
@@ -254,6 +271,9 @@ export class PlanarScaleOffsetCalibWizard {
 
         [this.els.inpPx, this.els.inpPy, this.els.inpHx, this.els.inpHy].forEach((el) => {
             el.addEventListener('input', () => this.checkAddButtonState());
+        });
+        this.els.inpAssetId.addEventListener('input', () => {
+            if (this.currentStep === 3) this.refreshFormalSaveState();
         });
 
         this.els.btnAdd.addEventListener('click', () => {
@@ -321,11 +341,47 @@ export class PlanarScaleOffsetCalibWizard {
 
     invalidateSolveResult() {
         this.solveResult = null;
+        this.solveArtifact = null;
+        this.solveContext = null;
         this.els.resPanel.classList.remove('visible');
         this.els.qualityHint.textContent = '';
         if (this.currentStep === 2) {
             this.els.btnNext.disabled = true;
         }
+    }
+
+    resolveProjectId() {
+        const value = this.getProjectId?.() ?? this.projectId;
+        return value == null ? '' : String(value).trim();
+    }
+
+    resolveSessionId() {
+        const value = this.getSessionId?.() ?? this.sessionId;
+        return value == null ? '' : String(value).trim();
+    }
+
+    resolveExpectedPersistenceRevision() {
+        const value = this.getExpectedPersistenceRevision?.() ?? this.expectedPersistenceRevision;
+        if (value == null || value === '') return null;
+        const revision = Number(value);
+        return Number.isSafeInteger(revision) && revision >= 0 ? revision : null;
+    }
+
+    getFormalSaveBlockReason() {
+        const projectId = this.resolveProjectId();
+        if (!projectId) return '当前页面没有工程上下文，本次结果仅供查看。';
+        if (!this.solveArtifact?.artifactId) return '缺少服务端解算凭据，请在当前工程上下文中重新执行计算。';
+        if (this.solveContext?.projectId !== projectId) return '工程上下文已变化，请重新执行计算。';
+        if (this.resolveExpectedPersistenceRevision() == null) return '缺少工程持久化 revision，不能正式保存。';
+        if (!this.els.inpAssetId.value.trim()) return '请输入工程标定资产 ID。';
+        return '';
+    }
+
+    refreshFormalSaveState() {
+        const reason = this.getFormalSaveBlockReason();
+        this.els.btnNext.disabled = Boolean(reason);
+        this.els.saveContextHint.textContent = reason || '服务端解算凭据有效，可以按当前工程 revision 保存。';
+        this.els.inpAssetId.disabled = !this.resolveProjectId();
     }
 
     goToStep(step) {
@@ -351,7 +407,7 @@ export class PlanarScaleOffsetCalibWizard {
             this.els.desc2.textContent = `已采集 ${this.points.length} 个点位，点击执行计算进行最小二乘法解算。`;
         } else {
             this.els.btnNext.textContent = '保存并完成';
-            this.els.btnNext.disabled = false;
+            this.refreshFormalSaveState();
         }
     }
 
@@ -474,10 +530,21 @@ export class PlanarScaleOffsetCalibWizard {
         this.els.btnSolve.disabled = true;
         this.els.btnNext.disabled = true;
 
+        const solveContext = {
+            projectId: this.resolveProjectId(),
+            sessionId: this.resolveSessionId(),
+            assetId: this.els.inpAssetId.value.trim(),
+            cameraBindingId: this.getCameraBindingId?.() || ''
+        };
+        this.solveArtifact = null;
+        this.solveContext = solveContext;
+
         if (window.chrome?.webview) {
-            window.chrome.webview.postMessage({
-                messageType: 'planar2d:solve',
-                payload: this.points
+            webMessageBridge.sendMessage('planar2d:solve', {
+                payload: {
+                    points: this.points,
+                    ...solveContext
+                }
             });
             return;
         }
@@ -512,6 +579,7 @@ export class PlanarScaleOffsetCalibWizard {
         }
 
         this.solveResult = result;
+        this.solveArtifact = result.solveArtifact || null;
         this.els.resPanel.classList.add('visible');
 
         this.els.valRmse.innerHTML = `${parseFloat(result.rmse).toFixed(3)} <span class="calib-metric-unit">mm</span>`;
@@ -548,7 +616,9 @@ export class PlanarScaleOffsetCalibWizard {
             this.els.badge.textContent = '已通过';
             this.els.badge.classList.remove('review');
             this.els.badge.classList.add('accepted');
-            this.els.qualityHint.textContent = '结果已通过生产验收门槛，可以进入下一步保存标定文件。';
+            this.els.qualityHint.textContent = this.solveArtifact?.artifactId
+                ? '结果已通过生产验收门槛，并已生成当前工程可用的服务端解算凭据。'
+                : '结果已通过生产验收门槛；当前无工程上下文，仅可查看，不能正式保存。';
         }
     }
 
@@ -558,16 +628,28 @@ export class PlanarScaleOffsetCalibWizard {
             return;
         }
 
-        const fileName = this.els.inpFilename.value.trim() || 'planar_scale_offset_calib.json';
+        const blockReason = this.getFormalSaveBlockReason();
+        if (blockReason) {
+            alert(blockReason);
+            this.refreshFormalSaveState();
+            return;
+        }
+
+        const projectId = this.resolveProjectId();
+        const expectedPersistenceRevision = this.resolveExpectedPersistenceRevision();
+        const assetId = this.els.inpAssetId.value.trim();
         this.els.btnNext.disabled = true;
         this.els.btnNext.textContent = '保存中...';
 
         if (window.chrome?.webview) {
-            window.chrome.webview.postMessage({
-                messageType: 'planar2d:save',
+            webMessageBridge.sendMessage('planar2d:save', {
                 payload: {
-                    fileName,
-                    result: this.solveResult
+                    solveArtifactId: this.solveArtifact.artifactId,
+                    projectId,
+                    expectedPersistenceRevision,
+                    assetId,
+                    sessionId: this.solveContext.sessionId,
+                    cameraBindingId: this.solveContext.cameraBindingId
                 }
             });
             return;
@@ -577,17 +659,17 @@ export class PlanarScaleOffsetCalibWizard {
     }
 
     handleSaveResult(result) {
-        this.els.btnNext.disabled = false;
         this.els.btnNext.textContent = '保存并完成';
 
         if (!result.success) {
+            this.refreshFormalSaveState();
             alert(`保存失败: ${result.message || '未知错误'}`);
             return;
         }
 
         const toast = document.createElement('div');
         toast.style.cssText = 'position: fixed; top: 20px; right: 20px; background: #10b981; color: white; padding: 12px 24px; border-radius: 8px; font-weight: 500; font-size: 14px; box-shadow: 0 4px 12px rgba(16,185,129,0.3); z-index: 10000;';
-        toast.textContent = '✓ 标定文件保存成功';
+        toast.textContent = '✓ 工程标定资产保存成功';
         document.body.appendChild(toast);
 
         setTimeout(() => {

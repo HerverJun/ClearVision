@@ -55,10 +55,12 @@ public sealed class PreviewArtifactReadResult
 {
     internal PreviewArtifactReadResult(
         PreviewArtifactReferenceV1 reference,
-        byte[] bytes)
+        byte[] bytes,
+        PreviewArtifactOwnerScope owner)
     {
         Reference = reference;
         Bytes = bytes;
+        Owner = owner;
     }
 
     public PreviewArtifactReferenceV1 Reference { get; }
@@ -66,6 +68,7 @@ public sealed class PreviewArtifactReadResult
     public string ContentType => Reference.ContentType;
     public long Length => Reference.Length;
     public string Sha256 => Reference.Sha256;
+    internal PreviewArtifactOwnerScope Owner { get; }
 }
 
 public sealed class PreviewArtifactValue

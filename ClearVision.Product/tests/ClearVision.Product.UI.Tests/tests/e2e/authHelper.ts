@@ -10,12 +10,50 @@ type E2EAuthenticatedUser = {
   passwordPolicy?: { minimumLength: number };
 };
 
+const E2E_ADMIN_CAPABILITIES = [
+  'project.edit',
+  'station.commands.create',
+  'station.packages.read',
+  'station.packages.deploy',
+  'station.test-packages.create',
+  'settings.update',
+  'settings.reset',
+  'plc.settings.update',
+  'plc.mappings.update',
+  'plc.connection.test',
+  'tcp.profiles.update',
+  'tcp.connections.operate',
+  'station.communication.update',
+  'station.communication-token.manage',
+  'cameras.bindings.update',
+  'cameras.capture',
+  'cameras.preview.operate',
+  'trigger-input.operate',
+  'ai.models.create',
+  'ai.models.update',
+  'ai.models.delete',
+  'ai.models.activate',
+  'ai.models.set-default',
+  'ai.models.test',
+  'database.status.read',
+  'database.backup',
+  'database.repair',
+  'database.restore',
+  'database.cleanup',
+  'users.read',
+  'users.create',
+  'users.update',
+  'users.delete',
+  'users.reset-password',
+];
+
 const E2E_USER: E2EAuthenticatedUser = {
   userId: 'e2e-admin',
   id: 'e2e-admin',
   username: 'admin',
   displayName: 'E2E Admin',
   role: 'Admin',
+  capabilities: E2E_ADMIN_CAPABILITIES,
 };
 
 export async function bootAuthenticatedApp(

@@ -170,7 +170,25 @@ public class PlanarScaleOffsetCalibrationService : IPlanarScaleOffsetCalibration
             ?? throw new InvalidOperationException("Unable to resolve calibration output directory.");
         Directory.CreateDirectory(directoryPath);
 
-        var bundle = new CalibrationBundleV2
+        var bundle = CreateCalibrationBundle(result);
+
+        var json = CalibrationBundleV2Json.Serialize(bundle);
+        await File.WriteAllTextAsync(fullPath, json);
+        return true;
+    }
+
+    public static CalibrationBundleV2 CreateCalibrationBundle(PlanarScaleOffsetCalibrationResult result)
+    {
+        ArgumentNullException.ThrowIfNull(result);
+        var accepted = result.MeetsAcceptanceCriteria();
+        if (!accepted)
+        {
+            throw new ArgumentException(
+                "Planar scale-offset calibration result must pass acceptance before a bundle can be created.",
+                nameof(result));
+        }
+
+        return new CalibrationBundleV2
         {
                 CalibrationKind = CalibrationKindV2.PlanarTransform2D,
                 TransformModel = TransformModelV2.ScaleOffset,
@@ -203,10 +221,6 @@ public class PlanarScaleOffsetCalibrationService : IPlanarScaleOffsetCalibration
                 },
                 ProducerOperator = nameof(PlanarScaleOffsetCalibrationService)
         };
-
-        var json = CalibrationBundleV2Json.Serialize(bundle);
-        await File.WriteAllTextAsync(fullPath, json);
-        return true;
     }
 
     public static string ResolveCalibrationSavePath(string fileName)

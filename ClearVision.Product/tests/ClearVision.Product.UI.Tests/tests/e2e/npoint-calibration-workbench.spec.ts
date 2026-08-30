@@ -47,12 +47,19 @@ async function setCurrentProject(page: Page) {
   await page.evaluate(async () => {
     const projectModule = await import('/src/features/project/projectManager.js');
     const inspectionModule = await import('/src/features/inspection/inspectionController.js');
-    projectModule.setCurrentProject({
+    const project = {
       id: 'e2e-npoint-project',
       name: 'E2E NPoint Project',
       description: '',
       flow: null,
-    });
+      persistenceRevision: 7,
+      assets: {
+        calibrationAssets: [],
+        spatialAssets: [],
+      },
+    };
+    projectModule.default.currentProject = project;
+    projectModule.setCurrentProject(project);
     inspectionModule.default.setProject('e2e-npoint-project');
   });
 }
@@ -201,7 +208,13 @@ function createSolvedResponse(request: any) {
     candidateBundle,
     candidateBundleJson: JSON.stringify(candidateBundle),
     artifacts: [
-      { role: 'candidate-bundle', schema: 'calibration-candidate-bundle.v1', artifactId: 'artifact-candidate' },
+      {
+        role: 'solve-provenance',
+        kind: 'calibrationSolveBundle',
+        schema: 'calibration-solve-provenance.v1',
+        artifactId: 'artifact-solve-npoint',
+        contentHash: 'sha256:server-owned-npoint-bundle',
+      },
       { role: 'sample-table', schema: 'calibration-sample-table.v1', artifactId: 'artifact-samples' },
     ],
     diagnostics: ['visual-scene-calibration-draft-truncated=false'],
@@ -238,6 +251,7 @@ test.describe('NPoint calibration draft workbench', () => {
     await setCurrentProject(page);
 
     let solveCallCount = 0;
+    let formalSaveRequest: any = null;
     await page.route('**/api/calibration/npoint-draft/solve', async route => {
       solveCallCount += 1;
       const request = route.request().postDataJSON();
@@ -247,8 +261,34 @@ test.describe('NPoint calibration draft workbench', () => {
         body: JSON.stringify(solveCallCount === 1 ? createSolvedResponse(request) : createFailedResponse(request)),
       });
     });
+    await page.route('**/api/projects/e2e-npoint-project/calibration-assets/from-draft', async route => {
+      formalSaveRequest = route.request().postDataJSON();
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          projectId: 'e2e-npoint-project',
+          persistenceRevision: 8,
+          asset: {
+            assetId: 'asset-npoint-e2e',
+            projectRevision: 8,
+            contentHash: 'sha256:formal-npoint-bundle',
+          },
+          assets: {
+            calibrationAssets: [
+              {
+                assetId: 'asset-npoint-e2e',
+                targetNodeId: (formalSaveRequest || {}).targetNodeId,
+                contentHash: 'sha256:formal-npoint-bundle',
+              },
+            ],
+            spatialAssets: [],
+          },
+        }),
+      });
+    });
 
-    await addAndSelectNPointNode(page);
+    const nodeId = await addAndSelectNPointNode(page);
     await waitForWorkbenchReady(page);
 
     await page.locator('[data-action="template9"]').click();
@@ -265,6 +305,20 @@ test.describe('NPoint calibration draft workbench', () => {
     await saveScreenshot(page, 'g12b-npoint-outlier-disabled.png');
 
     await expect(page.locator('[data-action="export"]')).toBeEnabled();
+    await expect(page.locator('[data-action="formal-save"]')).toBeEnabled();
+    await page.locator('[data-action="formal-save"]').click();
+    await expect(page.locator('.calibration-draft-status')).toContainText('FormalSaved');
+    await expect(page.locator('.calibration-draft-status')).toContainText('asset-npoint-e2e / r8');
+    expect(formalSaveRequest).toMatchObject({
+      expectedPersistenceRevision: 7,
+      targetNodeId: nodeId,
+      solveArtifactId: 'artifact-solve-npoint',
+    });
+    expect(formalSaveRequest.sessionId).toMatch(/^calibration-draft-/u);
+    expect(formalSaveRequest.imageIdentity).toBeTruthy();
+    expect(formalSaveRequest).not.toHaveProperty('candidateBundle');
+    expect(formalSaveRequest).not.toHaveProperty('candidateBundleJson');
+    expect(formalSaveRequest).not.toHaveProperty('expectedContentHash');
     await saveScreenshot(page, 'g12b-npoint-candidate-export-ready.png');
     const [download] = await Promise.all([
       page.waitForEvent('download'),

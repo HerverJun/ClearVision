@@ -262,6 +262,7 @@ export class CalibrationDraftWorkbench {
             lastSolveResult: null,
             candidateBundle: null,
             candidateBundleJson: null,
+            solveArtifactId: null,
             formalAssetId: null,
             formalAssetRevision: null,
             formalAssetHash: null,
@@ -462,7 +463,19 @@ export class CalibrationDraftWorkbench {
         }
         const formalSaveButton = this.container?.querySelector('[data-action="formal-save"]');
         if (formalSaveButton) {
-            formalSaveButton.disabled = this.formalSaveInProgress || !this.session.candidateBundleJson;
+            const hasProjectContext = Boolean(this.getProjectId());
+            const project = this.getProject?.() || {};
+            const revision = Number(project.persistenceRevision ?? project.PersistenceRevision);
+            const hasRevision = Number.isSafeInteger(revision) && revision >= 0;
+            formalSaveButton.disabled = this.formalSaveInProgress ||
+                !hasProjectContext ||
+                !hasRevision ||
+                !this.session.solveArtifactId;
+            formalSaveButton.title = !hasProjectContext
+                ? 'Open a saved Project before Formal Save'
+                : !hasRevision
+                    ? 'Reload the Project revision before Formal Save'
+                    : 'Save the server solve artifact as a Project asset';
             formalSaveButton.textContent = this.formalSaveInProgress ? 'Saving...' : 'Formal Save';
         }
         const empty = this.container?.querySelector('.calibration-draft-empty');
@@ -574,6 +587,7 @@ export class CalibrationDraftWorkbench {
         this.session.lastSolveResult = null;
         this.session.candidateBundle = null;
         this.session.candidateBundleJson = null;
+        this.session.solveArtifactId = null;
         this.session.formalAssetId = null;
         this.session.formalAssetRevision = null;
         this.session.formalAssetHash = null;
@@ -791,6 +805,8 @@ export class CalibrationDraftWorkbench {
             this.session.formalAssetRevision = null;
             this.session.formalAssetHash = null;
             this.session.artifacts = response.artifacts || [];
+            this.session.solveArtifactId = this.session.artifacts.find((artifact) =>
+                artifact?.kind === 'calibrationSolveBundle')?.artifactId || null;
             this.session.diagnostics = response.diagnostics || [];
             this.session.dirty = response.success !== true;
             this.renderStatus(response.success ? null : response.errorMessage);
@@ -808,30 +824,34 @@ export class CalibrationDraftWorkbench {
     }
 
     async formalSaveCandidate() {
-        if (!this.session.candidateBundleJson) {
-            this.renderStatus('Recalc a draft candidate before Formal Save.');
+        if (!this.session.solveArtifactId) {
+            this.renderStatus('Recalc a server-backed draft before Formal Save.');
             return;
         }
 
         const projectId = this.getProjectId() || EMPTY_GUID;
         if (!projectId || projectId === EMPTY_GUID) {
-            this.renderStatus('Open a project before Formal Save.');
+            this.renderStatus('Open a saved Project before Formal Save; this draft remains display-only.');
             return;
         }
 
         const project = this.getProject?.() || {};
         const expectedRevision = Number(project.persistenceRevision ?? project.PersistenceRevision);
+        if (!Number.isSafeInteger(expectedRevision) || expectedRevision < 0) {
+            this.renderStatus('Reload the Project revision before Formal Save.');
+            return;
+        }
         this.formalSaveInProgress = true;
         this.session.status = 'Saving';
         this.renderStatus('Saving formal asset...');
 
         try {
             const response = await httpClient.post(`/projects/${projectId}/calibration-assets/from-draft`, {
-                expectedPersistenceRevision: Number.isFinite(expectedRevision) ? expectedRevision : null,
+                expectedPersistenceRevision: expectedRevision,
                 sessionId: this.session.sessionId,
                 targetNodeId: this.getOperator()?.id || EMPTY_GUID,
                 imageIdentity: this.session.imageIdentity,
-                candidateBundleJson: this.session.candidateBundleJson
+                solveArtifactId: this.session.solveArtifactId
             });
             const asset = response?.asset || response?.Asset || {};
             const revision = response?.persistenceRevision ?? response?.PersistenceRevision ?? asset.projectRevision ?? asset.ProjectRevision;

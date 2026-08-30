@@ -899,7 +899,7 @@ test('CalibrationDraftWorkbench initializes from legacy PointPairs as ephemeral 
   );
 });
 
-test('CalibrationDraftWorkbench formal save posts candidate and records saved asset', async () => {
+test('CalibrationDraftWorkbench formal save posts only solve provenance and records saved asset', async () => {
   const originalPost = httpClient.post;
   const calls = [];
   let savedResponse = null;
@@ -910,7 +910,8 @@ test('CalibrationDraftWorkbench formal save posts candidate and records saved as
     session: {
       sessionId: 'draft-1',
       imageIdentity: 'image-hash',
-      candidateBundleJson: '{"schemaVersion":2}',
+      candidateBundleJson: '{"schemaVersion":2,"displayOnly":true}',
+      solveArtifactId: 'solve-artifact-1',
       diagnostics: [],
       status: 'Solved'
     },
@@ -951,7 +952,10 @@ test('CalibrationDraftWorkbench formal save posts candidate and records saved as
   assert.equal(calls[0].body.expectedPersistenceRevision, 11);
   assert.equal(calls[0].body.sessionId, 'draft-1');
   assert.equal(calls[0].body.targetNodeId, 'node-1');
-  assert.equal(calls[0].body.candidateBundleJson, '{"schemaVersion":2}');
+  assert.equal(calls[0].body.solveArtifactId, 'solve-artifact-1');
+  assert.equal(Object.hasOwn(calls[0].body, 'candidateBundle'), false);
+  assert.equal(Object.hasOwn(calls[0].body, 'candidateBundleJson'), false);
+  assert.equal(Object.hasOwn(calls[0].body, 'expectedContentHash'), false);
   assert.equal(workbench.session.status, 'FormalSaved');
   assert.equal(workbench.session.formalAssetId, 'asset-1');
   assert.equal(workbench.session.formalAssetRevision, 12);
@@ -968,7 +972,7 @@ test('CalibrationDraftWorkbench formal save displays backend failure reason', as
     session: {
       sessionId: 'draft-1',
       imageIdentity: 'image-hash',
-      candidateBundleJson: '{"schemaVersion":2}',
+      solveArtifactId: 'solve-artifact-1',
       diagnostics: [],
       status: 'Solved'
     },
@@ -982,7 +986,7 @@ test('CalibrationDraftWorkbench formal save displays backend failure reason', as
   });
 
   httpClient.post = async () => {
-    throw new Error('PSV019: calibration candidate checksum mismatch.');
+    throw new Error('not-found: calibration solve artifact unavailable.');
   };
 
   try {
@@ -992,8 +996,46 @@ test('CalibrationDraftWorkbench formal save displays backend failure reason', as
   }
 
   assert.equal(workbench.session.status, 'FormalSaveFailed');
-  assert.equal(workbench.session.diagnostics[0], 'PSV019: calibration candidate checksum mismatch.');
-  assert.ok(statusMessages.includes('PSV019: calibration candidate checksum mismatch.'));
+  assert.equal(workbench.session.diagnostics[0], 'not-found: calibration solve artifact unavailable.');
+  assert.ok(statusMessages.includes('not-found: calibration solve artifact unavailable.'));
+});
+
+test('CalibrationDraftWorkbench keeps a solved draft display-only without project context', async () => {
+  const originalPost = httpClient.post;
+  let postCount = 0;
+  const statusMessages = [];
+  const workbench = Object.create(CalibrationDraftWorkbench.prototype);
+  Object.assign(workbench, {
+    formalSaveInProgress: false,
+    session: {
+      sessionId: 'draft-display-only',
+      imageIdentity: 'image-hash',
+      solveArtifactId: 'solve-artifact-display-only',
+      diagnostics: [],
+      status: 'Solved'
+    },
+    getProjectId: () => null,
+    getProject: () => null,
+    getOperator: () => ({ id: 'node-1' }),
+    renderStatus: message => statusMessages.push(message),
+    onFormalSaveSuccess: () => {
+      throw new Error('display-only draft must not save');
+    }
+  });
+
+  httpClient.post = async () => {
+    postCount += 1;
+    throw new Error('unexpected save');
+  };
+
+  try {
+    await CalibrationDraftWorkbench.prototype.formalSaveCandidate.call(workbench);
+  } finally {
+    httpClient.post = originalPost;
+  }
+
+  assert.equal(postCount, 0);
+  assert.ok(statusMessages.some(message => String(message).includes('display-only')));
 });
 
 test('PropertyPanel groups CaliperFitV2 controls and locks image-center coordinates', () => {

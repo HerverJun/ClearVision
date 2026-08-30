@@ -98,7 +98,53 @@ public sealed class PreviewArtifactStore : IDisposable
                 return false;
             }
 
-            result = new PreviewArtifactReadResult(entry.ToReference(), entry.Bytes.ToArray());
+            if (!HasValidContentHash(entry))
+            {
+                RemoveEntryUnderLock(artifactId!);
+                return false;
+            }
+
+            result = new PreviewArtifactReadResult(entry.ToReference(), entry.Bytes.ToArray(), entry.Owner);
+            return true;
+        }
+    }
+
+    public bool TryReadScoped(
+        string? artifactId,
+        string? userId,
+        Guid projectId,
+        string expectedKind,
+        out PreviewArtifactReadResult? result)
+    {
+        result = null;
+        if (!IsValidArtifactId(artifactId) ||
+            string.IsNullOrWhiteSpace(expectedKind))
+        {
+            return false;
+        }
+
+        lock (_gate)
+        {
+            if (_disposed || !_entries.TryGetValue(artifactId!, out var entry))
+            {
+                return false;
+            }
+
+            if (!string.Equals(entry.Owner.UserId, userId, StringComparison.Ordinal) ||
+                entry.Owner.ProjectId != projectId ||
+                !string.Equals(entry.Kind, expectedKind, StringComparison.Ordinal) ||
+                IsExpired(entry) ||
+                !HasValidContentHash(entry))
+            {
+                if (IsExpired(entry) || !HasValidContentHash(entry))
+                {
+                    RemoveEntryUnderLock(artifactId!);
+                }
+
+                return false;
+            }
+
+            result = new PreviewArtifactReadResult(entry.ToReference(), entry.Bytes.ToArray(), entry.Owner);
             return true;
         }
     }
@@ -407,6 +453,12 @@ public sealed class PreviewArtifactStore : IDisposable
 
     private bool IsExpired(PreviewArtifactEntry entry) =>
         entry.ExpiresAtUtc <= _clock.UtcNow;
+
+    private static bool HasValidContentHash(PreviewArtifactEntry entry) =>
+        string.Equals(
+            entry.Sha256,
+            ComputeSha256(entry.Bytes),
+            StringComparison.Ordinal);
 
     private void CleanupExpiredUnderLock()
     {

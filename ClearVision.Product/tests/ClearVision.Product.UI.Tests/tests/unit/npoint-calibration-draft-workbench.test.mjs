@@ -59,7 +59,7 @@ async function createHarness() {
   };
 }
 
-test('NPoint draft workbench keeps Formal Save behind candidate and writes only formal assets on save', async (t) => {
+test('NPoint draft workbench keeps Formal Save behind server solve provenance and posts only its reference', async (t) => {
   const harness = await createHarness();
   t.after(() => harness.close());
 
@@ -143,7 +143,14 @@ test('NPoint draft workbench keeps Formal Save behind candidate and writes only 
             transformKind: 'Affine',
             matrix: [1, 0, 0, 0, 1, 0]
           }),
-          artifacts: [],
+          artifacts: [
+            {
+              artifactId: 'solve-artifact-npoint-1',
+              kind: 'calibrationSolveBundle',
+              schema: 'calibration-solve-provenance.v1',
+              contentHash: 'sha256:server-owned-bundle'
+            }
+          ],
           diagnostics: []
         };
       }
@@ -230,11 +237,15 @@ test('NPoint draft workbench keeps Formal Save behind candidate and writes only 
   assert.equal(result.formalSaveCallsBeforeSolve, 0);
   assert.equal(result.pointPairsAfterDraftEdit, result.originalPointPairs);
   assert.equal(result.solveRequest.body.samples[0].pixelX, 15);
+  assert.equal(result.solveRequest.body.projectId, '11111111-1111-1111-1111-111111111111');
   assert.equal(result.formalSaveEnabledAfterSolve, true);
   assert.equal(result.formalSaveRequest.body.sessionId.startsWith('calibration-draft-'), true);
   assert.equal(result.formalSaveRequest.body.targetNodeId, 'npoint-node-1');
   assert.equal(result.formalSaveRequest.body.expectedPersistenceRevision, 41);
-  assert.match(result.formalSaveRequest.body.candidateBundleJson, /"schemaVersion":2/);
+  assert.equal(result.formalSaveRequest.body.solveArtifactId, 'solve-artifact-npoint-1');
+  assert.equal(Object.hasOwn(result.formalSaveRequest.body, 'candidateBundle'), false);
+  assert.equal(Object.hasOwn(result.formalSaveRequest.body, 'candidateBundleJson'), false);
+  assert.equal(Object.hasOwn(result.formalSaveRequest.body, 'expectedContentHash'), false);
   assert.equal(result.currentProjectRevision, 42);
   assert.equal(result.currentProjectAssets.calibrationAssets[0].assetId, 'asset-calibration-1');
   assert.match(result.statusText, /FormalSaved|asset-calibration-1|r42/);
