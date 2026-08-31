@@ -232,6 +232,11 @@ public sealed class RuntimeHost : IAsyncDisposable
     public async Task<RuntimePackage> LoadPackageAsync(string packageRoot, CancellationToken cancellationToken = default)
     {
         var package = await _packageLoader.LoadAsync(packageRoot, cancellationToken);
+        // Package identity, execution authority, resource bindings, and every
+        // operator parameter must be accepted before result/image writers or
+        // persisted variable stores can touch external state.
+        ValidateRuntimeAdmission(package);
+        cancellationToken.ThrowIfCancellationRequested();
         var stateScopeId = BuildRuntimeProjectVariableStateScopeId(package);
         var persistedSnapshots = _projectVariableStateStore?.Load(stateScopeId, package.GlobalVariables) ?? [];
         var projectVariableSession = new ProjectVariableSession(package.GlobalVariables, persistedSnapshots);
@@ -356,6 +361,9 @@ public sealed class RuntimeHost : IAsyncDisposable
             EnsurePackageLoaded();
             EnsureNotRunning();
             ValidateRuntimeAdmission(_loadedPackage!);
+            imagePath = string.IsNullOrWhiteSpace(imagePath)
+                ? null
+                : RuntimePathGuard.ResolveApprovedInputPath(imagePath, _loadedPackage!.RootPath);
             runCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
             runGeneration = Interlocked.Increment(ref _runGenerationCounter);
             _activeRunGeneration = runGeneration;
@@ -393,7 +401,10 @@ public sealed class RuntimeHost : IAsyncDisposable
             EnsureNotRunning();
             ValidateRuntimeAdmission(_loadedPackage!);
 
-            var files = EnumerateReplayFiles(folderPath, _loadedPackage!.RuntimeProfile).ToList();
+            var approvedFolderPath = RuntimePathGuard.ResolveApprovedInputPath(
+                folderPath,
+                _loadedPackage!.RootPath);
+            var files = EnumerateReplayFiles(approvedFolderPath, _loadedPackage.RuntimeProfile).ToList();
             if (files.Count == 0)
             {
                 throw new RuntimePackageException("所选文件夹中没有可运行的图片文件。");
@@ -641,20 +652,12 @@ public sealed class RuntimeHost : IAsyncDisposable
             var appliedFlow = RuntimeFlowAdapter.ToEntity(applyResult.Flow);
             var appliedIdentityFlow = RuntimeFlowAdapter.ToEntity(applyResult.IdentityFlow);
             runtimeSnapshot = CreateRuntimeExecutionSnapshot(package, appliedFlow, appliedIdentityFlow, runtimeSnapshot);
+            var flow = runtimeSnapshot.CreateExecutionFlow();
+            var validation = _flowExecutionService.ValidateSnapshot(runtimeSnapshot);
             _currentExecutionSnapshot = runtimeSnapshot;
             _currentRunId = runId;
-            EmitSnapshot();
-            sourceImageBytes = await PrepareRuntimeInputAsync(imagePath, cancellationToken);
-            var flow = runtimeSnapshot.CreateExecutionFlow();
             _currentFlowId = flow.Id;
-            var variableSession = _projectVariableSession ?? new ProjectVariableSession(package.GlobalVariables);
-            var variableContext = new ProjectVariableExecutionContext(
-                variableSession,
-                ProjectVariableBindingIndex.Build(package.GlobalVariables),
-                Guid.TryParse(runId, out var parsedRunId) ? parsedRunId : Guid.NewGuid(),
-                commitHandler: CommitLoadedProjectVariableSession);
-
-            var validation = _flowExecutionService.ValidateSnapshot(runtimeSnapshot);
+            EmitSnapshot();
             if (!validation.IsValid)
             {
                 var invalidResult = _resultNormalizer.CreateValidationFailure(
@@ -670,6 +673,14 @@ public sealed class RuntimeHost : IAsyncDisposable
                 await PersistResultAsync(invalidResult, cancellationToken);
                 return invalidResult;
             }
+
+            sourceImageBytes = await PrepareRuntimeInputAsync(imagePath, cancellationToken);
+            var variableSession = _projectVariableSession ?? new ProjectVariableSession(package.GlobalVariables);
+            var variableContext = new ProjectVariableExecutionContext(
+                variableSession,
+                ProjectVariableBindingIndex.Build(package.GlobalVariables),
+                Guid.TryParse(runId, out var parsedRunId) ? parsedRunId : Guid.NewGuid(),
+                commitHandler: CommitLoadedProjectVariableSession);
 
             using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
             timeoutCts.CancelAfter(TimeSpan.FromMilliseconds(package.RuntimeProfile.SingleRunTimeoutMs));
@@ -768,13 +779,18 @@ public sealed class RuntimeHost : IAsyncDisposable
             return loadedSnapshot;
         }
 
+        var reboundResources = loadedSnapshot.ResourceBindings.ToDictionary(
+            pair => pair.Key,
+            pair => pair.Value,
+            StringComparer.Ordinal);
+        reboundResources["PackageFlowHash"] = appliedFlowHash;
         return new ExecutionSnapshot(
             loadedSnapshot.ProjectId,
             appliedFlow,
             package.Manifest.SourceProjectRevision,
             ExecutionSnapshotSource.RuntimePackage,
             ExecutionRunMode.StationRuntime,
-            loadedSnapshot.ResourceBindings,
+            reboundResources,
             runtimePackageId: package.Manifest.PackageId,
             globalVariables: package.GlobalVariables,
             executionIdentityFlow: appliedIdentityFlow);

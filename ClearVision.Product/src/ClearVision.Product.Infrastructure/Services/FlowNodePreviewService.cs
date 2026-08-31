@@ -34,17 +34,33 @@ public sealed class FlowNodePreviewService : IFlowNodePreviewService
         OperatorFlow flow,
         Guid targetNodeId,
         byte[]? inputImage,
+        Guid projectId,
+        long persistenceRevision,
+        ExecutionRequestAuthority authority,
+        ProjectVariableExecutionContext? projectVariables = null,
         CancellationToken ct = default)
     {
-        return await PreviewWithMetricsAsync(flow, targetNodeId, inputImage, null, ct);
+        ArgumentNullException.ThrowIfNull(authority);
+        return await PreviewWithMetricsCoreAsync(
+            flow,
+            targetNodeId,
+            inputImage,
+            projectVariables,
+            projectId,
+            persistenceRevision,
+            authority,
+            ct);
     }
 
-    public async Task<FlowNodePreviewWithMetricsResult> PreviewWithMetricsAsync(
+    private async Task<FlowNodePreviewWithMetricsResult> PreviewWithMetricsCoreAsync(
         OperatorFlow flow,
         Guid targetNodeId,
         byte[]? inputImage,
         ProjectVariableExecutionContext? projectVariables,
-        CancellationToken ct = default)
+        Guid projectId,
+        long persistenceRevision,
+        ExecutionRequestAuthority authority,
+        CancellationToken ct)
     {
         var targetOperator = flow.Operators.FirstOrDefault(item => item.Id == targetNodeId);
         if (targetOperator == null)
@@ -54,6 +70,21 @@ public sealed class FlowNodePreviewService : IFlowNodePreviewService
                 Success = false,
                 TargetNodeId = targetNodeId,
                 ErrorMessage = $"未找到目标节点: {targetNodeId}"
+            };
+        }
+
+        var snapshot = CreatePreviewSnapshot(flow, projectId, persistenceRevision, authority);
+        var validation = _flowExecution.ValidateSnapshot(snapshot);
+        if (validation == null || !validation.IsValid)
+        {
+            return new FlowNodePreviewWithMetricsResult
+            {
+                Success = false,
+                TargetNodeId = targetNodeId,
+                ErrorMessage = validation == null
+                    ? "ADMISSION_FLOW_VALIDATION_UNAVAILABLE: Preview flow validation is unavailable."
+                    : $"ADMISSION_FLOW_INVALID: {string.Join("; ", validation.Errors)}",
+                DiagnosticCodes = ["admission_rejected"]
             };
         }
 
@@ -88,12 +119,6 @@ public sealed class FlowNodePreviewService : IFlowNodePreviewService
             ? inputImage
             : null;
         var inputData = BuildInputData(externalInputImage);
-        var snapshot = new ExecutionSnapshot(
-            flow.Id == Guid.Empty ? Guid.NewGuid() : flow.Id,
-            flow,
-            persistenceRevision: 0,
-            ExecutionSnapshotSource.Draft,
-            ExecutionRunMode.Preview);
         var result = await _flowExecution.ExecuteDebugWithSnapshotAsync(
             snapshot,
             debugOptions,
@@ -142,6 +167,35 @@ public sealed class FlowNodePreviewService : IFlowNodePreviewService
                 })
                 .ToList()
         };
+    }
+
+    private static ExecutionSnapshot CreatePreviewSnapshot(
+        OperatorFlow flow,
+        Guid projectId,
+        long persistenceRevision,
+        ExecutionRequestAuthority authority)
+    {
+        if (projectId == Guid.Empty || persistenceRevision < 0)
+        {
+            throw new InvalidOperationException("ADMISSION_DRAFT_PROJECT_BINDING_REQUIRED: AutoTune preview requires a valid project revision binding.");
+        }
+
+        var resourceBindings = authority.ResourceBindings.ToDictionary(pair => pair.Key, pair => pair.Value, StringComparer.Ordinal);
+        resourceBindings["ProjectRevision"] = persistenceRevision.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        resourceBindings["FlowHash"] = ExecutionFlowIdentity.ComputeFlowHash(flow);
+
+        return new ExecutionSnapshot(
+            projectId,
+            flow,
+            persistenceRevision,
+            ExecutionSnapshotSource.Draft,
+            ExecutionRunMode.Preview,
+            resourceBindings: resourceBindings,
+            principal: authority.Principal,
+            capabilityManifest: authority.CapabilityManifest,
+            expectedProjectRevision: authority.ExpectedProjectRevision,
+            confirmationId: authority.ConfirmationId,
+            auditId: authority.AuditId);
     }
 
     private PreviewMetrics? AnalyzePreviewMetrics(byte[]? previewImageBytes, Dictionary<string, object> outputData)

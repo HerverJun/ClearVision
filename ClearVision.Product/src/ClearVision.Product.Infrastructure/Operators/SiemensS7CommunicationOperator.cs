@@ -9,6 +9,7 @@ using ClearVision.Product.Core.Attributes;
 using ClearVision.Product.Core.Entities;
 using ClearVision.Product.Core.Enums;
 using ClearVision.Product.Core.Operators;
+using ClearVision.Product.Core.Services;
 using Microsoft.Extensions.Logging;
 namespace ClearVision.Product.Infrastructure.Operators;
 
@@ -23,9 +24,9 @@ namespace ClearVision.Product.Infrastructure.Operators;
     IconName = "s7",
     Version = "1.0.1"
 )]
-[OperatorParameterRule("IpAddress", RequiredWhenAll = new[] { "UseGlobalFallback==false" }, ResourceKind = OperatorResourceKind.PlcEndpoint, ReasonCode = "SIEMENS_OPERATOR_IP_REQUIRED_WITHOUT_GLOBAL_FALLBACK")]
-[OperatorParameterRule("Port", RequiredWhenAll = new[] { "UseGlobalFallback==false" }, ReasonCode = "SIEMENS_OPERATOR_PORT_REQUIRED_WITHOUT_GLOBAL_FALLBACK")]
+[OperatorParameterRule("ProfileId", RequiredPolicy = OperatorParameterRequiredPolicy.Required, ResourceKind = OperatorResourceKind.PlcProfile, ReasonCode = "SIEMENS_PLC_PROFILE_REQUIRED")]
 [OperatorParameterRule("Address", RequiredPolicy = OperatorParameterRequiredPolicy.Required, ResourceKind = OperatorResourceKind.PlcAddress, ReasonCode = "SIEMENS_PLC_ADDRESS_REQUIRED")]
+[OperatorParameterRule("Operation", RequiredPolicy = OperatorParameterRequiredPolicy.Required, ReasonCode = "SIEMENS_PLC_OPERATION_REQUIRED")]
 [OperatorParameterRule("WriteValue", RequiredPolicy = OperatorParameterRequiredPolicy.Optional, EnabledWhenAll = new[] { "Operation==Write" }, HiddenWhenAll = new[] { "Operation!=Write" }, IgnoredWhenAll = new[] { "Operation!=Write" }, ReasonCode = "SIEMENS_WRITE_VALUE_ONLY_FOR_WRITE")]
 [OperatorParameterRule("PollingMode", EnabledWhenAll = new[] { "Operation==Read" }, HiddenWhenAll = new[] { "Operation!=Read" }, IgnoredWhenAll = new[] { "Operation!=Read" }, ReasonCode = "SIEMENS_POLLING_ONLY_FOR_READ")]
 [OperatorParameterRule("PollingCondition", EnabledWhenAll = new[] { "Operation==Read", "PollingMode==WaitForValue" }, HiddenWhenAny = new[] { "Operation!=Read", "PollingMode!=WaitForValue" }, IgnoredWhenAny = new[] { "Operation!=Read", "PollingMode!=WaitForValue" }, ReasonCode = "SIEMENS_POLLING_CONDITION_ONLY_WHEN_WAITING")]
@@ -35,14 +36,8 @@ namespace ClearVision.Product.Infrastructure.Operators;
 [InputPort("Data", "数据", PortDataType.Any, IsRequired = false)]
 [OutputPort("Response", "响应", PortDataType.String)]
 [OutputPort("Status", "状态", PortDataType.Boolean)]
-[OperatorParam("IpAddress", "IP地址", "string", DefaultValue = "192.168.0.1")]
-[OperatorParam("Port", "端口", "int", DefaultValue = 102, Min = 1, Max = 65535)]
-[OperatorParam("UseGlobalFallback", "允许全局回退", "bool", DefaultValue = false, Description = "启用后缺失的IP/Port可回退到全局通信配置")]
-[OperatorParam("CpuType", "CPU类型", "enum", DefaultValue = "S71200", Options = new[] { "S7200|S7-200", "S7200Smart|S7-200 Smart", "S7300|S7-300", "S7400|S7-400", "S71200|S7-1200", "S71500|S7-1500" })]
-[OperatorParam("Rack", "机架号", "int", DefaultValue = 0, Min = 0, Max = 15)]
-[OperatorParam("Slot", "插槽号", "int", DefaultValue = 1, Min = 0, Max = 15)]
+[OperatorParam("ProfileId", "PLC Profile", "string", DefaultValue = "")]
 [OperatorParam("Address", "PLC地址", "string", DefaultValue = "DB1.DBW100")]
-[OperatorParam("DataType", "数据类型", "enum", DefaultValue = "Word", Options = new[] { "Bit|位 (Bool)", "Byte|字节 (Byte)", "Word|字 (Word/UInt16)", "Int16|短整型 (Int16)", "DWord|双字 (DWord/UInt32)", "Int32|整型 (Int32)", "Float|浮点 (Float)", "Double|双精度 (Double)", "String|字符串 (String)" })]
 [OperatorParam("Operation", "操作", "enum", DefaultValue = "Read", Options = new[] { "Read|读取", "Write|写入" })]
 [OperatorParam("WriteValue", "写入值", "string", DefaultValue = "")]
 [OperatorParam("PollingMode", "轮询模式", "enum", Description = "读取时是否启用轮询等待", DefaultValue = "None", Options = new[] { "None|不等待", "WaitForValue|等待指定值" })]
@@ -57,16 +52,31 @@ public class SiemensS7CommunicationOperator : PlcCommunicationOperatorBase
     public override OperatorType OperatorType => OperatorType.SiemensS7Communication;
 
     public SiemensS7CommunicationOperator(ILogger<SiemensS7CommunicationOperator> logger)
-        : this(logger, CreateClient)
+        : this(logger, DenyAllExecutionResourceProfileResolver.Instance, CreateClient)
+    {
+    }
+
+    public SiemensS7CommunicationOperator(
+        ILogger<SiemensS7CommunicationOperator> logger,
+        IExecutionResourceProfileResolver executionResourceProfileResolver)
+        : this(logger, executionResourceProfileResolver, CreateClient)
     {
     }
 
     internal SiemensS7CommunicationOperator(
         ILogger<SiemensS7CommunicationOperator> logger,
         Func<string, int, SiemensCpuType, int, int, IPlcClient> clientFactory)
-        : base(logger)
+        : this(logger, DenyAllExecutionResourceProfileResolver.Instance, clientFactory)
     {
-        _clientFactory = clientFactory;
+    }
+
+    internal SiemensS7CommunicationOperator(
+        ILogger<SiemensS7CommunicationOperator> logger,
+        IExecutionResourceProfileResolver executionResourceProfileResolver,
+        Func<string, int, SiemensCpuType, int, int, IPlcClient> clientFactory)
+        : base(logger, executionResourceProfileResolver)
+    {
+        _clientFactory = clientFactory ?? throw new ArgumentNullException(nameof(clientFactory));
     }
 
     protected override async Task<OperatorExecutionOutput> ExecuteCoreAsync(
@@ -74,15 +84,23 @@ public class SiemensS7CommunicationOperator : PlcCommunicationOperatorBase
         Dictionary<string, object>? inputs,
         CancellationToken cancellationToken)
     {
-        // 获取参数
-        var operatorIpAddress = GetStringParam(@operator, "IpAddress", "");
-        var operatorPort = GetIntParam(@operator, "Port", 0);
-        var useGlobalFallback = GetBoolParam(@operator, "UseGlobalFallback", false);
-        var cpuTypeStr = GetStringParam(@operator, "CpuType", "S71200");
-        var rack = GetIntParam(@operator, "Rack", 0, 0, 15);
-        var slot = GetIntParam(@operator, "Slot", 1, 0, 15);
-        var address = GetStringParam(@operator, "Address", "DB1.DBW100");
-        var dataType = GetStringParam(@operator, "DataType", "Word");
+        var forbiddenRawTarget = FindForbiddenRawTargetParameter(
+            @operator,
+            "IpAddress",
+            "Port",
+            "UseGlobalFallback",
+            "CpuType",
+            "Rack",
+            "Slot",
+            "DataType");
+        if (forbiddenRawTarget != null)
+        {
+            return CreateFailureOutput(
+                $"PLC_RAW_TARGET_FORBIDDEN: {forbiddenRawTarget} cannot grant execution authority; use ProfileId and an allow-listed Address/Operation binding.");
+        }
+
+        var profileId = GetStringParam(@operator, "ProfileId", string.Empty);
+        var requestedAddress = GetStringParam(@operator, "Address", "DB1.DBW100");
         var operation = GetStringParam(@operator, "Operation", "Read");
 
         // 【第二优先级】轮询等待模式参数
@@ -111,38 +129,50 @@ public class SiemensS7CommunicationOperator : PlcCommunicationOperatorBase
                 $"PLC_POLLING_CONDITION_INVALID: PollingCondition must be one of: {string.Join(", ", PlcOperatorParameterContract.SupportedPollingConditions)}.");
         }
 
-        // 解析CPU类型
-        var cpuType = cpuTypeStr.ToUpper() switch
-        {
-            "S7200" => SiemensCpuType.S7200,
-            "S7200SMART" => SiemensCpuType.S7200Smart,
-            "S7300" => SiemensCpuType.S7300,
-            "S7400" => SiemensCpuType.S7400,
-            "S71200" => SiemensCpuType.S71200,
-            "S71500" => SiemensCpuType.S71500,
-            _ => SiemensCpuType.S71200
-        };
-
-        var logIp = string.IsNullOrWhiteSpace(operatorIpAddress) ? "(unset)" : operatorIpAddress;
-        var logPort = operatorPort;
+        var logIp = "(unresolved)";
+        var logPort = 0;
 
         try
         {
-            var (ipAddress, port, _, connectionSource) = ResolveConnectionSettings(
-                operatorIpAddress,
-                operatorPort,
-                "S7",
-                useGlobalFallback);
+            var resolution = ResolveExecutionResource(
+                profileId,
+                ExecutionPlcProtocols.SiemensS7,
+                requestedAddress,
+                operation);
+            if (!resolution.Resolved || resolution.Resource == null)
+            {
+                return CreateFailureOutput($"{resolution.Code}: {resolution.Message}");
+            }
+
+            var resource = resolution.Resource;
+            var ipAddress = resource.Host;
+            var port = resource.Port;
+            var rack = resource.Rack;
+            var slot = resource.Slot;
+            var address = resource.Address;
+            var dataType = resource.DataType;
+            var cpuType = resource.CpuType.ToUpperInvariant() switch
+            {
+                "S7200" => SiemensCpuType.S7200,
+                "S7200SMART" => SiemensCpuType.S7200Smart,
+                "S7300" => SiemensCpuType.S7300,
+                "S7400" => SiemensCpuType.S7400,
+                "S71200" => SiemensCpuType.S71200,
+                "S71500" => SiemensCpuType.S71500,
+                _ => throw new InvalidOperationException("RESOURCE_PLC_PROFILE_INVALID: Unsupported S7 CPU type.")
+            };
             logIp = ipAddress;
             logPort = port;
 
             // 构建连接键
             var connectionKey = $"S7:{ipAddress}:{port}:{cpuType}:{rack}:{slot}";
 
-            // 获取或创建连接
-            var (client, _) = await GetOrCreateConnectionAsync(
+            // 获取带生命周期保护的池连接；最后一个 lease 释放后才物理关闭。
+            await using var connectionLease = await AcquireConnectionLeaseAsync(
                 connectionKey,
-                () => _clientFactory(ipAddress, port, cpuType, rack, slot));
+                () => _clientFactory(ipAddress, port, cpuType, rack, slot),
+                cancellationToken);
+            var client = connectionLease.Client;
 
             if (PlcOperatorParameterContract.IsRead(operation))
             {
@@ -161,7 +191,7 @@ public class SiemensS7CommunicationOperator : PlcCommunicationOperatorBase
                             pollingInterval,
                             cancellationToken),
                         cancellationToken);
-                    AttachConnectionAuditInfo(pollingReadOutput, connectionSource);
+                    AttachConnectionAuditInfo(pollingReadOutput, "ServerProfile");
                     return pollingReadOutput;
                 }
 
@@ -169,7 +199,7 @@ public class SiemensS7CommunicationOperator : PlcCommunicationOperatorBase
                     connectionKey,
                     () => ExecuteReadAsync(client, address, dataType, cancellationToken),
                     cancellationToken);
-                AttachConnectionAuditInfo(readOutput, connectionSource);
+                AttachConnectionAuditInfo(readOutput, "ServerProfile");
                 return readOutput;
             }
 
@@ -180,7 +210,7 @@ public class SiemensS7CommunicationOperator : PlcCommunicationOperatorBase
                     connectionKey,
                     () => ExecuteWriteAsync(client, address, dataType, writeValue, cancellationToken),
                     cancellationToken);
-                AttachConnectionAuditInfo(writeOutput, connectionSource);
+                AttachConnectionAuditInfo(writeOutput, "ServerProfile");
                 return writeOutput;
             }
 
@@ -286,9 +316,22 @@ public class SiemensS7CommunicationOperator : PlcCommunicationOperatorBase
 
     public override ValidationResult ValidateParameters(Operator @operator)
     {
-        var operatorIpAddress = GetStringParam(@operator, "IpAddress", "");
-        var operatorPort = GetIntParam(@operator, "Port", 0);
-        var useGlobalFallback = GetBoolParam(@operator, "UseGlobalFallback", false);
+        var forbiddenRawTarget = FindForbiddenRawTargetParameter(
+            @operator,
+            "IpAddress",
+            "Port",
+            "UseGlobalFallback",
+            "CpuType",
+            "Rack",
+            "Slot",
+            "DataType");
+        if (forbiddenRawTarget != null)
+        {
+            return ValidationResult.Invalid(
+                $"PLC_RAW_TARGET_FORBIDDEN: {forbiddenRawTarget} cannot grant execution authority; use ProfileId and an allow-listed Address/Operation binding.");
+        }
+
+        var profileId = GetStringParam(@operator, "ProfileId", string.Empty);
         var address = GetStringParam(@operator, "Address", "");
         var operation = GetStringParam(@operator, "Operation", "Read");
         var pollingMode = GetStringParam(@operator, "PollingMode", "None");
@@ -313,17 +356,15 @@ public class SiemensS7CommunicationOperator : PlcCommunicationOperatorBase
                 $"PLC_POLLING_CONDITION_INVALID: PollingCondition must be one of: {string.Join(", ", PlcOperatorParameterContract.SupportedPollingConditions)}.");
         }
 
-        try
+        var resolution = ResolveExecutionResource(
+            profileId,
+            ExecutionPlcProtocols.SiemensS7,
+            address,
+            operation);
+        if (!resolution.Resolved || resolution.Resource == null)
         {
-            ResolveConnectionSettings(operatorIpAddress, operatorPort, "S7", useGlobalFallback);
+            return ValidationResult.Invalid($"{resolution.Code}: {resolution.Message}");
         }
-        catch (Exception ex)
-        {
-            return ValidationResult.Invalid(ex.Message);
-        }
-
-        if (string.IsNullOrWhiteSpace(address))
-            return ValidationResult.Invalid("PLC地址不能为空");
 
         return ValidationResult.Valid();
     }

@@ -3,11 +3,11 @@
 // 调用 REST API，触发 MES/AGV 等外部服务
 // 作者：蘅芜君
 
-using System.Text;
 using ClearVision.Product.Core.Attributes;
 using ClearVision.Product.Core.Entities;
 using ClearVision.Product.Core.Enums;
 using ClearVision.Product.Core.Operators;
+using ClearVision.Product.Infrastructure.Services;
 using Microsoft.Extensions.Logging;
 namespace ClearVision.Product.Infrastructure.Operators;
 
@@ -47,9 +47,15 @@ public class HttpRequestOperator : OperatorBase
 {
     public override OperatorType OperatorType => OperatorType.HttpRequest;
 
-    private static readonly HttpClient _httpClient = new();
+    private readonly IHttpResourceBroker _httpResourceBroker;
 
-    public HttpRequestOperator(ILogger<HttpRequestOperator> logger) : base(logger) { }
+    public HttpRequestOperator(
+        ILogger<HttpRequestOperator> logger,
+        IHttpResourceBroker httpResourceBroker)
+        : base(logger)
+    {
+        _httpResourceBroker = httpResourceBroker ?? throw new ArgumentNullException(nameof(httpResourceBroker));
+    }
 
     protected override async Task<OperatorExecutionOutput> ExecuteCoreAsync(
         Operator @operator,
@@ -91,12 +97,6 @@ public class HttpRequestOperator : OperatorBase
             }
         }
 
-        // 添加默认 Content-Type
-        if (!headers.ContainsKey("Content-Type") && !headers.ContainsKey("content-type"))
-        {
-            headers["Content-Type"] = contentType;
-        }
-
         // 执行请求（带重试）
         for (int attempt = 0; attempt <= maxAttempts; attempt++)
         {
@@ -105,7 +105,13 @@ public class HttpRequestOperator : OperatorBase
                 using var cts = new CancellationTokenSource(TimeSpan.FromMilliseconds(timeoutMs));
                 using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(cts.Token, cancellationToken);
 
-                var result = await ExecuteRequestAsync(url, method, body, headers, linkedCts.Token);
+                var result = await ExecuteRequestAsync(
+                    url,
+                    normalizedMethod,
+                    body,
+                    contentType,
+                    headers,
+                    linkedCts.Token);
 
                 if (result.IsSuccess)
                 {
@@ -124,6 +130,10 @@ public class HttpRequestOperator : OperatorBase
                     return OperatorExecutionOutput.Failure(result.ErrorMessage ?? "HTTP 请求失败");
                 }
             }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
+            }
             catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
             {
                 // 超时
@@ -137,6 +147,13 @@ public class HttpRequestOperator : OperatorBase
                 {
                     return OperatorExecutionOutput.Failure($"HTTP 请求超时 ({timeoutMs}ms)");
                 }
+            }
+            catch (HttpResourceBrokerException ex)
+            {
+                Logger.LogWarning(
+                    "[HttpRequest] outbound resource policy rejected request: {Code}",
+                    ex.Code);
+                return OperatorExecutionOutput.Failure($"{ex.Code}: {ex.Message}");
             }
             catch (Exception ex)
             {
@@ -171,42 +188,26 @@ public class HttpRequestOperator : OperatorBase
         string url,
         string method,
         string? body,
+        string contentType,
         Dictionary<string, string> headers,
         CancellationToken cancellationToken)
     {
-        using var request = new HttpRequestMessage(new HttpMethod(method.ToUpper()), url);
-
-        // 添加 Headers
-        foreach (var (key, value) in headers)
-        {
-            if (key.Equals("Content-Type", StringComparison.OrdinalIgnoreCase))
-            {
-                request.Content = body != null
-                    ? new StringContent(body, Encoding.UTF8, value)
-                    : null;
-            }
-            else
-            {
-                request.Headers.TryAddWithoutValidation(key, value);
-            }
-        }
-
-        // 如果没有设置 Content，但有 Body
-        if (request.Content == null && body != null)
-        {
-            request.Content = new StringContent(body, Encoding.UTF8, "application/json");
-        }
-
-        var response = await _httpClient.SendAsync(request, cancellationToken);
-        var responseBody = await response.Content.ReadAsStringAsync(cancellationToken);
+        var response = await _httpResourceBroker.SendAsync(
+            new HttpResourceRequest(
+                url,
+                new HttpMethod(method),
+                body,
+                contentType,
+                headers),
+            cancellationToken);
 
         var outputData = new Dictionary<string, object>
         {
             { "StatusCode", (int)response.StatusCode },
             { "IsSuccess", response.IsSuccessStatusCode },
             { "IsSuccessStatusCode", response.IsSuccessStatusCode },
-            { "Response", responseBody },
-            { "ResponseBody", responseBody }
+            { "Response", response.Body },
+            { "ResponseBody", response.Body }
         };
 
         if (response.IsSuccessStatusCode)
@@ -218,7 +219,7 @@ public class HttpRequestOperator : OperatorBase
             return new RequestResult
             {
                 IsSuccess = false,
-                ErrorMessage = $"HTTP {(int)response.StatusCode}: {responseBody}",
+                ErrorMessage = $"HTTP {(int)response.StatusCode}: {response.Body}",
                 OutputData = outputData
             };
         }
@@ -232,6 +233,18 @@ public class HttpRequestOperator : OperatorBase
         if (string.IsNullOrWhiteSpace(url))
         {
             return ValidationResult.Invalid("Url 不能为空");
+        }
+
+        if (!Uri.TryCreate(url, UriKind.Absolute, out var uri) ||
+            !(uri.Scheme.Equals(Uri.UriSchemeHttp, StringComparison.OrdinalIgnoreCase) ||
+              uri.Scheme.Equals(Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase)) ||
+            string.IsNullOrWhiteSpace(uri.Host) ||
+            !string.IsNullOrWhiteSpace(uri.UserInfo) ||
+            uri.Port is < 1 or > 65535 ||
+            uri.HostNameType is not (
+                UriHostNameType.Dns or UriHostNameType.IPv4 or UriHostNameType.IPv6))
+        {
+            return ValidationResult.Invalid("Url 必须是有效的 http/https 绝对地址，且不得包含用户凭据");
         }
 
         var validMethods = new[] { "GET", "POST", "PUT", "DELETE", "PATCH" };

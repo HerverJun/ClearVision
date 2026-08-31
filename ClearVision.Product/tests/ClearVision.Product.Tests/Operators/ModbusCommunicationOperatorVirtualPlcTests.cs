@@ -1,6 +1,9 @@
 using ClearVision.Product.Core.Entities;
 using ClearVision.Product.Core.Enums;
+using ClearVision.Product.Core.Interfaces;
+using ClearVision.Product.Core.Services;
 using ClearVision.Product.Infrastructure.Operators;
+using ClearVision.Product.Infrastructure.Services;
 using FluentAssertions;
 using Microsoft.Extensions.Logging;
 using NSubstitute;
@@ -9,13 +12,16 @@ namespace ClearVision.Product.Tests.Operators;
 
 [TestClassification(TestDomain.Core, TestPurpose.Regression, TestLane.Pr, TestEvidenceType.Contract, TestOracleType.Contract, TestResourceRequirement.None, TestExpectedDuration.Fast, TestFlakyPolicy.Blocking, "product")]
 [Trait("Category", "VirtualPLC")]
+[Collection("PLC Operator Integration")]
 public class ModbusCommunicationOperatorVirtualPlcTests
 {
     private readonly ModbusCommunicationOperator _operator;
 
     public ModbusCommunicationOperatorVirtualPlcTests()
     {
-        _operator = new ModbusCommunicationOperator(Substitute.For<ILogger<ModbusCommunicationOperator>>());
+        _operator = new ModbusCommunicationOperator(
+            Substitute.For<ILogger<ModbusCommunicationOperator>>(),
+            CreateResolver());
     }
 
     [Fact]
@@ -113,10 +119,7 @@ public class ModbusCommunicationOperatorVirtualPlcTests
         Dictionary<string, object>? inputs = null)
     {
         var op = new Operator("virtual-plc-modbus", OperatorType.ModbusCommunication, 0, 0);
-        op.AddParameter(TestHelpers.CreateParameter("Protocol", "TCP", "string"));
-        op.AddParameter(TestHelpers.CreateParameter("IpAddress", GetHost(), "string"));
-        op.AddParameter(TestHelpers.CreateParameter("Port", GetPort(), "int"));
-        op.AddParameter(TestHelpers.CreateParameter("SlaveId", GetUnitId(), "int"));
+        op.AddParameter(TestHelpers.CreateParameter("ProfileId", "virtual-modbus", "string"));
         op.AddParameter(TestHelpers.CreateParameter("RegisterAddress", registerAddress, "int"));
         op.AddParameter(TestHelpers.CreateParameter("RegisterCount", registerCount, "int"));
         op.AddParameter(TestHelpers.CreateParameter("FunctionCode", functionCode, "string"));
@@ -130,6 +133,47 @@ public class ModbusCommunicationOperatorVirtualPlcTests
         outputData.Should().ContainKey("Response");
 
         return Convert.ToString(outputData["Response"]) ?? string.Empty;
+    }
+
+    private static IExecutionResourceProfileResolver CreateResolver()
+    {
+        var configurationService = Substitute.For<IConfigurationService>();
+        configurationService.GetCurrent().Returns(new AppConfig
+        {
+            ExecutionResources = new ExecutionResourceProfilesConfig
+            {
+                PlcProfiles =
+                [
+                    new PlcExecutionResourceProfile
+                    {
+                        Id = "virtual-modbus",
+                        Enabled = true,
+                        Protocol = ExecutionPlcProtocols.ModbusTcp,
+                        Host = GetHost(),
+                        Port = GetPort(),
+                        UnitId = GetUnitId(),
+                        Bindings = new[] { 0, 1, 2, 3, 4, 10, 20 }
+                            .Select(address => new PlcExecutionResourceBinding
+                            {
+                                Address = address.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                                DataType = "Word",
+                                CanRead = true,
+                                CanWrite = true,
+                                MaxElementCount = 125,
+                                AllowedFunctionCodes =
+                                [
+                                    "ReadCoils",
+                                    "ReadHolding",
+                                    "WriteSingle",
+                                    "WriteMultiple"
+                                ]
+                            })
+                            .ToList()
+                    }
+                ]
+            }
+        });
+        return new ServerExecutionResourceProfileResolver(configurationService);
     }
 
     private async Task WaitForRegisterAsync(int address, int expected)

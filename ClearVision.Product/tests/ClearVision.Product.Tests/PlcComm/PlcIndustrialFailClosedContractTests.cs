@@ -5,11 +5,15 @@ using ClearVision.PlcComm.Interfaces;
 using ClearVision.PlcComm.Siemens;
 using ClearVision.Product.Core.Entities;
 using ClearVision.Product.Core.Enums;
+using ClearVision.Product.Core.Interfaces;
 using ClearVision.Product.Core.Operators;
+using ClearVision.Product.Core.Services;
 using ClearVision.Product.Core.ValueObjects;
 using ClearVision.Product.Infrastructure.Operators;
+using ClearVision.Product.Infrastructure.Services;
 using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
+using NSubstitute;
 
 namespace ClearVision.Product.Tests.PlcComm;
 
@@ -221,6 +225,57 @@ public sealed class PlcIndustrialFailClosedContractTests : IAsyncLifetime
         client.WriteCalls.Should().Be(0);
     }
 
+    [Theory]
+    [InlineData("S7")]
+    [InlineData("MC")]
+    [InlineData("FINS")]
+    public async Task RawPlcEndpoint_ShouldFailBeforeConnectionFactory(string protocol)
+    {
+        var client = new SpyPlcClient(BigEndianTransform.Instance, [[0x00, 0x01]]);
+        var factoryCalls = 0;
+        var sut = CreateSut(protocol, client, () => factoryCalls++);
+        var @operator = CreateOperator(protocol, "Read", "None", "Equal");
+        @operator.AddParameter(CreateParameter("IpAddress", "203.0.113.77"));
+
+        var validation = sut.ValidateParameters(@operator);
+        var result = await sut.ExecuteAsync(@operator);
+
+        validation.IsValid.Should().BeFalse();
+        validation.Errors.Should().ContainSingle().Which.Should().StartWith("PLC_RAW_TARGET_FORBIDDEN:");
+        result.IsSuccess.Should().BeFalse();
+        result.ErrorMessage.Should().StartWith("PLC_RAW_TARGET_FORBIDDEN:");
+        factoryCalls.Should().Be(0);
+        client.ConnectCalls.Should().Be(0);
+        client.ReadCalls.Should().Be(0);
+        client.WriteCalls.Should().Be(0);
+    }
+
+    [Fact]
+    public async Task S7AuthoritativeProfile_ShouldSupplyEndpointCpuRackAndSlotToFactory()
+    {
+        var client = new SpyPlcClient(BigEndianTransform.Instance, [[0x00, 0x01]]);
+        (string Host, int Port, SiemensCpuType Cpu, int Rack, int Slot)? captured = null;
+        var sut = new SiemensS7CommunicationOperator(
+            NullLogger<SiemensS7CommunicationOperator>.Instance,
+            CreateResolver("S7"),
+            (host, port, cpu, rack, slot) =>
+            {
+                captured = (host, port, cpu, rack, slot);
+                return client;
+            });
+        var @operator = CreateOperator("S7", "Read", "None", "Equal");
+
+        var result = await sut.ExecuteAsync(@operator);
+
+        result.IsSuccess.Should().BeTrue(result.ErrorMessage);
+        captured.Should().NotBeNull();
+        captured!.Value.Host.Should().Be("127.0.0.1");
+        captured.Value.Port.Should().Be(32001);
+        captured.Value.Cpu.Should().Be(SiemensCpuType.S71200);
+        captured.Value.Rack.Should().Be(0);
+        captured.Value.Slot.Should().Be(1);
+    }
+
     [Fact]
     public async Task FinsPollingNone_ShouldPreserveSingleReadBehavior()
     {
@@ -298,10 +353,12 @@ public sealed class PlcIndustrialFailClosedContractTests : IAsyncLifetime
         SpyPlcClient client,
         Action onFactoryCall)
     {
+        var resolver = CreateResolver(protocol);
         return protocol switch
         {
             "S7" => new SiemensS7CommunicationOperator(
                 NullLogger<SiemensS7CommunicationOperator>.Instance,
+                resolver,
                 (_, _, _, _, _) =>
                 {
                     onFactoryCall();
@@ -309,6 +366,7 @@ public sealed class PlcIndustrialFailClosedContractTests : IAsyncLifetime
                 }),
             "MC" => new MitsubishiMcCommunicationOperator(
                 NullLogger<MitsubishiMcCommunicationOperator>.Instance,
+                resolver,
                 (_, _) =>
                 {
                     onFactoryCall();
@@ -316,6 +374,7 @@ public sealed class PlcIndustrialFailClosedContractTests : IAsyncLifetime
                 }),
             "FINS" => new OmronFinsCommunicationOperator(
                 NullLogger<OmronFinsCommunicationOperator>.Instance,
+                resolver,
                 (_, _) =>
                 {
                     onFactoryCall();
@@ -331,20 +390,18 @@ public sealed class PlcIndustrialFailClosedContractTests : IAsyncLifetime
         string pollingMode,
         string pollingCondition)
     {
-        var (operatorType, address) = protocol switch
+        var (operatorType, profileId, address) = protocol switch
         {
-            "S7" => (OperatorType.SiemensS7Communication, "DB1.DBW100"),
-            "MC" => (OperatorType.MitsubishiMcCommunication, "D100"),
-            "FINS" => (OperatorType.OmronFinsCommunication, "DM100"),
+            "S7" => (OperatorType.SiemensS7Communication, "test-s7-profile", "DB1.DBW100"),
+            "MC" => (OperatorType.MitsubishiMcCommunication, "test-mc-profile", "D100"),
+            "FINS" => (OperatorType.OmronFinsCommunication, "test-fins-profile", "DM100"),
             _ => throw new ArgumentOutOfRangeException(nameof(protocol), protocol, null)
         };
 
         var @operator = new Operator($"{protocol} Contract", operatorType, 0, 0);
-        @operator.AddParameter(CreateParameter("IpAddress", "127.0.0.1"));
-        @operator.AddParameter(CreateParameter("Port", 32001));
+        @operator.AddParameter(CreateParameter("ProfileId", profileId));
         @operator.AddParameter(CreateParameter("Address", address));
         @operator.AddParameter(CreateParameter("Length", 1));
-        @operator.AddParameter(CreateParameter("DataType", "Word"));
         @operator.AddParameter(CreateParameter("Operation", operation));
         @operator.AddParameter(CreateParameter("PollingMode", pollingMode));
         @operator.AddParameter(CreateParameter("PollingCondition", pollingCondition));
@@ -352,6 +409,51 @@ public sealed class PlcIndustrialFailClosedContractTests : IAsyncLifetime
         @operator.AddParameter(CreateParameter("PollingTimeout", 1000));
         @operator.AddParameter(CreateParameter("PollingInterval", 10));
         return @operator;
+    }
+
+    private static IExecutionResourceProfileResolver CreateResolver(string protocol)
+    {
+        var (profileId, serverProtocol, address) = protocol switch
+        {
+            "S7" => ("test-s7-profile", ExecutionPlcProtocols.SiemensS7, "DB1.DBW100"),
+            "MC" => ("test-mc-profile", ExecutionPlcProtocols.MitsubishiMc, "D100"),
+            "FINS" => ("test-fins-profile", ExecutionPlcProtocols.OmronFins, "DM100"),
+            _ => throw new ArgumentOutOfRangeException(nameof(protocol), protocol, null)
+        };
+        var configurationService = Substitute.For<IConfigurationService>();
+        configurationService.GetCurrent().Returns(new AppConfig
+        {
+            ExecutionResources = new ExecutionResourceProfilesConfig
+            {
+                PlcProfiles =
+                [
+                    new PlcExecutionResourceProfile
+                    {
+                        Id = profileId,
+                        Enabled = true,
+                        Protocol = serverProtocol,
+                        Host = "127.0.0.1",
+                        Port = 32001,
+                        CpuType = "S71200",
+                        Rack = 0,
+                        Slot = 1,
+                        UnitId = 1,
+                        Bindings =
+                        [
+                            new PlcExecutionResourceBinding
+                            {
+                                Address = address,
+                                DataType = "Word",
+                                CanRead = true,
+                                CanWrite = true,
+                                MaxElementCount = 999
+                            }
+                        ]
+                    }
+                ]
+            }
+        });
+        return new ServerExecutionResourceProfileResolver(configurationService);
     }
 
     private static Parameter CreateParameter(string name, object value) =>

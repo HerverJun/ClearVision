@@ -9,14 +9,18 @@ using Xunit;
 namespace ClearVision.Product.Tests.Operators;
 
 [TestClassification(TestDomain.Core, TestPurpose.Regression, TestLane.Pr, TestEvidenceType.Contract, TestOracleType.Contract, TestResourceRequirement.None, TestExpectedDuration.Fast, TestFlakyPolicy.Blocking, "product")]
-public class TimerStatisticsOperatorTests
+public class TimerStatisticsOperatorTests : IDisposable
 {
     private readonly TimerStatisticsOperator _operator;
+    private readonly IDisposable _authorityScope;
 
     public TimerStatisticsOperatorTests()
     {
+        _authorityScope = TestExecutionAuthorityScope.Enter();
         _operator = new TimerStatisticsOperator(Substitute.For<ILogger<TimerStatisticsOperator>>());
     }
+
+    public void Dispose() => _authorityScope.Dispose();
 
     [Fact]
     public void OperatorType_ShouldBeTimerStatistics()
@@ -41,7 +45,7 @@ public class TimerStatisticsOperatorTests
         Assert.NotNull(result.OutputData);
         Assert.Equal(2, (int)result.OutputData!["Count"]);
         Assert.True(Convert.ToDouble(result.OutputData["TotalMs"]) >= Convert.ToDouble(result.OutputData["AverageMs"]));
-        Assert.Equal("OperatorInstance", result.OutputData["StateScope"]);
+        Assert.Equal("Project/Session/Flow/Run/Operator", result.OutputData["StateScope"]);
         Assert.Equal(120, (int)result.OutputData["StateTtlMinutes"]);
     }
 
@@ -57,7 +61,7 @@ public class TimerStatisticsOperatorTests
 
         Assert.True(resultB.IsSuccess);
         Assert.Equal(1, (int)resultB.OutputData!["Count"]);
-        Assert.Equal(opB.Id, Assert.IsType<Guid>(resultB.OutputData["StateKey"]));
+        Assert.Contains(opB.Id.ToString(), Assert.IsType<string>(resultB.OutputData["StateKey"]));
     }
 
     [Fact]

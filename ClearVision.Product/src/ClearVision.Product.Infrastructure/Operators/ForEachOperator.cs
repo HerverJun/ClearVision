@@ -50,11 +50,6 @@ public class ForEachOperator : OperatorBase
         _serviceScopeFactory = serviceScopeFactory ?? throw new ArgumentNullException(nameof(serviceScopeFactory));
     }
 
-    /// <summary>
-    /// 子图流程定义
-    /// </summary>
-    public OperatorFlow? SubGraph { get; set; }
-
     protected override async Task<OperatorExecutionOutput> ExecuteCoreAsync(
         Operator @operator,
         Dictionary<string, object>? inputs,
@@ -102,18 +97,32 @@ public class ForEachOperator : OperatorBase
             items.Count, ioMode, maxParallelism, failFast);
 
         // 3. 获取或加载子图
-        var subGraph = GetSubGraph(@operator);
-        if (subGraph == null)
+        if (!NestedExecutionFlowCatalog.TryResolveForEachSubGraph(
+                @operator,
+                out var subGraph,
+                out var nestedFlowCode,
+                out var nestedFlowMessage) ||
+            subGraph == null)
         {
-            return OperatorExecutionOutput.Failure("ForEach 算子未配置子图（SubGraph）");
+            return OperatorExecutionOutput.Failure($"{nestedFlowCode}: {nestedFlowMessage}");
+        }
+
+        if (!TryCreateNestedExecutionPlan(
+                @operator,
+                subGraph,
+                out var executionPlan,
+                out var authorityError) ||
+            executionPlan == null)
+        {
+            return OperatorExecutionOutput.Failure(authorityError);
         }
 
         // 4. 根据 IoMode 执行
         try
         {
             var results = ioMode.Equals("Sequential", StringComparison.OrdinalIgnoreCase)
-                ? await ExecuteSequentialAsync(items, subGraph, timeoutMs, failFast, cancellationToken)
-                : await ExecuteParallelAsync(items, subGraph, maxParallelism, timeoutMs, failFast, orderResults, cancellationToken);
+                ? await ExecuteSequentialAsync(items, executionPlan, timeoutMs, failFast, cancellationToken)
+                : await ExecuteParallelAsync(items, executionPlan, maxParallelism, timeoutMs, failFast, orderResults, cancellationToken);
 
             var aggregateResult = BuildAggregateResult(results, orderResults);
 
@@ -161,7 +170,7 @@ public class ForEachOperator : OperatorBase
     /// </summary>
     private async Task<List<ForEachItemResult>> ExecuteParallelAsync(
         List<object> items,
-        OperatorFlow subGraph,
+        NestedExecutionPlan executionPlan,
         int maxParallelism,
         int timeoutMs,
         bool failFast,
@@ -187,9 +196,8 @@ public class ForEachOperator : OperatorBase
                 try
                 {
                     var subResult = await ExecuteSubGraphAsync(
-                        subGraph,
+                        executionPlan,
                         BuildSubInputs(item, index, items.Count),
-                        timeoutMs,
                         ct);
 
                     // 从 OutputData 中获取 Result 字段
@@ -243,7 +251,7 @@ public class ForEachOperator : OperatorBase
     /// </summary>
     private async Task<List<ForEachItemResult>> ExecuteSequentialAsync(
         List<object> items,
-        OperatorFlow subGraph,
+        NestedExecutionPlan executionPlan,
         int timeoutMs,
         bool failFast,
         CancellationToken cancellationToken)
@@ -265,9 +273,8 @@ public class ForEachOperator : OperatorBase
                 using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(cts.Token, cancellationToken);
 
                 var subResult = await ExecuteSubGraphAsync(
-                    subGraph,
+                    executionPlan,
                     BuildSubInputs(item, index, items.Count),
-                    timeoutMs,
                     linkedCts.Token);
 
                 // 从 OutputData 中获取 Result 字段
@@ -336,17 +343,18 @@ public class ForEachOperator : OperatorBase
     /// 执行子图
     /// </summary>
     private async Task<FlowExecutionResult> ExecuteSubGraphAsync(
-        OperatorFlow subGraph,
+        NestedExecutionPlan executionPlan,
         Dictionary<string, object> inputs,
-        int timeoutMs,
         CancellationToken cancellationToken)
     {
-        // 对于子图执行，禁用并行模式（子图内部已经是并行了）
+        // Each iteration receives a fresh immutable snapshot while retaining
+        // the outer run/session identity used by stateful child operators.
+        var childSnapshot = executionPlan.CreateSnapshot();
         using var scope = _serviceScopeFactory.CreateScope();
-        var flowExecution = scope.ServiceProvider.GetRequiredService<IFlowExecutionEngine>();
+        var flowExecution = scope.ServiceProvider.GetRequiredService<IFlowExecutionService>();
 
-        return await flowExecution.ExecuteFlowAsync(
-            subGraph,
+        return await flowExecution.ExecuteWithSnapshotAsync(
+            childSnapshot,
             inputs,
             enableParallel: false,
             cancellationToken: cancellationToken);
@@ -387,34 +395,115 @@ public class ForEachOperator : OperatorBase
         };
     }
 
-    /// <summary>
-    /// 从算子参数中获取子图定义
-    /// </summary>
-    private OperatorFlow? GetSubGraph(Operator @operator)
+    private static bool TryCreateNestedExecutionPlan(
+        Operator forEach,
+        OperatorFlow requestedSubGraph,
+        out NestedExecutionPlan? plan,
+        out string error)
     {
-        // 优先使用运行时设置的 SubGraph 属性
-        if (SubGraph != null)
+        plan = null;
+        var authorityScope = ExecutionAuthorityContext.Current;
+        var outerSnapshot = authorityScope?.CapturedSnapshot;
+        if (outerSnapshot == null)
         {
-            return SubGraph;
+            error = "ADMISSION_NESTED_EXECUTION_AUTHORITY_REQUIRED: ForEach child graphs require a governed outer execution snapshot.";
+            return false;
         }
 
-        // 尝试从算子参数中获取
-        var subGraphParam = @operator.Parameters.FirstOrDefault(p => p.Name == "SubGraph");
-        if (subGraphParam?.Value != null)
+        var boundOperators = outerSnapshot.CreateExecutionFlow().Operators
+            .Where(item => item.Id == forEach.Id && item.Type == OperatorType.ForEach)
+            .ToArray();
+        if (boundOperators.Length != 1 ||
+            ComputeOperatorHash(boundOperators[0]) != ComputeOperatorHash(forEach) ||
+            !NestedExecutionFlowCatalog.TryResolveForEachSubGraph(
+                boundOperators[0],
+                out var boundSubGraph,
+                out _,
+                out _) ||
+            boundSubGraph == null ||
+            !string.Equals(
+                ExecutionFlowIdentity.ComputeFlowHash(boundSubGraph),
+                ExecutionFlowIdentity.ComputeFlowHash(requestedSubGraph),
+                StringComparison.Ordinal))
         {
-            try
-            {
-                // 反序列化子图定义
-                var json = System.Text.Json.JsonSerializer.Serialize(subGraphParam.Value);
-                return System.Text.Json.JsonSerializer.Deserialize<OperatorFlow>(json);
-            }
-            catch (Exception ex)
-            {
-                Logger.LogError(ex, "[ForEach] 反序列化子图失败");
-            }
+            error = "ADMISSION_NESTED_FLOW_NOT_BOUND: The ForEach operator or child graph differs from the immutable outer snapshot.";
+            return false;
         }
 
-        return null;
+        var frozenSubGraph = ExecutionFlowIdentity.CloneFlow(boundSubGraph);
+        ExecutionCapabilityManifest childCapabilities;
+        try
+        {
+            childCapabilities = ExecutionCapabilityManifest.Derive(
+                frozenSubGraph,
+                outerSnapshot.CapabilityManifest.IsExplicit);
+        }
+        catch (InvalidOperationException ex)
+        {
+            error = ex.Message;
+            return false;
+        }
+
+        var undeclaredCapabilities =
+            childCapabilities.Capabilities & ~outerSnapshot.CapabilityManifest.Capabilities;
+        if (undeclaredCapabilities != ExecutionSideEffect.None)
+        {
+            error = $"ADMISSION_NESTED_CAPABILITY_NOT_DECLARED: The child graph requires undeclared capabilities '{undeclaredCapabilities}'.";
+            return false;
+        }
+
+        IReadOnlyDictionary<string, string> scopedBindings;
+        try
+        {
+            if (!ExecutionResourceBindingManifest.TryScopeToFlow(
+                    frozenSubGraph,
+                    outerSnapshot.ResourceBindings,
+                    out scopedBindings,
+                    out var resourceCode,
+                    out var resourceMessage))
+            {
+                error = $"{resourceCode}: {resourceMessage}";
+                return false;
+            }
+        }
+        catch (InvalidOperationException ex)
+        {
+            error = ex.Message;
+            return false;
+        }
+
+        var childBindings = scopedBindings.ToDictionary(
+            pair => pair.Key,
+            pair => pair.Value,
+            StringComparer.Ordinal);
+        if (outerSnapshot.Source == ExecutionSnapshotSource.Draft)
+        {
+            childBindings["FlowHash"] = ExecutionFlowIdentity.ComputeFlowHash(frozenSubGraph);
+        }
+
+        plan = new NestedExecutionPlan(
+            outerSnapshot,
+            frozenSubGraph,
+            childCapabilities,
+            childBindings);
+
+        var authority = ExecutionAuthorityMatrix.Validate(plan.CreateSnapshot());
+        if (!authority.Allowed)
+        {
+            plan = null;
+            error = $"{authority.Code}: {authority.Message}";
+            return false;
+        }
+
+        error = string.Empty;
+        return true;
+    }
+
+    private static string ComputeOperatorHash(Operator @operator)
+    {
+        var flow = new OperatorFlow("ForEachAuthorityIdentity");
+        flow.Operators.Add(@operator);
+        return ExecutionFlowIdentity.ComputeFlowHash(flow);
     }
 
     public override ValidationResult ValidateParameters(Operator @operator)
@@ -451,6 +540,31 @@ public class ForEachOperator : OperatorBase
         return clampToRange
             ? GetIntParam(@operator, parameterName, 30000, 1000, 300000)
             : GetIntParam(@operator, parameterName, 30000);
+    }
+
+    private sealed class NestedExecutionPlan(
+        ExecutionSnapshot outerSnapshot,
+        OperatorFlow frozenSubGraph,
+        ExecutionCapabilityManifest capabilityManifest,
+        IReadOnlyDictionary<string, string> resourceBindings)
+    {
+        public ExecutionSnapshot CreateSnapshot() => new(
+            outerSnapshot.ProjectId,
+            frozenSubGraph,
+            outerSnapshot.PersistenceRevision,
+            outerSnapshot.Source,
+            outerSnapshot.RunMode,
+            resourceBindings,
+            runtimePackageId: outerSnapshot.RuntimePackageId,
+            shadowRole: outerSnapshot.ShadowRole,
+            globalVariables: outerSnapshot.CreateGlobalVariables(),
+            principal: outerSnapshot.Principal,
+            capabilityManifest: capabilityManifest,
+            expectedProjectRevision: outerSnapshot.ExpectedProjectRevision,
+            confirmationId: outerSnapshot.ConfirmationId,
+            auditId: outerSnapshot.AuditId,
+            sessionId: outerSnapshot.SessionId,
+            runId: outerSnapshot.RunId);
     }
 
     /// <summary>

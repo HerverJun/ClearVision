@@ -109,7 +109,7 @@ public class RuntimeMvpTests
             await File.WriteAllBytesAsync(imagePath, imageBytes);
 
             var flowExecutionService = CreateFlowExecutionService(new DeterministicJudgmentExecutor());
-            var inspectionService = CreateInspectionService(flowExecutionService, project.Id);
+            var inspectionService = CreateInspectionService(flowExecutionService, project);
 
             await using var runtimeHost = new RuntimeHost(
                 flowExecutionService,
@@ -119,10 +119,21 @@ public class RuntimeMvpTests
 
             await runtimeHost.LoadPackageAsync(export.PackageRootPath);
 
-            var studioResult = await inspectionService.ExecuteSingleAsync(project.Id, imageBytes, project.Flow!.ToEntity());
+            var studioResult = await inspectionService.ExecuteSingleAsync(
+                project.Id,
+                imageBytes,
+                flow: null,
+                authority: new ExecutionRequestAuthority(
+                    new ExecutionPrincipal(
+                        "operator-runtime-consistency",
+                        "Runtime Consistency Operator",
+                        "Operator",
+                        IsAuthenticated: true)),
+                cancellationToken: CancellationToken.None);
             var stationResult = await runtimeHost.RunSingleAsync(imagePath);
 
             studioResult.Status.Should().Be(InspectionStatus.OK);
+            studioResult.ExecutionSource.Should().Be(ExecutionSnapshotSource.PersistedProject.ToString());
             stationResult.Outcome.Should().Be(RuntimeRunOutcome.Ok);
             stationResult.HasJudgmentSignal.Should().BeTrue();
             stationResult.InspectionStatus.Should().Be(studioResult.Status);
@@ -1208,6 +1219,154 @@ public class RuntimeMvpTests
         }
     }
 
+    [Fact]
+    public async Task RuntimePackageLoader_ReparsePackageRoot_ShouldRejectBeforeReadingManifest()
+    {
+        var root = CreateTempDirectory();
+        try
+        {
+            var export = await new RuntimePackageExporter(
+                new OperatorFactory(),
+                NullLogger<RuntimePackageExporter>.Instance).ExportAsync(new RuntimePackageExportRequest
+                {
+                    Project = CreateProjectDto("reparse-package-root"),
+                    TargetRootDirectory = root
+                });
+            var linkedPackageRoot = Path.Combine(root, "linked-package");
+            Directory.CreateSymbolicLink(linkedPackageRoot, export.PackageRootPath);
+            var loader = new RuntimePackageLoader(
+                new RuntimePackageValidator(),
+                NullLogger<RuntimePackageLoader>.Instance);
+
+            var act = () => loader.LoadAsync(linkedPackageRoot);
+
+            await act.Should().ThrowAsync<RuntimePackageException>()
+                .WithMessage("*RESOURCE_PATH_REPARSE_POINT_FORBIDDEN*");
+        }
+        finally
+        {
+            SafeDeleteDirectory(root);
+        }
+    }
+
+    [Fact]
+    public async Task RuntimeHost_ReparseInputPath_ShouldRejectBeforeExecutionDispatch()
+    {
+        var root = CreateTempDirectory();
+        try
+        {
+            var export = await new RuntimePackageExporter(
+                new OperatorFactory(),
+                NullLogger<RuntimePackageExporter>.Instance).ExportAsync(new RuntimePackageExportRequest
+                {
+                    Project = CreateProjectDto("reparse-runtime-input"),
+                    TargetRootDirectory = root
+                });
+            var externalInputRoot = Path.Combine(root, "external-input");
+            Directory.CreateDirectory(externalInputRoot);
+            await File.WriteAllBytesAsync(Path.Combine(externalInputRoot, "input.bmp"), ValidImageBytes);
+            var linkedInputRoot = Path.Combine(export.PackageRootPath, "linked-input");
+            Directory.CreateSymbolicLink(linkedInputRoot, externalInputRoot);
+
+            var flowExecutionService = Substitute.For<IFlowExecutionService>();
+            flowExecutionService.ValidateSnapshot(Arg.Any<ExecutionSnapshot>())
+                .Returns(new FlowValidationResult { IsValid = true });
+            var executeCount = 0;
+            flowExecutionService.ExecuteWithSnapshotAsync(
+                    Arg.Any<ExecutionSnapshot>(),
+                    Arg.Any<Dictionary<string, object>?>(),
+                    Arg.Any<ProjectVariableExecutionContext>(),
+                    Arg.Any<bool>(),
+                    Arg.Any<CancellationToken>())
+                .Returns(_ =>
+                {
+                    executeCount++;
+                    return Task.FromResult(new FlowExecutionResult { IsSuccess = true });
+                });
+            await using var runtimeHost = new RuntimeHost(
+                flowExecutionService,
+                new RuntimePackageLoader(new RuntimePackageValidator(), NullLogger<RuntimePackageLoader>.Instance),
+                new RuntimeResultNormalizer(),
+                NullLogger<RuntimeHost>.Instance);
+            await runtimeHost.LoadPackageAsync(export.PackageRootPath);
+
+            var act = () => runtimeHost.RunSingleAsync(Path.Combine(linkedInputRoot, "input.bmp"));
+
+            await act.Should().ThrowAsync<RuntimePackageException>()
+                .WithMessage("*RESOURCE_PATH_REPARSE_POINT_FORBIDDEN*");
+            executeCount.Should().Be(0);
+        }
+        finally
+        {
+            SafeDeleteDirectory(root);
+        }
+    }
+
+    [Fact]
+    public async Task RuntimeHost_AppliedSnapshotRejection_ShouldPrecedeInputFileAccessAndDispatch()
+    {
+        var root = CreateTempDirectory();
+        try
+        {
+            var export = await new RuntimePackageExporter(
+                new OperatorFactory(),
+                NullLogger<RuntimePackageExporter>.Instance).ExportAsync(new RuntimePackageExportRequest
+                {
+                    Project = CreateProjectDto("applied-snapshot-admission-first"),
+                    TargetRootDirectory = root
+                });
+            var missingInputPath = Path.Combine(root, "must-not-be-read.bmp");
+            var validationCount = 0;
+            var executeCount = 0;
+            var flowExecutionService = Substitute.For<IFlowExecutionService>();
+            flowExecutionService.ValidateSnapshot(Arg.Any<ExecutionSnapshot>())
+                .Returns(_ =>
+                {
+                    validationCount++;
+                    return validationCount < 3
+                        ? new FlowValidationResult { IsValid = true }
+                        : new FlowValidationResult
+                        {
+                            IsValid = false,
+                            Errors = ["TEST_APPLIED_SNAPSHOT_REJECTED"]
+                        };
+                });
+            flowExecutionService.ExecuteWithSnapshotAsync(
+                    Arg.Any<ExecutionSnapshot>(),
+                    Arg.Any<Dictionary<string, object>?>(),
+                    Arg.Any<ProjectVariableExecutionContext>(),
+                    Arg.Any<bool>(),
+                    Arg.Any<CancellationToken>())
+                .Returns(_ =>
+                {
+                    executeCount++;
+                    return Task.FromResult(new FlowExecutionResult { IsSuccess = true });
+                });
+            var resultWriter = new TrackingRuntimeResultWriter();
+            var imageWriter = new TrackingRuntimeImageWriter();
+            await using var runtimeHost = new RuntimeHost(
+                flowExecutionService,
+                new RuntimePackageLoader(new RuntimePackageValidator(), NullLogger<RuntimePackageLoader>.Instance),
+                new RuntimeResultNormalizer(),
+                NullLogger<RuntimeHost>.Instance,
+                _ => ValueTask.FromResult(new RuntimePreparedWriters(resultWriter, imageWriter)));
+            await runtimeHost.LoadPackageAsync(export.PackageRootPath);
+
+            var result = await runtimeHost.RunSingleAsync(missingInputPath);
+
+            result.ReasonCode.Should().Be("FlowInvalid");
+            result.DiagnosticMessage.Should().Contain("TEST_APPLIED_SNAPSHOT_REJECTED");
+            result.SourceImageBytes.Should().BeNull();
+            validationCount.Should().Be(3);
+            executeCount.Should().Be(0);
+            resultWriter.EnqueueCount.Should().Be(1);
+        }
+        finally
+        {
+            SafeDeleteDirectory(root);
+        }
+    }
+
     private sealed class FailingRuntimeProjectVariableStateStore : IProjectVariableStateStore
     {
         public bool FailSaves { get; set; }
@@ -1279,7 +1438,9 @@ public class RuntimeMvpTests
         throw new InvalidOperationException($"Runtime result record not found for run {result.RunId}.");
     }
 
-    private static InspectionService CreateInspectionService(IFlowExecutionService flowExecutionService, Guid projectId)
+    private static InspectionService CreateInspectionService(
+        IFlowExecutionService flowExecutionService,
+        ProjectDto project)
     {
         var resultRepository = Substitute.For<IInspectionResultRepository>();
         resultRepository.AddAsync(Arg.Any<InspectionResult>())
@@ -1296,7 +1457,11 @@ public class RuntimeMvpTests
         });
 
         var projectRepository = Substitute.For<IProjectRepository>();
-        projectRepository.GetByIdFreshAsync(projectId).Returns(new Project("active-runtime-project"));
+        var storedProject = new Project("active-runtime-project");
+        storedProject.UpdateFlow(project.Flow!.ToEntity());
+        storedProject.SetPersistenceRevision(project.PersistenceRevision);
+        projectRepository.GetByIdFreshAsync(project.Id).Returns(storedProject);
+        projectRepository.GetWithFlowAsync(project.Id).Returns(storedProject);
 
         return new InspectionService(
             resultRepository,

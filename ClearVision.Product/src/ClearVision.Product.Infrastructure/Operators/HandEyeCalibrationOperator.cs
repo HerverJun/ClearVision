@@ -33,10 +33,14 @@ namespace ClearVision.Product.Infrastructure.Operators;
 [OutputPort("HtmlReport", "HTML Report", PortDataType.String)]
 [OutputPort("Suggestions", "Suggestions", PortDataType.Any)]
 [OutputPort("SuggestedValidationPoses", "Suggested Validation Poses", PortDataType.String)]
+[OutputPort("CalibrationAssetId", "Calibration Asset Id", PortDataType.String)]
+[OutputPort("CalibrationAssetCandidate", "Calibration Asset Candidate", PortDataType.Boolean)]
+[OutputPort("CalibrationContentHash", "Calibration Content Hash", PortDataType.String)]
 [OperatorParam("CalibrationType", "Calibration Type", "enum", DefaultValue = "eye_in_hand", Options = new[] { "eye_in_hand|Eye In Hand", "eye_to_hand|Eye To Hand" })]
 [OperatorParam("Method", "Method", "enum", DefaultValue = "TSAI", Options = new[] { "TSAI|Tsai", "PARK|Park", "HORAUD|Horaud", "ANDREFF|Andreff", "DANIILIDIS|Daniilidis" })]
 [OperatorParam("CameraMatrix", "Camera Matrix", "string", DefaultValue = "")]
 [OperatorParam("DistortionCoeffs", "Distortion Coeffs", "string", DefaultValue = "")]
+[OperatorParam("CalibrationAssetId", "Calibration Asset Id", "string", DefaultValue = "")]
 public sealed class HandEyeCalibrationOperator : OperatorBase
 {
     public HandEyeCalibrationOperator(ILogger<HandEyeCalibrationOperator> logger)
@@ -86,6 +90,10 @@ public sealed class HandEyeCalibrationOperator : OperatorBase
             ["Suggestions"] = result.Validation.Suggestions,
             ["SuggestedValidationPoses"] = result.Validation.SuggestedValidationPosesJson
         };
+        CalibrationAssetCandidateOutput.AddTo(
+            output,
+            GetStringParam(@operator, "CalibrationAssetId", string.Empty),
+            calibrationData);
 
         return OperatorExecutionOutput.Success(output);
     }

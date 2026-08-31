@@ -8,6 +8,7 @@ using ClearVision.Product.Core.Attributes;
 using ClearVision.Product.Core.Entities;
 using ClearVision.Product.Core.Enums;
 using ClearVision.Product.Core.Operators;
+using ClearVision.Product.Core.Services;
 using Microsoft.Extensions.Logging;
 namespace ClearVision.Product.Infrastructure.Operators;
 
@@ -30,7 +31,7 @@ namespace ClearVision.Product.Infrastructure.Operators;
 [OperatorParam("Reset", "Reset History", "bool", DefaultValue = false)]
 public class TimerStatisticsOperator : OperatorBase
 {
-    private readonly ConcurrentDictionary<Guid, TimerState> _states = new();
+    private readonly ConcurrentDictionary<ExecutionStateKey, TimerState> _states = new();
 
     public override OperatorType OperatorType => OperatorType.TimerStatistics;
 
@@ -63,17 +64,18 @@ public class TimerStatisticsOperator : OperatorBase
         var stateTtlMinutes = GetIntParam(@operator, "StateTtlMinutes", 120, min: 0, max: 10_080);
         var reset = GetBoolParam(@operator, "Reset", false);
         var nowUtc = DateTime.UtcNow;
-        CleanupStaleStates(nowUtc, @operator.Id);
+        var stateKey = ExecutionStateKey.ForOperator(@operator.Id);
+        CleanupStaleStates(nowUtc, stateKey);
 
         if (reset)
         {
-            _states.TryRemove(@operator.Id, out _);
+            _states.TryRemove(stateKey, out _);
             return Task.FromResult(OperatorExecutionOutput.Success(CreateOutput(
                 elapsedMs: 0,
                 totalMs: 0,
                 averageMs: 0,
                 count: 0,
-                @operator.Id,
+                stateKey,
                 stateTtlMinutes,
                 resetApplied: true,
                 inputs)));
@@ -83,7 +85,7 @@ public class TimerStatisticsOperator : OperatorBase
         double totalMs;
         double averageMs;
         int count;
-        var state = _states.GetOrAdd(@operator.Id, static _ => new TimerState());
+        var state = _states.GetOrAdd(stateKey, static _ => new TimerState());
 
         lock (state.SyncRoot)
         {
@@ -131,7 +133,7 @@ public class TimerStatisticsOperator : OperatorBase
             totalMs,
             averageMs,
             count,
-            @operator.Id,
+            stateKey,
             stateTtlMinutes,
             resetApplied: false,
             inputs)));
@@ -176,7 +178,7 @@ public class TimerStatisticsOperator : OperatorBase
         double totalMs,
         double averageMs,
         int count,
-        Guid operatorId,
+        ExecutionStateKey stateKey,
         int stateTtlMinutes,
         bool resetApplied,
         Dictionary<string, object>? inputs)
@@ -187,14 +189,14 @@ public class TimerStatisticsOperator : OperatorBase
             { "TotalMs", totalMs },
             { "AverageMs", averageMs },
             { "Count", count },
-            { "StateScope", "OperatorInstance" },
-            { "StateKey", operatorId },
+            { "StateScope", "Project/Session/Flow/Run/Operator" },
+            { "StateKey", stateKey.ToString() },
             { "StateTtlMinutes", stateTtlMinutes },
             { "ResetApplied", resetApplied },
             { "Diagnostics", new Dictionary<string, object>
                 {
-                    { "StateScope", "OperatorInstance" },
-                    { "StateStorage", "InMemoryByOperatorId" },
+                    { "StateScope", "Project/Session/Flow/Run/Operator" },
+                    { "StateStorage", "InMemoryByExecutionStateKey" },
                     { "StateTtlMinutes", stateTtlMinutes },
                     { "ResetApplied", resetApplied }
                 }
@@ -209,11 +211,11 @@ public class TimerStatisticsOperator : OperatorBase
         return output;
     }
 
-    private void CleanupStaleStates(DateTime nowUtc, Guid currentOperatorId)
+    private void CleanupStaleStates(DateTime nowUtc, ExecutionStateKey currentStateKey)
     {
         foreach (var entry in _states)
         {
-            if (entry.Key == currentOperatorId)
+            if (entry.Key == currentStateKey)
             {
                 continue;
             }

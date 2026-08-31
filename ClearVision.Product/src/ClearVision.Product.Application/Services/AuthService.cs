@@ -12,10 +12,12 @@ namespace ClearVision.Product.Application.Services;
 /// <summary>
 /// Auth service backed by in-memory sessions.
 /// </summary>
-public class AuthService : IAuthService
+public class AuthService : IAuthService, IAuthSessionRevocationService
 {
     private const int UsernameMinLength = 3;
     private const int SessionTokenByteLength = 32;
+    public const int PerUserSessionCapacity = 8;
+    public const int GlobalSessionCapacity = 256;
     public const string InitialAdminSetupAlreadyCompletedMessage = "系统已完成初始化，请直接登录";
     public const string InstallationAlreadyCompletedCode = "INSTALLATION_ALREADY_COMPLETED";
     public const string SetupValidationErrorCode = "SETUP_VALIDATION_ERROR";
@@ -30,6 +32,7 @@ public class AuthService : IAuthService
     private static readonly Dictionary<string, LoginFailureState> _loginFailures = new(StringComparer.OrdinalIgnoreCase);
     private static readonly object _lock = new();
     private static readonly TimeSpan _lockoutDuration = TimeSpan.FromMinutes(15);
+    private static long _sessionSequence;
 
     public Func<DateTime> UtcNowProvider { get; set; } = static () => DateTime.UtcNow;
 
@@ -86,6 +89,7 @@ public class AuthService : IAuthService
             var failureState = RegisterFailedAttempt(normalizedUsername, utcNow, threshold);
             if (failureState.IsLockedAt(utcNow))
             {
+                RevokeSessionsForUser(user.Id.ToString(), "account-lockout");
                 _logger.LogWarning("[AuthService] Login locked after failures: {Username}", normalizedUsername);
                 return AuthResult.Fail(BuildLockoutMessage(failureState.LockedUntilUtc));
             }
@@ -118,7 +122,12 @@ public class AuthService : IAuthService
         lock (_lock)
         {
             CleanExpiredSessionsLocked(utcNow);
-            _sessions[token] = new SessionRecord(session, passwordFingerprint);
+            _sessions[token] = new SessionRecord(
+                session,
+                passwordFingerprint,
+                Interlocked.Increment(ref _sessionSequence),
+                utcNow);
+            EnforceSessionCapacitiesLocked(session.UserId);
         }
 
         _logger.LogInformation("[AuthService] Login success: {Username}", normalizedUsername);
@@ -192,6 +201,15 @@ public class AuthService : IAuthService
             return null;
         }
 
+        if (!string.Equals(record.Session.Role, user.Role.ToString(), StringComparison.Ordinal) ||
+            !string.Equals(record.Session.Username, user.Username, StringComparison.Ordinal))
+        {
+            // Do not silently upgrade or otherwise change the authority of an
+            // already-issued token. The user must authenticate again.
+            RemoveSession(token);
+            return null;
+        }
+
         var refreshed = new UserSession
         {
             UserId = user.Id.ToString(),
@@ -202,10 +220,12 @@ public class AuthService : IAuthService
 
         lock (_lock)
         {
-            if (_sessions.TryGetValue(token, out var current) && ReferenceEquals(current, record))
+            if (!_sessions.TryGetValue(token, out var current) || !ReferenceEquals(current, record))
             {
-                _sessions[token] = record with { Session = refreshed };
+                return null;
             }
+
+            _sessions[token] = record with { Session = refreshed, LastValidatedAtUtc = utcNow };
         }
 
         return refreshed;
@@ -244,7 +264,7 @@ public class AuthService : IAuthService
         var newHash = _passwordHasher.HashPassword(newPassword);
         user.ChangePassword(newHash);
         await _userRepository.UpdateAsync(user);
-        RevokeSessionsForUser(user.Id.ToString());
+        RevokeSessionsForUser(user.Id.ToString(), "password-changed");
         _logger.LogInformation("[AuthService] Password changed: {UserId}", userId);
 
         return AuthResult.Ok(string.Empty, MapToDto(user));
@@ -326,6 +346,7 @@ public class AuthService : IAuthService
         {
             _sessions.Clear();
             _loginFailures.Clear();
+            _sessionSequence = 0;
         }
     }
 
@@ -334,6 +355,29 @@ public class AuthService : IAuthService
         lock (_lock)
         {
             return _sessions.Count;
+        }
+    }
+
+    internal static void AddLegacyExpiringSessionForTests(
+        string token,
+        UserSession session,
+        string passwordHash,
+        DateTime createdAtUtc)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(token);
+        ArgumentNullException.ThrowIfNull(session);
+        if (!session.ExpiresAt.HasValue)
+        {
+            throw new ArgumentException("A legacy test session must have an absolute expiry.", nameof(session));
+        }
+
+        lock (_lock)
+        {
+            _sessions[token] = new SessionRecord(
+                session,
+                ComputePasswordFingerprint(passwordHash),
+                Interlocked.Increment(ref _sessionSequence),
+                createdAtUtc);
         }
     }
 
@@ -371,8 +415,14 @@ public class AuthService : IAuthService
         }
     }
 
-    private static void RevokeSessionsForUser(string userId)
+    public void RevokeSessionsForUser(string userId, string reason)
     {
+        if (string.IsNullOrWhiteSpace(userId))
+        {
+            return;
+        }
+
+        var removed = 0;
         lock (_lock)
         {
             foreach (var token in _sessions
@@ -380,8 +430,52 @@ public class AuthService : IAuthService
                          .Select(item => item.Key)
                          .ToList())
             {
+                if (_sessions.Remove(token))
+                {
+                    removed++;
+                }
+            }
+        }
+
+        _logger.LogInformation(
+            "[AuthService] Revoked {SessionCount} session(s) for user {UserId}. Reason={Reason}",
+            removed,
+            userId,
+            string.IsNullOrWhiteSpace(reason) ? "security-event" : reason.Trim());
+    }
+
+    private static void EnforceSessionCapacitiesLocked(string userId)
+    {
+        var perUserOverflow = _sessions.Count(item =>
+            string.Equals(item.Value.Session.UserId, userId, StringComparison.Ordinal)) - PerUserSessionCapacity;
+        if (perUserOverflow > 0)
+        {
+            foreach (var token in _sessions
+                         .Where(item => string.Equals(item.Value.Session.UserId, userId, StringComparison.Ordinal))
+                         .OrderBy(item => item.Value.CreatedSequence)
+                         .ThenBy(item => item.Key, StringComparer.Ordinal)
+                         .Take(perUserOverflow)
+                         .Select(item => item.Key)
+                         .ToList())
+            {
                 _sessions.Remove(token);
             }
+        }
+
+        var globalOverflow = _sessions.Count - GlobalSessionCapacity;
+        if (globalOverflow <= 0)
+        {
+            return;
+        }
+
+        foreach (var token in _sessions
+                     .OrderBy(item => item.Value.CreatedSequence)
+                     .ThenBy(item => item.Key, StringComparer.Ordinal)
+                     .Take(globalOverflow)
+                     .Select(item => item.Key)
+                     .ToList())
+        {
+            _sessions.Remove(token);
         }
     }
 
@@ -527,5 +621,9 @@ public class AuthService : IAuthService
         public bool IsLockedAt(DateTime utcNow) => LockedUntilUtc > utcNow;
     }
 
-    private sealed record SessionRecord(UserSession Session, string PasswordFingerprint);
+    private sealed record SessionRecord(
+        UserSession Session,
+        string PasswordFingerprint,
+        long CreatedSequence,
+        DateTime LastValidatedAtUtc);
 }

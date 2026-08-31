@@ -35,6 +35,9 @@ public sealed class HandEyeCalibrationOperatorTests
         var outputData = result.OutputData!;
         outputData["CalibrationQuality"].Should().Be("good");
         outputData["HtmlReport"].Should().BeOfType<string>().Which.Should().Contain("Hand-Eye Calibration Validation Report");
+        CalibrationAssetCandidateAssertions.ShouldMatchGovernedSavePayload(
+            outputData,
+            "hand-eye-calibration-asset");
     }
 
     [Fact]
@@ -165,6 +168,7 @@ public sealed class HandEyeCalibrationOperatorTests
         op.AddParameter(TestHelpers.CreateParameter("Method", "TSAI", "string"));
         op.AddParameter(TestHelpers.CreateParameter("CameraMatrix", string.Empty, "string"));
         op.AddParameter(TestHelpers.CreateParameter("DistortionCoeffs", string.Empty, "string"));
+        op.AddParameter(TestHelpers.CreateParameter("CalibrationAssetId", "hand-eye-calibration-asset", "string"));
         return op;
     }
 

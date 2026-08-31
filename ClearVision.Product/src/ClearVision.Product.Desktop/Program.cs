@@ -268,6 +268,7 @@ static class Program
 
         builder.Services.AddAiFlowGeneration(builder.Configuration);
         builder.Services.AddVisionServices(builder.Configuration);
+        builder.Services.AddSingleton<AutoTuneExecutionGate>();
         builder.Services.AddOpenTelemetry()
             .ConfigureResource(resource => resource
                 .AddService(

@@ -54,6 +54,9 @@ public class CameraCalibrationOperatorTests
         root.GetProperty("schemaVersion").GetInt32().Should().Be(2);
         root.GetProperty("transformModel").GetString().Should().Be("preview");
         root.GetProperty("quality").GetProperty("accepted").GetBoolean().Should().BeFalse();
+        CalibrationAssetCandidateAssertions.ShouldMatchGovernedSavePayload(
+            result.OutputData!,
+            "camera-calibration-asset");
     }
 
     [Fact]
@@ -78,7 +81,10 @@ public class CameraCalibrationOperatorTests
             Convert.ToDouble(result.OutputData["MaxReprojectionError"]).Should().BeLessThanOrEqualTo(0.60);
             Convert.ToInt32(result.OutputData["ImageCount"]).Should().BeGreaterOrEqualTo(12);
             Assert.IsType<double[]>(result.OutputData["PerViewErrors"]).Length.Should().BeGreaterOrEqualTo(12);
-            File.Exists(outputPath).Should().BeTrue();
+            File.Exists(outputPath).Should().BeFalse("calibration operators must not persist raw client paths");
+            CalibrationAssetCandidateAssertions.ShouldMatchGovernedSavePayload(
+                result.OutputData!,
+                "camera-calibration-asset");
 
             var calibrationJson = result.OutputData["CalibrationData"].ToString();
             calibrationJson.Should().NotBeNullOrWhiteSpace();
@@ -111,6 +117,7 @@ public class CameraCalibrationOperatorTests
         op.AddParameter(TestHelpers.CreateParameter("BoardHeight", "BoardHeight", "int", 6, 2, 30, true));
         op.AddParameter(TestHelpers.CreateParameter("SquareSize", "SquareSize", "double", 25.0, 0.1, 1000.0, true));
         op.AddParameter(TestHelpers.CreateParameter("Mode", "SingleImage", "string"));
+        op.AddParameter(TestHelpers.CreateParameter("CalibrationAssetId", "camera-calibration-asset", "string"));
         return op;
     }
 
@@ -123,6 +130,8 @@ public class CameraCalibrationOperatorTests
         op.AddParameter(TestHelpers.CreateParameter("SquareSize", 25.0, "double"));
         op.AddParameter(TestHelpers.CreateParameter("Mode", "FolderCalibration", "string"));
         op.AddParameter(TestHelpers.CreateParameter("ImageFolder", folder, "string"));
+        op.AddParameter(TestHelpers.CreateParameter("CalibrationAssetId", "camera-calibration-asset", "string"));
+        // Legacy persisted flows may still contain this parameter; the operator must ignore it.
         op.AddParameter(TestHelpers.CreateParameter("CalibrationOutputPath", outputPath, "string"));
         return op;
     }

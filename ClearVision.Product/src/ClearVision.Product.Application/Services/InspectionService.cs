@@ -190,12 +190,28 @@ public class InspectionService : IInspectionService
         OperatorFlow? flow,
         CancellationToken cancellationToken = default)
     {
+        return await ExecuteSingleAsync(
+            projectId,
+            imageData,
+            flow,
+            ExecutionRequestAuthority.InternalSystem,
+            cancellationToken);
+    }
+
+    public async Task<InspectionResult> ExecuteSingleAsync(
+        Guid projectId,
+        byte[] imageData,
+        OperatorFlow? flow,
+        ExecutionRequestAuthority authority,
+        CancellationToken cancellationToken = default)
+    {
         var (snapshot, globalVariables) = await ResolveExecutionFlowAsync(
             projectId,
             flow,
             HasExecutableFlow(flow)
                 ? ExecutionAdmissionSurface.StudioInspectionRun
                 : ExecutionAdmissionSurface.StoredProjectExecution,
+            authority,
             cancellationToken);
         return await ExecuteSingleWithCoordinatorAsync(
             snapshot,
@@ -328,18 +344,36 @@ public class InspectionService : IInspectionService
         OperatorFlow? flow,
         CancellationToken cancellationToken = default)
     {
+        return await ExecuteSingleAsync(
+            projectId,
+            cameraId,
+            flow,
+            ExecutionRequestAuthority.InternalSystem,
+            cancellationToken);
+    }
+
+    public async Task<InspectionResult> ExecuteSingleAsync(
+        Guid projectId,
+        string cameraId,
+        OperatorFlow? flow,
+        ExecutionRequestAuthority authority,
+        CancellationToken cancellationToken = default)
+    {
+        var cameraBindingId = RequireCameraBinding(cameraId);
         var (snapshot, globalVariables) = await ResolveExecutionFlowAsync(
             projectId,
             flow,
             HasExecutableFlow(flow)
                 ? ExecutionAdmissionSurface.StudioInspectionRun
                 : ExecutionAdmissionSurface.StoredProjectExecution,
-            cancellationToken);
+            authority,
+            cancellationToken,
+            cameraBindingId);
         return await ExecuteSingleWithCoordinatorAsync(
             snapshot,
             sessionId => ExecuteSingleFromCameraCoreAsync(
                 projectId,
-                cameraId,
+                cameraBindingId,
                 snapshot,
                 globalVariables,
                 sessionId,
@@ -360,12 +394,30 @@ public class InspectionService : IInspectionService
         CancellationToken cancellationToken,
         Action<InspectionResult>? onResultReady = null)
     {
+        await StartRealtimeInspectionAsync(
+            projectId,
+            cameraId,
+            ExecutionRequestAuthority.InternalSystem,
+            cancellationToken,
+            onResultReady);
+    }
+
+    public async Task StartRealtimeInspectionAsync(
+        Guid projectId,
+        string? cameraId,
+        ExecutionRequestAuthority authority,
+        CancellationToken cancellationToken,
+        Action<InspectionResult>? onResultReady = null)
+    {
+        var cameraBindingId = string.IsNullOrWhiteSpace(cameraId) ? null : RequireCameraBinding(cameraId);
         var (snapshot, _) = await ResolveExecutionFlowAsync(
             projectId,
             flow: null,
             ExecutionAdmissionSurface.StoredProjectExecution,
-            cancellationToken);
-        await StartRealtimeInspectionFlowCoreAsync(snapshot, cameraId, cancellationToken, onResultReady);
+            authority,
+            cancellationToken,
+            cameraBindingId);
+        await StartRealtimeInspectionFlowCoreAsync(snapshot, cancellationToken, onResultReady);
     }
 
     /// <summary>
@@ -380,32 +432,51 @@ public class InspectionService : IInspectionService
         CancellationToken cancellationToken,
         Action<InspectionResult>? onResultReady = null)
     {
-        // 检测页“运行流程”（连续/实时）属于正式运行：允许流程声明的真实 I/O，
-        // 仅保留项目存在/激活等非 I/O 安全校验（运行中防并发由 Coordinator 负责）。
+        await StartRealtimeInspectionFlowAsync(
+            projectId,
+            flow,
+            cameraId,
+            ExecutionRequestAuthority.InternalSystem,
+            cancellationToken,
+            onResultReady);
+    }
+
+    public async Task StartRealtimeInspectionFlowAsync(
+        Guid projectId,
+        OperatorFlow flow,
+        string? cameraId,
+        ExecutionRequestAuthority authority,
+        CancellationToken cancellationToken,
+        Action<InspectionResult>? onResultReady = null)
+    {
+        var cameraBindingId = string.IsNullOrWhiteSpace(cameraId) ? null : RequireCameraBinding(cameraId);
         var (snapshot, _) = await ResolveExecutionFlowAsync(
             projectId,
             flow,
             ExecutionAdmissionSurface.StudioInspectionRun,
-            cancellationToken);
+            authority,
+            cancellationToken,
+            cameraBindingId);
         await StartRealtimeInspectionFlowCoreAsync(
             snapshot,
-            cameraId,
             cancellationToken,
             onResultReady);
     }
 
     private async Task StartRealtimeInspectionFlowCoreAsync(
         ExecutionSnapshot snapshot,
-        string? cameraId,
         CancellationToken cancellationToken,
         Action<InspectionResult>? onResultReady = null)
     {
         var projectId = snapshot.ProjectId;
-        var flow = snapshot.CreateExecutionFlow();
-        var sessionId = Guid.NewGuid();
-        var effectiveCameraId = ImageAcquisitionFlowAnalyzer.ShouldBypassExternalCameraInput(flow)
-            ? null
-            : cameraId;
+        var sessionId = snapshot.SessionId;
+        var effectiveCameraId = ResolveAuthoritativeExternalCameraBinding(snapshot);
+
+        if (effectiveCameraId != null)
+        {
+            ThrowIfSnapshotValidationRejected(
+                await _flowExecutionService.ValidateSnapshotAsync(snapshot, cancellationToken));
+        }
 
         _logger.LogInformation(
             "[InspectionService] 请求启动实时检测: ProjectId={ProjectId}, SessionId={SessionId}, CameraId={CameraId}",
@@ -717,7 +788,7 @@ public class InspectionService : IInspectionService
         CancellationToken cancellationToken)
     {
         var projectId = snapshot.ProjectId;
-        var sessionId = Guid.NewGuid();
+        var sessionId = snapshot.SessionId;
         var startResult = await _coordinator.TryStartAsync(snapshot, sessionId, cancellationToken);
         if (startResult != StartResult.Success)
         {
@@ -759,6 +830,7 @@ public class InspectionService : IInspectionService
             HasExecutableFlow(flow)
                 ? ExecutionAdmissionSurface.StudioInspectionRun
                 : ExecutionAdmissionSurface.StoredProjectExecution,
+            ExecutionRequestAuthority.InternalSystem,
             cancellationToken);
 
         return await ExecuteSingleResolvedCoreAsync(
@@ -912,7 +984,25 @@ public class InspectionService : IInspectionService
             }
 
             cancellationToken.ThrowIfCancellationRequested();
-            imageDto = await _imageAcquisitionService.AcquireFromCameraAsync(cameraId, cancellationToken);
+            var access = _projectSaveCoordinator == null
+                ? null
+                : await _projectSaveCoordinator.AcquireProjectAccessAsync(projectId, cancellationToken);
+            await using (access)
+            {
+                ThrowIfSnapshotValidationRejected(
+                    await _flowExecutionService.ValidateSnapshotAsync(snapshot, cancellationToken));
+                var authoritativeCameraBindingId = ResolveAuthoritativeExternalCameraBinding(snapshot);
+                if (!string.Equals(authoritativeCameraBindingId, cameraId, StringComparison.OrdinalIgnoreCase))
+                {
+                    ThrowIfAdmissionRejected(ExecutionAdmissionResult.Reject(
+                        "ADMISSION_EXTERNAL_CAMERA_BINDING_MISMATCH",
+                        "The requested camera does not match the immutable execution snapshot."));
+                }
+
+                imageDto = await _imageAcquisitionService.AcquireFromCameraAsync(
+                    authoritativeCameraBindingId!,
+                    cancellationToken);
+            }
 
             if (string.IsNullOrEmpty(imageDto.DataBase64))
             {
@@ -965,8 +1055,11 @@ public class InspectionService : IInspectionService
         Guid projectId,
         OperatorFlow? flow,
         ExecutionAdmissionSurface surface,
-        CancellationToken cancellationToken = default)
+        ExecutionRequestAuthority authority,
+        CancellationToken cancellationToken = default,
+        string? externalCameraBindingId = null)
     {
+        ArgumentNullException.ThrowIfNull(authority);
         var access = _projectSaveCoordinator == null
             ? null
             : await _projectSaveCoordinator.AcquireProjectAccessAsync(projectId, cancellationToken);
@@ -976,15 +1069,51 @@ public class InspectionService : IInspectionService
             {
                 var draftProject = await _projectRepository.GetByIdFreshAsync(projectId)
                     ?? throw new ProjectNotFoundException(projectId);
+                if (draftProject.IsDeleted)
+                {
+                    throw new ProjectNotFoundException(projectId);
+                }
+                if (authority.ExpectedProjectRevision is null ||
+                    authority.ExpectedProjectRevision.Value != draftProject.PersistenceRevision)
+                {
+                    ThrowIfAdmissionRejected(ExecutionAdmissionResult.Reject(
+                        "ADMISSION_DRAFT_REVISION_REQUIRED",
+                        $"Draft expected revision '{authority.ExpectedProjectRevision?.ToString() ?? "missing"}' does not match project revision '{draftProject.PersistenceRevision}'."));
+                }
+
                 var admittedFlow = AdmitExecutionFlow(flow!, "inspection.inline");
+                var flowHash = ExecutionFlowIdentity.ComputeFlowHash(admittedFlow);
+                var authoritativeCameraBindingId = ResolveExternalCameraBindingForFlow(
+                    admittedFlow,
+                    externalCameraBindingId);
+                var externalCapabilities = authoritativeCameraBindingId == null
+                    ? ExecutionSideEffect.None
+                    : ExecutionSideEffect.DeviceRead;
+                var resourceBindings = ExecutionResourceBindingManifest.Build(
+                    admittedFlow,
+                    "Draft",
+                    new Dictionary<string, string>
+                    {
+                        ["ProjectRevision"] = draftProject.PersistenceRevision.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                        ["FlowHash"] = flowHash
+                    },
+                    authoritativeCameraBindingId == null
+                        ? null
+                        : new ExecutionExternalResourceManifest(authoritativeCameraBindingId));
                 var snapshot = new ExecutionSnapshot(
                     projectId,
                     admittedFlow,
                     draftProject.PersistenceRevision,
                     ExecutionSnapshotSource.Draft,
                     ExecutionRunMode.FormalPrimary,
-                    new Dictionary<string, string> { ["ProjectRevision"] = draftProject.PersistenceRevision.ToString(System.Globalization.CultureInfo.InvariantCulture) },
-                    globalVariables: draftProject.GlobalVariables);
+                    resourceBindings,
+                    globalVariables: draftProject.GlobalVariables,
+                    principal: authority.Principal,
+                    capabilityManifest: authority.CapabilityManifest,
+                    expectedProjectRevision: authority.ExpectedProjectRevision,
+                    confirmationId: authority.ConfirmationId,
+                    auditId: authority.AuditId,
+                    externalCapabilities: externalCapabilities);
                 ThrowIfAdmissionRejected(_executionAdmissionService.ValidateSnapshot(snapshot, surface));
                 _logger.LogInformation(
                     "[InspectionService] 使用前端提供的流程数据执行检测 (算子数: {OperatorCount})",
@@ -993,7 +1122,7 @@ public class InspectionService : IInspectionService
             }
 
             var project = await _projectRepository.GetWithFlowAsync(projectId);
-            if (project == null)
+            if (project is not { IsDeleted: false })
             {
                 throw new ProjectNotFoundException(projectId);
             }
@@ -1004,14 +1133,35 @@ public class InspectionService : IInspectionService
             if (HasExecutableFlow(project.Flow))
             {
                 var admittedFlow = AdmitExecutionFlow(project.Flow, "inspection.persisted");
+                var authoritativeCameraBindingId = ResolveExternalCameraBindingForFlow(
+                    admittedFlow,
+                    externalCameraBindingId);
+                var externalCapabilities = authoritativeCameraBindingId == null
+                    ? ExecutionSideEffect.None
+                    : ExecutionSideEffect.DeviceRead;
+                var resourceBindings = ExecutionResourceBindingManifest.Build(
+                    admittedFlow,
+                    "StoredProject",
+                    new Dictionary<string, string>
+                    {
+                        ["ProjectRevision"] = project.PersistenceRevision.ToString(System.Globalization.CultureInfo.InvariantCulture)
+                    },
+                    authoritativeCameraBindingId == null
+                        ? null
+                        : new ExecutionExternalResourceManifest(authoritativeCameraBindingId));
                 var snapshot = new ExecutionSnapshot(
                     projectId,
                     admittedFlow,
                     project.PersistenceRevision,
                     ExecutionSnapshotSource.PersistedProject,
                     ExecutionRunMode.FormalPrimary,
-                    new Dictionary<string, string> { ["ProjectRevision"] = project.PersistenceRevision.ToString(System.Globalization.CultureInfo.InvariantCulture) },
-                    globalVariables: project.GlobalVariables);
+                    resourceBindings,
+                    globalVariables: project.GlobalVariables,
+                    principal: authority.Principal,
+                    capabilityManifest: new ExecutionCapabilityManifest(
+                        ExecutionCapabilityManifest.Derive(admittedFlow).Capabilities | externalCapabilities,
+                        isExplicit: false),
+                    externalCapabilities: externalCapabilities);
                 ThrowIfAdmissionRejected(_executionAdmissionService.ValidateSnapshot(snapshot, surface));
                 return (snapshot, snapshot.CreateGlobalVariables());
             }
@@ -1034,6 +1184,65 @@ public class InspectionService : IInspectionService
 
             throw new InvalidOperationException($"Project {projectId} does not contain an executable flow.");
         }
+    }
+
+    private string RequireCameraBinding(string cameraBindingId)
+    {
+        if (string.IsNullOrWhiteSpace(cameraBindingId))
+        {
+            ThrowIfAdmissionRejected(ExecutionAdmissionResult.Reject(
+                "ADMISSION_CAMERA_BINDING_REQUIRED",
+                "A configured camera binding id is required."));
+        }
+
+        var normalized = cameraBindingId.Trim();
+        var config = _configurationService.GetCurrent();
+        var binding = config.Cameras.FirstOrDefault(item =>
+            item.IsEnabled && string.Equals(item.Id, normalized, StringComparison.OrdinalIgnoreCase));
+        if (binding == null || string.IsNullOrWhiteSpace(binding.SerialNumber))
+        {
+            ThrowIfAdmissionRejected(ExecutionAdmissionResult.Reject(
+                "ADMISSION_CAMERA_BINDING_NOT_FOUND",
+                $"Camera binding '{normalized}' is missing, disabled, or invalid."));
+        }
+
+        return binding.Id;
+    }
+
+    private static string? ResolveExternalCameraBindingForFlow(
+        OperatorFlow flow,
+        string? cameraBindingId) =>
+        string.IsNullOrWhiteSpace(cameraBindingId) ||
+        ImageAcquisitionFlowAnalyzer.ShouldBypassExternalCameraInput(flow)
+            ? null
+            : cameraBindingId.Trim();
+
+    private static string? ResolveAuthoritativeExternalCameraBinding(ExecutionSnapshot snapshot)
+    {
+        if (!snapshot.ExternalCapabilities.HasFlag(ExecutionSideEffect.DeviceRead))
+        {
+            return null;
+        }
+
+        return snapshot.ResourceBindings.TryGetValue("CameraBindingId", out var cameraBindingId) &&
+               !string.IsNullOrWhiteSpace(cameraBindingId)
+            ? cameraBindingId.Trim()
+            : null;
+    }
+
+    private static void ThrowIfSnapshotValidationRejected(FlowValidationResult validation)
+    {
+        if (validation.IsValid)
+        {
+            return;
+        }
+
+        throw new ExecutionAdmissionService.ExecutionAdmissionRejectedException(
+            ExecutionAdmissionResult.Reject(
+                "ADMISSION_EXECUTION_SNAPSHOT_INVALID",
+                validation.Errors.Count == 0
+                    ? "Execution snapshot validation failed."
+                    : string.Join("; ", validation.Errors)));
     }
 
     private OperatorFlow AdmitExecutionFlow(OperatorFlow flow, string source)

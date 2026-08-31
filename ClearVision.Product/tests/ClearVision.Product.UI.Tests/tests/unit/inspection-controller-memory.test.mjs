@@ -48,6 +48,9 @@ const { default: httpClient } = await import(
 const { default: webMessageBridge } = await import(
   '../../../../src/ClearVision.Product.Desktop/wwwroot/src/core/messaging/webMessageBridge.js'
 );
+const { getCurrentProject, setCurrentProject } = await import(
+  '../../../../src/ClearVision.Product.Desktop/wwwroot/src/features/project/projectManager.js'
+);
 
 const INSPECTION_WEB_MESSAGE_TYPES = [
   'operatorExecuted',
@@ -149,6 +152,7 @@ test('executeSingle encodes large Uint8Array images without expanding the whole 
   const originalProjectId = inspectionController.projectId;
   const originalCameraId = inspectionController.cameraId;
   const originalFlowProvider = inspectionController.flowProvider;
+  const originalCurrentProject = getCurrentProject();
   const originalBuffer = globalThis.Buffer;
   const originalBtoa = globalThis.btoa;
   const payloadBytes = new Uint8Array(150_000);
@@ -164,6 +168,7 @@ test('executeSingle encodes large Uint8Array images without expanding the whole 
     inspectionController.projectId = originalProjectId;
     inspectionController.cameraId = originalCameraId;
     inspectionController.flowProvider = originalFlowProvider;
+    setCurrentProject(originalCurrentProject);
     globalThis.Buffer = originalBuffer;
     globalThis.btoa = originalBtoa;
   });
@@ -186,6 +191,7 @@ test('executeSingle encodes large Uint8Array images without expanding the whole 
     };
   };
 
+  setCurrentProject({ id: 'project-current', persistenceRevision: 0 });
   inspectionController.setProject('project-current');
   inspectionController.setCamera(null);
   inspectionController.setFlowProvider(() => ({ operators: [], connections: [] }));
@@ -194,6 +200,8 @@ test('executeSingle encodes large Uint8Array images without expanding the whole 
 
   assert.equal(result.status, 'OK');
   assert.equal(capturedRequest.projectId, 'project-current');
+  assert.equal(capturedRequest.expectedProjectRevision, 0);
+  assert.deepEqual(capturedRequest.capabilityManifest, []);
   assert.deepEqual(capturedRequest.flowData, { operators: [], connections: [] });
   assert.equal(capturedRequest.imageBase64, originalBuffer.from(payloadBytes).toString('base64'));
 });

@@ -68,6 +68,8 @@ public sealed class DryRunProjectVariableTests
     {
         var flow = new OperatorFlow("dryrun-legacy");
         var flowExecution = Substitute.For<IFlowExecutionService>();
+        flowExecution.ValidateSnapshot(Arg.Any<ExecutionSnapshot>())
+            .Returns(new FlowValidationResult { IsValid = true });
         flowExecution.ExecuteWithSnapshotAsync(
                 Arg.Any<ExecutionSnapshot>(),
                 Arg.Any<Dictionary<string, object>?>(),
@@ -86,6 +88,21 @@ public sealed class DryRunProjectVariableTests
             new DryRunStubRegistry());
 
         result.IsSuccess.Should().BeTrue();
+        flowExecution.Received(1).ValidateSnapshot(Arg.Is<ExecutionSnapshot>(snapshot =>
+            snapshot.Source == ExecutionSnapshotSource.Draft &&
+            snapshot.RunMode == ExecutionRunMode.Preview &&
+            snapshot.ProjectId != Guid.Empty &&
+            snapshot.PersistenceRevision == 0 &&
+            snapshot.ExpectedProjectRevision == 0 &&
+            snapshot.Principal.IsAuthenticated &&
+            snapshot.Principal.IsEngineerOrAdmin &&
+            !snapshot.Principal.IsSystem &&
+            snapshot.CapabilityManifest.IsExplicit &&
+            !string.IsNullOrWhiteSpace(snapshot.ConfirmationId) &&
+            !string.IsNullOrWhiteSpace(snapshot.AuditId) &&
+            snapshot.ConfirmationId != snapshot.AuditId &&
+            snapshot.ResourceBindings["ProjectRevision"] == "0" &&
+            snapshot.ResourceBindings["FlowHash"] == snapshot.FlowHash));
         await flowExecution.Received(1).ExecuteWithSnapshotAsync(
             Arg.Is<ExecutionSnapshot>(snapshot => snapshot.FlowHash == ExecutionFlowIdentity.ComputeFlowHash(flow)),
             Arg.Any<Dictionary<string, object>?>(),

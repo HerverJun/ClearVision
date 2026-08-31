@@ -138,7 +138,6 @@ public sealed class RuntimeDependencyBoundaryTests
             "src/ClearVision.Product.Core/Services/IFlowExecutionService.cs",
             "src/ClearVision.Product.Infrastructure/Services/FlowExecutionService.cs",
             "src/ClearVision.Product.Infrastructure/Services/GovernedFlowExecutionService.cs",
-            "src/ClearVision.Product.Infrastructure/Operators/ForEachOperator.cs",
             "src/ClearVision.Product.Infrastructure/DependencyInjection/VisionRuntimeServiceCollectionExtensions.cs"
         };
         var legacyCall = new Regex(@"\.ExecuteFlow(?:Debug)?Async\s*\(", RegexOptions.CultureInvariant);
@@ -164,6 +163,65 @@ public sealed class RuntimeDependencyBoundaryTests
     }
 
     [Fact]
+    public void ProductionSource_InstallsExecutionAuthorityOnlyAtGovernedBoundary()
+    {
+        var repoRoot = FindRepoRoot();
+        var sourceRoot = Path.Combine(repoRoot, "src");
+        var allowedFiles = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            "src/ClearVision.Product.Core/Services/ExecutionAuthorityContext.cs",
+            "src/ClearVision.Product.Infrastructure/Services/GovernedFlowExecutionService.cs"
+        };
+        var enterCall = new Regex(@"\bExecutionAuthorityContext\.Enter\s*\(", RegexOptions.CultureInvariant);
+        var hits = Directory.EnumerateFiles(sourceRoot, "*.cs", SearchOption.AllDirectories)
+            .Select(file => new
+            {
+                Relative = Path.GetRelativePath(repoRoot, file).Replace('\\', '/'),
+                Lines = File.ReadAllLines(file)
+            })
+            .Where(item => !allowedFiles.Contains(item.Relative))
+            .SelectMany(item => item.Lines.Select((line, index) => new { item.Relative, Line = line, Index = index + 1 }))
+            .Where(item => enterCall.IsMatch(item.Line))
+            .Select(item => $"{item.Relative}:{item.Index}:{item.Line.Trim()}")
+            .ToList();
+
+        Assert.True(
+            hits.Count == 0,
+            "Execution authority scopes escaped the governed adapter: " + string.Join("; ", hits));
+    }
+
+    [Fact]
+    public void ProductionSource_DoesNotCallLegacyCameraAcquisitionShims()
+    {
+        var repoRoot = FindRepoRoot();
+        var sourceRoot = Path.Combine(repoRoot, "src");
+        var compatibilityBoundaryFiles = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            "src/ClearVision.Product.Core/Cameras/ICamera.cs",
+            "src/ClearVision.Product.Infrastructure/Cameras/CameraManager.cs"
+        };
+        var legacyAcquisition = new Regex(
+            @"\b(?:GetOrCreateByBindingAsync|GetOrCreateCameraAsync|OpenCameraAsync)\s*\(",
+            RegexOptions.CultureInvariant);
+
+        var hits = Directory.EnumerateFiles(sourceRoot, "*.cs", SearchOption.AllDirectories)
+            .Select(file => new
+            {
+                Relative = Path.GetRelativePath(repoRoot, file).Replace('\\', '/'),
+                Lines = File.ReadAllLines(file)
+            })
+            .Where(item => !compatibilityBoundaryFiles.Contains(item.Relative))
+            .SelectMany(item => item.Lines.Select((line, index) => new { item.Relative, Line = line, Index = index + 1 }))
+            .Where(item => legacyAcquisition.IsMatch(item.Line))
+            .Select(item => $"{item.Relative}:{item.Index}:{item.Line.Trim()}")
+            .ToList();
+
+        Assert.True(
+            hits.Count == 0,
+            "Legacy camera acquisition escaped the compatibility boundary: " + string.Join("; ", hits));
+    }
+
+    [Fact]
     public void ProductFacingFlowService_ExposesOnlySnapshotBasedFlowAndDebugExecution()
     {
         var methods = typeof(IFlowExecutionService).GetMethods();
@@ -177,15 +235,14 @@ public sealed class RuntimeDependencyBoundaryTests
     }
 
     [Fact]
-    public void ProductFacingSingleOperatorExecution_RequiresGovernedContext()
+    public void ProductFacingSingleOperatorExecution_RequiresImmutableSnapshot()
     {
         var productMethod = typeof(IFlowExecutionService).GetMethods()
-            .Single(method => method.Name == nameof(IFlowExecutionService.ExecuteOperatorAsync));
+            .Single(method => method.Name == nameof(IFlowExecutionService.ExecuteOperatorWithSnapshotAsync));
         var rawMethod = typeof(IFlowExecutionEngine).GetMethods()
             .Single(method => method.Name == nameof(IFlowExecutionEngine.ExecuteOperatorAsync));
 
-        Assert.Equal(typeof(GovernedOperatorExecutionContext), productMethod.GetParameters()[0].ParameterType);
-        Assert.Equal(typeof(ClearVision.Product.Core.Entities.Operator), productMethod.GetParameters()[1].ParameterType);
+        Assert.Equal(typeof(ExecutionSnapshot), productMethod.GetParameters()[0].ParameterType);
         Assert.Equal(typeof(ClearVision.Product.Core.Entities.Operator), rawMethod.GetParameters()[0].ParameterType);
     }
 

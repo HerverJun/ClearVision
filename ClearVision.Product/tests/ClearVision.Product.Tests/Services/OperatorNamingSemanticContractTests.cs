@@ -41,7 +41,7 @@ public sealed class OperatorNamingSemanticContractTests
         new(OperatorType.CoordinateTransform, typeof(CoordinateTransformOperator), 26, "像素到物理坐标（单点）", "坐标转换", 4, 3, 2, ["Coordinate Transform"]),
         new(OperatorType.RoiManager, typeof(RoiManagerOperator), 42, "ROI裁剪与掩膜", "ROI管理器", 1, 3, 10),
         new(OperatorType.TryCatch, typeof(TryCatchOperator), 83, "Try分支透传", "异常捕获", 1, 4, 3, ["Try-Catch 流程控制"]),
-        new(OperatorType.ModbusCommunication, typeof(ModbusCommunicationOperator), 27, "Modbus TCP通信", "Modbus通信", 1, 2, 9, ["Modbus Communication"]),
+        new(OperatorType.ModbusCommunication, typeof(ModbusCommunicationOperator), 27, "Modbus TCP通信", "Modbus通信", 1, 2, 6, ["Modbus Communication"]),
         new(OperatorType.Thresholding, typeof(ThresholdOperator), 4, "全局阈值处理", "二值化", 1, 1, 4, ["Threshold"]),
         new(OperatorType.FFT1D, typeof(FFT1DOperator), 251, "信号/图像傅里叶变换（FFT）", "一维FFT", 2, 4, 0, ["FFT 1D"]),
         new(OperatorType.InverseFFT1D, typeof(InverseFFT1DOperator), 253, "信号/图像逆傅里叶变换（IFFT）", "一维逆FFT", 2, 4, 0, ["Inverse FFT 1D"]),

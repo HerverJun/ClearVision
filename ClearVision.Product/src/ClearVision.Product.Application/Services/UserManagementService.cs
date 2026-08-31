@@ -17,6 +17,19 @@ public class UserManagementService
     private readonly IUserRepository _userRepository;
     private readonly IPasswordHasher _passwordHasher;
     private readonly IConfigurationService? _configurationService;
+    private readonly IAuthSessionRevocationService? _sessionRevocation;
+
+    public UserManagementService(
+        IUserRepository userRepository,
+        IPasswordHasher passwordHasher,
+        IConfigurationService configurationService,
+        IAuthSessionRevocationService sessionRevocation)
+    {
+        _userRepository = userRepository;
+        _passwordHasher = passwordHasher;
+        _configurationService = configurationService;
+        _sessionRevocation = sessionRevocation;
+    }
 
     public UserManagementService(
         IUserRepository userRepository,
@@ -126,6 +139,11 @@ public class UserManagementService
             request.DisplayName,
             request.Role,
             request.IsActive);
+        if (mutation.Status == UserAuthorityMutationStatus.Success)
+        {
+            _sessionRevocation?.RevokeSessionsForUser(userId.ToString(), "user-authority-updated");
+        }
+
         return MapAuthorityMutation(mutation);
     }
 
@@ -138,6 +156,11 @@ public class UserManagementService
             return UserResult.Fail("无效的用户ID", UserManagementErrorCodes.ValidationError);
 
         var mutation = await _userRepository.TryDeletePreservingActiveAdminAsync(userId);
+        if (mutation.Status == UserAuthorityMutationStatus.Success)
+        {
+            _sessionRevocation?.RevokeSessionsForUser(userId.ToString(), "user-deleted");
+        }
+
         return MapAuthorityMutation(mutation);
     }
 
@@ -162,6 +185,7 @@ public class UserManagementService
         var newHash = _passwordHasher.HashPassword(newPassword);
         user.ChangePassword(newHash);
         await _userRepository.UpdateAsync(user);
+        _sessionRevocation?.RevokeSessionsForUser(userId.ToString(), "password-reset");
 
         return UserResult.Ok(MapToDto(user));
     }

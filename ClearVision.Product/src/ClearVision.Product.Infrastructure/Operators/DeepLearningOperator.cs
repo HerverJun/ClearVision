@@ -208,18 +208,23 @@ public class DeepLearningOperator : OperatorBase
     /// <summary>
     /// 模型缓存 - 避免重复加载
     /// </summary>
-    private static readonly ConcurrentDictionary<string, CachedModelSession> _modelCache = new();
+    private static readonly ConcurrentDictionary<string, CachedModelSession> _modelCache = new(StringComparer.OrdinalIgnoreCase);
+
+    // Test-only race seam. Null in production, so the normal path performs no allocation,
+    // scheduling, or synchronization beyond the single null check.
+    internal static Action<OnnxModelFileIdentity>? InitialModelIdentityObservedForTests { get; set; }
 
     /// <summary>
-    /// 线程锁 - 用于并发加载模型
+    /// Serializes cache replacement. Model loading is rare, while one stable gate prevents a
+    /// second unbounded per-path lock table from being created by model churn.
     /// </summary>
-    private static readonly ConcurrentDictionary<string, SemaphoreSlim> _modelLocks = new();
+    private static readonly SemaphoreSlim _modelCacheLoadLock = new(1, 1);
     private const int DefaultMaxCachedModels = 3;
     private const int DefaultOnnxRuntimeThreadCount = 4;
     private const long DefaultTensorPoolMaxBytes = 256L * 1024 * 1024;
     private const int DefaultNmsCandidateLimit = 10000;
     private static readonly LinkedList<string> _modelAccessOrder = new();
-    private static readonly Dictionary<string, LinkedListNode<string>> _modelAccessNodes = new();
+    private static readonly Dictionary<string, LinkedListNode<string>> _modelAccessNodes = new(StringComparer.OrdinalIgnoreCase);
     private static readonly object _modelCacheEvictionLock = new();
     private static readonly ConcurrentDictionary<int, int[]> _inputTensorDimensions = new();
 
@@ -1336,96 +1341,107 @@ public class DeepLearningOperator : OperatorBase
         int gpuDeviceId = 0,
         CancellationToken cancellationToken = default)
     {
-        var cacheKey = $"{modelPath}_gpu_{useGpu}_{gpuDeviceId}";
-        if (_modelCache.TryGetValue(cacheKey, out var cachedSessionEntry))
-        {
-            if (cachedSessionEntry.TryAcquire(out var cachedLease))
-            {
-                TouchModelCacheKey(cacheKey);
-                return cachedLease;
-            }
-
-            _modelCache.TryRemove(new KeyValuePair<string, CachedModelSession>(cacheKey, cachedSessionEntry));
-        }
-
-        var lockObj = _modelLocks.GetOrAdd(cacheKey, _ => new SemaphoreSlim(1, 1));
-
-        var lockAcquired = false;
         try
         {
-            await lockObj.WaitAsync(cancellationToken).ConfigureAwait(false);
-            lockAcquired = true;
+            var observedIdentity = OnnxModelFileIdentity.Capture(modelPath);
+            InitialModelIdentityObservedForTests?.Invoke(observedIdentity);
 
-            if (_modelCache.TryGetValue(cacheKey, out cachedSessionEntry))
+            await _modelCacheLoadLock.WaitAsync(cancellationToken).ConfigureAwait(false);
+            try
             {
-                if (cachedSessionEntry.TryAcquire(out var cachedLease))
+                // Re-hash after entering the replacement gate. Returning the initially observed
+                // cache key would let a same-path replacement race hand a new lease the retired
+                // session. Cache hits are therefore decided only from this lock-protected
+                // observation.
+                var currentIdentity = OnnxModelFileIdentity.Capture(observedIdentity.CanonicalPath);
+                var variantPrefix = BuildModelVariantPrefix(currentIdentity.CanonicalPath, useGpu, gpuDeviceId);
+                var cacheKey = BuildModelCacheKey(variantPrefix, currentIdentity.ContentSha256);
+
+                if (TryAcquireCachedModel(cacheKey, out var cachedLease))
                 {
-                    TouchModelCacheKey(cacheKey);
                     return cachedLease;
                 }
 
-                _modelCache.TryRemove(new KeyValuePair<string, CachedModelSession>(cacheKey, cachedSessionEntry));
-            }
-
-            var sessionOptions = new SessionOptions
-            {
-                InterOpNumThreads = RuntimeOptions.InterOpThreads,
-                IntraOpNumThreads = RuntimeOptions.IntraOpThreads,
-                GraphOptimizationLevel = GraphOptimizationLevel.ORT_ENABLE_ALL
-            };
-
-            var activeExecutionProvider = "CPU";
-
-            if (useGpu && GpuAvailabilityChecker.IsCudaAvailable)
-            {
-                if (TryAppendTensorRtExecutionProvider(sessionOptions, gpuDeviceId, out var tensorRtFailureReason))
+                // Load from one exact byte snapshot and re-check the resulting key. The file may
+                // have changed between the lock-protected hash and this snapshot.
+                var snapshot = OnnxModelFileIdentity.CaptureSnapshot(currentIdentity.CanonicalPath);
+                variantPrefix = BuildModelVariantPrefix(snapshot.Identity.CanonicalPath, useGpu, gpuDeviceId);
+                cacheKey = BuildModelCacheKey(variantPrefix, snapshot.Identity.ContentSha256);
+                if (TryAcquireCachedModel(cacheKey, out cachedLease))
                 {
-                    activeExecutionProvider = "TensorRT";
-                    Logger.LogInformation("[DeepLearning] TensorRT execution provider enabled, device ID: {DeviceId}", gpuDeviceId);
+                    return cachedLease;
+                }
+
+                var sessionOptions = new SessionOptions
+                {
+                    InterOpNumThreads = RuntimeOptions.InterOpThreads,
+                    IntraOpNumThreads = RuntimeOptions.IntraOpThreads,
+                    GraphOptimizationLevel = GraphOptimizationLevel.ORT_ENABLE_ALL
+                };
+
+                var activeExecutionProvider = "CPU";
+
+                if (useGpu && GpuAvailabilityChecker.IsCudaAvailable)
+                {
+                    if (TryAppendTensorRtExecutionProvider(sessionOptions, gpuDeviceId, out var tensorRtFailureReason))
+                    {
+                        activeExecutionProvider = "TensorRT";
+                        Logger.LogInformation("[DeepLearning] TensorRT execution provider enabled, device ID: {DeviceId}", gpuDeviceId);
+                    }
+                    else
+                    {
+                        if (GpuAvailabilityChecker.IsTensorRtAvailable)
+                        {
+                            Logger.LogWarning(
+                                "[DeepLearning] TensorRT detected but not enabled. Falling back to CUDA. Reason: {Reason}",
+                                tensorRtFailureReason);
+                        }
+
+                        try
+                        {
+                            sessionOptions.AppendExecutionProvider_CUDA(gpuDeviceId);
+                            activeExecutionProvider = "CUDA";
+                            Logger.LogInformation("[DeepLearning] CUDA execution provider enabled, device ID: {DeviceId}", gpuDeviceId);
+                        }
+                        catch (Exception ex)
+                        {
+                            Logger.LogWarning(ex, "[DeepLearning] GPU execution provider enable failed, falling back to CPU");
+                        }
+                    }
                 }
                 else
                 {
-                    if (GpuAvailabilityChecker.IsTensorRtAvailable)
-                    {
-                        Logger.LogWarning(
-                            "[DeepLearning] TensorRT detected but not enabled. Falling back to CUDA. Reason: {Reason}",
-                            tensorRtFailureReason);
-                    }
-
-                    try
-                    {
-                        sessionOptions.AppendExecutionProvider_CUDA(gpuDeviceId);
-                        activeExecutionProvider = "CUDA";
-                        Logger.LogInformation("[DeepLearning] CUDA execution provider enabled, device ID: {DeviceId}", gpuDeviceId);
-                    }
-                    catch (Exception ex)
-                    {
-                        Logger.LogWarning(ex, "[DeepLearning] GPU execution provider enable failed, falling back to CPU");
-                    }
+                    Logger.LogInformation("[DeepLearning] Using CPU execution provider");
                 }
+
+                // Construct from the bytes that were hashed so the cache identity and the loaded
+                // graph cannot diverge through a same-path replacement race.
+                var session = new InferenceSession(snapshot.Content, sessionOptions);
+                var cacheEntry = new CachedModelSession(session);
+
+                lock (_modelCacheEvictionLock)
+                {
+                    RetireSupersededModelVersions(variantPrefix, cacheKey);
+                    EvictModelsIfNeeded();
+                    _modelCache[cacheKey] = cacheEntry;
+                    TouchModelCacheKey(cacheKey);
+                }
+
+                Logger.LogDebug(
+                    "[DeepLearning] Model version {ModelSha256} loaded successfully with execution provider: {ExecutionProvider}",
+                    snapshot.Identity.ContentSha256,
+                    activeExecutionProvider);
+                if (!cacheEntry.TryAcquire(out var createdLease))
+                {
+                    throw new InvalidOperationException("Newly created model session could not be acquired.");
+                }
+
+                return createdLease;
             }
-            else
+            finally
             {
-                Logger.LogInformation("[DeepLearning] Using CPU execution provider");
+                _modelCacheLoadLock.Release();
             }
-
-            var session = new InferenceSession(modelPath, sessionOptions);
-            var cacheEntry = new CachedModelSession(session);
-
-            lock (_modelCacheEvictionLock)
-            {
-                EvictModelsIfNeeded();
-                _modelCache[cacheKey] = cacheEntry;
-                TouchModelCacheKey(cacheKey);
-            }
-
-            Logger.LogDebug("[DeepLearning] Model loaded successfully with execution provider: {ExecutionProvider}", activeExecutionProvider);
-            if (!cacheEntry.TryAcquire(out var createdLease))
-            {
-                throw new InvalidOperationException("Newly created model session could not be acquired.");
-            }
-
-            return createdLease;
         }
         catch (OperationCanceledException)
         {
@@ -1436,14 +1452,41 @@ public class DeepLearningOperator : OperatorBase
             Logger.LogError(ex, "[DeepLearning] Failed to load model with verified execution provider");
             return null;
         }
-        finally
+    }
+
+    private bool TryAcquireCachedModel(
+        string cacheKey,
+        [NotNullWhen(true)] out CachedModelSession.ModelSessionLease? lease)
+    {
+        lease = null;
+        if (!_modelCache.TryGetValue(cacheKey, out var cachedSessionEntry))
         {
-            if (lockAcquired)
+            return false;
+        }
+
+        if (cachedSessionEntry.TryAcquire(out lease))
+        {
+            TouchModelCacheKey(cacheKey);
+            return true;
+        }
+
+        lock (_modelCacheEvictionLock)
+        {
+            if (_modelCache.TryRemove(new KeyValuePair<string, CachedModelSession>(cacheKey, cachedSessionEntry)))
             {
-                lockObj.Release();
+                RemoveModelAccessNode(cacheKey);
             }
         }
+
+        lease = null;
+        return false;
     }
+
+    private static string BuildModelVariantPrefix(string canonicalPath, bool useGpu, int gpuDeviceId) =>
+        $"{canonicalPath}|gpu:{useGpu}|device:{gpuDeviceId}|";
+
+    private static string BuildModelCacheKey(string variantPrefix, string contentSha256) =>
+        $"{variantPrefix}sha256:{contentSha256}";
 
     private bool TryAppendTensorRtExecutionProvider(SessionOptions sessionOptions, int gpuDeviceId, out string failureReason)
     {
@@ -1516,7 +1559,8 @@ public class DeepLearningOperator : OperatorBase
         if (string.IsNullOrWhiteSpace(modelPath))
             return;
 
-        var keyPrefix = $"{modelPath}_gpu_";
+        var canonicalPath = new FileInfo(Path.GetFullPath(modelPath)).FullName;
+        var keyPrefix = $"{canonicalPath}|gpu:";
         var keysToRemove = _modelCache.Keys
             .Where(k => k.StartsWith(keyPrefix, StringComparison.OrdinalIgnoreCase))
             .ToList();
@@ -1530,7 +1574,6 @@ public class DeepLearningOperator : OperatorBase
                     session.MarkForDisposal();
                 }
 
-                _modelLocks.TryRemove(key, out _);
                 RemoveModelAccessNode(key);
             }
         }
@@ -1540,6 +1583,11 @@ public class DeepLearningOperator : OperatorBase
     {
         lock (_modelCacheEvictionLock)
         {
+            if (!_modelCache.ContainsKey(cacheKey))
+            {
+                return;
+            }
+
             RemoveModelAccessNode(cacheKey);
             _modelAccessNodes[cacheKey] = _modelAccessOrder.AddLast(cacheKey);
         }
@@ -1557,8 +1605,25 @@ public class DeepLearningOperator : OperatorBase
                 oldSession.MarkForDisposal();
                 Logger.LogInformation("[DeepLearning] 驱逐模型缓存: {Key}", oldestKey);
             }
+        }
+    }
 
-            _modelLocks.TryRemove(oldestKey, out _);
+    private static void RetireSupersededModelVersions(string variantPrefix, string protectedKey)
+    {
+        var supersededKeys = _modelCache.Keys
+            .Where(key =>
+                key.StartsWith(variantPrefix, StringComparison.OrdinalIgnoreCase) &&
+                !key.Equals(protectedKey, StringComparison.OrdinalIgnoreCase))
+            .ToArray();
+
+        foreach (var key in supersededKeys)
+        {
+            if (_modelCache.TryRemove(key, out var superseded))
+            {
+                superseded.MarkForDisposal();
+            }
+
+            RemoveModelAccessNode(key);
         }
     }
 

@@ -374,6 +374,7 @@ public class OperatorMetadataScanner
         OperatorResourceKind.PlcAddress => "plc_address",
         OperatorResourceKind.TcpProfile => "tcp_profile",
         OperatorResourceKind.NetworkEndpoint => "network_endpoint",
+        OperatorResourceKind.PlcProfile => "plc_profile",
         _ => throw new ArgumentOutOfRangeException(nameof(resourceKind), resourceKind, null)
     };
 

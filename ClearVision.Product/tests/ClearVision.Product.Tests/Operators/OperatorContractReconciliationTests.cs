@@ -15,8 +15,12 @@ namespace ClearVision.Product.Tests.Operators;
 
 [TestClassification(TestDomain.Core, TestPurpose.Regression, TestLane.Pr, TestEvidenceType.Contract, TestOracleType.Contract, TestResourceRequirement.None, TestExpectedDuration.Fast, TestFlakyPolicy.Blocking, "operator-quality", Suites = "Stage12Regression;MeasurementRegression;DetectionRegression;DataProcessingPhase1;DataProcessingPhase2")]
 
-public class OperatorContractReconciliationTests
+public class OperatorContractReconciliationTests : IDisposable
 {
+    private readonly IDisposable _authorityScope = TestExecutionAuthorityScope.Enter();
+
+    public void Dispose() => _authorityScope.Dispose();
+
     [Fact]
     public void Metadata_ShouldExpose_Reconciled_Params_And_Ports()
     {

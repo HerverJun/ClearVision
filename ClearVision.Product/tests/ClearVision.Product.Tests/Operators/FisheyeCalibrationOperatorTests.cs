@@ -35,12 +35,19 @@ public class FisheyeCalibrationOperatorTests
     public async Task ExecuteAsync_WithValidImage_ShouldReturnSuccess()
     {
         var op = new Operator("FisheyeCalibration", OperatorType.FisheyeCalibration, 0, 0);
+        var legacyOutputPath = Path.Combine(Path.GetTempPath(), $"fisheye-raw-output-{Guid.NewGuid():N}.json");
+        op.AddParameter(TestHelpers.CreateParameter("CalibrationAssetId", "fisheye-calibration-asset", "string"));
+        op.AddParameter(TestHelpers.CreateParameter("CalibrationOutputPath", legacyOutputPath, "string"));
         using var image = TestHelpers.CreateTestImage();
         var inputs = TestHelpers.CreateImageInputs(image);
 
         var result = await _operator.ExecuteAsync(op, inputs);
         // 没有标定板的图像会返回成功但 Found=false
         result.IsSuccess.Should().BeTrue();
+        CalibrationAssetCandidateAssertions.ShouldMatchGovernedSavePayload(
+            result.OutputData!,
+            "fisheye-calibration-asset");
+        File.Exists(legacyOutputPath).Should().BeFalse();
     }
 
     [Fact]

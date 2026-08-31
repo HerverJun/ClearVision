@@ -98,12 +98,15 @@ public sealed class AuthenticatedContextProjectionServiceTests
             ClearVisionCapabilities.CameraBindingsUpdate,
             ClearVisionCapabilities.CameraCapture,
             ClearVisionCapabilities.CameraPreviewOperate,
+            ClearVisionCapabilities.InspectionResultsRead,
             ClearVisionCapabilities.PlcConnectionTest,
             ClearVisionCapabilities.ProjectEdit,
             ClearVisionCapabilities.TcpConnectionsOperate,
             ClearVisionCapabilities.TriggerInputOperate
         ]);
-        @operator.Capabilities.Should().BeEmpty();
+        @operator.Capabilities.Should().Equal([
+            ClearVisionCapabilities.InspectionResultsRead
+        ]);
         unknown.Capabilities.Should().BeEmpty();
     }
 

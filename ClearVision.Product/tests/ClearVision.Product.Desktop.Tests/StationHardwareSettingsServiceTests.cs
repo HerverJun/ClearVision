@@ -3,6 +3,7 @@ using ClearVision.Product.Core.Entities;
 using ClearVision.Product.Core.Interfaces;
 using ClearVision.Product.Station;
 using FluentAssertions;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using NSubstitute;
 
@@ -282,36 +283,229 @@ public sealed class StationHardwareSettingsServiceTests
     }
 
     [Fact]
-    public async Task TestPlcConnectionAsync_WhenIpAddressIsEmpty_ShouldReturnValidationFailure()
+    public async Task TestCameraAsync_WithConfiguredBinding_ShouldUseServerTargetAndSettings()
     {
         var configService = Substitute.For<IConfigurationService>();
         var cameraManager = Substitute.For<ICameraManager>();
-        var sut = CreateService(configService, cameraManager);
-        var communication = new CommunicationConfig
+        var authoritativeBinding = new CameraBindingConfig
         {
-            ActiveProtocol = CommunicationConfig.ProtocolS7,
-            S7 = new S7CommunicationProfile
-            {
-                IpAddress = "",
-                Port = 102,
-                Rack = 0,
-                Slot = 1
-            }
+            Id = "cam-configured",
+            SerialNumber = "SN-CONFIGURED",
+            IsEnabled = true,
+            ExposureTimeUs = 7200,
+            GainDb = 2.25
+        };
+        cameraManager.GetBindings().Returns(new List<CameraBindingConfig> { authoritativeBinding });
+        var camera = Substitute.For<ICamera>();
+        camera.IsConnected.Returns(true);
+        camera.Name.Returns("Configured Camera");
+        var cameraLease = new TrackingCameraLease(camera);
+        cameraManager
+            .AcquireByBindingLeaseAsync("cam-configured", Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult<ICameraLease>(cameraLease));
+        var sut = CreateService(configService, cameraManager);
+        var clientCandidate = new CameraBindingConfig
+        {
+            Id = "cam-configured",
+            SerialNumber = "SN-CONFIGURED",
+            ExposureTimeUs = 999999,
+            GainDb = 99
         };
 
-        var result = await sut.TestPlcConnectionAsync(communication, CancellationToken.None);
+        var result = await sut.TestCameraAsync(clientCandidate);
+
+        result.Success.Should().BeTrue();
+        await cameraManager.Received(1).AcquireByBindingLeaseAsync(
+            "cam-configured",
+            Arg.Any<CancellationToken>());
+        cameraLease.DisposeCallCount.Should().Be(1);
+        await camera.Received(1).SetExposureTimeAsync(7200);
+        await camera.Received(1).SetGainAsync(2.25);
+        await cameraManager.DidNotReceive().GetOrCreateByBindingAsync(Arg.Any<string>());
+        await cameraManager.DidNotReceive().GetOrCreateCameraAsync(Arg.Any<string>());
+        await cameraManager.DidNotReceive().OpenCameraAsync(Arg.Any<string>());
+    }
+
+    [Theory]
+    [InlineData("missing-binding", "SN-MISSING")]
+    [InlineData("SN-AUTHORIZED", "SN-AUTHORIZED")]
+    [InlineData("disabled-binding", "SN-DISABLED")]
+    [InlineData("unbound-camera", "")]
+    [InlineData("authorized-binding", "SN-FORGED")]
+    public async Task TestCameraAsync_WhenClientTargetIsNotAuthoritative_ShouldNotOpenCamera(
+        string requestedBindingId,
+        string requestedSerialNumber)
+    {
+        var configService = Substitute.For<IConfigurationService>();
+        var cameraManager = Substitute.For<ICameraManager>();
+        cameraManager.GetBindings().Returns(new List<CameraBindingConfig>
+        {
+            new()
+            {
+                Id = "authorized-binding",
+                SerialNumber = "SN-AUTHORIZED",
+                IsEnabled = true
+            },
+            new()
+            {
+                Id = "disabled-binding",
+                SerialNumber = "SN-DISABLED",
+                IsEnabled = false
+            },
+            new()
+            {
+                Id = "unbound-camera",
+                SerialNumber = string.Empty,
+                IsEnabled = true
+            }
+        });
+        var sut = CreateService(configService, cameraManager);
+
+        var result = await sut.TestCameraAsync(new CameraBindingConfig
+        {
+            Id = requestedBindingId,
+            SerialNumber = requestedSerialNumber
+        });
+
+        result.Success.Should().BeFalse();
+        await cameraManager.DidNotReceive().AcquireByBindingLeaseAsync(
+            Arg.Any<string>(),
+            Arg.Any<CancellationToken>());
+        await cameraManager.DidNotReceive().GetOrCreateByBindingAsync(Arg.Any<string>());
+        await cameraManager.DidNotReceive().GetOrCreateCameraAsync(Arg.Any<string>());
+        await cameraManager.DidNotReceive().OpenCameraAsync(Arg.Any<string>());
+        cameraManager.DidNotReceive().GetCamera(Arg.Any<string>());
+    }
+
+    [Fact]
+    public async Task TestPlcConnectionAsync_WhenIpAddressIsEmpty_ShouldReturnValidationFailure()
+    {
+        var configService = new InMemoryAppConfigAuthority(new AppConfig
+        {
+            Communication = new CommunicationConfig
+            {
+                ActiveProtocol = CommunicationConfig.ProtocolS7,
+                S7 = new S7CommunicationProfile
+                {
+                    IpAddress = string.Empty,
+                    Port = 102
+                }
+            }
+        });
+        var cameraManager = Substitute.For<ICameraManager>();
+        var probeCalls = 0;
+        var sut = CreateService(
+            configService,
+            cameraManager,
+            (_, _, _) =>
+            {
+                probeCalls++;
+                return Task.FromResult(true);
+            });
+
+        var result = await sut.TestPlcConnectionAsync(
+            CommunicationConfig.ProtocolS7,
+            CancellationToken.None);
 
         result.Success.Should().BeFalse();
         result.Message.Should().Contain("PLC IP 地址不能为空");
+        probeCalls.Should().Be(0);
+    }
+
+    [Fact]
+    public async Task TestPlcConnectionAsync_ShouldUsePersistedProfileInsteadOfClientTarget()
+    {
+        var configService = new InMemoryAppConfigAuthority(new AppConfig
+        {
+            Communication = new CommunicationConfig
+            {
+                ActiveProtocol = CommunicationConfig.ProtocolS7,
+                S7 = new S7CommunicationProfile
+                {
+                    IpAddress = "192.0.2.44",
+                    Port = 1102,
+                    CpuType = "S7-1500",
+                    Rack = 2,
+                    Slot = 3
+                }
+            }
+        });
+        var cameraManager = Substitute.For<ICameraManager>();
+        string? dispatchedConnectionString = null;
+        var sut = CreateService(
+            configService,
+            cameraManager,
+            (connectionString, _, _) =>
+            {
+                dispatchedConnectionString = connectionString;
+                return Task.FromResult(true);
+            });
+
+        var result = await sut.TestPlcConnectionAsync("S7", CancellationToken.None);
+
+        result.Success.Should().BeTrue();
+        dispatchedConnectionString.Should().Be("S7://192.0.2.44:1102?cpu=S7-1500&rack=2&slot=3");
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("forged-profile")]
+    [InlineData("SiemensS7")]
+    public async Task TestPlcConnectionAsync_WhenProfileIdIsMissingOrForged_ShouldNotProbe(string profileId)
+    {
+        var configService = new InMemoryAppConfigAuthority(new AppConfig());
+        var cameraManager = Substitute.For<ICameraManager>();
+        var probeCalls = 0;
+        var sut = CreateService(
+            configService,
+            cameraManager,
+            (_, _, _) =>
+            {
+                probeCalls++;
+                return Task.FromResult(true);
+            });
+
+        var result = await sut.TestPlcConnectionAsync(profileId, CancellationToken.None);
+
+        result.Success.Should().BeFalse();
+        probeCalls.Should().Be(0);
     }
 
     private static StationHardwareSettingsService CreateService(
         IConfigurationService configurationService,
-        ICameraManager cameraManager)
+        ICameraManager cameraManager,
+        Func<string, ILogger, CancellationToken, Task<bool>>? plcConnectionProbe = null)
     {
-        return new StationHardwareSettingsService(
-            configurationService,
-            cameraManager,
-            NullLogger<StationHardwareSettingsService>.Instance);
+        return plcConnectionProbe == null
+            ? new StationHardwareSettingsService(
+                configurationService,
+                cameraManager,
+                NullLogger<StationHardwareSettingsService>.Instance)
+            : new StationHardwareSettingsService(
+                configurationService,
+                cameraManager,
+                NullLogger<StationHardwareSettingsService>.Instance,
+                plcConnectionProbe);
+    }
+
+    private sealed class TrackingCameraLease : ICameraLease
+    {
+        private int _disposeCallCount;
+
+        public TrackingCameraLease(ICamera camera)
+        {
+            Camera = camera;
+        }
+
+        public ICamera Camera { get; }
+        public int DisposeCallCount => Volatile.Read(ref _disposeCallCount);
+
+        public void Dispose() => Interlocked.Increment(ref _disposeCallCount);
+
+        public ValueTask DisposeAsync()
+        {
+            Dispose();
+            return ValueTask.CompletedTask;
+        }
     }
 }

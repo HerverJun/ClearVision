@@ -161,7 +161,17 @@ public class ImageAcquisitionServiceIntegrationTests
         var camera = Substitute.For<ICamera>();
         camera.IsConnected.Returns(true);
         camera.AcquireSingleFrameAsync().Returns(Task.FromResult(CreateTestImageBytes()));
-        _cameraManager.GetCamera("camera-1").Returns(camera);
+        _cameraManager.GetBindings().Returns(new List<CameraBindingConfig>
+        {
+            new()
+            {
+                Id = "camera-1",
+                SerialNumber = "SN-CAMERA-1",
+                IsEnabled = true,
+                TriggerMode = "Software"
+            }
+        });
+        var cameraLease = ConfigureCameraLease("camera-1", camera);
 
         // Act
         var result = await _acquisitionService.AcquireFromCameraAsync("camera-1");
@@ -173,6 +183,11 @@ public class ImageAcquisitionServiceIntegrationTests
         result.Height.Should().BeGreaterThan(0);
         result.DataBase64.Should().NotBeNullOrEmpty();
         await camera.Received(1).AcquireSingleFrameAsync();
+        await _cameraManager.Received(1).AcquireByBindingLeaseAsync(
+            "camera-1",
+            Arg.Any<CancellationToken>());
+        cameraLease.DisposeCallCount.Should().Be(1);
+        await _cameraManager.DidNotReceive().GetOrCreateCameraAsync(Arg.Any<string>());
     }
 
     [Fact]
@@ -198,6 +213,56 @@ public class ImageAcquisitionServiceIntegrationTests
         result.Height.Should().Be(1);
         await _streamCoordinator.Received(1).AcquireFrameAsync("binding-1", Arg.Any<CancellationToken>());
         await _cameraManager.DidNotReceive().GetOrCreateCameraAsync(Arg.Any<string>());
+        await _cameraManager.DidNotReceive().AcquireByBindingLeaseAsync(
+            Arg.Any<string>(),
+            Arg.Any<CancellationToken>());
+    }
+
+    [Theory]
+    [InlineData("missing-binding")]
+    [InlineData("SN-AUTHORIZED")]
+    [InlineData("disabled-binding")]
+    [InlineData("unbound-camera")]
+    public async Task AcquireFromCameraAsync_WhenBindingAuthorityRejectsTarget_ShouldHaveZeroCameraSideEffects(
+        string requestedId)
+    {
+        _cameraManager.GetBindings().Returns(new List<CameraBindingConfig>
+        {
+            new()
+            {
+                Id = "authorized-binding",
+                SerialNumber = "SN-AUTHORIZED",
+                IsEnabled = true,
+                TriggerMode = "Software"
+            },
+            new()
+            {
+                Id = "disabled-binding",
+                SerialNumber = "SN-DISABLED",
+                IsEnabled = false,
+                TriggerMode = "Software"
+            },
+            new()
+            {
+                Id = "unbound-camera",
+                SerialNumber = string.Empty,
+                IsEnabled = true,
+                TriggerMode = "Software"
+            }
+        });
+
+        var act = async () => await _acquisitionService.AcquireFromCameraAsync(requestedId);
+
+        await act.Should().ThrowAsync<InvalidOperationException>();
+        _cameraManager.DidNotReceive().GetCamera(Arg.Any<string>());
+        await _cameraManager.DidNotReceive().GetOrCreateCameraAsync(Arg.Any<string>());
+        await _cameraManager.DidNotReceive().GetOrCreateByBindingAsync(Arg.Any<string>());
+        await _cameraManager.DidNotReceive().AcquireByBindingLeaseAsync(
+            Arg.Any<string>(),
+            Arg.Any<CancellationToken>());
+        await _streamCoordinator.DidNotReceive().AcquireFrameAsync(
+            Arg.Any<string>(),
+            Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -207,7 +272,17 @@ public class ImageAcquisitionServiceIntegrationTests
         var camera = Substitute.For<ICamera>();
         camera.IsConnected.Returns(true);
         camera.AcquireSingleFrameAsync().Returns(Task.FromResult(CreateTestImageBytes()));
-        _cameraManager.GetCamera("camera-stream").Returns(camera);
+        _cameraManager.GetBindings().Returns(new List<CameraBindingConfig>
+        {
+            new()
+            {
+                Id = "camera-stream",
+                SerialNumber = "SN-CAMERA-STREAM",
+                IsEnabled = true,
+                TriggerMode = "Software"
+            }
+        });
+        var cameraLease = ConfigureCameraLease("camera-stream", camera);
 
         var frameReceived = new TaskCompletionSource<ImageDto>(TaskCreationOptions.RunContinuationsAsynchronously);
 
@@ -225,6 +300,7 @@ public class ImageAcquisitionServiceIntegrationTests
         try
         {
             result = await frameReceived.Task.WaitAsync(TimeSpan.FromSeconds(10));
+            cameraLease.DisposeCallCount.Should().Be(0);
         }
         finally
         {
@@ -235,6 +311,11 @@ public class ImageAcquisitionServiceIntegrationTests
         result.Width.Should().BeGreaterThan(0);
         result.Height.Should().BeGreaterThan(0);
         await camera.Received().AcquireSingleFrameAsync();
+        await _cameraManager.Received(1).AcquireByBindingLeaseAsync(
+            "camera-stream",
+            Arg.Any<CancellationToken>());
+        cameraLease.DisposeCallCount.Should().Be(1);
+        await _cameraManager.DidNotReceive().GetOrCreateCameraAsync(Arg.Any<string>());
     }
 
     [Fact]
@@ -324,6 +405,35 @@ public class ImageAcquisitionServiceIntegrationTests
     {
         var bytes = CreateTestImageBytes();
         await File.WriteAllBytesAsync(path, bytes);
+    }
+
+    private TrackingCameraLease ConfigureCameraLease(string bindingId, ICamera camera)
+    {
+        var lease = new TrackingCameraLease(camera);
+        _cameraManager.AcquireByBindingLeaseAsync(bindingId, Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult<ICameraLease>(lease));
+        return lease;
+    }
+
+    private sealed class TrackingCameraLease : ICameraLease
+    {
+        private int _disposeCallCount;
+
+        public TrackingCameraLease(ICamera camera)
+        {
+            Camera = camera;
+        }
+
+        public ICamera Camera { get; }
+        public int DisposeCallCount => Volatile.Read(ref _disposeCallCount);
+
+        public void Dispose() => Interlocked.Increment(ref _disposeCallCount);
+
+        public ValueTask DisposeAsync()
+        {
+            Dispose();
+            return ValueTask.CompletedTask;
+        }
     }
 
     #endregion

@@ -98,42 +98,48 @@ public static class PlcEndpoints
 
         app.MapPost("/api/plc/test-connection", async (
             PlcTestConnectionRequest request,
+            IConfigurationService configService,
             ILoggerFactory loggerFactory,
+            IServiceProvider services,
             CancellationToken ct) =>
         {
-            if (!TryNormalizeSupportedProtocol(request.Protocol, out var protocol))
+            if (request.UnsupportedFields is { Count: > 0 })
             {
                 return Results.BadRequest(new
                 {
                     success = false,
-                    message = "仅支持 S7、MC、FINS 连接测试。"
+                    errorCode = "PLC_RAW_TARGET_FORBIDDEN",
+                    message = "客户端 IP、端口或 PLC 拓扑参数不能授予连接测试权限；请仅提交已保存的 ProfileId。"
                 });
             }
 
-            var ipAddress = (request.IpAddress ?? string.Empty).Trim();
-            if (string.IsNullOrWhiteSpace(ipAddress))
+            var profileId = (request.ProfileId ?? string.Empty).Trim();
+            if (!TryNormalizeSupportedProtocol(profileId, out var protocol) ||
+                !profileId.Equals(protocol, StringComparison.OrdinalIgnoreCase))
             {
                 return Results.BadRequest(new
                 {
                     success = false,
-                    message = "PLC IP 地址不能为空。"
+                    errorCode = "PLC_PROFILE_NOT_FOUND",
+                    message = "PLC ProfileId 不存在或不受支持。"
                 });
             }
 
-            if (request.Port <= 0 || request.Port > 65535)
+            var read = await configService.ReadAsync(ct);
+            if (!read.IsHealthy || read.Config == null)
             {
-                return Results.BadRequest(new
-                {
-                    success = false,
-                    message = "端口必须在 1-65535 之间。"
-                });
+                return AppConfigEndpointResults.ReadFailure(read);
             }
 
-            if (!TryBuildPlcCommConnectionString(protocol, request, out var connectionString, out var badRequestMessage))
+            var config = read.Config;
+            config.Normalize();
+            var profile = config.Communication.GetProfile(protocol);
+            if (!TryBuildPlcCommConnectionString(protocol, profile, out var connectionString, out var badRequestMessage))
             {
                 return Results.BadRequest(new
                 {
                     success = false,
+                    errorCode = "PLC_PROFILE_INVALID",
                     message = badRequestMessage
                 });
             }
@@ -141,14 +147,9 @@ public static class PlcEndpoints
             try
             {
                 var logger = loggerFactory.CreateLogger("PlcConnectionTest");
-                using var client = PlcClientFactory.CreateFromConnectionString(connectionString, logger);
-                var connected = await client.ConnectAsync(ct);
-                var pingOk = connected && await client.PingAsync(ct);
-
-                if (connected)
-                {
-                    await SafeDisconnectAsync(client);
-                }
+                var probe = services.GetService(typeof(IPlcConnectionTestProbe)) as IPlcConnectionTestProbe
+                    ?? DefaultPlcConnectionTestProbe.Instance;
+                var pingOk = await probe.TestAsync(connectionString, logger, ct);
 
                 return Results.Ok(new
                 {
@@ -238,18 +239,6 @@ public static class PlcEndpoints
         return app;
     }
 
-    private static async Task SafeDisconnectAsync(ClearVision.PlcComm.Interfaces.IPlcClient client)
-    {
-        try
-        {
-            await client.DisconnectAsync();
-        }
-        catch
-        {
-            // Ignore disconnect errors in test endpoint.
-        }
-    }
-
     private static bool IsAdmin(HttpContext context) => ClearVisionPermissionPolicies.IsAdmin(context);
 
     private static CommunicationConfig CloneCommunication(CommunicationConfig source)
@@ -262,22 +251,40 @@ public static class PlcEndpoints
 
     private static bool TryBuildPlcCommConnectionString(
         string protocol,
-        PlcTestConnectionRequest request,
+        PlcCommunicationProfile profile,
         out string connectionString,
         out string errorMessage)
     {
         connectionString = string.Empty;
         errorMessage = string.Empty;
-        var ipAddress = (request.IpAddress ?? string.Empty).Trim();
-        var port = request.Port;
+        var ipAddress = (profile.IpAddress ?? string.Empty).Trim();
+        var port = profile.Port;
+        if (string.IsNullOrWhiteSpace(ipAddress))
+        {
+            errorMessage = "已保存的 PLC Profile 缺少 IP 地址。";
+            return false;
+        }
+
+        if (port is < 1 or > 65535)
+        {
+            errorMessage = "已保存的 PLC Profile 端口必须在 1-65535 之间。";
+            return false;
+        }
 
         switch (protocol)
         {
             case CommunicationConfig.ProtocolS7:
             {
-                var cpu = string.IsNullOrWhiteSpace(request.CpuType) ? "S7-1200" : request.CpuType!.Trim();
-                var rack = request.Rack ?? 0;
-                var slot = request.Slot ?? 1;
+                var s7 = profile as S7CommunicationProfile;
+                if (s7 == null)
+                {
+                    errorMessage = "已保存的 S7 Profile 类型无效。";
+                    return false;
+                }
+
+                var cpu = string.IsNullOrWhiteSpace(s7.CpuType) ? "S7-1200" : s7.CpuType.Trim();
+                var rack = s7.Rack;
+                var slot = s7.Slot;
                 if (rack < 0 || rack > 15)
                 {
                     errorMessage = "Rack 必须在 0-15 之间。";
@@ -324,12 +331,43 @@ public static class PlcEndpoints
 
 public class PlcTestConnectionRequest
 {
-    public string? Protocol { get; set; }
-    public string? IpAddress { get; set; }
-    public int Port { get; set; } = 102;
-    public string? CpuType { get; set; }
-    public int? Rack { get; set; }
-    public int? Slot { get; set; }
+    public string? ProfileId { get; set; }
+
+    [System.Text.Json.Serialization.JsonExtensionData]
+    public Dictionary<string, System.Text.Json.JsonElement>? UnsupportedFields { get; set; }
+}
+
+public interface IPlcConnectionTestProbe
+{
+    Task<bool> TestAsync(string connectionString, ILogger logger, CancellationToken cancellationToken);
+}
+
+internal sealed class DefaultPlcConnectionTestProbe : IPlcConnectionTestProbe
+{
+    public static DefaultPlcConnectionTestProbe Instance { get; } = new();
+
+    public async Task<bool> TestAsync(
+        string connectionString,
+        ILogger logger,
+        CancellationToken cancellationToken)
+    {
+        using var client = PlcClientFactory.CreateFromConnectionString(connectionString, logger);
+        var connected = await client.ConnectAsync(cancellationToken);
+        var pingOk = connected && await client.PingAsync(cancellationToken);
+        if (connected)
+        {
+            try
+            {
+                await client.DisconnectAsync();
+            }
+            catch
+            {
+                // The probe result is already known; disconnect remains best-effort.
+            }
+        }
+
+        return pingOk;
+    }
 }
 
 public sealed class PlcSettingsUpdateRequest : CommunicationConfig

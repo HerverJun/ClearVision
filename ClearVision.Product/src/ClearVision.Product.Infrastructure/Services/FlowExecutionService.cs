@@ -92,6 +92,7 @@ public class FlowExecutionService : IFlowExecutionEngine, IFlowDefinitionValidat
     private readonly ConcurrentDictionary<Guid, CancellationTokenSource> _executionCancellations = new();
     private readonly IVariableContext _variableContext;
     private readonly IProjectVariableExecutionContextAccessor _projectVariableContextAccessor;
+    private readonly IOperatorDispatchJournal _operatorDispatchJournal;
 
     // 调试输出缓存按调试会话和算子分桶；大小索引在 _debugCacheEvictionGate 下同步维护。
     private readonly ConcurrentDictionary<(Guid DebugSessionId, Guid OperatorId), Dictionary<string, object>> _debugCache = new();
@@ -520,12 +521,14 @@ public class FlowExecutionService : IFlowExecutionEngine, IFlowDefinitionValidat
         IProjectVariableExecutionContextAccessor? projectVariableContextAccessor = null,
         long? debugCacheMaxBytes = null,
         int? debugCacheMaxEntries = null,
-        long? debugCacheMaxEntryBytes = null)
+        long? debugCacheMaxEntryBytes = null,
+        IOperatorDispatchJournal? operatorDispatchJournal = null)
     {
         _executors = BuildExecutorLookup(executors);
         _logger = logger;
         _variableContext = variableContext;
         _projectVariableContextAccessor = projectVariableContextAccessor ?? new ProjectVariableExecutionContextAccessor();
+        _operatorDispatchJournal = operatorDispatchJournal ?? new InMemoryOperatorDispatchJournal();
         _debugCacheMaxBytes = Math.Max(0, debugCacheMaxBytes ?? DefaultDebugCacheMaxBytes);
         _debugCacheMaxEntries = Math.Max(0, debugCacheMaxEntries ?? DefaultDebugCacheMaxEntries);
         _debugCacheMaxEntryBytes = Math.Min(
@@ -1495,6 +1498,8 @@ public class FlowExecutionService : IFlowExecutionEngine, IFlowDefinitionValidat
     {
         op.MarkExecutionStarted();
         var opStopwatch = System.Diagnostics.Stopwatch.StartNew();
+        OperatorDispatchJournalEntry? dispatchEntry = null;
+        var handlerInvoked = false;
 
         try
         {
@@ -1502,8 +1507,39 @@ public class FlowExecutionService : IFlowExecutionEngine, IFlowDefinitionValidat
             using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
             timeoutCts.CancelAfter(TimeSpan.FromMilliseconds(DefaultOperatorTimeoutMs));
 
+            var capabilities = ExecutionSideEffectCatalog.GetCapabilities(op);
+            if (capabilities != ExecutionSideEffect.None)
+            {
+                dispatchEntry = await _operatorDispatchJournal.PrepareAsync(
+                    OperatorDispatchIdentity.Capture(op),
+                    timeoutCts.Token);
+            }
+
+            timeoutCts.Token.ThrowIfCancellationRequested();
+            if (dispatchEntry != null)
+            {
+                dispatchEntry = await _operatorDispatchJournal.MarkDispatchedAsync(
+                    dispatchEntry.CorrelationId,
+                    timeoutCts.Token);
+            }
+
             // 具体执行器负责核心逻辑；OperatorBase 会统一释放输入中的 ImageWrapper 引用。
+            // This gate is deliberately adjacent to the only production executor call;
+            // arbitrary IOperatorExecutor implementations cannot bypass it.
+            timeoutCts.Token.ThrowIfCancellationRequested();
+            handlerInvoked = true;
             var opResult = await executor.ExecuteAsync(op, inputs, timeoutCts.Token);
+            if (dispatchEntry != null)
+            {
+                dispatchEntry = await _operatorDispatchJournal.ConfirmAsync(
+                    dispatchEntry.CorrelationId,
+                    opResult.IsSuccess
+                        ? OperatorDispatchOutcome.Succeeded
+                        : OperatorDispatchOutcome.Failed,
+                    opResult.IsSuccess ? null : "EXECUTOR_REPORTED_FAILURE",
+                    CancellationToken.None);
+            }
+
             opStopwatch.Stop();
 
             if (cancellationToken.IsCancellationRequested)
@@ -1554,6 +1590,11 @@ public class FlowExecutionService : IFlowExecutionEngine, IFlowDefinitionValidat
         }
         catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
         {
+            await FinalizeUnconfirmedDispatchAsync(
+                dispatchEntry,
+                handlerInvoked,
+                "DISPATCH_TIMEOUT_OUTCOME_UNKNOWN",
+                "DISPATCH_TIMEOUT_BEFORE_HANDLER");
             opStopwatch.Stop();
             op.MarkExecutionFailed($"Operator timed out ({DefaultOperatorTimeoutMs / 1000}s)");
             _logger.LogError("算子执行超时: {OperatorName} ({OperatorId})", SanitizeLogValue(op.Name), SanitizeLogValue(op.Id));
@@ -1569,6 +1610,11 @@ public class FlowExecutionService : IFlowExecutionEngine, IFlowDefinitionValidat
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
+            await FinalizeUnconfirmedDispatchAsync(
+                dispatchEntry,
+                handlerInvoked,
+                "DISPATCH_CANCELED_OUTCOME_UNKNOWN",
+                "DISPATCH_CANCELED_BEFORE_HANDLER");
             opStopwatch.Stop();
             op.MarkExecutionFailed("Operator execution was canceled.");
             _logger.LogWarning("算子执行被取消: {OperatorName} ({OperatorId})", SanitizeLogValue(op.Name), SanitizeLogValue(op.Id));
@@ -1577,6 +1623,11 @@ public class FlowExecutionService : IFlowExecutionEngine, IFlowDefinitionValidat
         }
         catch (Exception ex)
         {
+            await FinalizeUnconfirmedDispatchAsync(
+                dispatchEntry,
+                handlerInvoked,
+                "DISPATCH_EXCEPTION_OUTCOME_UNKNOWN",
+                "DISPATCH_FAILED_BEFORE_HANDLER");
             opStopwatch.Stop();
             op.MarkExecutionFailed(ex.Message);
             _logger.LogError(ex, "算子执行异常: {OperatorName} ({OperatorId})", SanitizeLogValue(op.Name), SanitizeLogValue(op.Id));
@@ -1589,6 +1640,62 @@ public class FlowExecutionService : IFlowExecutionEngine, IFlowDefinitionValidat
                 ExecutionTimeMs = opStopwatch.ElapsedMilliseconds,
                 ErrorMessage = ex.Message
             };
+        }
+    }
+
+    private async Task FinalizeUnconfirmedDispatchAsync(
+        OperatorDispatchJournalEntry? entry,
+        bool handlerInvoked,
+        string unknownFailureCode,
+        string beforeHandlerFailureCode)
+    {
+        if (entry == null || entry.Outcome != OperatorDispatchOutcome.Pending)
+        {
+            return;
+        }
+
+        try
+        {
+            if (entry.Stage == OperatorDispatchStage.Prepared)
+            {
+                await _operatorDispatchJournal.MarkPreparedFailedAsync(
+                    entry.CorrelationId,
+                    beforeHandlerFailureCode,
+                    CancellationToken.None);
+                return;
+            }
+
+            if (entry.Stage != OperatorDispatchStage.Dispatched)
+            {
+                return;
+            }
+
+            if (!handlerInvoked)
+            {
+                await _operatorDispatchJournal.ConfirmAsync(
+                    entry.CorrelationId,
+                    OperatorDispatchOutcome.Failed,
+                    beforeHandlerFailureCode,
+                    CancellationToken.None);
+                return;
+            }
+
+            await _operatorDispatchJournal.MarkIndeterminateAsync(
+                entry.CorrelationId,
+                unknownFailureCode,
+                CancellationToken.None);
+            _logger.LogWarning(
+                "Operator dispatch outcome is indeterminate. CorrelationId={CorrelationId}, OperatorId={OperatorId}; no rollback is claimed.",
+                entry.CorrelationId,
+                entry.OperatorId);
+        }
+        catch (Exception journalException)
+        {
+            _logger.LogCritical(
+                journalException,
+                "Failed to persist operator dispatch outcome. CorrelationId={CorrelationId}, OperatorId={OperatorId}; no rollback is claimed.",
+                entry.CorrelationId,
+                entry.OperatorId);
         }
     }
 

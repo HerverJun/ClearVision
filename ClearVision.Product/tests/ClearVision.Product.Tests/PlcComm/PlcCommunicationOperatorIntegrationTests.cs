@@ -1,14 +1,17 @@
 using System.Buffers.Binary;
 using System.Net;
 using System.Net.Sockets;
-using System.Reflection;
 using ClearVision.PlcComm.Interfaces;
 using ClearVision.Product.Core.Entities;
 using ClearVision.Product.Core.Enums;
+using ClearVision.Product.Core.Interfaces;
+using ClearVision.Product.Core.Services;
 using ClearVision.Product.Core.ValueObjects;
 using ClearVision.Product.Infrastructure.Operators;
+using ClearVision.Product.Infrastructure.Services;
 using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
+using NSubstitute;
 
 namespace ClearVision.Product.Tests.PlcComm;
 
@@ -16,6 +19,9 @@ namespace ClearVision.Product.Tests.PlcComm;
 [Collection("PLC Operator Integration")]
 public class PlcCommunicationOperatorIntegrationTests : IDisposable
 {
+    private const string McProfileId = "test-mc-profile";
+    private const string FinsProfileId = "test-fins-profile";
+
     public PlcCommunicationOperatorIntegrationTests()
     {
         ResetPlcOperatorState();
@@ -35,15 +41,15 @@ public class PlcCommunicationOperatorIntegrationTests : IDisposable
         var port = ((IPEndPoint)listener.LocalEndpoint).Port;
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
         var serverTask = ServeMcReadAsync(listener, cts.Token, 0x12, 0x34);
-        var sut = new MitsubishiMcCommunicationOperator(NullLogger<MitsubishiMcCommunicationOperator>.Instance);
+        var sut = new MitsubishiMcCommunicationOperator(
+            NullLogger<MitsubishiMcCommunicationOperator>.Instance,
+            CreatePlcResolver(McProfileId, ExecutionPlcProtocols.MitsubishiMc, port, "D100"));
         var @operator = CreateOperator(
             "MC Read",
             OperatorType.MitsubishiMcCommunication,
-            ("IpAddress", IPAddress.Loopback.ToString(), "string"),
-            ("Port", port, "int"),
+            ("ProfileId", McProfileId, "string"),
             ("Address", "D100", "string"),
             ("Length", 1, "int"),
-            ("DataType", "Word", "string"),
             ("Operation", "Read", "string"));
 
         var result = await sut.ExecuteAsync(@operator, cancellationToken: cts.Token);
@@ -67,14 +73,14 @@ public class PlcCommunicationOperatorIntegrationTests : IDisposable
         var port = ((IPEndPoint)listener.LocalEndpoint).Port;
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
         var serverTask = ServeMcWriteAndCaptureAsync(listener, cts.Token);
-        var sut = new MitsubishiMcCommunicationOperator(NullLogger<MitsubishiMcCommunicationOperator>.Instance);
+        var sut = new MitsubishiMcCommunicationOperator(
+            NullLogger<MitsubishiMcCommunicationOperator>.Instance,
+            CreatePlcResolver(McProfileId, ExecutionPlcProtocols.MitsubishiMc, port, "D100"));
         var @operator = CreateOperator(
             "MC Write",
             OperatorType.MitsubishiMcCommunication,
-            ("IpAddress", IPAddress.Loopback.ToString(), "string"),
-            ("Port", port, "int"),
+            ("ProfileId", McProfileId, "string"),
             ("Address", "D100", "string"),
-            ("DataType", "Word", "string"),
             ("Operation", "Write", "string"),
             ("WriteValue", string.Empty, "string"));
 
@@ -97,12 +103,13 @@ public class PlcCommunicationOperatorIntegrationTests : IDisposable
     [Fact]
     public void MitsubishiMcCommunicationOperator_WriteValidation_ShouldIgnoreDisabledReadAndPollingValues()
     {
-        var sut = new MitsubishiMcCommunicationOperator(NullLogger<MitsubishiMcCommunicationOperator>.Instance);
+        var sut = new MitsubishiMcCommunicationOperator(
+            NullLogger<MitsubishiMcCommunicationOperator>.Instance,
+            CreatePlcResolver(McProfileId, ExecutionPlcProtocols.MitsubishiMc, 5002, "D100"));
         var @operator = CreateOperator(
             "MC Write Validation",
             OperatorType.MitsubishiMcCommunication,
-            ("IpAddress", IPAddress.Loopback.ToString(), "string"),
-            ("Port", 5002, "int"),
+            ("ProfileId", McProfileId, "string"),
             ("Address", "D100", "string"),
             ("Operation", "Write", "string"),
             ("Length", 0, "int"),
@@ -113,14 +120,22 @@ public class PlcCommunicationOperatorIntegrationTests : IDisposable
     }
 
     [Fact]
-    public async Task MitsubishiMcCommunicationOperator_PendingEndpoint_ShouldFailBeforeConnection()
+    public async Task MitsubishiMcCommunicationOperator_RawEndpoint_ShouldFailBeforeConnectionFactory()
     {
-        var sut = new MitsubishiMcCommunicationOperator(NullLogger<MitsubishiMcCommunicationOperator>.Instance);
+        var factoryCalls = 0;
+        var sut = new MitsubishiMcCommunicationOperator(
+            NullLogger<MitsubishiMcCommunicationOperator>.Instance,
+            CreatePlcResolver(McProfileId, ExecutionPlcProtocols.MitsubishiMc, 5002, "D100"),
+            (_, _) =>
+            {
+                factoryCalls++;
+                throw new InvalidOperationException("Raw target must be rejected before the connection factory.");
+            });
         var @operator = CreateOperator(
-            "MC Pending Endpoint",
+            "MC Raw Endpoint",
             OperatorType.MitsubishiMcCommunication,
-            ("IpAddress", "<pending-plc-endpoint>", "string"),
-            ("Port", 5002, "int"),
+            ("ProfileId", McProfileId, "string"),
+            ("IpAddress", "203.0.113.77", "string"),
             ("Address", "D100", "string"),
             ("Operation", "Read", "string"));
 
@@ -128,6 +143,8 @@ public class PlcCommunicationOperatorIntegrationTests : IDisposable
         var result = await sut.ExecuteAsync(@operator);
 
         result.IsSuccess.Should().BeFalse();
+        result.ErrorMessage.Should().StartWith("PLC_RAW_TARGET_FORBIDDEN:");
+        factoryCalls.Should().Be(0);
     }
 
     [Fact]
@@ -144,15 +161,15 @@ public class PlcCommunicationOperatorIntegrationTests : IDisposable
             new byte[] { 0x00, 0x00 },
             new byte[] { 0x01, 0x00 });
 
-        var sut = new MitsubishiMcCommunicationOperator(NullLogger<MitsubishiMcCommunicationOperator>.Instance);
+        var sut = new MitsubishiMcCommunicationOperator(
+            NullLogger<MitsubishiMcCommunicationOperator>.Instance,
+            CreatePlcResolver(McProfileId, ExecutionPlcProtocols.MitsubishiMc, port, "D100"));
         var @operator = CreateOperator(
             "MC Read Polling",
             OperatorType.MitsubishiMcCommunication,
-            ("IpAddress", IPAddress.Loopback.ToString(), "string"),
-            ("Port", port, "int"),
+            ("ProfileId", McProfileId, "string"),
             ("Address", "D100", "string"),
             ("Length", 1, "int"),
-            ("DataType", "Word", "string"),
             ("Operation", "Read", "string"),
             ("PollingMode", "WaitForValue", "string"),
             ("PollingCondition", "Equal", "string"),
@@ -170,7 +187,7 @@ public class PlcCommunicationOperatorIntegrationTests : IDisposable
         result.OutputData["Value"].Should().Be((ushort)1);
         result.OutputData["PollingMatched"].Should().Be(true);
         result.OutputData["PollingReadCount"].Should().Be(2);
-        result.OutputData["ConnectionSource"].Should().Be("OperatorParameters");
+        result.OutputData["ConnectionSource"].Should().Be("ServerProfile");
         requestCount.Should().Be(2);
     }
 
@@ -183,15 +200,15 @@ public class PlcCommunicationOperatorIntegrationTests : IDisposable
         var port = ((IPEndPoint)listener.LocalEndpoint).Port;
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
         var serverTask = ServeFinsReadAsync(listener, cts.Token, 0x12, 0x34);
-        var sut = new OmronFinsCommunicationOperator(NullLogger<OmronFinsCommunicationOperator>.Instance);
+        var sut = new OmronFinsCommunicationOperator(
+            NullLogger<OmronFinsCommunicationOperator>.Instance,
+            CreatePlcResolver(FinsProfileId, ExecutionPlcProtocols.OmronFins, port, "DM100"));
         var @operator = CreateOperator(
             "FINS Read",
             OperatorType.OmronFinsCommunication,
-            ("IpAddress", IPAddress.Loopback.ToString(), "string"),
-            ("Port", port, "int"),
+            ("ProfileId", FinsProfileId, "string"),
             ("Address", "DM100", "string"),
             ("Length", 1, "int"),
-            ("DataType", "Word", "string"),
             ("Operation", "Read", "string"));
 
         var result = await sut.ExecuteAsync(@operator, cancellationToken: cts.Token);
@@ -215,14 +232,14 @@ public class PlcCommunicationOperatorIntegrationTests : IDisposable
         var port = ((IPEndPoint)listener.LocalEndpoint).Port;
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
         var serverTask = ServeFinsWriteAndCaptureAsync(listener, cts.Token);
-        var sut = new OmronFinsCommunicationOperator(NullLogger<OmronFinsCommunicationOperator>.Instance);
+        var sut = new OmronFinsCommunicationOperator(
+            NullLogger<OmronFinsCommunicationOperator>.Instance,
+            CreatePlcResolver(FinsProfileId, ExecutionPlcProtocols.OmronFins, port, "DM100"));
         var @operator = CreateOperator(
             "FINS Write",
             OperatorType.OmronFinsCommunication,
-            ("IpAddress", IPAddress.Loopback.ToString(), "string"),
-            ("Port", port, "int"),
+            ("ProfileId", FinsProfileId, "string"),
             ("Address", "DM100", "string"),
-            ("DataType", "Word", "string"),
             ("Operation", "Write", "string"),
             ("WriteValue", string.Empty, "string"));
 
@@ -256,33 +273,59 @@ public class PlcCommunicationOperatorIntegrationTests : IDisposable
         return @operator;
     }
 
+    private static IExecutionResourceProfileResolver CreatePlcResolver(
+        string profileId,
+        string protocol,
+        int port,
+        string address)
+    {
+        var configurationService = Substitute.For<IConfigurationService>();
+        configurationService.GetCurrent().Returns(new AppConfig
+        {
+            ExecutionResources = new ExecutionResourceProfilesConfig
+            {
+                PlcProfiles =
+                [
+                    new PlcExecutionResourceProfile
+                    {
+                        Id = profileId,
+                        Enabled = true,
+                        Protocol = protocol,
+                        Host = IPAddress.Loopback.ToString(),
+                        Port = port,
+                        CpuType = "S71200",
+                        Rack = 0,
+                        Slot = 1,
+                        UnitId = 1,
+                        Bindings =
+                        [
+                            new PlcExecutionResourceBinding
+                            {
+                                Address = address,
+                                DataType = "Word",
+                                CanRead = true,
+                                CanWrite = true,
+                                MaxElementCount = 999,
+                                AllowedFunctionCodes =
+                                [
+                                    "ReadCoils",
+                                    "ReadHolding",
+                                    "WriteSingle",
+                                    "WriteMultiple"
+                                ]
+                            }
+                        ]
+                    }
+                ]
+            }
+        });
+        return new ServerExecutionResourceProfileResolver(configurationService);
+    }
+
     private static void ResetPlcOperatorState()
     {
         PlcCommunicationOperatorBase.StopHeartbeat();
-
-        var connectionPoolField = typeof(PlcCommunicationOperatorBase).GetField("_connectionPool", BindingFlags.Static | BindingFlags.NonPublic);
-        var lastKnownStateField = typeof(PlcCommunicationOperatorBase).GetField("_lastKnownState", BindingFlags.Static | BindingFlags.NonPublic);
-
-        if (connectionPoolField?.GetValue(null) is Dictionary<string, IPlcClient> connectionPool)
-        {
-            foreach (var client in connectionPool.Values)
-            {
-                try
-                {
-                    client.Dispose();
-                }
-                catch
-                {
-                }
-            }
-
-            connectionPool.Clear();
-        }
-
-        if (lastKnownStateField?.GetValue(null) is Dictionary<string, bool> lastKnownState)
-        {
-            lastKnownState.Clear();
-        }
+        PlcCommunicationOperatorBase.ClearConnectionPoolAsync().GetAwaiter().GetResult();
     }
 
     private static async Task<byte[]> ServeMcWriteAndCaptureAsync(TcpListener listener, CancellationToken ct)

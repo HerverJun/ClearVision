@@ -15,6 +15,8 @@ public class AppConfig
 
     public TcpCommunicationConfig TcpCommunication { get; set; } = new();
 
+    public ExecutionResourceProfilesConfig ExecutionResources { get; set; } = new();
+
     public StorageConfig Storage { get; set; } = new();
 
     public RuntimeConfig Runtime { get; set; } = new();
@@ -35,6 +37,8 @@ public class AppConfig
         Communication.Normalize();
         TcpCommunication ??= new TcpCommunicationConfig();
         TcpCommunication.Normalize();
+        ExecutionResources ??= new ExecutionResourceProfilesConfig();
+        ExecutionResources.Normalize();
         Storage ??= new StorageConfig();
         Runtime ??= new RuntimeConfig();
         Runtime.Normalize();
@@ -735,6 +739,161 @@ public sealed record TcpCommunicationValidationIssue(
     string Field,
     int? Index,
     string Message);
+
+/// <summary>
+/// Server-owned profiles for execution resources whose raw targets must never
+/// be accepted as client authority. Existing configuration files omit this
+/// section and therefore normalize to deny-by-default empty profile lists.
+/// </summary>
+public sealed class ExecutionResourceProfilesConfig
+{
+    public List<DatabaseExecutionResourceProfile> DatabaseProfiles { get; set; } = new();
+
+    public List<SerialExecutionResourceProfile> SerialProfiles { get; set; } = new();
+
+    public List<PlcExecutionResourceProfile> PlcProfiles { get; set; } = new();
+
+    public void Normalize()
+    {
+        DatabaseProfiles = (DatabaseProfiles ?? new List<DatabaseExecutionResourceProfile>())
+            .OfType<DatabaseExecutionResourceProfile>()
+            .ToList();
+        foreach (var profile in DatabaseProfiles)
+        {
+            profile.Normalize();
+        }
+
+        SerialProfiles = (SerialProfiles ?? new List<SerialExecutionResourceProfile>())
+            .OfType<SerialExecutionResourceProfile>()
+            .ToList();
+        foreach (var profile in SerialProfiles)
+        {
+            profile.Normalize();
+        }
+
+        PlcProfiles = (PlcProfiles ?? new List<PlcExecutionResourceProfile>())
+            .OfType<PlcExecutionResourceProfile>()
+            .ToList();
+        foreach (var profile in PlcProfiles)
+        {
+            profile.Normalize();
+        }
+    }
+}
+
+public sealed class DatabaseExecutionResourceProfile
+{
+    public string Id { get; set; } = string.Empty;
+
+    public bool Enabled { get; set; }
+
+    public string DbType { get; set; } = string.Empty;
+
+    public string ConnectionString { get; set; } = string.Empty;
+
+    public List<string> AllowedTableNames { get; set; } = new();
+
+    public void Normalize()
+    {
+        Id = (Id ?? string.Empty).Trim();
+        DbType = (DbType ?? string.Empty).Trim();
+        ConnectionString = (ConnectionString ?? string.Empty).Trim();
+        AllowedTableNames = (AllowedTableNames ?? new List<string>())
+            .Where(value => !string.IsNullOrWhiteSpace(value))
+            .Select(value => value.Trim())
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+    }
+}
+
+public sealed class SerialExecutionResourceProfile
+{
+    public string Id { get; set; } = string.Empty;
+
+    public bool Enabled { get; set; }
+
+    public string PortName { get; set; } = string.Empty;
+
+    public int BaudRate { get; set; }
+
+    public int DataBits { get; set; } = 8;
+
+    public string StopBits { get; set; } = "One";
+
+    public string Parity { get; set; } = "None";
+
+    public void Normalize()
+    {
+        Id = (Id ?? string.Empty).Trim();
+        PortName = (PortName ?? string.Empty).Trim();
+        StopBits = (StopBits ?? string.Empty).Trim();
+        Parity = (Parity ?? string.Empty).Trim();
+    }
+}
+
+public sealed class PlcExecutionResourceProfile
+{
+    public string Id { get; set; } = string.Empty;
+
+    public bool Enabled { get; set; }
+
+    public string Protocol { get; set; } = string.Empty;
+
+    public string Host { get; set; } = string.Empty;
+
+    public int Port { get; set; }
+
+    public string CpuType { get; set; } = "S71200";
+
+    public int Rack { get; set; }
+
+    public int Slot { get; set; } = 1;
+
+    public int UnitId { get; set; } = 1;
+
+    public List<PlcExecutionResourceBinding> Bindings { get; set; } = new();
+
+    public void Normalize()
+    {
+        Id = (Id ?? string.Empty).Trim();
+        Protocol = (Protocol ?? string.Empty).Trim();
+        Host = (Host ?? string.Empty).Trim();
+        CpuType = (CpuType ?? string.Empty).Trim();
+        Bindings = (Bindings ?? new List<PlcExecutionResourceBinding>())
+            .OfType<PlcExecutionResourceBinding>()
+            .ToList();
+        foreach (var binding in Bindings)
+        {
+            binding.Normalize();
+        }
+    }
+}
+
+public sealed class PlcExecutionResourceBinding
+{
+    public string Address { get; set; } = string.Empty;
+
+    public string DataType { get; set; } = "Word";
+
+    public bool CanRead { get; set; } = true;
+
+    public bool CanWrite { get; set; }
+
+    public int MaxElementCount { get; set; } = 1;
+
+    public List<string> AllowedFunctionCodes { get; set; } = new();
+
+    public void Normalize()
+    {
+        Address = (Address ?? string.Empty).Trim();
+        DataType = string.IsNullOrWhiteSpace(DataType) ? "Word" : DataType.Trim();
+        AllowedFunctionCodes = (AllowedFunctionCodes ?? new List<string>())
+            .Where(value => !string.IsNullOrWhiteSpace(value))
+            .Select(value => value.Trim())
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+    }
+}
 
 public class StorageConfig
 {

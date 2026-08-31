@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Security.Cryptography;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using ClearVision.Product.Core.Entities;
@@ -229,7 +230,7 @@ internal static class OpenCvCalibrationDatasetRunner
         var allocationBefore = GC.GetTotalAllocatedBytes(precise: true);
         try
         {
-            var op = CreateCameraCalibrationOperator(imageFolder, outputBundlePath);
+            var op = CreateCameraCalibrationOperator(imageFolder);
             var executor = new CameraCalibrationOperator(NullLogger<CameraCalibrationOperator>.Instance);
             var execution = await executor.ExecuteAsync(op, null);
             DisposeImageOutput(execution.OutputData);
@@ -269,7 +270,7 @@ internal static class OpenCvCalibrationDatasetRunner
         var allocationBefore = GC.GetTotalAllocatedBytes(precise: true);
         try
         {
-            var op = CreateStereoCalibrationOperator(leftFolder, rightFolder, outputBundlePath, options.MinStereoPairs);
+            var op = CreateStereoCalibrationOperator(leftFolder, rightFolder, options.MinStereoPairs);
             var executor = new StereoCalibrationOperator(NullLogger<StereoCalibrationOperator>.Instance);
             var execution = await executor.ExecuteAsync(op, null);
             DisposeImageOutput(execution.OutputData);
@@ -414,7 +415,8 @@ internal static class OpenCvCalibrationDatasetRunner
         var rejectedOutlierCount = GetInt(output, "RejectedOutlierCount");
         var calibrationJson = output.TryGetValue("CalibrationData", out var calibrationObj) ? calibrationObj?.ToString() : "";
         var bundleRoundTripValid = !string.IsNullOrWhiteSpace(calibrationJson) && IsValidCalibrationBundleJson(calibrationJson!);
-        var outputFileWritten = File.Exists(outputBundlePath);
+        var candidateContractValid = HasValidCandidateContract(output, calibrationJson);
+        var rawOutputFileWritten = File.Exists(outputBundlePath);
 
         var errors = new List<string>();
         if (requireAccepted && !accepted)
@@ -437,9 +439,14 @@ internal static class OpenCvCalibrationDatasetRunner
             errors.Add("calibration bundle JSON failed schema round-trip smoke");
         }
 
-        if (!outputFileWritten)
+        if (!candidateContractValid)
         {
-            errors.Add("calibration output file was not written");
+            errors.Add("calibration asset candidate contract was not produced");
+        }
+
+        if (rawOutputFileWritten)
+        {
+            errors.Add("calibration operator wrote a raw output file");
         }
 
         return new CaseResult(
@@ -454,14 +461,15 @@ internal static class OpenCvCalibrationDatasetRunner
             Math.Round(maxReprojection, 6),
             imageCount,
             totalImages,
-            ClassifyCameraFailure(errors, accepted, reprojection, maxReprojectionRmsPx, imageCount, minDetectedImages, bundleRoundTripValid, outputFileWritten),
+            ClassifyCameraFailure(errors, accepted, reprojection, maxReprojectionRmsPx, imageCount, minDetectedImages, bundleRoundTripValid, candidateContractValid, rawOutputFileWritten),
             errors.Count == 0 ? null : string.Join("; ", errors),
             new Dictionary<string, object?>
             {
                 ["RejectedDetectionCount"] = rejectedDetectionCount,
                 ["RejectedOutlierCount"] = rejectedOutlierCount,
                 ["BundleRoundTripValid"] = bundleRoundTripValid,
-                ["OutputFileWritten"] = outputFileWritten,
+                ["CandidateContractValid"] = candidateContractValid,
+                ["RawOutputFileWritten"] = rawOutputFileWritten,
                 ["Diagnostics"] = GetStringList(output, "Diagnostics"),
                 ["Thresholds"] = thresholds
             });
@@ -497,7 +505,8 @@ internal static class OpenCvCalibrationDatasetRunner
         var failedPairs = GetInt(output, "FailedPairs");
         var calibrationJson = output.TryGetValue("CalibrationData", out var calibrationObj) ? calibrationObj?.ToString() : "";
         var bundleRoundTripValid = !string.IsNullOrWhiteSpace(calibrationJson) && IsValidCalibrationBundleJson(calibrationJson!, stereo: true);
-        var outputFileWritten = File.Exists(outputBundlePath);
+        var candidateContractValid = HasValidCandidateContract(output, calibrationJson);
+        var rawOutputFileWritten = File.Exists(outputBundlePath);
 
         var errors = new List<string>();
         if (expectedPairCount > 0 && totalPairs != expectedPairCount)
@@ -540,9 +549,14 @@ internal static class OpenCvCalibrationDatasetRunner
             errors.Add("stereo calibration bundle JSON failed schema round-trip smoke");
         }
 
-        if (!outputFileWritten)
+        if (!candidateContractValid)
         {
-            errors.Add("stereo calibration output file was not written");
+            errors.Add("stereo calibration asset candidate contract was not produced");
+        }
+
+        if (rawOutputFileWritten)
+        {
+            errors.Add("stereo calibration operator wrote a raw output file");
         }
 
         return new CaseResult(
@@ -557,7 +571,7 @@ internal static class OpenCvCalibrationDatasetRunner
             Math.Round(maxPerView, 6),
             validPairs,
             totalPairs,
-            ClassifyStereoFailure(errors, accepted, validPairs, options.MinStereoPairs, stereoRms, options.MaxStereoReprojectionRmsPx, epipolar, options.MaxEpipolarErrorPx, bundleRoundTripValid, outputFileWritten),
+            ClassifyStereoFailure(errors, accepted, validPairs, options.MinStereoPairs, stereoRms, options.MaxStereoReprojectionRmsPx, epipolar, options.MaxEpipolarErrorPx, bundleRoundTripValid, candidateContractValid, rawOutputFileWritten),
             errors.Count == 0 ? null : string.Join("; ", errors),
             new Dictionary<string, object?>
             {
@@ -570,7 +584,8 @@ internal static class OpenCvCalibrationDatasetRunner
                 ["ExpectedPairsFromManifest"] = expectedPairCount,
                 ["FailedPairs"] = failedPairs,
                 ["BundleRoundTripValid"] = bundleRoundTripValid,
-                ["OutputFileWritten"] = outputFileWritten,
+                ["CandidateContractValid"] = candidateContractValid,
+                ["RawOutputFileWritten"] = rawOutputFileWritten,
                 ["Thresholds"] = thresholds
             });
     }
@@ -605,7 +620,7 @@ internal static class OpenCvCalibrationDatasetRunner
             });
     }
 
-    private static Operator CreateCameraCalibrationOperator(string imageFolder, string outputPath)
+    private static Operator CreateCameraCalibrationOperator(string imageFolder)
     {
         var op = new Operator("OpenCV calibration dataset", OperatorType.CameraCalibration, 0, 0);
         op.AddParameter(Parameter("PatternType", "string", "Chessboard"));
@@ -614,11 +629,11 @@ internal static class OpenCvCalibrationDatasetRunner
         op.AddParameter(Parameter("SquareSize", "double", 25.0));
         op.AddParameter(Parameter("Mode", "string", "FolderCalibration"));
         op.AddParameter(Parameter("ImageFolder", "string", imageFolder));
-        op.AddParameter(Parameter("CalibrationOutputPath", "string", outputPath));
+        op.AddParameter(Parameter("CalibrationAssetId", "string", "dataset-camera-calibration"));
         return op;
     }
 
-    private static Operator CreateStereoCalibrationOperator(string leftFolder, string rightFolder, string outputPath, int minValidPairs)
+    private static Operator CreateStereoCalibrationOperator(string leftFolder, string rightFolder, int minValidPairs)
     {
         var op = new Operator("OpenCV stereo calibration dataset", OperatorType.StereoCalibration, 0, 0);
         op.AddParameter(Parameter("PatternType", "string", "Chessboard"));
@@ -628,7 +643,7 @@ internal static class OpenCvCalibrationDatasetRunner
         op.AddParameter(Parameter("Mode", "string", "FolderCalibration"));
         op.AddParameter(Parameter("LeftImageFolder", "string", leftFolder));
         op.AddParameter(Parameter("RightImageFolder", "string", rightFolder));
-        op.AddParameter(Parameter("CalibrationOutputPath", "string", outputPath));
+        op.AddParameter(Parameter("CalibrationAssetId", "string", "dataset-stereo-calibration"));
         op.AddParameter(Parameter("MinValidPairs", "int", minValidPairs));
         op.AddParameter(Parameter("ZeroDisparity", "bool", false));
         op.AddParameter(Parameter("Alpha", "double", 0.0));
@@ -680,6 +695,34 @@ internal static class OpenCvCalibrationDatasetRunner
                root.TryGetProperty("quality", out var quality) &&
                quality.TryGetProperty("accepted", out _) &&
                requiredPayload;
+    }
+
+    private static bool HasValidCandidateContract(Dictionary<string, object> output, string? calibrationJson)
+    {
+        var assetId = output.TryGetValue("CalibrationAssetId", out var assetIdValue)
+            ? assetIdValue?.ToString()
+            : null;
+        var contentHash = output.TryGetValue("CalibrationContentHash", out var hashValue)
+            ? hashValue?.ToString()
+            : null;
+
+        if (!GetBool(output, "CalibrationAssetCandidate") ||
+            string.IsNullOrWhiteSpace(assetId) ||
+            assetId.Length > 128 ||
+            !assetId.All(character => char.IsAsciiLetterOrDigit(character) || character is '-' or '_' or '.') ||
+            string.IsNullOrWhiteSpace(calibrationJson) ||
+            contentHash is not { Length: 71 } ||
+            !contentHash.StartsWith("sha256:", StringComparison.Ordinal) ||
+            !contentHash[7..].All(character => character is >= '0' and <= '9' or >= 'a' and <= 'f'))
+        {
+            return false;
+        }
+
+        using var payload = JsonDocument.Parse(calibrationJson);
+        var payloadOptions = new JsonSerializerOptions(JsonSerializerDefaults.Web) { WriteIndented = true };
+        var payloadBytes = JsonSerializer.SerializeToUtf8Bytes(payload.RootElement, payloadOptions);
+        var expectedHash = "sha256:" + Convert.ToHexString(SHA256.HashData(payloadBytes)).ToLowerInvariant();
+        return string.Equals(contentHash, expectedHash, StringComparison.Ordinal);
     }
 
     private static bool GetBool(Dictionary<string, object> output, string key)
@@ -761,7 +804,8 @@ internal static class OpenCvCalibrationDatasetRunner
         int imageCount,
         int minDetectedImages,
         bool bundleRoundTripValid,
-        bool outputFileWritten)
+        bool candidateContractValid,
+        bool rawOutputFileWritten)
     {
         if (errors.Count == 0)
         {
@@ -783,9 +827,14 @@ internal static class OpenCvCalibrationDatasetRunner
             return "round_trip_serialization_failure";
         }
 
-        if (!outputFileWritten)
+        if (!candidateContractValid)
         {
-            return "output_write_failure";
+            return "candidate_contract_failure";
+        }
+
+        if (rawOutputFileWritten)
+        {
+            return "raw_output_write_violation";
         }
 
         return accepted ? "threshold_failure" : "rejected_calibration";
@@ -801,7 +850,8 @@ internal static class OpenCvCalibrationDatasetRunner
         double epipolar,
         double maxEpipolar,
         bool bundleRoundTripValid,
-        bool outputFileWritten)
+        bool candidateContractValid,
+        bool rawOutputFileWritten)
     {
         if (errors.Count == 0)
         {
@@ -828,9 +878,14 @@ internal static class OpenCvCalibrationDatasetRunner
             return "round_trip_serialization_failure";
         }
 
-        if (!outputFileWritten)
+        if (!candidateContractValid)
         {
-            return "output_write_failure";
+            return "candidate_contract_failure";
+        }
+
+        if (rawOutputFileWritten)
+        {
+            return "raw_output_write_violation";
         }
 
         return accepted ? "threshold_failure" : "rejected_calibration";

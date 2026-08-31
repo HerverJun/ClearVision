@@ -854,33 +854,13 @@ export function installCameraTab(SettingsView) {
         async testSerialPhotoelectricTrigger() {
             if (!this.requireCapability(Capabilities.TRIGGER_INPUT_OPERATE)) return;
             const button = this.container?.querySelector('#btn-test-serial-photoelectric');
-            const portInput = this.container?.querySelector('#cam-param-serial-port-name');
-            const baudInput = this.container?.querySelector('#cam-param-serial-baud-rate');
-            const debounceInput = this.container?.querySelector('#cam-param-serial-debounce');
-            const timeoutInput = this.container?.querySelector('#cam-param-serial-timeout');
-
-            let portName = String(portInput?.value || '').trim().toUpperCase();
-            if (!portName) {
-                await this.loadSerialPhotoelectricPorts({ silent: true, applyRecommended: true });
-                portName = String(portInput?.value || '').trim().toUpperCase();
-            }
-
-            if (!portName) {
-                const prompted = window.prompt('请输入串口光电串口号', 'COM3');
-                portName = String(prompted || '').trim().toUpperCase();
-            }
-
-            if (!/^COM\d+$/i.test(portName)) {
-                showToast('串口号格式需要类似 COM3', 'warning');
+            const binding = this.getSelectedCameraBinding();
+            if (!binding?.id) {
+                showToast('请先选择并保存串口光电相机绑定', 'warning');
                 return;
             }
-
-            const baudRate = this.normalizeSerialBaudRate(baudInput?.value);
-            const debounceMs = this.normalizeSerialDebounceMs(debounceInput?.value);
-            const rawTimeoutMs = Number.parseInt(String(timeoutInput?.value ?? ''), 10);
-            const timeoutMs = Number.isFinite(rawTimeoutMs) && rawTimeoutMs > 0
-                ? this.normalizeSerialTimeoutMs(rawTimeoutMs)
-                : 10000;
+            const expectedRevision = this.requireAppConfigRevision('串口光电测试');
+            if (expectedRevision === null) return;
             const previousText = button?.textContent;
 
             if (button) {
@@ -889,16 +869,17 @@ export function installCameraTab(SettingsView) {
             }
 
             try {
-                showToast(`正在监听 ${portName} 串口光电，请遮挡一次传感器`, 'info');
+                showToast(`正在使用已保存绑定 ${binding.displayName || binding.id}，请遮挡一次传感器`, 'info');
                 const result = await settingsApi.testSerialPhotoelectric({
-                    portName,
-                    baudRate,
-                    debounceMs,
-                    timeoutMs
+                    cameraBindingId: binding.id,
+                    expectedRevision
                 });
-                const resultPort = result?.portName || result?.PortName || portName;
+                const resultPort = result?.portName || result?.PortName || binding.id;
                 showToast(`串口光电测试成功: ${resultPort} 收到遮挡帧 01 11`, 'success');
             } catch (error) {
+                if (await this.handleAppConfigRevisionConflict(error, '串口光电测试')) {
+                    return;
+                }
                 showToast('串口光电测试失败: ' + (error?.message || error), 'error');
             } finally {
                 if (button) {
@@ -935,6 +916,39 @@ export function installCameraTab(SettingsView) {
             }
         }
         ,
+        startContinuousPreviewHeartbeat(sessionId, heartbeatIntervalMs) {
+            if (!sessionId) return () => {};
+            const rawIntervalMs = Number(heartbeatIntervalMs);
+            const intervalMs = Number.isFinite(rawIntervalMs) && rawIntervalMs > 0
+                ? Math.max(1000, Math.min(30000, Math.floor(rawIntervalMs)))
+                : 10000;
+            let stopped = false;
+            let timeoutId = null;
+
+            const schedule = () => {
+                if (stopped) return;
+                timeoutId = this.lifecycle.setTimeout(async () => {
+                    timeoutId = null;
+                    if (stopped) return;
+                    try {
+                        await settingsApi.heartbeatContinuousPreview({ sessionId });
+                    } catch (error) {
+                        console.warn('[SettingsView] Failed to heartbeat continuous preview session:', error);
+                    }
+                    schedule();
+                }, intervalMs);
+            };
+
+            schedule();
+            return () => {
+                stopped = true;
+                if (timeoutId !== null) {
+                    this.lifecycle.clearTimeout(timeoutId);
+                    timeoutId = null;
+                }
+            };
+        }
+        ,
         async fetchContinuousPreviewFrame(sessionId, options = {}) {
             if (!this.requireCapability(Capabilities.CAMERA_PREVIEW_OPERATE)) {
                 throw new Error('当前账户不能读取相机预览。');
@@ -965,8 +979,12 @@ export function installCameraTab(SettingsView) {
         ,
         async captureSharedFrame(cameraBindingId, options = {}) {
             const session = await this.startContinuousPreviewSession(cameraBindingId);
+            const sessionId = session.sessionId || session.SessionId;
+            const stopHeartbeat = this.startContinuousPreviewHeartbeat(
+                sessionId,
+                session.heartbeatIntervalMs || session.HeartbeatIntervalMs);
             try {
-                const preview = await this.fetchContinuousPreviewFrame(session.sessionId || session.SessionId, {
+                const preview = await this.fetchContinuousPreviewFrame(sessionId, {
                     signal: options.signal
                 });
                 return {
@@ -978,7 +996,8 @@ export function installCameraTab(SettingsView) {
                     cameraBindingId
                 };
             } finally {
-                await this.stopContinuousPreviewSession(session.sessionId || session.SessionId);
+                stopHeartbeat();
+                await this.stopContinuousPreviewSession(sessionId);
             }
         }
         ,
@@ -1035,6 +1054,7 @@ export function installCameraTab(SettingsView) {
             let previewActive = false;
             let previewLoopToken = 0;
             let activePreviewAbortController = null;
+            let stopPreviewHeartbeat = null;
             const triggerMode = this.normalizeCameraTriggerMode(binding?.triggerMode);
             const triggerModeLabel = triggerMode === 'External' ? 'External' : 'Continuous';
             const startupText = triggerMode === 'External'
@@ -1082,6 +1102,8 @@ export function installCameraTab(SettingsView) {
             const stopPreview = async () => {
                 previewActive = false;
                 previewLoopToken += 1;
+                stopPreviewHeartbeat?.();
+                stopPreviewHeartbeat = null;
                 cancelActivePreviewRequest();
                 await this.stopContinuousPreviewSession(sessionId);
                 sessionId = null;
@@ -1132,6 +1154,10 @@ export function installCameraTab(SettingsView) {
                 try {
                     const session = await this.startContinuousPreviewSession(binding.id);
                     sessionId = session.sessionId || session.SessionId;
+                    stopPreviewHeartbeat?.();
+                    stopPreviewHeartbeat = this.startContinuousPreviewHeartbeat(
+                        sessionId,
+                        session.heartbeatIntervalMs || session.HeartbeatIntervalMs);
                     const sessionTargetFrameRateFps = this.normalizeCameraTargetFrameRate(
                         session.targetFrameRateFps || session.TargetFrameRateFps || binding.targetFrameRateFps
                     );
@@ -1173,6 +1199,8 @@ export function installCameraTab(SettingsView) {
                         });
                     }
                 } catch (error) {
+                    stopPreviewHeartbeat?.();
+                    stopPreviewHeartbeat = null;
                     if (error?.name === 'AbortError') {
                         return;
                     }

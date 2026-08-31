@@ -60,18 +60,40 @@ public static class CameraTriggerModeExtensions
         return Math.Clamp(targetFrameRateFps, MinTargetFrameRateFps, MaxTargetFrameRateFps);
     }
 
-    public static CameraBindingConfig? FindBinding(this ICameraManager cameraManager, string? bindingIdOrCameraId)
+    public static CameraBindingConfig? FindBinding(this ICameraManager cameraManager, string? bindingId)
     {
-        if (string.IsNullOrWhiteSpace(bindingIdOrCameraId))
+        ArgumentNullException.ThrowIfNull(cameraManager);
+        if (string.IsNullOrWhiteSpace(bindingId))
         {
             return null;
         }
 
-        var normalized = bindingIdOrCameraId.Trim();
+        var normalized = bindingId.Trim();
         return (cameraManager.GetBindings() ?? new List<CameraBindingConfig>()).FirstOrDefault(binding =>
-            binding.Id.Equals(normalized, StringComparison.OrdinalIgnoreCase)
-            || (!string.IsNullOrWhiteSpace(binding.SerialNumber)
-                && binding.SerialNumber.Equals(normalized, StringComparison.OrdinalIgnoreCase)));
+            string.Equals(binding.Id, normalized, StringComparison.OrdinalIgnoreCase));
+    }
+
+    public static CameraBindingConfig RequireEnabledBinding(this ICameraManager cameraManager, string bindingId)
+    {
+        ArgumentNullException.ThrowIfNull(cameraManager);
+        ArgumentException.ThrowIfNullOrWhiteSpace(bindingId);
+
+        var normalized = bindingId.Trim();
+        var binding = cameraManager.FindBinding(normalized)
+            ?? throw new InvalidOperationException($"Camera binding '{normalized}' is not configured.");
+
+        if (!binding.IsEnabled)
+        {
+            throw new InvalidOperationException($"Camera binding '{normalized}' is disabled.");
+        }
+
+        binding.Normalize();
+        if (string.IsNullOrWhiteSpace(binding.SerialNumber))
+        {
+            throw new InvalidOperationException($"Camera binding '{normalized}' has no physical device serial number.");
+        }
+
+        return binding;
     }
 }
 

@@ -3,8 +3,10 @@
 // 【Phase 4】LLM 闭环验证 - 自动调参端点
 // 作者：架构修复方案 v2
 
+using System.Security.Claims;
 using ClearVision.Product.Core.Entities;
 using ClearVision.Product.Core.Enums;
+using ClearVision.Product.Core.Interfaces;
 using ClearVision.Product.Core.Services;
 using ClearVision.Product.Core.ValueObjects;
 using ClearVision.Product.Infrastructure.Services;
@@ -20,6 +22,10 @@ namespace ClearVision.Product.Desktop.Endpoints;
 /// </summary>
 public static class AutoTuneEndpoints
 {
+    // StateWrite is permitted only through the isolated preview execution context.
+    // Every external capability, including future catalog additions, fails closed.
+    private const ExecutionSideEffect AutoTuneAllowedCapabilities = ExecutionSideEffect.StateWrite;
+
     /// <summary>
     /// 注册自动调参端点
     /// </summary>
@@ -28,141 +34,18 @@ public static class AutoTuneEndpoints
         var group = app.MapGroup("/api/autotune")
             .WithTags("AutoTune");
 
-        // POST /api/autotune/operator - 单个算子自动调参
-        group.MapPost("/operator", async (
-            OperatorAutoTuneRequest request,
-            IAutoTuneService autoTuneService,
-            ILogger<AutoTuneService> logger,
-            CancellationToken ct) =>
-        {
-            try
-            {
-                logger.LogInformation(
-                    "[AutoTuneAPI] 请求算子调参: Type={Type}, MaxIterations={MaxIter}",
-                    request.OperatorType, request.MaxIterations);
-
-                var result = await autoTuneService.AutoTuneOperatorAsync(
-                    request.OperatorType,
-                    request.InputImage,
-                    request.InitialParameters,
-                    request.Goal,
-                    request.MaxIterations,
-                    ct);
-
-                return result.Success
-                    ? Results.Ok(new AutoTuneResponse
-                    {
-                        Success = true,
-                        FinalParameters = result.FinalParameters,
-                        FinalScore = result.FinalScore,
-                        TotalIterations = result.TotalIterations,
-                        TotalExecutionTimeMs = result.TotalExecutionTimeMs,
-                        IsGoalAchieved = result.IsGoalAchieved,
-                        Iterations = result.Iterations.Select(i => new AutoTuneIterationDto
-                        {
-                            Iteration = i.Iteration,
-                            Parameters = i.Parameters,
-                            Score = i.Score,
-                            ExecutionTimeMs = i.ExecutionTimeMs,
-                            Metrics = MapMetricsToDto(i.Metrics)
-                        }).ToList()
-                    })
-                    : Results.BadRequest(new AutoTuneResponse
-                    {
-                        Success = false,
-                        ErrorMessage = result.ErrorMessage,
-                        Iterations = result.Iterations.Select(i => new AutoTuneIterationDto
-                        {
-                            Iteration = i.Iteration,
-                            Parameters = i.Parameters,
-                            Score = i.Score,
-                            ExecutionTimeMs = i.ExecutionTimeMs
-                        }).ToList()
-                    });
-            }
-            catch (OperationCanceledException)
-            {
-                return Results.StatusCode(499); // Client Closed Request
-            }
-            catch (Exception ex)
-            {
-                logger.LogError(ex, "[AutoTuneAPI] 算子调参失败");
-                return Results.Problem(ex.Message);
-            }
-        })
-        .WithName("AutoTuneOperator")
-        .WithDescription("对单个算子进行自动调参");
-
-        // POST /api/autotune/flow-node - 流程内节点自动调参
-        group.MapPost("/flow-node", async (
-            FlowNodeAutoTuneRequest request,
-            IAutoTuneService autoTuneService,
-            ILogger<AutoTuneService> logger,
-            CancellationToken ct) =>
-        {
-            try
-            {
-                logger.LogInformation(
-                    "[AutoTuneAPI] 请求流程节点调参: FlowId={FlowId}, NodeId={NodeId}",
-                    request.FlowId, request.TargetNodeId);
-
-                // 转换流程数据
-                var flow = FlowEntityMapper.ToPreviewEntity(request.FlowData, request.TargetNodeId);
-
-                var result = await autoTuneService.AutoTuneInFlowAsync(
-                    flow,
-                    request.TargetNodeId,
-                    request.InputImage,
-                    request.InitialParameters,
-                    request.Goal,
-                    request.MaxIterations,
-                    ct);
-
-                return result.Success
-                    ? Results.Ok(new AutoTuneResponse
-                    {
-                        Success = true,
-                        FinalParameters = result.FinalParameters,
-                        FinalScore = result.FinalScore,
-                        TotalIterations = result.TotalIterations,
-                        TotalExecutionTimeMs = result.TotalExecutionTimeMs,
-                        IsGoalAchieved = result.IsGoalAchieved,
-                        Iterations = result.Iterations.Select(i => new AutoTuneIterationDto
-                        {
-                            Iteration = i.Iteration,
-                            Parameters = i.Parameters,
-                            Score = i.Score,
-                            ExecutionTimeMs = i.ExecutionTimeMs,
-                            Metrics = MapMetricsToDto(i.Metrics)
-                        }).ToList()
-                    })
-                    : Results.BadRequest(new AutoTuneResponse
-                    {
-                        Success = false,
-                        ErrorMessage = result.ErrorMessage
-                    });
-            }
-            catch (OperationCanceledException)
-            {
-                return Results.StatusCode(499);
-            }
-            catch (Exception ex)
-            {
-                logger.LogError(ex, "[AutoTuneAPI] 流程节点调参失败");
-                return Results.Problem(ex.Message);
-            }
-        })
-        .WithName("AutoTuneFlowNode")
-        .WithDescription("对流程中的特定节点进行自动调参");
-
         // POST /api/autotune/flow-node/preview - 线序场景专用预览与分析
         group.MapPost("/flow-node/preview", async (
             FlowNodePreviewRequest request,
+            HttpContext context,
             IFlowNodePreviewService previewService,
             IExecutionAdmissionService executionAdmissionService,
+            IProjectRepository projectRepository,
+            AutoTuneExecutionGate executionGate,
             ILogger<AutoTuneService> logger,
-            CancellationToken ct) =>
+            CancellationToken _) =>
         {
+            CancellationTokenSource? executionCancellation = null;
             try
             {
                 logger.LogInformation(
@@ -170,19 +53,25 @@ public static class AutoTuneEndpoints
                     request.FlowId, request.TargetNodeId);
 
                 var flow = FlowEntityMapper.ToPreviewEntity(request.FlowData, request.TargetNodeId);
-                // 线序预览属于预览 surface：禁止真实外部 I/O（File 图源读图仍允许，与节点预览一致）。
-                var admission = executionAdmissionService.ValidateFlowSideEffects(
-                    flow,
-                    ExecutionAdmissionSurface.AutoTunePreview);
+                var admission = ValidateAutoTuneFlow(executionAdmissionService, flow);
                 if (!admission.IsAllowed)
                 {
-                    return Results.BadRequest(new
-                    {
-                        Code = admission.Code,
-                        Error = admission.Message,
-                        Violations = admission.Violations
-                    });
+                    return ToAdmissionFailure(admission);
                 }
+
+                var authorityAdmission = await ValidateAutoTuneAuthorityAsync(
+                    request,
+                    context,
+                    flow,
+                    executionAdmissionService,
+                    projectRepository,
+                    context.RequestAborted);
+                if (authorityAdmission.Failure != null)
+                {
+                    return authorityAdmission.Failure;
+                }
+
+                var authority = authorityAdmission.Authority!;
 
                 byte[]? inputImage = null;
                 if (!string.IsNullOrWhiteSpace(request.InputImageBase64) &&
@@ -191,41 +80,94 @@ public static class AutoTuneEndpoints
                     return ImagePayloadDecoder.ToErrorResult(decodeError, statusCode);
                 }
 
+                using var executionLease = executionGate.TryAcquire(authority.Principal.SubjectId);
+                if (executionLease == null)
+                {
+                    return ToFailure(StatusCodes.Status429TooManyRequests, "AUTOTUNE_CONCURRENCY_LIMIT_EXCEEDED", "AutoTune execution concurrency limit exceeded.");
+                }
+
+                executionCancellation = executionGate.CreateDeadlineSource(context.RequestAborted);
                 var result = await previewService.PreviewWithMetricsAsync(
                     flow,
                     request.TargetNodeId,
                     inputImage,
-                    ct);
+                    request.ProjectId,
+                    request.ExpectedProjectRevision!.Value,
+                    authority,
+                    projectVariables: null,
+                    ct: executionCancellation.Token);
 
                 return Results.Ok(MapFlowNodePreviewResponse(result));
             }
-            catch (OperationCanceledException)
+            catch (OperationCanceledException) when (context.RequestAborted.IsCancellationRequested)
             {
                 return Results.StatusCode(499);
+            }
+            catch (OperationCanceledException) when (executionCancellation?.IsCancellationRequested == true)
+            {
+                return ToFailure(StatusCodes.Status408RequestTimeout, "AUTOTUNE_DEADLINE_EXCEEDED", "AutoTune execution exceeded its server deadline.");
             }
             catch (Exception ex)
             {
                 logger.LogError(ex, "[AutoTuneAPI] 线序预览分析失败");
                 return Results.Problem(ex.Message);
             }
+            finally
+            {
+                executionCancellation?.Dispose();
+            }
         })
         .WithName("PreviewFlowNodeWithMetrics")
-        .WithDescription("返回线序节点预览图、结构化指标、诊断码、建议和缺失资源");
+        .WithDescription("返回线序节点预览图、结构化指标、诊断码、建议和缺失资源")
+        .RequireClearVisionPermission(ClearVisionPermissionPolicies.CanEditProject);
 
         // POST /api/autotune/scenario - 线序场景级自动调参
         group.MapPost("/scenario", async (
             ScenarioAutoTuneRequest request,
+            HttpContext context,
             IAutoTuneService autoTuneService,
+            IExecutionAdmissionService executionAdmissionService,
+            IProjectRepository projectRepository,
+            AutoTuneExecutionGate executionGate,
             ILogger<AutoTuneService> logger,
-            CancellationToken ct) =>
+            CancellationToken _) =>
         {
+            CancellationTokenSource? executionCancellation = null;
             try
             {
                 logger.LogInformation(
                     "[AutoTuneAPI] 请求场景级自动调参: ScenarioKey={ScenarioKey}",
                     request.ScenarioKey);
 
+                if (!AutoTuneExecutionGate.IsIterationCountAllowed(request.MaxIterations))
+                {
+                    return ToFailure(
+                        StatusCodes.Status400BadRequest,
+                        "AUTOTUNE_ITERATION_LIMIT_EXCEEDED",
+                        $"MaxIterations must be between {AutoTuneExecutionGate.MinimumIterations} and {AutoTuneExecutionGate.MaximumIterations}.");
+                }
+
                 var flow = FlowEntityMapper.ToEntity(request.FlowData);
+                var admission = ValidateAutoTuneFlow(executionAdmissionService, flow);
+                if (!admission.IsAllowed)
+                {
+                    return ToAdmissionFailure(admission);
+                }
+
+                var authorityAdmission = await ValidateAutoTuneAuthorityAsync(
+                    request,
+                    context,
+                    flow,
+                    executionAdmissionService,
+                    projectRepository,
+                    context.RequestAborted);
+                if (authorityAdmission.Failure != null)
+                {
+                    return authorityAdmission.Failure;
+                }
+
+                var authority = authorityAdmission.Authority!;
+
                 if (string.IsNullOrWhiteSpace(request.InputImageBase64))
                 {
                     return Results.BadRequest(new ScenarioAutoTuneResponse
@@ -249,31 +191,50 @@ public static class AutoTuneEndpoints
                         : Results.BadRequest(errorResponse);
                 }
 
+                using var executionLease = executionGate.TryAcquire(authority.Principal.SubjectId);
+                if (executionLease == null)
+                {
+                    return ToFailure(StatusCodes.Status429TooManyRequests, "AUTOTUNE_CONCURRENCY_LIMIT_EXCEEDED", "AutoTune execution concurrency limit exceeded.");
+                }
+
+                executionCancellation = executionGate.CreateDeadlineSource(context.RequestAborted);
                 var result = await autoTuneService.AutoTuneScenarioAsync(
                     request.ScenarioKey,
                     flow,
                     inputImage,
                     request.Goal ?? new AutoTuneGoal(),
+                    request.ProjectId,
+                    request.ExpectedProjectRevision!.Value,
+                    authority,
                     request.MaxIterations,
-                    ct);
+                    executionCancellation.Token);
 
                 var response = MapScenarioAutoTuneResponse(result);
                 return result.Success || result.MissingResources.Count > 0
                     ? Results.Ok(response)
                     : Results.BadRequest(response);
             }
-            catch (OperationCanceledException)
+            catch (OperationCanceledException) when (context.RequestAborted.IsCancellationRequested)
             {
                 return Results.StatusCode(499);
+            }
+            catch (OperationCanceledException) when (executionCancellation?.IsCancellationRequested == true)
+            {
+                return ToFailure(StatusCodes.Status408RequestTimeout, "AUTOTUNE_DEADLINE_EXCEEDED", "AutoTune execution exceeded its server deadline.");
             }
             catch (Exception ex)
             {
                 logger.LogError(ex, "[AutoTuneAPI] 场景级自动调参失败");
                 return Results.Problem(ex.Message);
             }
+            finally
+            {
+                executionCancellation?.Dispose();
+            }
         })
         .WithName("AutoTuneScenario")
-        .WithDescription("仅对 wire-sequence-terminal 场景执行白名单参数自动调参");
+        .WithDescription("仅对 wire-sequence-terminal 场景执行白名单参数自动调参")
+        .RequireClearVisionPermission(ClearVisionPermissionPolicies.CanEditProject);
 
         // POST /api/autotune/suggest - 获取参数建议（快速建议，不调参）
         group.MapPost("/suggest", (
@@ -370,6 +331,188 @@ public static class AutoTuneEndpoints
 
         return app;
     }
+
+    private static ExecutionAdmissionResult ValidateAutoTuneFlow(
+        IExecutionAdmissionService executionAdmissionService,
+        OperatorFlow flow)
+    {
+        var admission = executionAdmissionService.ValidateFlowDefinition(
+            flow,
+            ExecutionAdmissionSurface.AutoTunePreview);
+        if (!admission.IsAllowed)
+        {
+            return admission;
+        }
+
+        var violations = flow.Operators
+            .Where(@operator => @operator.IsEnabled)
+            .Select(@operator =>
+            {
+                var capabilities = ExecutionSideEffectCatalog.GetCapabilities(@operator) & ~AutoTuneAllowedCapabilities;
+                return capabilities == ExecutionSideEffect.None
+                    ? null
+                    : new ExecutionAdmissionViolation(
+                        @operator.Id,
+                        @operator.Name,
+                        @operator.Type,
+                        $"{@operator.Type} requires external capability '{capabilities}', which is forbidden for AutoTune Draft execution.",
+                        ExecutionSideEffectCatalog.GetCapabilityParameterName(@operator, capabilities));
+            })
+            .Where(violation => violation != null)
+            .Cast<ExecutionAdmissionViolation>()
+            .ToList();
+
+        return violations.Count == 0
+            ? ExecutionAdmissionResult.Allow()
+            : ExecutionAdmissionResult.Reject(
+                "ADMISSION_AUTOTUNE_PREVIEW_SIDE_EFFECT_BLOCKED",
+                "AutoTune Draft execution cannot access files, networks, databases, PLCs, cameras, serial ports, or other devices.",
+                violations);
+    }
+
+    private static async Task<(ExecutionRequestAuthority? Authority, IResult? Failure)> ValidateAutoTuneAuthorityAsync(
+        AutoTuneDraftAuthorityRequest request,
+        HttpContext context,
+        OperatorFlow flow,
+        IExecutionAdmissionService executionAdmissionService,
+        IProjectRepository projectRepository,
+        CancellationToken cancellationToken)
+    {
+        var principal = ResolvePrincipal(context);
+        if (principal == null)
+        {
+            return (null, ToFailure(
+                StatusCodes.Status403Forbidden,
+                "ADMISSION_PRINCIPAL_REQUIRED",
+                "AutoTune Draft execution requires an authenticated principal."));
+        }
+
+        if (!principal.IsEngineerOrAdmin || principal.IsSystem)
+        {
+            return (null, ToFailure(
+                StatusCodes.Status403Forbidden,
+                "ADMISSION_DRAFT_ROLE_FORBIDDEN",
+                "AutoTune Draft execution requires an Engineer or Admin principal."));
+        }
+
+        if (request.ProjectId == Guid.Empty ||
+            request.ExpectedProjectRevision is not { } expectedRevision || expectedRevision < 0)
+        {
+            return (null, ToFailure(
+                StatusCodes.Status400BadRequest,
+                "ADMISSION_DRAFT_REVISION_REQUIRED",
+                "AutoTune Draft execution requires a projectId and expectedProjectRevision."));
+        }
+
+        if (!TryValidateAuthorityIds(request.ConfirmationId, request.AuditId, out var confirmationId, out var auditId))
+        {
+            return (null, ToFailure(
+                StatusCodes.Status400BadRequest,
+                "ADMISSION_DRAFT_CONFIRMATION_REQUIRED",
+                "AutoTune Draft execution requires distinct confirmationId and auditId UUIDs."));
+        }
+
+        if (request.DeclaredCapabilities is not { } declaredCapabilities)
+        {
+            return (null, ToFailure(
+                StatusCodes.Status400BadRequest,
+                "ADMISSION_DRAFT_CAPABILITY_CONFIRMATION_REQUIRED",
+                "AutoTune Draft execution requires an explicit declaredCapabilities value."));
+        }
+
+        var projectAdmission = await executionAdmissionService.ValidateProjectAsync(
+            request.ProjectId,
+            ExecutionAdmissionSurface.AutoTunePreview,
+            cancellationToken);
+        if (!projectAdmission.IsAllowed)
+        {
+            return (null, ToAdmissionFailure(projectAdmission));
+        }
+
+        var project = await projectRepository.GetByIdFreshAsync(request.ProjectId);
+        cancellationToken.ThrowIfCancellationRequested();
+        if (project == null || project.IsDeleted)
+        {
+            return (null, ToFailure(
+                StatusCodes.Status400BadRequest,
+                "ADMISSION_PROJECT_NOT_ACTIVE",
+                "The bound AutoTune project does not exist or has been deleted."));
+        }
+
+        if (project.PersistenceRevision != expectedRevision)
+        {
+            return (null, ToFailure(
+                StatusCodes.Status409Conflict,
+                "ADMISSION_DRAFT_REVISION_STALE",
+                $"AutoTune Draft expected project revision {expectedRevision}, but the current revision is {project.PersistenceRevision}."));
+        }
+
+        var requiredCapabilities = ExecutionCapabilityManifest.Derive(flow).Capabilities;
+        if (declaredCapabilities != requiredCapabilities)
+        {
+            return (null, ToFailure(
+                StatusCodes.Status400BadRequest,
+                "ADMISSION_CAPABILITY_MANIFEST_MISMATCH",
+                "The declared AutoTune capability manifest does not match the immutable flow."));
+        }
+
+        var flowHash = ExecutionFlowIdentity.ComputeFlowHash(flow);
+        var authority = new ExecutionRequestAuthority(
+            principal,
+            expectedRevision,
+            new ExecutionCapabilityManifest(declaredCapabilities, isExplicit: true),
+            confirmationId,
+            auditId,
+            new Dictionary<string, string>
+            {
+                ["ProjectRevision"] = project.PersistenceRevision.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                ["FlowHash"] = flowHash
+            });
+        return (authority, null);
+    }
+
+    private static ExecutionPrincipal? ResolvePrincipal(HttpContext context)
+    {
+        var subjectId = context.User.FindFirstValue(ClaimTypes.NameIdentifier)?.Trim();
+        var role = EndpointPermissionGuards.GetCurrentRole(context)?.Trim();
+        var name = context.User.Identity?.Name?.Trim();
+        if (context.User.Identity?.IsAuthenticated != true ||
+            string.IsNullOrWhiteSpace(subjectId) ||
+            string.IsNullOrWhiteSpace(role))
+        {
+            return null;
+        }
+
+        return new ExecutionPrincipal(
+            subjectId,
+            string.IsNullOrWhiteSpace(name) ? subjectId : name,
+            role,
+            IsAuthenticated: true);
+    }
+
+    private static bool TryValidateAuthorityIds(
+        string? rawConfirmationId,
+        string? rawAuditId,
+        out string confirmationId,
+        out string auditId)
+    {
+        confirmationId = rawConfirmationId?.Trim() ?? string.Empty;
+        auditId = rawAuditId?.Trim() ?? string.Empty;
+        return Guid.TryParse(confirmationId, out var parsedConfirmation) && parsedConfirmation != Guid.Empty &&
+            Guid.TryParse(auditId, out var parsedAudit) && parsedAudit != Guid.Empty &&
+            parsedConfirmation != parsedAudit;
+    }
+
+    private static IResult ToAdmissionFailure(ExecutionAdmissionResult admission) =>
+        Results.BadRequest(new
+        {
+            Code = admission.Code,
+            Error = admission.Message,
+            Violations = admission.Violations
+        });
+
+    private static IResult ToFailure(int statusCode, string code, string message) =>
+        Results.Json(new { Code = code, Error = message }, statusCode: statusCode);
 
     #region DTO 映射
 
@@ -495,82 +638,19 @@ public static class AutoTuneEndpoints
 
 #region 请求/响应 DTOs
 
-/// <summary>
-/// 算子自动调参请求
-/// </summary>
-public class OperatorAutoTuneRequest
+public abstract class AutoTuneDraftAuthorityRequest
 {
-    /// <summary>
-    /// 算子类型
-    /// </summary>
-    public OperatorType OperatorType { get; set; }
-
-    /// <summary>
-    /// 输入图像（Base64 或字节数组）
-    /// </summary>
-    public byte[] InputImage { get; set; } = Array.Empty<byte>();
-
-    /// <summary>
-    /// 初始参数
-    /// </summary>
-    public Dictionary<string, object> InitialParameters { get; set; } = new();
-
-    /// <summary>
-    /// 调参目标
-    /// </summary>
-    public AutoTuneGoal Goal { get; set; } = new();
-
-    /// <summary>
-    /// 最大迭代次数（默认 5）
-    /// </summary>
-    public int MaxIterations { get; set; } = 5;
-}
-
-/// <summary>
-/// 流程节点自动调参请求
-/// </summary>
-public class FlowNodeAutoTuneRequest
-{
-    /// <summary>
-    /// 流程 ID
-    /// </summary>
-    public Guid FlowId { get; set; }
-
-    /// <summary>
-    /// 目标节点 ID
-    /// </summary>
-    public Guid TargetNodeId { get; set; }
-
-    /// <summary>
-    /// 流程数据
-    /// </summary>
-    public FlowDataDto FlowData { get; set; } = new();
-
-    /// <summary>
-    /// 输入图像
-    /// </summary>
-    public byte[] InputImage { get; set; } = Array.Empty<byte>();
-
-    /// <summary>
-    /// 初始参数
-    /// </summary>
-    public Dictionary<string, object> InitialParameters { get; set; } = new();
-
-    /// <summary>
-    /// 调参目标
-    /// </summary>
-    public AutoTuneGoal Goal { get; set; } = new();
-
-    /// <summary>
-    /// 最大迭代次数（默认 5）
-    /// </summary>
-    public int MaxIterations { get; set; } = 5;
+    public Guid ProjectId { get; set; }
+    public long? ExpectedProjectRevision { get; set; }
+    public ExecutionSideEffect? DeclaredCapabilities { get; set; }
+    public string? ConfirmationId { get; set; }
+    public string? AuditId { get; set; }
 }
 
 /// <summary>
 /// 线序节点预览请求
 /// </summary>
-public class FlowNodePreviewRequest
+public class FlowNodePreviewRequest : AutoTuneDraftAuthorityRequest
 {
     public Guid FlowId { get; set; }
     public Guid TargetNodeId { get; set; }
@@ -582,7 +662,7 @@ public class FlowNodePreviewRequest
 /// <summary>
 /// 线序场景自动调参请求
 /// </summary>
-public class ScenarioAutoTuneRequest
+public class ScenarioAutoTuneRequest : AutoTuneDraftAuthorityRequest
 {
     public string ScenarioKey { get; set; } = string.Empty;
     public FlowDataDto FlowData { get; set; } = new();
@@ -610,52 +690,6 @@ public class ParameterSuggestionRequest
     /// 调参目标
     /// </summary>
     public AutoTuneGoal Goal { get; set; } = new();
-}
-
-/// <summary>
-/// 自动调参响应
-/// </summary>
-public class AutoTuneResponse
-{
-    /// <summary>
-    /// 是否成功
-    /// </summary>
-    public bool Success { get; set; }
-
-    /// <summary>
-    /// 最终参数
-    /// </summary>
-    public Dictionary<string, object> FinalParameters { get; set; } = new();
-
-    /// <summary>
-    /// 最终评分
-    /// </summary>
-    public double FinalScore { get; set; }
-
-    /// <summary>
-    /// 总迭代次数
-    /// </summary>
-    public int TotalIterations { get; set; }
-
-    /// <summary>
-    /// 总执行时间（毫秒）
-    /// </summary>
-    public long TotalExecutionTimeMs { get; set; }
-
-    /// <summary>
-    /// 是否达到目标
-    /// </summary>
-    public bool IsGoalAchieved { get; set; }
-
-    /// <summary>
-    /// 错误信息
-    /// </summary>
-    public string? ErrorMessage { get; set; }
-
-    /// <summary>
-    /// 迭代历史
-    /// </summary>
-    public List<AutoTuneIterationDto> Iterations { get; set; } = new();
 }
 
 /// <summary>

@@ -18,13 +18,16 @@ namespace ClearVision.Product.Infrastructure.Operators;
 [InputPort("Image", "Input Image", PortDataType.Image, IsRequired = true)]
 [OutputPort("Image", "Result Image", PortDataType.Image)]
 [OutputPort("CalibrationData", "Calibration Data", PortDataType.String)]
+[OutputPort("CalibrationAssetId", "Calibration Asset Id", PortDataType.String)]
+[OutputPort("CalibrationAssetCandidate", "Calibration Asset Candidate", PortDataType.Boolean)]
+[OutputPort("CalibrationContentHash", "Calibration Content Hash", PortDataType.String)]
 [OperatorParam("PatternType", "Pattern Type", "enum", DefaultValue = "Chessboard", Options = new[] { "Chessboard|Chessboard", "CircleGrid|CircleGrid" })]
 [OperatorParam("BoardWidth", "Board Width", "int", DefaultValue = 9, Min = 2, Max = 30)]
 [OperatorParam("BoardHeight", "Board Height", "int", DefaultValue = 6, Min = 2, Max = 30)]
 [OperatorParam("SquareSize", "Square Size(mm)", "double", DefaultValue = 25.0, Min = 0.1, Max = 1000.0)]
 [OperatorParam("Mode", "Mode", "enum", DefaultValue = "SingleImage", Options = new[] { "SingleImage|SingleImage", "FolderCalibration|FolderCalibration" })]
 [OperatorParam("ImageFolder", "Image Folder", "string", DefaultValue = "")]
-[OperatorParam("CalibrationOutputPath", "Calibration Output Path", "string", DefaultValue = "calibration_result.json")]
+[OperatorParam("CalibrationAssetId", "Calibration Asset Id", "string", DefaultValue = "")]
 public class CameraCalibrationOperator : OperatorBase
 {
     private const int MinValidFolderSamples = 12;
@@ -49,15 +52,15 @@ public class CameraCalibrationOperator : OperatorBase
         var squareSize = GetDoubleParam(@operator, "SquareSize", 25.0, 0.1, 1000.0);
         var mode = GetStringParam(@operator, "Mode", "SingleImage");
         var imageFolder = GetStringParam(@operator, "ImageFolder", "");
-        var calibrationOutputPath = GetStringParam(@operator, "CalibrationOutputPath", "calibration_result.json");
+        var calibrationAssetId = GetStringParam(@operator, "CalibrationAssetId", string.Empty);
         var patternSize = new Size(boardWidth, boardHeight);
 
         if (mode.Equals("FolderCalibration", StringComparison.OrdinalIgnoreCase))
         {
-            return ExecuteFolderCalibration(patternType, patternSize, squareSize, imageFolder, calibrationOutputPath, cancellationToken);
+            return ExecuteFolderCalibration(patternType, patternSize, squareSize, imageFolder, calibrationAssetId, cancellationToken);
         }
 
-        return ExecuteSingleImagePreview(inputs, patternType, patternSize);
+        return ExecuteSingleImagePreview(inputs, patternType, patternSize, calibrationAssetId);
     }
 
     public override ValidationResult ValidateParameters(Operator @operator)
@@ -94,7 +97,8 @@ public class CameraCalibrationOperator : OperatorBase
     private Task<OperatorExecutionOutput> ExecuteSingleImagePreview(
         Dictionary<string, object>? inputs,
         string patternType,
-        Size patternSize)
+        Size patternSize,
+        string calibrationAssetId)
     {
         if (!TryGetInputImage(inputs, "Image", out var imageWrapper) || imageWrapper == null)
         {
@@ -177,6 +181,7 @@ public class CameraCalibrationOperator : OperatorBase
             ["CornerCount"] = found ? corners.Length : 0,
             ["Message"] = "SingleImage mode generates preview diagnostics only."
         };
+        CalibrationAssetCandidateOutput.AddTo(output, calibrationAssetId, calibrationJson);
 
         return Task.FromResult(OperatorExecutionOutput.Success(CreateImageOutput(resultImage, output)));
     }
@@ -186,7 +191,7 @@ public class CameraCalibrationOperator : OperatorBase
         Size patternSize,
         double squareSize,
         string imageFolder,
-        string outputPath,
+        string calibrationAssetId,
         CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(imageFolder) || !Directory.Exists(imageFolder))
@@ -368,7 +373,6 @@ public class CameraCalibrationOperator : OperatorBase
         };
 
         var calibrationJson = CalibrationBundleV2Json.Serialize(bundle);
-        TryWriteOutputFile(outputPath, calibrationJson);
 
         using var previewBase = Cv2.ImRead(imageFiles[0], ImreadModes.Color);
         var resultImage = previewBase.Empty()
@@ -395,11 +399,11 @@ public class CameraCalibrationOperator : OperatorBase
             ["RejectedDetectionCount"] = failedFiles.Count,
             ["RejectedOutlierCount"] = outlierFiles.Count,
             ["Diagnostics"] = diagnostics,
-            ["OutputPath"] = outputPath,
             ["Message"] = accepted
                 ? $"Calibration accepted with {samples.Count}/{imageFiles.Length} samples."
                 : "Calibration completed but did not pass quality acceptance."
         };
+        CalibrationAssetCandidateOutput.AddTo(output, calibrationAssetId, calibrationJson);
 
         return Task.FromResult(OperatorExecutionOutput.Success(CreateImageOutput(resultImage, output)));
     }
@@ -588,24 +592,6 @@ public class CameraCalibrationOperator : OperatorBase
         }
 
         return points;
-    }
-
-    private void TryWriteOutputFile(string outputPath, string json)
-    {
-        try
-        {
-            var directory = Path.GetDirectoryName(outputPath);
-            if (!string.IsNullOrWhiteSpace(directory))
-            {
-                Directory.CreateDirectory(directory);
-            }
-
-            File.WriteAllText(outputPath, json);
-        }
-        catch (Exception ex)
-        {
-            Logger.LogWarning(ex, "Failed to save calibration file to {Path}.", outputPath);
-        }
     }
 
     private static void DisposeMatList(IEnumerable<Mat> mats)

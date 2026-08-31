@@ -4,6 +4,7 @@
 
 using ClearVision.Product.Core.Cameras;
 using ClearVision.Product.Core.Entities;
+using ClearVision.Product.Core.Enums;
 using ClearVision.Product.Core.Services;
 using Microsoft.Extensions.Logging;
 
@@ -14,11 +15,19 @@ namespace ClearVision.Product.Infrastructure.Services;
 /// </summary>
 public class IntelligentDetectionService : IIntelligentDetectionService
 {
-    private readonly ILogger<IntelligentDetectionService> _logger;
+    public const string CameraBindingResourceKey = "CameraBindingId";
+    private const int MaxRetryCount = 10;
+    private const int MaxRetryIntervalMs = 60_000;
 
-    public IntelligentDetectionService(ILogger<IntelligentDetectionService> logger)
+    private readonly ILogger<IntelligentDetectionService> _logger;
+    private readonly IExecutionAdmissionService _executionAdmissionService;
+
+    public IntelligentDetectionService(
+        ILogger<IntelligentDetectionService> logger,
+        IExecutionAdmissionService executionAdmissionService)
     {
         _logger = logger;
+        _executionAdmissionService = executionAdmissionService;
     }
 
     /// <summary>
@@ -32,13 +41,121 @@ public class IntelligentDetectionService : IIntelligentDetectionService
         RetryPolicy policy,
         CancellationToken cancellationToken = default)
     {
+        // This compatibility overload has no project revision, principal,
+        // confirmation, audit, or server-issued resource binding. It must not
+        // manufacture Draft authority around a caller-provided flow.
+        return await Task.FromResult(DetectionResult.Failed(
+            "ADMISSION_AUTHORITATIVE_SNAPSHOT_REQUIRED: Intelligent detection requires an authoritative stored-project or runtime-package snapshot."));
+    }
+
+    public async Task<DetectionResult> ExecuteWithRetryAsync(
+        ICameraManager cameraManager,
+        string cameraBindingId,
+        IFlowExecutionService flowService,
+        ExecutionSnapshot snapshot,
+        RetryPolicy policy,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(cameraManager);
+        ArgumentNullException.ThrowIfNull(flowService);
+        ArgumentNullException.ThrowIfNull(snapshot);
+        ArgumentNullException.ThrowIfNull(policy);
+        cancellationToken.ThrowIfCancellationRequested();
+        if (policy.MaxRetries is < 0 or > MaxRetryCount ||
+            policy.RetryIntervalMs is < 0 or > MaxRetryIntervalMs ||
+            !double.IsFinite(policy.MinConfidence) ||
+            policy.MinConfidence is < 0 or > 1 ||
+            !double.IsFinite(policy.TargetBrightness) ||
+            policy.TargetBrightness is < 0 or > 255)
+        {
+            return DetectionResult.Failed(
+                "ADMISSION_RETRY_POLICY_INVALID: Intelligent detection retry policy exceeds bounded limits.");
+        }
+
+        var surface = snapshot.Source switch
+        {
+            ExecutionSnapshotSource.PersistedProject => ExecutionAdmissionSurface.StoredProjectExecution,
+            ExecutionSnapshotSource.RuntimePackage => ExecutionAdmissionSurface.StationRuntimeExecution,
+            _ => (ExecutionAdmissionSurface?)null
+        };
+        if (surface == null)
+        {
+            return DetectionResult.Failed(
+                "ADMISSION_AUTHORITATIVE_SNAPSHOT_REQUIRED: Intelligent detection accepts only a stored-project or runtime-package snapshot.");
+        }
+
+        ExecutionAdmissionResult projectAdmission;
+        ExecutionAdmissionResult snapshotAdmission;
+        FlowValidationResult? flowValidation;
+        try
+        {
+            projectAdmission = await _executionAdmissionService.ValidateProjectAsync(
+                snapshot.ProjectId,
+                surface.Value,
+                cancellationToken);
+            if (!projectAdmission.IsAllowed)
+            {
+                return Rejected(projectAdmission.Code, projectAdmission.Message);
+            }
+
+            snapshotAdmission = _executionAdmissionService.ValidateSnapshot(snapshot, surface.Value);
+            if (!snapshotAdmission.IsAllowed)
+            {
+                return Rejected(snapshotAdmission.Code, snapshotAdmission.Message);
+            }
+
+            // Validate through the same governed flow boundary that will later
+            // dispatch. This remains before binding lookup or camera leasing.
+            flowValidation = await flowService.ValidateSnapshotAsync(snapshot, cancellationToken);
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "[智能检测] 执行准入校验失败");
+            return DetectionResult.Failed(
+                "ADMISSION_VALIDATION_UNAVAILABLE: Intelligent detection validation is unavailable.");
+        }
+
+        if (flowValidation is not { IsValid: true })
+        {
+            var message = flowValidation?.Errors.Count > 0
+                ? string.Join("; ", flowValidation.Errors)
+                : "Flow validation failed.";
+            return DetectionResult.Failed($"ADMISSION_FLOW_INVALID: {message}");
+        }
+
+        if (!snapshot.CapabilityManifest.Capabilities.HasFlag(ExecutionSideEffect.DeviceRead))
+        {
+            return DetectionResult.Failed(
+                "ADMISSION_CAMERA_CAPABILITY_REQUIRED: The authoritative snapshot must explicitly declare camera device-read capability.");
+        }
+
+        var declaredCameraBindingId = ResolveDeclaredCameraBinding(snapshot.CreateExecutionFlow());
+        if (!snapshot.ResourceBindings.TryGetValue(CameraBindingResourceKey, out var boundCameraBindingId) ||
+            string.IsNullOrWhiteSpace(boundCameraBindingId) ||
+            string.IsNullOrWhiteSpace(declaredCameraBindingId) ||
+            !string.Equals(boundCameraBindingId, declaredCameraBindingId, StringComparison.OrdinalIgnoreCase) ||
+            !string.Equals(boundCameraBindingId, cameraBindingId?.Trim(), StringComparison.OrdinalIgnoreCase))
+        {
+            return DetectionResult.Failed(
+                "ADMISSION_CAMERA_BINDING_REQUIRED: The camera binding must match the server-issued execution snapshot.");
+        }
+
         DetectionResult? lastResult = null;
-        var snapshot = new ExecutionSnapshot(
-            flow.Id == Guid.Empty ? Guid.NewGuid() : flow.Id,
-            flow,
-            persistenceRevision: 0,
-            ExecutionSnapshotSource.Draft,
-            ExecutionRunMode.FormalPrimary);
+        CameraBindingConfig binding;
+        try
+        {
+            binding = cameraManager.RequireEnabledBinding(boundCameraBindingId);
+        }
+        catch (Exception ex) when (ex is ArgumentException or InvalidOperationException)
+        {
+            _logger.LogWarning(ex, "[智能检测] 拒绝未授权的相机绑定 {CameraBindingId}", boundCameraBindingId);
+            return DetectionResult.Failed(
+                "RESOURCE_CAMERA_BINDING_REQUIRED: The server camera binding is unavailable or disabled.");
+        }
 
         for (int attempt = 0; attempt <= policy.MaxRetries; attempt++)
         {
@@ -46,8 +163,13 @@ public class IntelligentDetectionService : IIntelligentDetectionService
             {
                 _logger.LogInformation("[智能检测] 第 {Attempt}/{MaxRetries} 次检测尝试", attempt + 1, policy.MaxRetries + 1);
 
-                // 获取或创建相机
-                var camera = await cameraManager.GetOrCreateCameraAsync(cameraId);
+                // Pin the authoritative camera for the complete attempt so
+                // Close/ApplyBindings cannot dispose it during acquisition,
+                // exposure adjustment, or governed flow execution.
+                await using var cameraLease = await cameraManager.AcquireByBindingLeaseAsync(
+                    binding.Id,
+                    cancellationToken);
+                var camera = cameraLease.Camera;
 
                 // 采集图像
                 var imageBytes = await camera.AcquireSingleFrameAsync();
@@ -112,10 +234,39 @@ public class IntelligentDetectionService : IIntelligentDetectionService
         return lastResult ?? DetectionResult.Failed("超过最大重试次数");
     }
 
+    private static DetectionResult Rejected(string code, string message) =>
+        DetectionResult.Failed($"{code}: {message}");
+
+    private static string? ResolveDeclaredCameraBinding(OperatorFlow flow)
+    {
+        var cameraBindings = flow.Operators
+            .Where(@operator => @operator.IsEnabled && @operator.Type == OperatorType.ImageAcquisition)
+            .Where(IsCameraSource)
+            .Select(@operator => ReadParameter(@operator, "CameraId"))
+            .Where(value => !string.IsNullOrWhiteSpace(value))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Take(2)
+            .ToArray();
+        return cameraBindings.Length == 1 ? cameraBindings[0] : null;
+    }
+
+    private static bool IsCameraSource(Operator @operator)
+    {
+        var value = ReadParameter(@operator, "SourceType");
+        var separator = value.IndexOf('|', StringComparison.Ordinal);
+        var normalized = separator >= 0 ? value[..separator].Trim() : value;
+        return string.Equals(normalized, "Camera", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static string ReadParameter(Operator @operator, string name) =>
+        @operator.Parameters.FirstOrDefault(parameter =>
+            string.Equals(parameter.Name, name, StringComparison.OrdinalIgnoreCase))
+        ?.GetValue()?.ToString()?.Trim() ?? string.Empty;
+
     /// <summary>
     /// 自适应曝光调整
     /// </summary>
-    public async Task<double> AdjustExposureAsync(ICamera camera, double imageBrightness, double targetBrightness = 128.0)
+    private async Task<double> AdjustExposureAsync(ICamera camera, double imageBrightness, double targetBrightness = 128.0)
     {
         try
         {

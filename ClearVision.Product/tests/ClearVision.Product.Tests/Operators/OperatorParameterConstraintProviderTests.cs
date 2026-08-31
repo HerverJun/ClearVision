@@ -551,9 +551,7 @@ public sealed class OperatorParameterConstraintProviderTests
                 metadata,
                 new Dictionary<string, object?>
                 {
-                    ["UseGlobalFallback"] = false,
-                    ["IpAddress"] = "192.168.3.39",
-                    ["Port"] = 5002,
+                    ["ProfileId"] = "line-mc",
                     ["Address"] = "D100",
                     ["Operation"] = "Write",
                     ["WriteValue"] = ""
@@ -564,13 +562,44 @@ public sealed class OperatorParameterConstraintProviderTests
                 metadata,
                 new Dictionary<string, object?>
                 {
-                    ["UseGlobalFallback"] = false,
-                    ["IpAddress"] = "",
-                    ["Port"] = "",
-                    ["Address"] = ""
+                    ["ProfileId"] = "",
+                    ["Address"] = "",
+                    ["Operation"] = ""
                 })
             .SelectMany(item => item.ParameterNames)
-            .Should().BeEquivalentTo(["IpAddress", "Port", "Address"]);
+            .Should().BeEquivalentTo(["ProfileId", "Address", "Operation"]);
+    }
+
+    [Fact]
+    public void PlcCommunication_Metadata_ShouldExposeOnlyProfileAndAllowListedTargetSelectors()
+    {
+        var cases = new Dictionary<OperatorType, string[]>
+        {
+            [OperatorType.SiemensS7Communication] =
+                ["IpAddress", "Port", "UseGlobalFallback", "CpuType", "Rack", "Slot", "DataType"],
+            [OperatorType.MitsubishiMcCommunication] =
+                ["IpAddress", "Port", "UseGlobalFallback", "DataType"],
+            [OperatorType.OmronFinsCommunication] =
+                ["IpAddress", "Port", "UseGlobalFallback", "DataType"],
+            [OperatorType.ModbusCommunication] =
+                ["Protocol", "IpAddress", "Port", "SlaveId"]
+        };
+
+        foreach (var (@operator, forbiddenParameters) in cases)
+        {
+            var metadata = _factory.GetMetadata(@operator)!;
+            var profile = metadata.Parameters.Single(parameter => parameter.Name == "ProfileId");
+            profile.Should().NotBeNull();
+            metadata.ParameterConstraints.Should().ContainSingle(constraint =>
+                constraint.Parameter == "ProfileId" &&
+                constraint.RequiredPolicy == "required" &&
+                constraint.ResourceKind == "plc_profile");
+            foreach (var forbiddenParameter in forbiddenParameters)
+            {
+                metadata.Parameters.Should().NotContain(parameter => parameter.Name == forbiddenParameter);
+                metadata.ParameterConstraints.Should().NotContain(constraint => constraint.Parameter == forbiddenParameter);
+            }
+        }
     }
 
     [Fact]
@@ -582,7 +611,6 @@ public sealed class OperatorParameterConstraintProviderTests
                 metadata,
                 new Dictionary<string, object?>
                 {
-                    ["UseGlobalProfile"] = true,
                     ["ProfileId"] = ""
                 })
             .Should().ContainSingle(item =>
@@ -592,15 +620,19 @@ public sealed class OperatorParameterConstraintProviderTests
         var profileStates = States(
             metadata,
             new Dictionary<string, object?> { ["ProfileId"] = "robot-profile" });
-        profileStates["Mode"].EffectiveDisabled.Should().BeTrue();
-        profileStates["IpAddress"].EffectiveDisabled.Should().BeTrue();
-        profileStates["Port"].EffectiveDisabled.Should().BeTrue();
-        profileStates["Timeout"].EffectiveDisabled.Should().BeTrue();
+        profileStates["ProfileId"].EffectiveRequired.Should().BeTrue();
+        profileStates["ProfileId"].EffectiveDisabled.Should().BeFalse();
+        foreach (var legacyTargetParameter in new[] { "UseGlobalProfile", "Mode", "IpAddress", "Port", "Timeout", "Encoding" })
+        {
+            metadata.Parameters.Should().NotContain(parameter =>
+                parameter.Name == legacyTargetParameter);
+        }
 
         var noResponseStates = States(
             metadata,
             new Dictionary<string, object?>
             {
+                ["ProfileId"] = "robot-profile",
                 ["WaitResponse"] = false,
                 ["ResponseParseMode"] = "Regex",
                 ["ResponseRegexPattern"] = "<pending-regex>"
@@ -618,6 +650,7 @@ public sealed class OperatorParameterConstraintProviderTests
                 metadata,
                 new Dictionary<string, object?>
                 {
+                    ["ProfileId"] = "robot-profile",
                     ["WaitResponse"] = false,
                     ["ResponseParseMode"] = "Regex",
                     ["ResponseRegexPattern"] = "<pending-regex>"
@@ -628,6 +661,7 @@ public sealed class OperatorParameterConstraintProviderTests
                 metadata,
                 new Dictionary<string, object?>
                 {
+                    ["ProfileId"] = "robot-profile",
                     ["WaitResponse"] = true,
                     ["ResponseParseMode"] = "Regex",
                     ["ResponseRegexPattern"] = ""
@@ -638,6 +672,7 @@ public sealed class OperatorParameterConstraintProviderTests
                 metadata,
                 new Dictionary<string, object?>
                 {
+                    ["ProfileId"] = "robot-profile",
                     ["WaitResponse"] = true,
                     ["ResponseParseMode"] = "KeyValue",
                     ["ResponseKeyValuePairDelimiter"] = "",
@@ -654,6 +689,7 @@ public sealed class OperatorParameterConstraintProviderTests
                 metadata,
                 new Dictionary<string, object?>
                 {
+                    ["ProfileId"] = "robot-profile",
                     ["WaitResponse"] = true,
                     ["ResponseParseMode"] = "KeyValue",
                     ["ResponseKeyValuePairDelimiter"] = "",

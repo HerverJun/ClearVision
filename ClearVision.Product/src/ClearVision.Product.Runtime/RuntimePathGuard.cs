@@ -1,9 +1,13 @@
 using System.Security.Cryptography;
+using ClearVision.Product.Core.Services;
 
 namespace ClearVision.Product.Runtime;
 
 internal static class RuntimePathGuard
 {
+    private const string PackageAllowedRootsEnvironmentVariable = "CV_RUNTIME_PACKAGE_ALLOWED_ROOTS";
+    private const string InputAllowedRootsEnvironmentVariable = "CV_RUNTIME_INPUT_ALLOWED_ROOTS";
+
     public static string ResolveChildPath(string rootPath, string relativePath)
     {
         if (string.IsNullOrWhiteSpace(relativePath))
@@ -33,6 +37,27 @@ internal static class RuntimePathGuard
     {
         ValidateStrictRelativeAssetPath(relativePath);
         return ResolveChildPath(rootPath, relativePath);
+    }
+
+    public static string ResolveApprovedPackageRoot(string packageRoot)
+    {
+        return ResolveApprovedPath(
+            packageRoot,
+            BuildApprovedPackageRoots(),
+            "Runtime package root");
+    }
+
+    public static string ResolveApprovedInputPath(string inputPath, string packageRoot)
+    {
+        var approvedRoots = new List<string>
+        {
+            Path.GetFullPath(packageRoot),
+            Path.GetFullPath(GetDefaultStationDataRoot()),
+            Path.GetFullPath(Path.GetTempPath())
+        };
+        approvedRoots.AddRange(ReadConfiguredRoots(InputAllowedRootsEnvironmentVariable));
+
+        return ResolveApprovedPath(inputPath, approvedRoots, "Runtime input path");
     }
 
     public static void ValidateStrictRelativeAssetPath(string relativePath)
@@ -148,6 +173,48 @@ internal static class RuntimePathGuard
             .Select(path => path.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar) + Path.DirectorySeparatorChar)
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToList();
+    }
+
+    private static IReadOnlyList<string> BuildApprovedPackageRoots()
+    {
+        var roots = new List<string>
+        {
+            Path.GetFullPath(GetDefaultStudioExportRoot()),
+            Path.GetFullPath(GetDefaultStationDataRoot()),
+            Path.GetFullPath(Path.Combine(Directory.GetCurrentDirectory(), ".tmp", "publish-check")),
+            Path.GetFullPath(Path.GetTempPath())
+        };
+        roots.AddRange(ReadConfiguredRoots(PackageAllowedRootsEnvironmentVariable));
+        roots.AddRange(ReadConfiguredRoots("CV_RUNTIME_EXPORT_ALLOWED_ROOTS"));
+        return roots.Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
+    }
+
+    private static IEnumerable<string> ReadConfiguredRoots(string environmentVariable)
+    {
+        var configured = Environment.GetEnvironmentVariable(environmentVariable);
+        return string.IsNullOrWhiteSpace(configured)
+            ? []
+            : configured
+                .Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                .Select(path => Path.GetFullPath(Environment.ExpandEnvironmentVariables(path)));
+    }
+
+    private static string ResolveApprovedPath(
+        string requestedPath,
+        IEnumerable<string> approvedRoots,
+        string label)
+    {
+        if (!CanonicalPathSafety.TryValidateWithinRoots(
+                requestedPath,
+                approvedRoots,
+                out var canonicalPath,
+                out var code,
+                out var message))
+        {
+            throw new RuntimePackageException($"{code}: {label} is not approved. {message}");
+        }
+
+        return canonicalPath;
     }
 
     private static bool IsUnderRoot(string candidate, string root)

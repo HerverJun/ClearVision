@@ -8,7 +8,10 @@ using System.Diagnostics;
 using System.IO.Ports;
 using System.Linq;
 using System.Net.Http;
+using System.Security.Claims;
 using System.Text.Json;
+using System.Text.Json.Serialization;
+using ClearVision.Product.Application.Security;
 using ClearVision.Product.Application.Services;
 using ClearVision.Product.Core.AI.Tools;
 using ClearVision.Product.Core.Cameras;
@@ -1790,7 +1793,10 @@ public static class SettingsEndpoints
                     });
                 }
 
-                var camera = await cameraManager.GetOrCreateByBindingAsync(request.CameraBindingId);
+                await using var cameraLease = await cameraManager.AcquireByBindingLeaseAsync(
+                    request.CameraBindingId,
+                    context.RequestAborted);
+                var camera = cameraLease.Camera;
 
                 await camera.SetExposureTimeAsync(binding.ExposureTimeUs);
                 await camera.SetGainAsync(binding.GainDb);
@@ -1864,28 +1870,97 @@ public static class SettingsEndpoints
         app.MapPost("/api/trigger-input/test-serial-photoelectric", async (
             SerialPhotoelectricTestRequest request,
             [FromServices]
+            IConfigurationService configService,
+            [FromServices]
             ISerialPhotoelectricTriggerInputService serialPhotoelectricTriggerInputService,
             HttpContext context) =>
         {
-            var timeoutMs = Math.Clamp(request.TimeoutMs <= 0 ? 10000 : request.TimeoutMs, 1000, 60000);
-            var debounceMs = CameraSoftwareTriggerSourceExtensions.NormalizeSerialPhotoelectricDebounceMs(request.DebounceMs);
-            var baudRate = CameraSoftwareTriggerSourceExtensions.NormalizeSerialPhotoelectricBaudRate(request.BaudRate);
-            var portName = (request.PortName ?? string.Empty).Trim().ToUpperInvariant();
+            if (request.UnsupportedFields is { Count: > 0 })
+            {
+                return Results.BadRequest(new
+                {
+                    success = false,
+                    errorCode = "SERIAL_PHOTOELECTRIC_RAW_TARGET_FORBIDDEN",
+                    message = "客户端串口目标或测试参数不能授予硬件访问权限；请仅提交已保存的 CameraBindingId 与 expectedRevision。"
+                });
+            }
+
+            var bindingId = (request.CameraBindingId ?? string.Empty).Trim();
+            if (string.IsNullOrWhiteSpace(bindingId))
+            {
+                return Results.BadRequest(new
+                {
+                    success = false,
+                    errorCode = "SERIAL_PHOTOELECTRIC_BINDING_REQUIRED",
+                    message = "CameraBindingId is required."
+                });
+            }
+
+            if (!request.ExpectedRevision.HasValue)
+            {
+                return AppConfigEndpointResults.ExpectedRevisionFailure();
+            }
+
+            var configRead = await configService.ReadAsync(context.RequestAborted);
+            if (!configRead.IsHealthy || configRead.Config == null)
+            {
+                return AppConfigEndpointResults.ReadFailure(configRead);
+            }
+
+            var config = configRead.Config;
+            if (config.Revision != request.ExpectedRevision.Value)
+            {
+                return Results.Json(new
+                {
+                    success = false,
+                    errorCode = "SERIAL_PHOTOELECTRIC_BINDING_REVISION_STALE",
+                    message = "串口光电测试绑定已被更新，请刷新配置后重试。",
+                    expectedRevision = request.ExpectedRevision.Value,
+                    actualRevision = config.Revision,
+                    revision = config.Revision
+                }, statusCode: StatusCodes.Status409Conflict);
+            }
+
+            var binding = (config.Cameras ?? [])
+                .FirstOrDefault(candidate => candidate.Id.Equals(bindingId, StringComparison.OrdinalIgnoreCase));
+            if (binding == null)
+            {
+                return Results.NotFound(new
+                {
+                    success = false,
+                    errorCode = "SERIAL_PHOTOELECTRIC_BINDING_NOT_FOUND",
+                    message = "CameraBindingId does not reference a saved camera binding."
+                });
+            }
+
+            if (!binding.IsEnabled ||
+                !binding.UsesSerialPhotoelectricTrigger() ||
+                !System.Text.RegularExpressions.Regex.IsMatch(
+                    binding.SerialPhotoelectricPortName ?? string.Empty,
+                    "^COM[0-9]+$",
+                    System.Text.RegularExpressions.RegexOptions.IgnoreCase) ||
+                binding.SerialPhotoelectricBaudRate <= 0 ||
+                binding.SerialPhotoelectricDebounceMs < CameraSoftwareTriggerSourceExtensions.MinEnterPhotoelectricDebounceMs ||
+                binding.SerialPhotoelectricDebounceMs > CameraSoftwareTriggerSourceExtensions.MaxEnterPhotoelectricDebounceMs ||
+                binding.SerialPhotoelectricTimeoutMs < CameraSoftwareTriggerSourceExtensions.MinEnterPhotoelectricTimeoutMs ||
+                binding.SerialPhotoelectricTimeoutMs > CameraSoftwareTriggerSourceExtensions.MaxEnterPhotoelectricTimeoutMs)
+            {
+                return Results.BadRequest(new
+                {
+                    success = false,
+                    errorCode = "SERIAL_PHOTOELECTRIC_BINDING_INVALID",
+                    message = "已保存的相机绑定未启用或不是有效的串口光电触发 profile。"
+                });
+            }
 
             try
             {
+                var triggerOptions = binding.ToSerialPhotoelectricTriggerOptions() with
+                {
+                    AcceptPendingSignalsAfterUtc = DateTime.UtcNow
+                };
                 var result = await serialPhotoelectricTriggerInputService.WaitForSerialPhotoelectricAsync(
-                    new SerialPhotoelectricTriggerOptions(
-                        "settings-serial-photoelectric-test",
-                        "Settings Serial Photoelectric Test",
-                        portName,
-                        baudRate,
-                        debounceMs,
-                        timeoutMs,
-                        IgnoreWhileBusy: false)
-                    {
-                        AcceptPendingSignalsAfterUtc = DateTime.UtcNow
-                    },
+                    triggerOptions,
                     context.RequestAborted);
 
                 return Results.Ok(new
@@ -1926,23 +2001,36 @@ public static class SettingsEndpoints
 
         app.MapPost("/api/cameras/continuous-preview/start", async (
             CameraContinuousPreviewStartRequest request,
+            HttpContext context,
             [FromServices]
-            ICameraFrameStreamCoordinator streamCoordinator) =>
+            ICameraFrameStreamCoordinator streamCoordinator,
+            CancellationToken cancellationToken) =>
         {
             if (string.IsNullOrWhiteSpace(request.CameraBindingId))
             {
                 return Results.BadRequest(new { Error = "CameraBindingId is required." });
             }
 
+            var ownerHash = ResolveContinuousPreviewOwnerHash(context);
+            if (string.IsNullOrWhiteSpace(ownerHash))
+            {
+                return Results.Unauthorized();
+            }
+
             try
             {
-                var session = await streamCoordinator.StartPreviewSessionAsync(request.CameraBindingId);
+                var session = await streamCoordinator.StartPreviewSessionAsync(
+                    request.CameraBindingId,
+                    ownerHash,
+                    cancellationToken);
                 return Results.Ok(new
                 {
                     session.SessionId,
                     session.CameraBindingId,
                     TriggerMode = session.TriggerMode.ToConfigValue(),
-                    session.TargetFrameRateFps
+                    session.TargetFrameRateFps,
+                    session.ExpiresAtUtc,
+                    session.HeartbeatIntervalMs
                 });
             }
             catch (Exception ex)
@@ -1964,9 +2052,18 @@ public static class SettingsEndpoints
                 return Results.BadRequest(new { Error = "SessionId is required." });
             }
 
+            var ownerHash = ResolveContinuousPreviewOwnerHash(context);
+            if (string.IsNullOrWhiteSpace(ownerHash))
+            {
+                return Results.Unauthorized();
+            }
+
             try
             {
-                var frame = await streamCoordinator.WaitForPreviewFrameAsync(sessionId, cancellationToken);
+                var frame = await streamCoordinator.WaitForPreviewFrameAsync(
+                    sessionId,
+                    ownerHash,
+                    cancellationToken);
                 context.Response.Headers.CacheControl = "no-store, no-cache, must-revalidate";
                 context.Response.Headers.Pragma = "no-cache";
                 context.Response.Headers.Expires = "0";
@@ -1987,8 +2084,41 @@ public static class SettingsEndpoints
         })
         .RequireClearVisionPermission(ClearVisionPermissionPolicies.CanOperateHardware);
 
+        app.MapPost("/api/cameras/continuous-preview/heartbeat", async (
+            CameraContinuousPreviewStopRequest request,
+            HttpContext context,
+            [FromServices]
+            ICameraFrameStreamCoordinator streamCoordinator,
+            CancellationToken cancellationToken) =>
+        {
+            if (string.IsNullOrWhiteSpace(request.SessionId))
+            {
+                return Results.BadRequest(new { Error = "SessionId is required." });
+            }
+
+            var ownerHash = ResolveContinuousPreviewOwnerHash(context);
+            if (string.IsNullOrWhiteSpace(ownerHash))
+            {
+                return Results.Unauthorized();
+            }
+
+            var heartbeat = await streamCoordinator.HeartbeatPreviewSessionAsync(
+                request.SessionId,
+                ownerHash,
+                cancellationToken);
+            return heartbeat == null
+                ? Results.NotFound(new { Error = "Continuous preview session was not found." })
+                : Results.Ok(new
+                {
+                    heartbeat.SessionId,
+                    heartbeat.ExpiresAtUtc
+                });
+        })
+        .RequireClearVisionPermission(ClearVisionPermissionPolicies.CanOperateHardware);
+
         app.MapPost("/api/cameras/continuous-preview/stop", async (
             CameraContinuousPreviewStopRequest request,
+            HttpContext context,
             [FromServices]
             ICameraFrameStreamCoordinator streamCoordinator) =>
         {
@@ -1997,12 +2127,40 @@ public static class SettingsEndpoints
                 return Results.BadRequest(new { Error = "SessionId is required." });
             }
 
-            await streamCoordinator.StopPreviewSessionAsync(request.SessionId);
-            return Results.Ok(new { Message = "Continuous preview session stopped." });
+            var ownerHash = ResolveContinuousPreviewOwnerHash(context);
+            if (string.IsNullOrWhiteSpace(ownerHash))
+            {
+                return Results.Unauthorized();
+            }
+
+            return await streamCoordinator.StopPreviewSessionAsync(request.SessionId, ownerHash)
+                ? Results.Ok(new { Message = "Continuous preview session stopped." })
+                : Results.NotFound(new { Error = "Continuous preview session was not found." });
         })
         .RequireClearVisionPermission(ClearVisionPermissionPolicies.CanOperateHardware);
 
         return app;
+    }
+
+    private static string ResolveContinuousPreviewOwnerHash(HttpContext context)
+    {
+        string? userId = null;
+        if (context.Items.TryGetValue("CurrentUser", out var userObj))
+        {
+            userId = userObj switch
+            {
+                ClearVision.Product.Application.Services.UserSession user => user.UserId,
+                ClearVision.Product.Desktop.Middleware.UserSession user => user.UserId,
+                _ => null
+            };
+        }
+
+        if (string.IsNullOrWhiteSpace(userId))
+        {
+            userId = context.User?.FindFirstValue(ClaimTypes.NameIdentifier);
+        }
+
+        return AuthenticatedOwnerResolver.ResolveOwnerHash(userId);
     }
 
     private static AppConfig MergeSettingsUpdate(AppConfig currentConfig, JsonElement request)
@@ -3503,13 +3661,12 @@ public class TriggerDeviceLearnRequest
 
 public class SerialPhotoelectricTestRequest
 {
-    public string? PortName { get; set; }
+    public string? CameraBindingId { get; set; }
 
-    public int BaudRate { get; set; } = 9600;
+    public long? ExpectedRevision { get; set; }
 
-    public int DebounceMs { get; set; }
-
-    public int TimeoutMs { get; set; } = 10000;
+    [JsonExtensionData]
+    public Dictionary<string, JsonElement>? UnsupportedFields { get; set; }
 }
 
 public sealed record SerialPhotoelectricPortInfo(

@@ -8,6 +8,7 @@ using ClearVision.Product.Core.Attributes;
 using ClearVision.Product.Core.Entities;
 using ClearVision.Product.Core.Enums;
 using ClearVision.Product.Core.Operators;
+using ClearVision.Product.Core.Services;
 using Microsoft.Extensions.Logging;
 namespace ClearVision.Product.Infrastructure.Operators;
 
@@ -24,6 +25,7 @@ namespace ClearVision.Product.Infrastructure.Operators;
 )]
 [InputPort("Data", "发送数据", PortDataType.Any, IsRequired = false)]
 [OutputPort("Response", "接收数据", PortDataType.Any)]
+[OperatorParam("ProfileId", "串口Profile", "string", DefaultValue = "")]
 [OperatorParam("PortName", "串口号", "string", DefaultValue = "COM1")]
 [OperatorParam("BaudRate", "波特率", "enum", DefaultValue = "9600", Options = new[] { "9600|9600", "19200|19200", "38400|38400", "57600|57600", "115200|115200" })]
 [OperatorParam("DataBits", "数据位", "int", DefaultValue = 8, Min = 5, Max = 8)]
@@ -43,21 +45,35 @@ public class SerialCommunicationOperator : OperatorBase
     private const int DefaultResponseWaitMs = 100;
     private const int ResponsePollIntervalMs = 10;
 
+    private readonly IExecutionResourceProfileResolver _resourceProfileResolver;
     private readonly Func<SerialPortConnectionSettings, ISerialPortConnection> _connectionFactory;
 
     public override OperatorType OperatorType => OperatorType.SerialCommunication;
 
     public SerialCommunicationOperator(ILogger<SerialCommunicationOperator> logger)
-        : this(logger, settings => new SerialPortConnection(settings))
+        : this(
+            logger,
+            DenyAllExecutionResourceProfileResolver.Instance,
+            settings => new SerialPortConnection(settings))
+    {
+    }
+
+    public SerialCommunicationOperator(
+        ILogger<SerialCommunicationOperator> logger,
+        IExecutionResourceProfileResolver resourceProfileResolver)
+        : this(logger, resourceProfileResolver, settings => new SerialPortConnection(settings))
     {
     }
 
     internal SerialCommunicationOperator(
         ILogger<SerialCommunicationOperator> logger,
+        IExecutionResourceProfileResolver resourceProfileResolver,
         Func<SerialPortConnectionSettings, ISerialPortConnection> connectionFactory)
         : base(logger)
     {
-        _connectionFactory = connectionFactory;
+        _resourceProfileResolver = resourceProfileResolver ??
+            throw new ArgumentNullException(nameof(resourceProfileResolver));
+        _connectionFactory = connectionFactory ?? throw new ArgumentNullException(nameof(connectionFactory));
     }
 
     protected override async Task<OperatorExecutionOutput> ExecuteCoreAsync(
@@ -65,23 +81,24 @@ public class SerialCommunicationOperator : OperatorBase
         Dictionary<string, object>? inputs,
         CancellationToken cancellationToken)
     {
-        // 获取参数
-        var portName = GetStringParam(@operator, "PortName", "COM1");
-        var baudRateStr = GetStringParam(@operator, "BaudRate", "9600");
-        var dataBits = GetIntParam(@operator, "DataBits", 8);
-        var stopBitsStr = GetStringParam(@operator, "StopBits", "One");
-        var parityStr = GetStringParam(@operator, "Parity", "None");
+        var profileId = GetStringParam(@operator, "ProfileId", string.Empty);
+        var resolution = _resourceProfileResolver.ResolveSerial(profileId);
+        if (!resolution.Resolved || resolution.Resource == null)
+        {
+            return OperatorExecutionOutput.Failure($"{resolution.Code}: {resolution.Message}");
+        }
+
+        var resource = resolution.Resource;
+        var portName = resource.PortName;
+        var baudRate = resource.BaudRate;
+        var dataBits = resource.DataBits;
+        var stopBitsStr = resource.StopBits;
+        var parityStr = resource.Parity;
         var timeoutMs = GetIntParam(@operator, "TimeoutMs", 3000);
         var responseWaitMs = Math.Clamp(GetIntParam(@operator, "ResponseWaitMs", DefaultResponseWaitMs), 0, timeoutMs);
         // 优先使用上游连线到 "发送数据" 端口的动态值，否则回退到参数面板中的静态内容。
         var sendData = ResolveSendData(@operator, inputs);
         var encoding = GetStringParam(@operator, "Encoding", "UTF8");
-
-        // 解析波特率
-        if (!int.TryParse(baudRateStr, out var baudRate))
-        {
-            baudRate = 9600;
-        }
 
         if (!TryParseStopBits(stopBitsStr, out var stopBits))
         {
@@ -263,22 +280,25 @@ public class SerialCommunicationOperator : OperatorBase
 
     public override ValidationResult ValidateParameters(Operator @operator)
     {
-        var portName = GetStringParam(@operator, "PortName", "COM1");
-        var baudRateStr = GetStringParam(@operator, "BaudRate", "9600");
-        var dataBits = GetIntParam(@operator, "DataBits", 8);
-        var stopBits = GetStringParam(@operator, "StopBits", "One");
-        var parity = GetStringParam(@operator, "Parity", "None");
+        var profileId = GetStringParam(@operator, "ProfileId", string.Empty);
+        var resolution = _resourceProfileResolver.ResolveSerial(profileId);
+        if (!resolution.Resolved || resolution.Resource == null)
+        {
+            return ValidationResult.Invalid($"{resolution.Code}: {resolution.Message}");
+        }
+
+        var resource = resolution.Resource;
+        var portName = resource.PortName;
+        var baudRate = resource.BaudRate;
+        var dataBits = resource.DataBits;
+        var stopBits = resource.StopBits;
+        var parity = resource.Parity;
         var encoding = GetStringParam(@operator, "Encoding", "UTF8");
         var sendData = GetStringParam(@operator, "SendData", string.Empty);
 
         if (string.IsNullOrWhiteSpace(portName))
         {
             return ValidationResult.Invalid("串口号不能为空");
-        }
-
-        if (!int.TryParse(baudRateStr, out var baudRate))
-        {
-            return ValidationResult.Invalid("波特率必须是数字");
         }
 
         if (baudRate <= 0)

@@ -95,17 +95,19 @@ public class ImageAcquisitionOperator : OperatorBase
             return CreateOutputFromEnvelope(envelope);
         }
 
-        // 优先获取 sourceType 和 filePath 参数
-        // 1. 尝试从连线输入获取
-        // 2. 如果没有连线输入，从算子自身的参数列表中获取 (Metadata-driven)
-        var sourceType = TryGetStringInput(inputs, "SourceType")
-            ?? TryGetStringInput(inputs, "sourceType")
-            ?? GetStringParam(@operator, "SourceType", GetStringParam(@operator, "sourceType", string.Empty));
+        // Resource selection is immutable snapshot authority. Runtime inputs may provide bounded
+        // image bytes/envelopes, but must never replace SourceType or FilePath after the capability
+        // and resource manifests have been validated.
+        var sourceType = GetStringParam(
+            @operator,
+            "SourceType",
+            GetStringParam(@operator, "sourceType", string.Empty));
         var normalizedSourceType = NormalizeSourceType(sourceType);
 
-        var filePath = TryGetStringInput(inputs, "FilePath")
-            ?? TryGetStringInput(inputs, "filePath")
-            ?? GetStringParam(@operator, "FilePath", GetStringParam(@operator, "filePath", string.Empty));
+        var filePath = GetStringParam(
+            @operator,
+            "FilePath",
+            GetStringParam(@operator, "filePath", string.Empty));
 
         var isFileSource = normalizedSourceType.Equals("File", StringComparison.OrdinalIgnoreCase);
         var isCameraSource = normalizedSourceType.Equals("Camera", StringComparison.OrdinalIgnoreCase);
@@ -146,15 +148,12 @@ public class ImageAcquisitionOperator : OperatorBase
 
             try
             {
-                var bindingConfig = _cameraManager.FindBinding(cameraId);
-                bindingConfig?.Normalize();
-                var normalizedTriggerMode = CameraTriggerModeExtensions.Normalize(
-                    bindingConfig?.TriggerMode
-                    ?? GetStringParam(@operator, "TriggerMode", GetStringParam(@operator, "triggerMode", "Software")));
+                var bindingConfig = _cameraManager.RequireEnabledBinding(cameraId);
+                var normalizedTriggerMode = CameraTriggerModeExtensions.Normalize(bindingConfig.TriggerMode);
 
                 if (normalizedTriggerMode.IsFrameDriven())
                 {
-                    var sharedFrame = await _streamCoordinator.AcquireFrameAsync(bindingConfig?.Id ?? cameraId, cancellationToken);
+                    var sharedFrame = await _streamCoordinator.AcquireFrameAsync(bindingConfig.Id, cancellationToken);
                     var sharedMat = Cv2.ImDecode(sharedFrame.ImageData, ImreadModes.Color);
                     if (sharedMat.Empty())
                     {
@@ -165,38 +164,34 @@ public class ImageAcquisitionOperator : OperatorBase
                     {
                         { "Channels", sharedMat.Channels() },
                         { "Source", normalizedTriggerMode.ToConfigValue().ToLowerInvariant() },
-                        { "CameraId", bindingConfig?.Id ?? cameraId }
+                        { "CameraId", bindingConfig.Id }
                     }));
                 }
 
-                // 获取并配置相机
-                var camera = await _cameraManager.GetOrCreateByBindingAsync(cameraId);
+                // Pin the authoritative camera instance for the complete acquisition. A binding
+                // replacement may retire this instance concurrently, but disposal must wait until
+                // this operation releases its lease.
+                await using var cameraLease = await _cameraManager.AcquireByBindingLeaseAsync(
+                    bindingConfig.Id,
+                    cancellationToken);
+                var camera = cameraLease.Camera;
 
-                // 相机参数优先来自“系统设置 -> 相机管理”，保留旧算子参数作为向后兼容 fallback。
-                var exposureTime = bindingConfig?.ExposureTimeUs
-                    ?? GetDoubleParam(@operator, "ExposureTime", GetDoubleParam(@operator, "exposureTime", 5000));
-                var gain = bindingConfig?.GainDb
-                    ?? GetDoubleParam(@operator, "Gain", GetDoubleParam(@operator, "gain", 1.0));
-                await camera.SetExposureTimeAsync(exposureTime);
-                await camera.SetGainAsync(gain);
+                await camera.SetExposureTimeAsync(bindingConfig.ExposureTimeUs);
+                await camera.SetGainAsync(bindingConfig.GainDb);
 
                 if (camera is IIndustrialCamera industrialCamera)
                 {
-                    if (bindingConfig != null)
-                    {
-                        await industrialCamera.SetPixelFormatAsync(CameraPixelFormatExtensions.Normalize(bindingConfig.PixelFormat));
-                    }
-
+                    await industrialCamera.SetPixelFormatAsync(CameraPixelFormatExtensions.Normalize(bindingConfig.PixelFormat));
                     await industrialCamera.SetTriggerModeAsync(CameraTriggerMode.Software);
                 }
 
-                if (bindingConfig?.UsesEnterPhotoelectricTrigger() == true)
+                if (bindingConfig.UsesEnterPhotoelectricTrigger())
                 {
                     await _triggerInputService.WaitForEnterPhotoelectricAsync(
                         bindingConfig.ToEnterPhotoelectricTriggerOptions(),
                         cancellationToken);
                 }
-                else if (bindingConfig?.UsesSerialPhotoelectricTrigger() == true)
+                else if (bindingConfig.UsesSerialPhotoelectricTrigger())
                 {
                     await _serialPhotoelectricTriggerInputService.WaitForSerialPhotoelectricAsync(
                         bindingConfig.ToSerialPhotoelectricTriggerOptions(),
@@ -217,7 +212,7 @@ public class ImageAcquisitionOperator : OperatorBase
                 {
                     { "Channels", mat.Channels() },
                     { "Source", ResolveCameraSourceTag(bindingConfig) },
-                    { "CameraId", cameraId }
+                    { "CameraId", bindingConfig.Id }
                 }));
             }
             catch (Exception ex)

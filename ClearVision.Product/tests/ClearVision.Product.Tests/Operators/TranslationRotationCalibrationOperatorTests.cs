@@ -27,10 +27,13 @@ public class TranslationRotationCalibrationOperatorTests
     public async Task ExecuteAsync_WithAffineLikePoints_ShouldProduceLowErrorTransform()
     {
         var sut = CreateSut();
+        var legacySavePath = Path.Combine(Path.GetTempPath(), $"translation-rotation-raw-save-{Guid.NewGuid():N}.json");
         var op = CreateOperator(new Dictionary<string, object>
         {
             { "Method", "LeastSquares" },
-            { "CalibrationPoints", BuildCalibrationPointsJson() }
+            { "CalibrationPoints", BuildCalibrationPointsJson() },
+            { "CalibrationAssetId", "translation-rotation-calibration-asset" },
+            { "SavePath", legacySavePath }
         });
 
         var result = await sut.ExecuteAsync(op, null);
@@ -44,6 +47,10 @@ public class TranslationRotationCalibrationOperatorTests
         Assert.True(bundle.Transform2D!.Matrix.All(row => row.Length == 3));
         Assert.Equal("Similarity", result.OutputData["TransformModel"]);
         Assert.True(result.OutputData.ContainsKey("Accepted"));
+        CalibrationAssetCandidateAssertions.ShouldMatchGovernedSavePayload(
+            result.OutputData!,
+            "translation-rotation-calibration-asset");
+        Assert.False(File.Exists(legacySavePath));
     }
 
     [Fact]

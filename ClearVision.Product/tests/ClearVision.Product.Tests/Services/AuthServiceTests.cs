@@ -4,6 +4,7 @@ using ClearVision.Product.Core.Entities;
 using ClearVision.Product.Core.Enums;
 using ClearVision.Product.Core.Interfaces;
 using FluentAssertions;
+using Microsoft.Extensions.Logging;
 using NSubstitute;
 
 namespace ClearVision.Product.Tests.Services;
@@ -168,8 +169,56 @@ public class AuthServiceTests
         (await service.GetSessionAsync(login.Token!)).Should().BeNull();
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task SessionLookup_WhenRevokedDuringRepositoryAwait_ShouldRejectStaleRefresh(
+        bool validateTokenSurface)
+    {
+        var repository = Substitute.For<IUserRepository>();
+        var passwordHasher = Substitute.For<IPasswordHasher>();
+        var configurationService = CreateConfigurationService(
+            sessionTimeoutMinutes: 30,
+            loginFailureLockoutCount: 2);
+        var user = CreateUser("revoke-race-user", "hash");
+        var repositoryEntered = new TaskCompletionSource<bool>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        var releaseRepository = new TaskCompletionSource<bool>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+
+        repository.GetByUsernameAsync("revoke-race-user", Arg.Any<CancellationToken>()).Returns(user);
+        repository.GetByIdAsync(user.Id).Returns(async _ =>
+        {
+            repositoryEntered.TrySetResult(true);
+            await releaseRepository.Task;
+            return user;
+        });
+        passwordHasher.VerifyPassword("correct-password", user.PasswordHash).Returns(true);
+        var service = new AuthService(repository, passwordHasher, configurationService);
+        var login = await service.LoginAsync("revoke-race-user", "correct-password");
+        login.Success.Should().BeTrue();
+
+        var lookup = validateTokenSurface
+            ? service.ValidateTokenAsync(login.Token!)
+            : ResolveSessionPresenceAsync(service, login.Token!);
+
+        try
+        {
+            await repositoryEntered.Task.WaitAsync(TimeSpan.FromSeconds(5));
+            service.RevokeSessionsForUser(user.Id.ToString(), "deterministic-race-test");
+            AuthService.GetInMemorySessionCountForTests().Should().Be(0);
+        }
+        finally
+        {
+            releaseRepository.TrySetResult(true);
+        }
+
+        (await lookup.WaitAsync(TimeSpan.FromSeconds(5))).Should().BeFalse();
+        AuthService.GetInMemorySessionCountForTests().Should().Be(0);
+    }
+
     [Fact]
-    public async Task ExistingSession_ShouldRefreshRoleFromCurrentUser()
+    public async Task ExistingSession_ShouldBeRevokedWhenRoleDowngrades()
     {
         var repository = Substitute.For<IUserRepository>();
         var passwordHasher = Substitute.For<IPasswordHasher>();
@@ -186,10 +235,9 @@ public class AuthServiceTests
 
         user.ChangeRole(UserRole.Operator);
 
-        (await service.ValidateTokenAsync(login.Token!)).Should().BeTrue();
-        var session = await service.GetSessionAsync(login.Token!);
-        session.Should().NotBeNull();
-        session!.Role.Should().Be(UserRole.Operator.ToString());
+        (await service.ValidateTokenAsync(login.Token!)).Should().BeFalse();
+        (await service.GetSessionAsync(login.Token!)).Should().BeNull();
+        AuthService.GetInMemorySessionCountForTests().Should().Be(0);
     }
 
     [Fact]
@@ -320,6 +368,156 @@ public class AuthServiceTests
         AuthService.GetInMemorySessionCountForTests().Should().Be(2);
         (await service.ValidateTokenAsync(firstLogin.Token!)).Should().BeTrue();
         (await service.ValidateTokenAsync(secondLogin.Token!)).Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task LoginAsync_ShouldOpportunisticallyRemoveOnlyExpiredLegacySessions()
+    {
+        var now = new DateTime(2026, 8, 31, 4, 0, 0, DateTimeKind.Utc);
+        var repository = Substitute.For<IUserRepository>();
+        var passwordHasher = Substitute.For<IPasswordHasher>();
+        var configurationService = CreateConfigurationService(sessionTimeoutMinutes: 1, loginFailureLockoutCount: 3);
+        var user = CreateUser("legacy-cleanup-user", "hash");
+        repository.GetByUsernameAsync("legacy-cleanup-user", Arg.Any<CancellationToken>()).Returns(user);
+        repository.GetByIdAsync(user.Id).Returns(_ => Task.FromResult<User?>(user));
+        passwordHasher.VerifyPassword("correct-password", user.PasswordHash).Returns(true);
+        var service = new AuthService(repository, passwordHasher, configurationService)
+        {
+            UtcNowProvider = () => now
+        };
+        const string expiredToken = "legacy-expired-token";
+        const string activeToken = "legacy-active-token";
+
+        AuthService.AddLegacyExpiringSessionForTests(
+            expiredToken,
+            CreateLegacySession(user, now.AddMinutes(-1)),
+            user.PasswordHash,
+            now.AddHours(-1));
+        AuthService.AddLegacyExpiringSessionForTests(
+            activeToken,
+            CreateLegacySession(user, now.AddMinutes(5)),
+            user.PasswordHash,
+            now.AddMinutes(-1));
+        AuthService.GetInMemorySessionCountForTests().Should().Be(2);
+
+        var login = await service.LoginAsync("legacy-cleanup-user", "correct-password");
+
+        login.Success.Should().BeTrue();
+        AuthService.GetInMemorySessionCountForTests().Should().Be(2,
+            "the expired legacy record is removed while the active legacy record and new desktop session remain");
+        (await service.ValidateTokenAsync(expiredToken)).Should().BeFalse();
+        (await service.ValidateTokenAsync(activeToken)).Should().BeTrue();
+        var desktopSession = await service.GetSessionAsync(login.Token!);
+        desktopSession.Should().NotBeNull();
+        desktopSession!.ExpiresAt.Should().BeNull("new desktop sessions remain process-lifetime sessions");
+    }
+
+    [Fact]
+    public async Task AuthenticationLifecycle_ShouldNeverWriteRawSessionTokensToLogs()
+    {
+        var repository = Substitute.For<IUserRepository>();
+        var passwordHasher = Substitute.For<IPasswordHasher>();
+        var configurationService = CreateConfigurationService(sessionTimeoutMinutes: 30, loginFailureLockoutCount: 3);
+        var logger = new InMemoryLogger<AuthService>();
+        var user = CreateUser("token-log-user", "hash");
+        repository.GetByUsernameAsync("token-log-user", Arg.Any<CancellationToken>()).Returns(user);
+        repository.GetByIdAsync(user.Id).Returns(_ => Task.FromResult<User?>(user));
+        passwordHasher.VerifyPassword("correct-password", user.PasswordHash).Returns(true);
+        var service = new AuthService(repository, passwordHasher, configurationService, logger);
+
+        var logoutLogin = await service.LoginAsync("token-log-user", "correct-password");
+        logoutLogin.Success.Should().BeTrue();
+        logoutLogin.Token.Should().NotBeNullOrWhiteSpace();
+        (await service.ValidateTokenAsync(logoutLogin.Token!)).Should().BeTrue();
+        await service.LogoutAsync(logoutLogin.Token!);
+        var revokedLogin = await service.LoginAsync("token-log-user", "correct-password");
+        revokedLogin.Success.Should().BeTrue();
+        revokedLogin.Token.Should().NotBeNullOrWhiteSpace();
+        service.RevokeSessionsForUser(user.Id.ToString(), "security-event");
+        (await service.ValidateTokenAsync(revokedLogin.Token!)).Should().BeFalse();
+
+        logger.Messages.Should().NotBeEmpty();
+        logger.Messages.Should().NotContain(message =>
+            message.Contains(logoutLogin.Token!, StringComparison.Ordinal) ||
+            message.Contains(revokedLogin.Token!, StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task LoginAsync_ShouldEvictOldestTokenAtPerUserCapacity()
+    {
+        var repository = Substitute.For<IUserRepository>();
+        var passwordHasher = Substitute.For<IPasswordHasher>();
+        var configurationService = CreateConfigurationService(sessionTimeoutMinutes: 30, loginFailureLockoutCount: 3);
+        var user = CreateUser("capacity-user", "hash");
+        repository.GetByUsernameAsync("capacity-user", Arg.Any<CancellationToken>()).Returns(user);
+        repository.GetByIdAsync(user.Id).Returns(_ => Task.FromResult<User?>(user));
+        passwordHasher.VerifyPassword("correct-password", user.PasswordHash).Returns(true);
+        var service = new AuthService(repository, passwordHasher, configurationService);
+        var tokens = new List<string>();
+
+        for (var index = 0; index < AuthService.PerUserSessionCapacity + 2; index++)
+        {
+            var login = await service.LoginAsync("capacity-user", "correct-password");
+            login.Success.Should().BeTrue();
+            tokens.Add(login.Token!);
+        }
+
+        AuthService.GetInMemorySessionCountForTests().Should().Be(AuthService.PerUserSessionCapacity);
+        (await service.ValidateTokenAsync(tokens[0])).Should().BeFalse();
+        (await service.ValidateTokenAsync(tokens[1])).Should().BeFalse();
+        foreach (var token in tokens.Skip(2))
+        {
+            (await service.ValidateTokenAsync(token)).Should().BeTrue();
+        }
+    }
+
+    [Fact]
+    public async Task LoginAsync_ShouldEvictOldestTokenAtGlobalCapacity()
+    {
+        var repository = Substitute.For<IUserRepository>();
+        var passwordHasher = Substitute.For<IPasswordHasher>();
+        var configurationService = CreateConfigurationService(sessionTimeoutMinutes: 30, loginFailureLockoutCount: 3);
+        var users = Enumerable.Range(0, AuthService.GlobalSessionCapacity + 1)
+            .Select(index => CreateUser($"global-{index:D3}", "hash"))
+            .ToDictionary(user => user.Username, StringComparer.Ordinal);
+        var usersById = users.Values.ToDictionary(user => user.Id);
+        repository.GetByUsernameAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns(call => Task.FromResult<User?>(users.GetValueOrDefault(call.ArgAt<string>(0))));
+        repository.GetByIdAsync(Arg.Any<Guid>())
+            .Returns(call => Task.FromResult<User?>(usersById.GetValueOrDefault(call.ArgAt<Guid>(0))));
+        passwordHasher.VerifyPassword("correct-password", "hash").Returns(true);
+        var service = new AuthService(repository, passwordHasher, configurationService);
+        var tokens = new List<string>();
+
+        foreach (var user in users.Values.OrderBy(item => item.Username, StringComparer.Ordinal))
+        {
+            var login = await service.LoginAsync(user.Username, "correct-password");
+            login.Success.Should().BeTrue();
+            tokens.Add(login.Token!);
+        }
+
+        AuthService.GetInMemorySessionCountForTests().Should().Be(AuthService.GlobalSessionCapacity);
+        (await service.ValidateTokenAsync(tokens[0])).Should().BeFalse();
+        (await service.ValidateTokenAsync(tokens[^1])).Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task ExistingSession_ShouldBeRevokedWhenRoleChanges()
+    {
+        var repository = Substitute.For<IUserRepository>();
+        var passwordHasher = Substitute.For<IPasswordHasher>();
+        var configurationService = CreateConfigurationService(sessionTimeoutMinutes: 30, loginFailureLockoutCount: 3);
+        var user = CreateUser("role-user", "hash", UserRole.Operator);
+        repository.GetByUsernameAsync("role-user", Arg.Any<CancellationToken>()).Returns(user);
+        repository.GetByIdAsync(user.Id).Returns(_ => Task.FromResult<User?>(user));
+        passwordHasher.VerifyPassword("correct-password", "hash").Returns(true);
+        var service = new AuthService(repository, passwordHasher, configurationService);
+        var login = await service.LoginAsync("role-user", "correct-password");
+
+        user.ChangeRole(UserRole.Engineer);
+
+        (await service.ValidateTokenAsync(login.Token!)).Should().BeFalse();
+        AuthService.GetInMemorySessionCountForTests().Should().Be(0);
     }
 
     [Fact]
@@ -528,5 +726,52 @@ public class AuthServiceTests
     private static User CreateUser(string username, string passwordHash, UserRole role = UserRole.Engineer)
     {
         return User.Create(username, passwordHash, username, role);
+    }
+
+    private static async Task<bool> ResolveSessionPresenceAsync(AuthService service, string token)
+    {
+        return await service.GetSessionAsync(token) != null;
+    }
+
+    private static UserSession CreateLegacySession(User user, DateTime expiresAt) => new()
+    {
+        UserId = user.Id.ToString(),
+        Username = user.Username,
+        Role = user.Role.ToString(),
+        ExpiresAt = expiresAt
+    };
+
+    private sealed class InMemoryLogger<T> : ILogger<T>
+    {
+        private readonly object _sync = new();
+        private readonly List<string> _messages = [];
+
+        public IReadOnlyList<string> Messages
+        {
+            get
+            {
+                lock (_sync)
+                {
+                    return _messages.ToArray();
+                }
+            }
+        }
+
+        public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
+
+        public bool IsEnabled(LogLevel logLevel) => true;
+
+        public void Log<TState>(
+            LogLevel logLevel,
+            EventId eventId,
+            TState state,
+            Exception? exception,
+            Func<TState, Exception?, string> formatter)
+        {
+            lock (_sync)
+            {
+                _messages.Add(formatter(state, exception));
+            }
+        }
     }
 }

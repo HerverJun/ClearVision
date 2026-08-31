@@ -17,6 +17,43 @@ import {
 
 export const PROPERTY_PANEL_CAPABILITY_OWNER_ID = 'property-panel-capability-v2';
 
+function startContinuousPreviewHeartbeat(sessionId, heartbeatIntervalMs, signal) {
+    const rawIntervalMs = Number(heartbeatIntervalMs);
+    const intervalMs = Number.isFinite(rawIntervalMs) && rawIntervalMs > 0
+        ? Math.max(1000, Math.min(30000, Math.floor(rawIntervalMs)))
+        : 10000;
+    let stopped = false;
+    let timeoutId = null;
+
+    const stop = () => {
+        stopped = true;
+        if (timeoutId !== null) {
+            globalThis.clearTimeout(timeoutId);
+            timeoutId = null;
+        }
+        signal?.removeEventListener?.('abort', stop);
+    };
+    const schedule = () => {
+        if (stopped || signal?.aborted) return;
+        timeoutId = globalThis.setTimeout(async () => {
+            timeoutId = null;
+            if (stopped || signal?.aborted) return;
+            try {
+                await httpClient.post('/cameras/continuous-preview/heartbeat', { sessionId }, { signal });
+            } catch (error) {
+                if (!signal?.aborted) {
+                    console.warn('[PropertyPanel] Failed to heartbeat continuous preview session:', error);
+                }
+            }
+            schedule();
+        }, intervalMs);
+    };
+
+    signal?.addEventListener?.('abort', stop, { once: true });
+    schedule();
+    return stop;
+}
+
 function resolveElement(target) {
     if (!target) {
         return null;
@@ -959,11 +996,16 @@ export class PropertyPanelCapabilityOwner {
                 throw new Error('相机共享帧会话启动失败。');
             }
 
+            const stopHeartbeat = startContinuousPreviewHeartbeat(
+                sessionId,
+                session?.heartbeatIntervalMs || session?.HeartbeatIntervalMs,
+                signal);
             try {
                 return await httpClient.getForBlob(
                     `/cameras/continuous-preview/frame/${encodeURIComponent(sessionId)}?_=${Date.now()}`,
                     { signal, cache: 'no-store' });
             } finally {
+                stopHeartbeat();
                 await httpClient.post('/cameras/continuous-preview/stop', { sessionId }).catch(() => {});
             }
         }

@@ -29,6 +29,7 @@ public class NPointCalibrationOperatorTests
     [Fact]
     public async Task ExecuteAsync_WithAffinePairs_ShouldReturnMatrix()
     {
+        var legacySavePath = Path.Combine(Path.GetTempPath(), $"npoint-raw-save-{Guid.NewGuid():N}.json");
         var pairsJson = "[" +
                         "{\"ImageX\":0,\"ImageY\":0,\"WorldX\":0,\"WorldY\":0}," +
                         "{\"ImageX\":10,\"ImageY\":0,\"WorldX\":20,\"WorldY\":0}," +
@@ -38,7 +39,9 @@ public class NPointCalibrationOperatorTests
         var op = CreateOperator(new Dictionary<string, object>
         {
             { "CalibrationMode", "Affine" },
-            { "PointPairs", pairsJson }
+            { "PointPairs", pairsJson },
+            { "CalibrationAssetId", "npoint-calibration-asset" },
+            { "SavePath", legacySavePath }
         });
 
         var result = await _operator.ExecuteAsync(op, null);
@@ -48,6 +51,10 @@ public class NPointCalibrationOperatorTests
         var calibrationData = Assert.IsType<string>(result.OutputData!["CalibrationData"]);
         Assert.True(CalibrationBundleV2Json.TryDeserialize(calibrationData, out var bundle, out var error), error);
         Assert.NotNull(bundle.Transform2D);
+        CalibrationAssetCandidateAssertions.ShouldMatchGovernedSavePayload(
+            result.OutputData!,
+            "npoint-calibration-asset");
+        Assert.False(File.Exists(legacySavePath));
     }
 
     [Fact]

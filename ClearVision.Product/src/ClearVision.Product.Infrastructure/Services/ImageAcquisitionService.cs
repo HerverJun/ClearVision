@@ -38,8 +38,37 @@ public class ImageAcquisitionService : IImageAcquisitionService, IDisposable
     private readonly Dictionary<Guid, Mat> _imageCache = new();
     private readonly LinkedList<Guid> _cacheOrder = new();
     private readonly Dictionary<Guid, LinkedListNode<Guid>> _cacheOrderNodes = new();
-    private readonly ConcurrentDictionary<string, CancellationTokenSource> _continuousAcquisitionTokens = new();
+    private readonly ConcurrentDictionary<string, ContinuousAcquisitionState> _continuousAcquisitions = new();
     private bool _disposed;
+
+    private sealed class ContinuousAcquisitionState : IDisposable
+    {
+        private readonly CancellationTokenSource _cancellationTokenSource;
+        private readonly TaskCompletionSource _completion = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public ContinuousAcquisitionState(CancellationTokenSource cancellationTokenSource)
+        {
+            _cancellationTokenSource = cancellationTokenSource;
+        }
+
+        public CancellationToken Token => _cancellationTokenSource.Token;
+        public Task Completion => _completion.Task;
+
+        public void Cancel()
+        {
+            try
+            {
+                _cancellationTokenSource.Cancel();
+            }
+            catch (ObjectDisposedException)
+            {
+            }
+        }
+
+        public void Complete() => _completion.TrySetResult();
+
+        public void Dispose() => _cancellationTokenSource.Dispose();
+    }
 
     public ImageAcquisitionService(ICameraManager cameraManager, ILogger<ImageAcquisitionService> logger)
         : this(cameraManager, NoOpCameraFrameStreamCoordinator.Instance, NoOpTriggerInputService.Instance, NoOpSerialPhotoelectricTriggerInputService.Instance, logger)
@@ -138,10 +167,9 @@ public class ImageAcquisitionService : IImageAcquisitionService, IDisposable
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(cameraId);
 
-        var binding = _cameraManager.FindBinding(cameraId);
-        binding?.Normalize();
+        var binding = _cameraManager.RequireEnabledBinding(cameraId);
 
-        if (binding != null && CameraTriggerModeExtensions.Normalize(binding.TriggerMode).IsFrameDriven())
+        if (CameraTriggerModeExtensions.Normalize(binding.TriggerMode).IsFrameDriven())
         {
             var streamFrame = await _streamCoordinator.AcquireFrameAsync(binding.Id, cancellationToken);
             return await CreateCameraImageDtoAsync(
@@ -152,14 +180,17 @@ public class ImageAcquisitionService : IImageAcquisitionService, IDisposable
                 cancellationToken);
         }
 
-        var camera = await ResolveCameraAsync(cameraId);
+        await using var cameraLease = await _cameraManager.AcquireByBindingLeaseAsync(
+            binding.Id,
+            cancellationToken);
+        var camera = cameraLease.Camera;
 
         try
         {
             await ApplyBindingSettingsAsync(camera, binding);
             await WaitForConfiguredSoftwareTriggerAsync(binding, cancellationToken);
             var frameData = await camera.AcquireSingleFrameAsync();
-            return await CreateCameraImageDtoAsync(binding?.Id ?? cameraId, frameData, null, null, cancellationToken);
+            return await CreateCameraImageDtoAsync(binding.Id, frameData, null, null, cancellationToken);
         }
         catch (Exception ex) when (ex is not CameraException and not ImageProcessingException)
         {
@@ -188,82 +219,114 @@ public class ImageAcquisitionService : IImageAcquisitionService, IDisposable
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(cameraId);
         ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(frameRate, 0);
+        ArgumentNullException.ThrowIfNull(onFrameAcquired);
 
-        var binding = _cameraManager.FindBinding(cameraId);
-        binding?.Normalize();
-        var acquisitionKey = binding?.Id ?? cameraId;
+        var binding = _cameraManager.RequireEnabledBinding(cameraId);
+        var acquisitionKey = binding.Id;
 
-        // 创建取消令牌
-        var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        if (!_continuousAcquisitionTokens.TryAdd(acquisitionKey, cts))
+        var state = new ContinuousAcquisitionState(
+            CancellationTokenSource.CreateLinkedTokenSource(cancellationToken));
+        if (!_continuousAcquisitions.TryAdd(acquisitionKey, state))
         {
-            cts.Dispose();
+            state.Dispose();
             throw new CameraException($"相机 {cameraId} 已经在连续采集模式中", cameraId);
         }
 
+        CameraStreamLease? streamLease = null;
+        ICameraLease? cameraLease = null;
         try
         {
-            if (binding != null && CameraTriggerModeExtensions.Normalize(binding.TriggerMode).IsFrameDriven())
+            if (CameraTriggerModeExtensions.Normalize(binding.TriggerMode).IsFrameDriven())
             {
-                var lease = await _streamCoordinator.AcquireStreamLeaseAsync(binding.Id, cts.Token);
+                var acquiredStreamLease = await _streamCoordinator.AcquireStreamLeaseAsync(binding.Id, state.Token);
+                streamLease = acquiredStreamLease;
+                var ownedStreamLease = acquiredStreamLease;
                 _ = Task.Run(async () =>
                 {
                     long? lastSequence = null;
                     try
                     {
-                        while (!cts.Token.IsCancellationRequested)
+                        while (!state.Token.IsCancellationRequested)
                         {
-                            var frame = await _streamCoordinator.WaitForNextFrameAsync(lease, lastSequence, cts.Token);
+                            var frame = await _streamCoordinator.WaitForNextFrameAsync(
+                                ownedStreamLease,
+                                lastSequence,
+                                state.Token);
                             lastSequence = frame.Sequence;
                             var imageDto = await CreateCameraImageDtoAsync(
                                 binding.Id,
                                 frame.ImageData,
                                 frame.Width,
                                 frame.Height,
-                                cts.Token);
+                                state.Token);
                             await onFrameAcquired(imageDto);
                         }
                     }
                     catch (OperationCanceledException)
                     {
                     }
+                    catch (Exception ex)
+                    {
+                        _logger.LogWarning(
+                            ex,
+                            "Frame-driven continuous acquisition stopped after a worker fault. CameraBindingId={CameraBindingId}",
+                            binding.Id);
+                    }
                     finally
                     {
-                        await _streamCoordinator.ReleaseStreamLeaseAsync(lease);
-                        _continuousAcquisitionTokens.TryRemove(acquisitionKey, out _);
-                        cts.Dispose();
+                        try
+                        {
+                            await _streamCoordinator.ReleaseStreamLeaseAsync(ownedStreamLease);
+                        }
+                        catch (Exception ex)
+                        {
+                            _logger.LogWarning(
+                                ex,
+                                "Failed to release frame stream lease. CameraBindingId={CameraBindingId}",
+                                binding.Id);
+                        }
+                        finally
+                        {
+                            CompleteContinuousAcquisition(acquisitionKey, state);
+                        }
                     }
-                }, cts.Token);
+                }, CancellationToken.None);
+                streamLease = null;
 
                 return;
             }
 
-            var camera = await ResolveCameraAsync(cameraId);
+            var acquiredCameraLease = await _cameraManager.AcquireByBindingLeaseAsync(binding.Id, state.Token);
+            cameraLease = acquiredCameraLease;
+            var camera = acquiredCameraLease.Camera;
             await ApplyBindingSettingsAsync(camera, binding);
-            // 计算帧间隔（毫秒）
             var frameInterval = TimeSpan.FromMilliseconds(1000.0 / frameRate);
 
-            // 启动连续采集循环
+            var ownedCameraLease = acquiredCameraLease;
             _ = Task.Run(async () =>
             {
                 try
                 {
-                    while (!cts.Token.IsCancellationRequested)
+                    while (!state.Token.IsCancellationRequested)
                     {
                         try
                         {
                             var startTime = DateTime.UtcNow;
-
-                            // 采集单帧
-                            var imageDto = await AcquireFromCameraAsync(cameraId, cts.Token);
+                            await WaitForConfiguredSoftwareTriggerAsync(binding, state.Token);
+                            var frameData = await camera.AcquireSingleFrameAsync();
+                            var imageDto = await CreateCameraImageDtoAsync(
+                                binding.Id,
+                                frameData,
+                                null,
+                                null,
+                                state.Token);
                             await onFrameAcquired(imageDto);
 
-                            // 控制帧率
                             var elapsed = DateTime.UtcNow - startTime;
                             var delay = frameInterval - elapsed;
                             if (delay > TimeSpan.Zero)
                             {
-                                await Task.Delay(delay, cts.Token);
+                                await Task.Delay(delay, state.Token);
                             }
                         }
                         catch (OperationCanceledException)
@@ -273,38 +336,93 @@ public class ImageAcquisitionService : IImageAcquisitionService, IDisposable
                         catch (Exception ex)
                         {
                             _logger.LogWarning(ex, "Continuous acquisition error: {Message}. Retrying after {Interval}ms.", ex.Message, frameInterval.TotalMilliseconds);
-                            await Task.Delay(frameInterval, cts.Token);
+                            try
+                            {
+                                await Task.Delay(frameInterval, state.Token);
+                            }
+                            catch (OperationCanceledException)
+                            {
+                                break;
+                            }
                         }
                     }
                 }
                 finally
                 {
-                    _continuousAcquisitionTokens.TryRemove(acquisitionKey, out _);
-                    cts.Dispose();
+                    try
+                    {
+                        await ownedCameraLease.DisposeAsync();
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogWarning(
+                            ex,
+                            "Failed to release continuous acquisition camera lease. CameraBindingId={CameraBindingId}",
+                            binding.Id);
+                    }
+                    finally
+                    {
+                        CompleteContinuousAcquisition(acquisitionKey, state);
+                    }
                 }
-            }, cts.Token);
+            }, CancellationToken.None);
+            cameraLease = null;
         }
         catch
         {
-            _continuousAcquisitionTokens.TryRemove(acquisitionKey, out _);
-            cts.Dispose();
+            try
+            {
+                if (streamLease != null)
+                {
+                    await _streamCoordinator.ReleaseStreamLeaseAsync(streamLease);
+                }
+            }
+            finally
+            {
+                try
+                {
+                    if (cameraLease != null)
+                    {
+                        await cameraLease.DisposeAsync();
+                    }
+                }
+                finally
+                {
+                    CompleteContinuousAcquisition(acquisitionKey, state);
+                }
+            }
             throw;
         }
     }
 
-    public Task StopContinuousAcquisitionAsync(string cameraId)
+    public async Task StopContinuousAcquisitionAsync(string cameraId)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(cameraId);
 
         var binding = _cameraManager.FindBinding(cameraId);
         var acquisitionKey = binding?.Id ?? cameraId;
 
-        if (_continuousAcquisitionTokens.TryRemove(acquisitionKey, out var cts))
+        if (_continuousAcquisitions.TryGetValue(acquisitionKey, out var state))
         {
-            cts.Cancel();
+            state.Cancel();
+            await state.Completion;
         }
+    }
 
-        return Task.CompletedTask;
+    private void CompleteContinuousAcquisition(string acquisitionKey, ContinuousAcquisitionState state)
+    {
+        var acquisitions = (ICollection<KeyValuePair<string, ContinuousAcquisitionState>>)_continuousAcquisitions;
+        try
+        {
+            if (acquisitions.Remove(new KeyValuePair<string, ContinuousAcquisitionState>(acquisitionKey, state)))
+            {
+                state.Dispose();
+            }
+        }
+        finally
+        {
+            state.Complete();
+        }
     }
 
     public Task<IEnumerable<string>> GetSupportedFormatsAsync()
@@ -673,29 +791,6 @@ public class ImageAcquisitionService : IImageAcquisitionService, IDisposable
         return ext.TrimStart('.');
     }
 
-    private async Task<ICamera> ResolveCameraAsync(string cameraId)
-    {
-        var binding = _cameraManager.FindBinding(cameraId);
-        if (binding != null)
-        {
-            var runtimeCamera = _cameraManager.GetCamera(binding.SerialNumber);
-            if (runtimeCamera?.IsConnected == true)
-            {
-                return runtimeCamera;
-            }
-
-            return await _cameraManager.GetOrCreateByBindingAsync(binding.Id);
-        }
-
-        var camera = _cameraManager.GetCamera(cameraId);
-        if (camera?.IsConnected == true)
-        {
-            return camera;
-        }
-
-        return await _cameraManager.GetOrCreateCameraAsync(cameraId);
-    }
-
     private static async Task ApplyBindingSettingsAsync(ICamera camera, CameraBindingConfig? binding)
     {
         if (binding == null)
@@ -800,13 +895,12 @@ public class ImageAcquisitionService : IImageAcquisitionService, IDisposable
         if (_disposed)
             return;
 
-        // 停止所有连续采集任务
-        foreach (var cts in _continuousAcquisitionTokens.Values)
+        // Workers retain their camera/stream leases until their complete lifetime ends. Disposal
+        // requests cancellation but lets each worker's finally block release its owned lease once.
+        foreach (var state in _continuousAcquisitions.Values)
         {
-            cts.Cancel();
-            cts.Dispose();
+            state.Cancel();
         }
-        _continuousAcquisitionTokens.Clear();
 
         // 释放所有缓存的图像
         lock (_imageCache)

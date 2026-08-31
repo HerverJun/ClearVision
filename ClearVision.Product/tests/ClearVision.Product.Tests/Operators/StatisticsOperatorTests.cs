@@ -9,14 +9,18 @@ using Xunit;
 namespace ClearVision.Product.Tests.Operators;
 
 [TestClassification(TestDomain.Core, TestPurpose.Regression, TestLane.Pr, TestEvidenceType.Contract, TestOracleType.Contract, TestResourceRequirement.None, TestExpectedDuration.Fast, TestFlakyPolicy.Blocking, "product")]
-public class StatisticsOperatorTests
+public class StatisticsOperatorTests : IDisposable
 {
     private readonly StatisticsOperator _operator;
+    private readonly IDisposable _authorityScope;
 
     public StatisticsOperatorTests()
     {
+        _authorityScope = TestExecutionAuthorityScope.Enter();
         _operator = new StatisticsOperator(Substitute.For<ILogger<StatisticsOperator>>());
     }
+
+    public void Dispose() => _authorityScope.Dispose();
 
     [Fact]
     public async Task ExecuteAsync_BasicStats_ReturnsCorrectResults()

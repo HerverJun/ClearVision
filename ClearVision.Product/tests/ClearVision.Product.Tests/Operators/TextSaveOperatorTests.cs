@@ -120,6 +120,55 @@ public class TextSaveOperatorTests
         }
     }
 
+    [Fact]
+    public async Task FileLockStripes_AfterTenThousandUniquePaths_ShouldRemainAtHardCapacity()
+    {
+        var baseline = TextSaveOperator.RetainedFileLockCount;
+
+        for (var index = 0; index < 10_000; index++)
+        {
+            var uniquePath = Path.Combine(Path.GetTempPath(), $"cv-text-lock-{index:D5}.txt");
+            await TextSaveOperator.ExecuteWithFileLockAsync(
+                uniquePath,
+                static _ => Task.CompletedTask);
+        }
+
+        Assert.InRange(baseline, 1, 256);
+        Assert.Equal(baseline, TextSaveOperator.RetainedFileLockCount);
+    }
+
+    [Fact]
+    public async Task ExecuteWithFileLockAsync_SameCanonicalPath_ShouldSerializeAllCallers()
+    {
+        var path = Path.Combine(Path.GetTempPath(), $"cv-text-lock-serial-{Guid.NewGuid():N}.txt");
+        var aliasPath = Path.Combine(Path.GetDirectoryName(path)!, ".", Path.GetFileName(path));
+        var start = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var active = 0;
+        var maxActive = 0;
+
+        var tasks = Enumerable.Range(0, 32)
+            .Select(index => Task.Run(async () =>
+            {
+                await start.Task;
+                var selectedPath = index % 2 == 0 ? path : aliasPath;
+                await TextSaveOperator.ExecuteWithFileLockAsync(
+                    selectedPath,
+                    async cancellationToken =>
+                    {
+                        var current = Interlocked.Increment(ref active);
+                        UpdateMaximum(ref maxActive, current);
+                        await Task.Delay(2, cancellationToken);
+                        Interlocked.Decrement(ref active);
+                    });
+            }))
+            .ToArray();
+
+        start.TrySetResult();
+        await Task.WhenAll(tasks).WaitAsync(TimeSpan.FromSeconds(10));
+
+        Assert.Equal(1, maxActive);
+    }
+
     private static TextSaveOperator CreateSut()
     {
         return new TextSaveOperator(Substitute.For<ILogger<TextSaveOperator>>());
@@ -137,5 +186,17 @@ public class TextSaveOperatorTests
         }
 
         return op;
+    }
+
+    private static void UpdateMaximum(ref int target, int candidate)
+    {
+        while (true)
+        {
+            var current = Volatile.Read(ref target);
+            if (candidate <= current || Interlocked.CompareExchange(ref target, candidate, current) == current)
+            {
+                return;
+            }
+        }
     }
 }

@@ -134,21 +134,18 @@ public sealed class ExecutionAdmissionServiceTests
     }
 
     [Theory]
-    [InlineData(ExecutionAdmissionSurface.NodePreview, true)]
-    [InlineData(ExecutionAdmissionSurface.AutoTunePreview, true)]
-    [InlineData(ExecutionAdmissionSurface.OperatorPreview, false)]
-    public void ValidateFlowSideEffects_FileImageAcquisition_ShouldFollowPerSurfacePolicy(
-        ExecutionAdmissionSurface surface,
-        bool expectedAllowed)
+    [MemberData(nameof(PreviewSurfaces_Data))]
+    public void ValidateFlowSideEffects_FileImageAcquisition_ShouldBlockOnEveryPreviewSurface(
+        ExecutionAdmissionSurface surface)
     {
-        // 产品策略：节点预览与线序预览允许读本地样张生成预览图；单算子预览只接受显式输入图，故阻断 File 图源。
+        // 所有 preview/debug 仅接受有界输入，不能从客户端参数读取文件。
         var admission = CreateService();
         var flow = SingleOperatorFlow(
             OperatorType.ImageAcquisition,
             ("SourceType", "File"),
             ("FilePath", @"C:\images\sample.png"));
 
-        admission.ValidateFlowSideEffects(flow, surface).IsAllowed.Should().Be(expectedAllowed);
+        admission.ValidateFlowSideEffects(flow, surface).IsAllowed.Should().BeFalse();
     }
 
     [Theory]
@@ -343,6 +340,23 @@ public sealed class ExecutionAdmissionServiceTests
         result.Code.Should().Be("ADMISSION_PROJECT_NOT_ACTIVE");
         // 正式运行的拒绝文案不得套用“预览”话术。
         result.Message.Should().NotContain("预览");
+    }
+
+    [Fact]
+    public async Task ValidateProjectAsync_WithSoftDeletedRepositoryValue_ShouldFailClosed()
+    {
+        var projectId = Guid.NewGuid();
+        var deletedProject = new Project("soft-deleted-project");
+        deletedProject.MarkAsDeleted();
+        var repository = Substitute.For<IProjectRepository>();
+        repository.GetByIdFreshAsync(projectId).Returns(deletedProject);
+
+        var result = await new ExecutionAdmissionService(repository).ValidateProjectAsync(
+            projectId,
+            ExecutionAdmissionSurface.StoredProjectExecution);
+
+        result.IsAllowed.Should().BeFalse();
+        result.Code.Should().Be("ADMISSION_PROJECT_NOT_ACTIVE");
     }
 
     [Fact]

@@ -16,7 +16,7 @@ public class FlowNodePreviewServiceTests
     [Fact]
     public async Task PreviewWithMetricsAsync_ShouldInjectExternalImage_WhenFileImageAcquisitionWithoutFilePathExistsUpstream()
     {
-        var flowExecution = Substitute.For<IFlowExecutionService>();
+        var flowExecution = CreateFlowExecution();
         Dictionary<string, object>? capturedInput = null;
         var acquisition = new Operator("Acquire", OperatorType.ImageAcquisition, 0, 0);
         var target = new Operator("Resize", OperatorType.ImageResize, 0, 0);
@@ -54,7 +54,7 @@ public class FlowNodePreviewServiceTests
             Substitute.For<IPreviewMetricsAnalyzer>(),
             new OperatorFactory());
 
-        var result = await service.PreviewWithMetricsAsync(flow, target.Id, new byte[] { 9, 9, 9 });
+        var result = await PreviewWithEngineerDraftAuthorityAsync(service, flow, target.Id, new byte[] { 9, 9, 9 });
 
         result.Success.Should().BeTrue();
         capturedInput.Should().NotBeNull();
@@ -64,7 +64,7 @@ public class FlowNodePreviewServiceTests
     [Fact]
     public async Task PreviewWithMetricsAsync_ShouldInjectExternalImage_WhenTargetIsFileImageAcquisitionWithoutFilePath()
     {
-        var flowExecution = Substitute.For<IFlowExecutionService>();
+        var flowExecution = CreateFlowExecution();
         Dictionary<string, object>? capturedInput = null;
         var target = new Operator("Acquire", OperatorType.ImageAcquisition, 0, 0);
         var flow = new OperatorFlow("preview-flow");
@@ -99,7 +99,7 @@ public class FlowNodePreviewServiceTests
             Substitute.For<IPreviewMetricsAnalyzer>(),
             new OperatorFactory());
 
-        var result = await service.PreviewWithMetricsAsync(flow, target.Id, new byte[] { 9, 9, 9 });
+        var result = await PreviewWithEngineerDraftAuthorityAsync(service, flow, target.Id, new byte[] { 9, 9, 9 });
 
         result.Success.Should().BeTrue();
         capturedInput.Should().NotBeNull();
@@ -110,7 +110,7 @@ public class FlowNodePreviewServiceTests
     [Fact]
     public async Task PreviewWithMetricsAsync_ShouldNotInjectExternalImage_WhenFileImageAcquisitionHasExplicitFilePath()
     {
-        var flowExecution = Substitute.For<IFlowExecutionService>();
+        var flowExecution = CreateFlowExecution();
         Dictionary<string, object>? capturedInput = null;
         var acquisition = new Operator("Acquire", OperatorType.ImageAcquisition, 0, 0);
         acquisition.AddParameter(new Parameter(Guid.NewGuid(), "SourceType", "SourceType", string.Empty, "enum", "File"));
@@ -153,7 +153,7 @@ public class FlowNodePreviewServiceTests
             Substitute.For<IPreviewMetricsAnalyzer>(),
             new OperatorFactory());
 
-        var result = await service.PreviewWithMetricsAsync(flow, target.Id, new byte[] { 9, 9, 9 });
+        var result = await PreviewWithEngineerDraftAuthorityAsync(service, flow, target.Id, new byte[] { 9, 9, 9 });
 
         result.Success.Should().BeFalse();
         capturedInput.Should().BeNull();
@@ -163,7 +163,7 @@ public class FlowNodePreviewServiceTests
     [Fact]
     public async Task PreviewWithMetricsAsync_ShouldUseBundledLabels_WhenLabelsPathIsBlank()
     {
-        var flowExecution = Substitute.For<IFlowExecutionService>();
+        var flowExecution = CreateFlowExecution();
         var target = new Operator("DeepLearning", OperatorType.DeepLearning, 0, 0);
         target.AddParameter(new Parameter(Guid.NewGuid(), "ModelPath", "ModelPath", string.Empty, "string", Path.GetTempFileName()));
         target.AddParameter(new Parameter(Guid.NewGuid(), "LabelsPath", "LabelsPath", string.Empty, "string", string.Empty));
@@ -199,7 +199,7 @@ public class FlowNodePreviewServiceTests
 
         try
         {
-            var result = await service.PreviewWithMetricsAsync(flow, target.Id, null);
+            var result = await PreviewWithEngineerDraftAuthorityAsync(service, flow, target.Id, null);
 
             result.Success.Should().BeTrue(
                 $"error={result.ErrorMessage}; missing={string.Join(" | ", result.MissingResources.Select(item => $"{item.ResourceKey}:{item.Description}"))}");
@@ -218,7 +218,7 @@ public class FlowNodePreviewServiceTests
     [Fact]
     public async Task PreviewWithMetricsAsync_ShouldReportMissingLabels_WhenNoTargetClassesAndNoMetadataOrLabelsFile()
     {
-        var flowExecution = Substitute.For<IFlowExecutionService>();
+        var flowExecution = CreateFlowExecution();
         var target = new Operator("DeepLearning", OperatorType.DeepLearning, 0, 0);
         var modelPath = Path.GetTempFileName();
         target.AddParameter(new Parameter(Guid.NewGuid(), "ModelPath", "ModelPath", string.Empty, "string", modelPath));
@@ -255,7 +255,7 @@ public class FlowNodePreviewServiceTests
 
         try
         {
-            var result = await service.PreviewWithMetricsAsync(flow, target.Id, null);
+            var result = await PreviewWithEngineerDraftAuthorityAsync(service, flow, target.Id, null);
 
             result.MissingResources.Should().Contain(item => item.ResourceKey == "DeepLearning.LabelsPath");
             result.DiagnosticCodes.Should().Contain("missing_labels");
@@ -272,7 +272,7 @@ public class FlowNodePreviewServiceTests
     [Fact]
     public async Task PreviewWithMetricsAsync_ShouldResolveDeepLearningModelFromCatalog()
     {
-        var flowExecution = Substitute.For<IFlowExecutionService>();
+        var flowExecution = CreateFlowExecution();
         var target = new Operator("DeepLearning", OperatorType.DeepLearning, 0, 0);
         var modelPath = Path.GetTempFileName();
         var catalogPath = CreateTempModelCatalog("demo_detection", "detection", modelPath);
@@ -311,7 +311,7 @@ public class FlowNodePreviewServiceTests
 
         try
         {
-            var result = await service.PreviewWithMetricsAsync(flow, target.Id, null);
+            var result = await PreviewWithEngineerDraftAuthorityAsync(service, flow, target.Id, null);
 
             result.Success.Should().BeTrue(
                 $"error={result.ErrorMessage}; missing={string.Join(" | ", result.MissingResources.Select(item => $"{item.ResourceKey}:{item.Description}"))}");
@@ -337,7 +337,7 @@ public class FlowNodePreviewServiceTests
     [InlineData("SemanticSegmentation")]
     public async Task PreviewWithMetricsAsync_NonDetectionTask_ShouldNotRequireDetectionLabels(string taskType)
     {
-        var flowExecution = Substitute.For<IFlowExecutionService>();
+        var flowExecution = CreateFlowExecution();
         var target = new Operator("DeepLearning", OperatorType.DeepLearning, 0, 0);
         var modelPath = Path.GetTempFileName();
         target.AddParameter(new Parameter(Guid.NewGuid(), "TaskType", "TaskType", string.Empty, "enum", taskType));
@@ -370,7 +370,7 @@ public class FlowNodePreviewServiceTests
 
         try
         {
-            var result = await service.PreviewWithMetricsAsync(flow, target.Id, null);
+            var result = await PreviewWithEngineerDraftAuthorityAsync(service, flow, target.Id, null);
 
             result.Success.Should().BeTrue();
             result.MissingResources.Should().NotContain(item => item.ResourceKey == "DeepLearning.LabelsPath");
@@ -385,7 +385,7 @@ public class FlowNodePreviewServiceTests
     [Fact]
     public async Task PreviewWithMetricsAsync_AutoClassificationCatalog_ShouldResolveModelWithoutDetectionLabels()
     {
-        var flowExecution = Substitute.For<IFlowExecutionService>();
+        var flowExecution = CreateFlowExecution();
         var target = new Operator("DeepLearning", OperatorType.DeepLearning, 0, 0);
         var modelPath = Path.GetTempFileName();
         var catalogPath = CreateTempModelCatalog("demo_classification", "classification", modelPath);
@@ -420,7 +420,7 @@ public class FlowNodePreviewServiceTests
 
         try
         {
-            var result = await service.PreviewWithMetricsAsync(flow, target.Id, null);
+            var result = await PreviewWithEngineerDraftAuthorityAsync(service, flow, target.Id, null);
 
             result.Success.Should().BeTrue();
             result.MissingResources.Should().NotContain(item => item.ResourceKey == "DeepLearning.ModelPath");
@@ -436,7 +436,7 @@ public class FlowNodePreviewServiceTests
     [Fact]
     public async Task PreviewWithMetricsAsync_AnomalyInferenceWithoutFeatureBank_ShouldReportDeclaredResource()
     {
-        var flowExecution = Substitute.For<IFlowExecutionService>();
+        var flowExecution = CreateFlowExecution();
         var target = new Operator("Anomaly", OperatorType.AnomalyDetection, 0, 0);
         target.AddParameter(new Parameter(Guid.NewGuid(), "Mode", "Mode", string.Empty, "enum", "inference"));
         target.AddParameter(new Parameter(Guid.NewGuid(), "FeatureBankPath", "FeatureBankPath", string.Empty, "file", string.Empty));
@@ -450,7 +450,7 @@ public class FlowNodePreviewServiceTests
             Substitute.For<IPreviewMetricsAnalyzer>(),
             new OperatorFactory());
 
-        var result = await service.PreviewWithMetricsAsync(flow, target.Id, CreatePreviewImageBytes());
+        var result = await PreviewWithEngineerDraftAuthorityAsync(service, flow, target.Id, CreatePreviewImageBytes());
 
         result.Success.Should().BeFalse();
         result.MissingResources.Should().ContainSingle(item =>
@@ -468,7 +468,7 @@ public class FlowNodePreviewServiceTests
     [Fact]
     public async Task PreviewWithMetricsAsync_CannyMode_ShouldIgnoreStaleMissingEdgeModelPath()
     {
-        var flowExecution = Substitute.For<IFlowExecutionService>();
+        var flowExecution = CreateFlowExecution();
         var target = new Operator("Edges", OperatorType.EdgeDetection, 0, 0);
         target.AddParameter(new Parameter(Guid.NewGuid(), "Method", "Method", string.Empty, "enum", "Canny"));
         target.AddParameter(new Parameter(
@@ -503,17 +503,100 @@ public class FlowNodePreviewServiceTests
             Substitute.For<IPreviewMetricsAnalyzer>(),
             new OperatorFactory());
 
-        var result = await service.PreviewWithMetricsAsync(flow, target.Id, CreatePreviewImageBytes());
+        var result = await PreviewWithEngineerDraftAuthorityAsync(service, flow, target.Id, CreatePreviewImageBytes());
 
         result.Success.Should().BeTrue();
         result.MissingResources.Should().NotContain(item => item.ResourceKey == "EdgeDetection.EdgeModelPath");
         result.DiagnosticCodes.Should().NotContain("missing_model");
     }
 
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task PreviewWithMetricsAsync_InvalidSnapshot_ShouldRejectBeforeModelResourceOrDebugWork(
+        bool modelPathExists)
+    {
+        var flowExecution = CreateFlowExecution();
+        const string admissionError = "TEST_PREVIEW_AUTHORITY_REJECTED";
+        flowExecution.ValidateSnapshot(Arg.Any<ExecutionSnapshot>()).Returns(new FlowValidationResult
+        {
+            IsValid = false,
+            Errors = [admissionError]
+        });
+        var createdModelPath = modelPathExists ? Path.GetTempFileName() : null;
+        var modelPath = createdModelPath ?? Path.Combine(
+            Path.GetPathRoot(Path.GetTempPath())!,
+            "clearvision-admission-outside",
+            $"missing-{Guid.NewGuid():N}.onnx");
+        var target = new Operator("DeepLearning", OperatorType.DeepLearning, 0, 0);
+        target.AddParameter(new Parameter(
+            Guid.NewGuid(),
+            "TaskType",
+            "TaskType",
+            string.Empty,
+            "enum",
+            "ImageClassification"));
+        target.AddParameter(new Parameter(
+            Guid.NewGuid(),
+            "ModelPath",
+            "ModelPath",
+            string.Empty,
+            "file",
+            modelPath));
+        var flow = new OperatorFlow("admission-first-model-preview");
+        flow.AddOperator(target);
+        File.Exists(modelPath).Should().Be(modelPathExists);
+        var service = new FlowNodePreviewService(
+            NullLogger<FlowNodePreviewService>.Instance,
+            flowExecution,
+            Substitute.For<IPreviewMetricsAnalyzer>(),
+            new OperatorFactory());
+
+        try
+        {
+            var result = await PreviewWithEngineerDraftAuthorityAsync(
+                service,
+                flow,
+                target.Id,
+                CreatePreviewImageBytes());
+
+            result.Success.Should().BeFalse();
+            result.ErrorMessage.Should().Be($"ADMISSION_FLOW_INVALID: {admissionError}");
+            result.DiagnosticCodes.Should().Equal("admission_rejected");
+            result.MissingResources.Should().BeEmpty(
+                "model path existence checks must not run after snapshot admission rejects the request");
+            flowExecution.Received(1).ValidateSnapshot(Arg.Is<ExecutionSnapshot>(snapshot =>
+                snapshot.ProjectId != Guid.Empty &&
+                snapshot.PersistenceRevision == PreviewPersistenceRevision &&
+                snapshot.Source == ExecutionSnapshotSource.Draft &&
+                snapshot.RunMode == ExecutionRunMode.Preview &&
+                snapshot.Principal.IsAuthenticated &&
+                snapshot.Principal.IsEngineerOrAdmin &&
+                snapshot.ExpectedProjectRevision == PreviewPersistenceRevision &&
+                snapshot.CapabilityManifest.IsExplicit &&
+                !string.IsNullOrWhiteSpace(snapshot.ConfirmationId) &&
+                !string.IsNullOrWhiteSpace(snapshot.AuditId)));
+            await flowExecution.DidNotReceiveWithAnyArgs().ExecuteDebugWithSnapshotAsync(
+                Arg.Any<ExecutionSnapshot>(),
+                Arg.Any<DebugOptions>(),
+                Arg.Any<Dictionary<string, object>?>(),
+                Arg.Any<ClearVision.Product.Core.ProjectVariables.ProjectVariableExecutionContext?>(),
+                Arg.Any<CancellationToken>());
+            flowExecution.DidNotReceive().GetDebugIntermediateResult(Arg.Any<Guid>(), Arg.Any<Guid>());
+        }
+        finally
+        {
+            if (createdModelPath != null && File.Exists(createdModelPath))
+            {
+                File.Delete(createdModelPath);
+            }
+        }
+    }
+
     [Fact]
     public async Task PreviewWithMetricsAsync_ShouldExcludeOriginalImageFromOutputs()
     {
-        var flowExecution = Substitute.For<IFlowExecutionService>();
+        var flowExecution = CreateFlowExecution();
         var target = new Operator("Resize", OperatorType.ImageResize, 0, 0);
         var flow = new OperatorFlow("preview-flow");
         flow.AddOperator(target);
@@ -547,7 +630,7 @@ public class FlowNodePreviewServiceTests
             Substitute.For<IPreviewMetricsAnalyzer>(),
             new OperatorFactory());
 
-        var result = await service.PreviewWithMetricsAsync(flow, target.Id, null);
+        var result = await PreviewWithEngineerDraftAuthorityAsync(service, flow, target.Id, null);
 
         result.Success.Should().BeTrue();
         result.PreviewImage.Should().Equal(previewImage);
@@ -556,6 +639,51 @@ public class FlowNodePreviewServiceTests
         result.Outputs.Should().NotContainKey("Image");
         result.Outputs.Should().NotContainKey("OriginalImage");
     }
+
+    private const long PreviewPersistenceRevision = 7;
+
+    private static IFlowExecutionService CreateFlowExecution()
+    {
+        var flowExecution = Substitute.For<IFlowExecutionService>();
+        flowExecution.ValidateSnapshot(Arg.Any<ExecutionSnapshot>()).Returns(new FlowValidationResult
+        {
+            IsValid = true
+        });
+        return flowExecution;
+    }
+
+    private static Task<FlowNodePreviewWithMetricsResult> PreviewWithEngineerDraftAuthorityAsync(
+        FlowNodePreviewService service,
+        OperatorFlow flow,
+        Guid targetNodeId,
+        byte[]? inputImage)
+    {
+        var projectId = Guid.NewGuid();
+        var authority = CreateEngineerDraftPreviewAuthority(flow, PreviewPersistenceRevision);
+        return service.PreviewWithMetricsAsync(
+            flow,
+            targetNodeId,
+            inputImage,
+            projectId,
+            PreviewPersistenceRevision,
+            authority,
+            projectVariables: null,
+            ct: CancellationToken.None);
+    }
+
+    private static ExecutionRequestAuthority CreateEngineerDraftPreviewAuthority(
+        OperatorFlow flow,
+        long persistenceRevision) =>
+        new(
+            new ExecutionPrincipal(
+                "engineer-preview-tests",
+                "Preview Engineer",
+                "Engineer",
+                IsAuthenticated: true),
+            expectedProjectRevision: persistenceRevision,
+            capabilityManifest: ExecutionCapabilityManifest.Derive(flow, isExplicit: true),
+            confirmationId: Guid.NewGuid().ToString("D"),
+            auditId: Guid.NewGuid().ToString("D"));
 
     private static byte[] CreatePreviewImageBytes()
     {

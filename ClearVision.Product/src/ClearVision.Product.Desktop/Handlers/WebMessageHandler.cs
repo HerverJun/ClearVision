@@ -34,6 +34,84 @@ using ConversationSessionAccessException = ClearVision.Product.Infrastructure.AI
 
 namespace ClearVision.Product.Desktop.Handlers;
 
+internal readonly record struct GenerateFlowRequestIdentity(
+    string OwnerHash,
+    string SessionId,
+    string RequestId)
+{
+    public static GenerateFlowRequestIdentity CreateForRegistration(
+        string ownerHash,
+        string? sessionId,
+        string requestId)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(ownerHash);
+        ArgumentException.ThrowIfNullOrWhiteSpace(sessionId);
+        ArgumentException.ThrowIfNullOrWhiteSpace(requestId);
+
+        return new GenerateFlowRequestIdentity(
+            ownerHash.Trim(),
+            sessionId.Trim(),
+            requestId.Trim());
+    }
+
+    public static bool TryCreateExact(
+        string ownerHash,
+        string? sessionId,
+        string? requestId,
+        out GenerateFlowRequestIdentity identity)
+    {
+        if (string.IsNullOrWhiteSpace(ownerHash) ||
+            string.IsNullOrWhiteSpace(sessionId) ||
+            string.IsNullOrWhiteSpace(requestId))
+        {
+            identity = default;
+            return false;
+        }
+
+        identity = CreateForRegistration(ownerHash, sessionId, requestId);
+        return true;
+    }
+}
+
+internal sealed class GenerateFlowRequestRegistry<TRequest>
+    where TRequest : class
+{
+    private readonly ConcurrentDictionary<GenerateFlowRequestIdentity, TRequest> _requests = new();
+
+    public int Count => _requests.Count;
+
+    public bool TryRegister(GenerateFlowRequestIdentity identity, TRequest request) =>
+        _requests.TryAdd(identity, request);
+
+    public bool TryResolveExact(
+        string ownerHash,
+        string? sessionId,
+        string? requestId,
+        out TRequest request)
+    {
+        if (GenerateFlowRequestIdentity.TryCreateExact(
+                ownerHash,
+                sessionId,
+                requestId,
+                out var identity) &&
+            _requests.TryGetValue(identity, out request!))
+        {
+            return true;
+        }
+
+        request = null!;
+        return false;
+    }
+
+    public bool CompareAndRemove(GenerateFlowRequestIdentity identity, TRequest expectedRequest) =>
+        ((ICollection<KeyValuePair<GenerateFlowRequestIdentity, TRequest>>)_requests)
+        .Remove(new KeyValuePair<GenerateFlowRequestIdentity, TRequest>(identity, expectedRequest));
+
+    public IReadOnlyList<TRequest> Snapshot() => _requests.Values.ToArray();
+
+    public void Clear() => _requests.Clear();
+}
+
 /// <summary>
 /// WebView2 消息处理器
 /// </summary>
@@ -54,9 +132,7 @@ public class WebMessageHandler : IWebMessageClient, IDisposable
     private int _pendingWebMessageCount;
     private int _webMessageDrainScheduled;
     private long _droppedWebMessageCount;
-    private readonly ConcurrentDictionary<string, ActiveGenerateFlowRequest> _activeGenerateFlowRequests = new(StringComparer.OrdinalIgnoreCase);
-    private readonly ConcurrentDictionary<string, string> _activeGenerateFlowRequestIdsBySessionId = new(StringComparer.OrdinalIgnoreCase);
-    private readonly object _activeGenerateFlowGate = new();
+    private readonly GenerateFlowRequestRegistry<ActiveGenerateFlowRequest> _activeGenerateFlowRequests = new();
     private readonly object _bindingGate = new();
     private WebMessageDeliveryBinding? _currentDeliveryBinding;
     private long _deliveryEpoch;
@@ -396,7 +472,7 @@ public class WebMessageHandler : IWebMessageClient, IDisposable
 
             if (current != null)
             {
-                requestsToCancel = _activeGenerateFlowRequests.Values.ToList();
+                requestsToCancel = _activeGenerateFlowRequests.Snapshot().ToList();
             }
 
             binding = new WebMessageDeliveryBinding(
@@ -427,7 +503,7 @@ public class WebMessageHandler : IWebMessageClient, IDisposable
         {
             _currentDeliveryBinding = null;
             Interlocked.Increment(ref _deliveryEpoch);
-            requests = _activeGenerateFlowRequests.Values.ToList();
+            requests = _activeGenerateFlowRequests.Snapshot().ToList();
         }
 
         CancelAndRemoveRequests(requests);
@@ -495,6 +571,29 @@ public class WebMessageHandler : IWebMessageClient, IDisposable
             var requestId = TryGetMessageString(payload, "requestId")
                 ?? TryGetMessageString(doc.RootElement, "requestId")
                 ?? Guid.NewGuid().ToString("N");
+            if (string.IsNullOrWhiteSpace(sessionId))
+            {
+                var response = new GenerateFlowResponse
+                {
+                    Success = false,
+                    Status = AiFlowGenerationResult.CompletionStatusFailed,
+                    Code = WebMessageErrorCodes.Validation,
+                    ErrorMessage = "GenerateFlow requires an explicit sessionId.",
+                    FailureSummary = "generate_flow_session_required: GenerateFlow requires an explicit sessionId.",
+                    SessionId = null,
+                    RequestId = requestId,
+                    ClarificationRequired = false,
+                    CompletionStatus = AiFlowGenerationResult.CompletionStatusFailed,
+                    InteractionState = AiInteractionStates.Failed,
+                    FirstFixRecommendation = "请重新打开 AI 会话后再发起生成。"
+                };
+                PostWebMessageJson(SerializeGenerateFlowResponse(
+                    response,
+                    AiFlowGenerationResult.FailureTypeSystemError), binding);
+                return;
+            }
+
+            sessionId = sessionId.Trim();
             var requirementMode = TryGetMessageString(payload, "requirementMode")
                 ?? TryGetMessageString(doc.RootElement, "requirementMode");
             var templateSelection = TryGetTemplateSelection(payload);
@@ -1008,12 +1107,12 @@ public class WebMessageHandler : IWebMessageClient, IDisposable
             var payload = doc.RootElement.TryGetProperty("payload", out var payloadElement) &&
                           payloadElement.ValueKind == JsonValueKind.Object
                 ? payloadElement
-                : doc.RootElement;
+                : default;
 
-            var requestId = TryGetMessageString(payload, "requestId") ??
-                            TryGetMessageString(doc.RootElement, "requestId");
-            var sessionId = TryGetMessageString(payload, "sessionId") ??
-                            TryGetMessageString(doc.RootElement, "sessionId");
+            // The envelope requestId identifies this WebMessage. Cancellation authority
+            // comes only from the explicit owner + sessionId + generation requestId tuple.
+            var requestId = TryGetMessageString(payload, "requestId");
+            var sessionId = TryGetMessageString(payload, "sessionId");
 
             if (!TryResolveGenerateFlowRequest(
                     principal.OwnerHash,
@@ -1114,10 +1213,12 @@ public class WebMessageHandler : IWebMessageClient, IDisposable
         WebMessageDeliveryBinding binding,
         out ActiveGenerateFlowRequest activeRequest)
     {
-        var candidate = new ActiveGenerateFlowRequest(
-            requestId,
-            sessionId,
+        var identity = GenerateFlowRequestIdentity.CreateForRegistration(
             ownerHash,
+            sessionId,
+            requestId);
+        var candidate = new ActiveGenerateFlowRequest(
+            identity,
             binding,
             new CancellationTokenSource());
 
@@ -1130,22 +1231,11 @@ public class WebMessageHandler : IWebMessageClient, IDisposable
                 return false;
             }
 
-            lock (_activeGenerateFlowGate)
+            if (!_activeGenerateFlowRequests.TryRegister(identity, candidate))
             {
-                if (_activeGenerateFlowRequests.ContainsKey(requestId) ||
-                    (!string.IsNullOrWhiteSpace(candidate.SessionKey) &&
-                     _activeGenerateFlowRequestIdsBySessionId.ContainsKey(candidate.SessionKey)))
-                {
-                    candidate.Dispose();
-                    activeRequest = null!;
-                    return false;
-                }
-
-                _activeGenerateFlowRequests[requestId] = candidate;
-                if (!string.IsNullOrWhiteSpace(candidate.SessionKey))
-                {
-                    _activeGenerateFlowRequestIdsBySessionId[candidate.SessionKey] = requestId;
-                }
+                candidate.Dispose();
+                activeRequest = null!;
+                return false;
             }
         }
 
@@ -1161,24 +1251,9 @@ public class WebMessageHandler : IWebMessageClient, IDisposable
 
     private bool TryRemoveActiveGenerateFlowRequest(ActiveGenerateFlowRequest activeRequest)
     {
-        lock (_activeGenerateFlowGate)
-        {
-            if (!_activeGenerateFlowRequests.TryGetValue(activeRequest.RequestId, out var registeredRequest) ||
-                !ReferenceEquals(registeredRequest, activeRequest))
-            {
-                return false;
-            }
-
-            _activeGenerateFlowRequests.TryRemove(activeRequest.RequestId, out _);
-            if (!string.IsNullOrWhiteSpace(activeRequest.SessionKey) &&
-                _activeGenerateFlowRequestIdsBySessionId.TryGetValue(activeRequest.SessionKey, out var mappedRequestId) &&
-                string.Equals(mappedRequestId, activeRequest.RequestId, StringComparison.OrdinalIgnoreCase))
-            {
-                _activeGenerateFlowRequestIdsBySessionId.TryRemove(activeRequest.SessionKey, out _);
-            }
-
-            return true;
-        }
+        return _activeGenerateFlowRequests.CompareAndRemove(
+            activeRequest.Identity,
+            activeRequest);
     }
 
     private bool TryResolveGenerateFlowRequest(
@@ -1187,30 +1262,12 @@ public class WebMessageHandler : IWebMessageClient, IDisposable
         string? sessionId,
         out ActiveGenerateFlowRequest activeRequest)
     {
-        if (!string.IsNullOrWhiteSpace(requestId) &&
-            _activeGenerateFlowRequests.TryGetValue(requestId, out activeRequest!) &&
-            string.Equals(activeRequest.OwnerHash, ownerHash, StringComparison.Ordinal))
-        {
-            return true;
-        }
-
-        var sessionKey = BuildSessionKey(ownerHash, sessionId);
-        if (!string.IsNullOrWhiteSpace(sessionId) &&
-            _activeGenerateFlowRequestIdsBySessionId.TryGetValue(sessionKey, out var mappedRequestId) &&
-            _activeGenerateFlowRequests.TryGetValue(mappedRequestId, out activeRequest!) &&
-            string.Equals(activeRequest.OwnerHash, ownerHash, StringComparison.Ordinal))
-        {
-            return true;
-        }
-
-        activeRequest = null!;
-        return false;
+        return _activeGenerateFlowRequests.TryResolveExact(
+            ownerHash,
+            sessionId,
+            requestId,
+            out activeRequest);
     }
-
-    private static string BuildSessionKey(string ownerHash, string? sessionId) =>
-        string.IsNullOrWhiteSpace(sessionId)
-            ? string.Empty
-            : $"{ownerHash}:{sessionId.Trim()}";
 
     private static string? TryGetMessageString(JsonElement element, string propertyName)
     {
@@ -1574,7 +1631,8 @@ public class WebMessageHandler : IWebMessageClient, IDisposable
 
         ClearPendingWebMessages();
 
-        foreach (var activeRequest in _activeGenerateFlowRequests.Values)
+        var activeGenerateFlowRequests = _activeGenerateFlowRequests.Snapshot();
+        foreach (var activeRequest in activeGenerateFlowRequests)
         {
             try
             {
@@ -1591,13 +1649,12 @@ public class WebMessageHandler : IWebMessageClient, IDisposable
             }
         }
 
-        foreach (var activeRequest in _activeGenerateFlowRequests.Values)
+        foreach (var activeRequest in activeGenerateFlowRequests)
         {
             activeRequest.Dispose();
         }
 
         _activeGenerateFlowRequests.Clear();
-        _activeGenerateFlowRequestIdsBySessionId.Clear();
 
         foreach (var subscription in _subscriptions)
         {
@@ -1659,27 +1716,24 @@ public class WebMessageHandler : IWebMessageClient, IDisposable
     private sealed class ActiveGenerateFlowRequest : IDisposable
     {
         public ActiveGenerateFlowRequest(
-            string requestId,
-            string? sessionId,
-            string ownerHash,
+            GenerateFlowRequestIdentity identity,
             WebMessageDeliveryBinding binding,
             CancellationTokenSource cancellationTokenSource)
         {
-            RequestId = requestId;
-            SessionId = sessionId;
-            OwnerHash = ownerHash;
+            Identity = identity;
             Binding = binding;
-            SessionKey = BuildSessionKey(ownerHash, sessionId);
             CancellationTokenSource = cancellationTokenSource;
         }
 
-        public string RequestId { get; }
+        public GenerateFlowRequestIdentity Identity { get; }
 
-        public string? SessionId { get; }
+        public string RequestId => Identity.RequestId;
 
-        public string OwnerHash { get; }
+        public string? SessionId => string.IsNullOrEmpty(Identity.SessionId)
+            ? null
+            : Identity.SessionId;
 
-        public string SessionKey { get; }
+        public string OwnerHash => Identity.OwnerHash;
 
         public WebMessageDeliveryBinding Binding { get; }
 

@@ -1,4 +1,3 @@
-using System.Collections;
 using System.Diagnostics;
 using System.Reflection;
 using ClearVision.PlcComm.Common;
@@ -8,14 +7,13 @@ using ClearVision.Product.Core.Entities;
 using ClearVision.Product.Core.Enums;
 using ClearVision.Product.Core.Operators;
 using ClearVision.Product.Infrastructure.Operators;
-using ClearVision.Product.Tests.Runtime;
 using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
 
 namespace ClearVision.Product.Tests.Operators;
 
 [TestClassification(TestDomain.Core, TestPurpose.Regression, TestLane.Pr, TestEvidenceType.Contract, TestOracleType.Contract, TestResourceRequirement.None, TestExpectedDuration.Fast, TestFlakyPolicy.Blocking, "product")]
-[Collection(RuntimeConcurrencyCollection.Name)]
+[Collection("PLC Operator Integration")]
 public class PlcCommunicationOperatorBaseConcurrencyTests
 {
     [Fact]
@@ -34,14 +32,14 @@ public class PlcCommunicationOperatorBaseConcurrencyTests
         await slowConnectStarted.Task.WaitAsync(TimeSpan.FromSeconds(2));
 
         var sw = Stopwatch.StartNew();
-        var fastResult = await sut.GetOrCreateConnectionPublicAsync("S7:192.168.0.2:102", () => fastClient)
+        await using var fastResult = await sut.GetOrCreateConnectionPublicAsync("S7:192.168.0.2:102", () => fastClient)
             .WaitAsync(TimeSpan.FromSeconds(2));
         sw.Stop();
 
-        fastResult.isNewConnection.Should().BeTrue();
+        fastResult.IsNewConnection.Should().BeTrue();
         sw.Elapsed.Should().BeLessThan(TimeSpan.FromMilliseconds(350));
 
-        _ = await slowTask.WaitAsync(TimeSpan.FromSeconds(3));
+        await using var slowResult = await slowTask.WaitAsync(TimeSpan.FromSeconds(3));
     }
 
     [Fact]
@@ -71,13 +69,19 @@ public class PlcCommunicationOperatorBaseConcurrencyTests
 
         startGate.TrySetResult();
         var results = await Task.WhenAll(tasks).WaitAsync(TimeSpan.FromSeconds(5));
+        try
+        {
+            factoryCalls.Should().Be(1);
+            connectCalls.Should().Be(1);
+            results.Count(static r => r.IsNewConnection).Should().Be(1);
 
-        factoryCalls.Should().Be(1);
-        connectCalls.Should().Be(1);
-        results.Count(static r => r.isNewConnection).Should().Be(1);
-
-        var firstClient = results[0].client;
-        results.Should().OnlyContain(r => ReferenceEquals(r.client, firstClient));
+            var firstClient = results[0].Client;
+            results.Should().OnlyContain(r => ReferenceEquals(r.Client, firstClient));
+        }
+        finally
+        {
+            await Task.WhenAll(results.Select(result => result.DisposeAsync().AsTask()));
+        }
     }
 
     [Fact]
@@ -91,9 +95,10 @@ public class PlcCommunicationOperatorBaseConcurrencyTests
             for (var i = 0; i < 64; i++)
             {
                 var key = $"S7:192.168.10.{i}:102";
-                _ = await sut.GetOrCreateConnectionPublicAsync(
+                var lease = await sut.GetOrCreateConnectionPublicAsync(
                     key,
                     () => new DelayedConnectPlcClient(TimeSpan.FromMilliseconds(1)));
+                await lease.DisposeAsync();
             }
 
             GetConnectionKeyLockCount().Should().Be(0);
@@ -141,19 +146,24 @@ public class PlcCommunicationOperatorBaseConcurrencyTests
     {
         ResetStaticConnectionState();
         var probe = new PingConcurrencyProbe();
-        var snapshot = Enumerable.Range(0, 8)
-            .Select(index => new KeyValuePair<string, IPlcClient>(
-                $"S7:192.168.3.{index}:102",
-                new SlowPingPlcClient(TimeSpan.FromMilliseconds(200), probe)))
-            .ToArray();
+        var sut = new TestPlcOperator();
+        const int connectionCount = 8;
 
         try
         {
-            await InvokePingSnapshotAsync(snapshot, CancellationToken.None);
+            for (var index = 0; index < connectionCount; index++)
+            {
+                var lease = await sut.GetOrCreateConnectionPublicAsync(
+                    $"S7:192.168.3.{index}:102",
+                    () => new SlowPingPlcClient(TimeSpan.FromMilliseconds(200), probe));
+                await lease.DisposeAsync();
+            }
+
+            await PlcCommunicationOperatorBase.RunHeartbeatProbeOnceForTestingAsync(CancellationToken.None);
 
             probe.MaxActive.Should().BeGreaterThan(1);
             probe.MaxActive.Should().BeLessThanOrEqualTo(GetPrivateStaticInt("MaxHeartbeatConcurrency"));
-            probe.PingCount.Should().Be(snapshot.Length);
+            probe.PingCount.Should().Be(connectionCount);
             GetOperationLockCount().Should().Be(0);
         }
         finally
@@ -219,54 +229,8 @@ public class PlcCommunicationOperatorBaseConcurrencyTests
 
     private static void ResetStaticConnectionState()
     {
-        var poolField = typeof(PlcCommunicationOperatorBase).GetField("_connectionPool", BindingFlags.Static | BindingFlags.NonPublic);
-        var stateField = typeof(PlcCommunicationOperatorBase).GetField("_lastKnownState", BindingFlags.Static | BindingFlags.NonPublic);
-        var keyLocksField = typeof(PlcCommunicationOperatorBase).GetField("_connectionKeyLocks", BindingFlags.Static | BindingFlags.NonPublic);
-        var operationLocksField = typeof(PlcCommunicationOperatorBase).GetField("_operationLocks", BindingFlags.Static | BindingFlags.NonPublic);
-
-        if (poolField?.GetValue(null) is IDictionary pool)
-        {
-            foreach (DictionaryEntry entry in pool)
-            {
-                if (entry.Value is IDisposable disposable)
-                {
-                    disposable.Dispose();
-                }
-            }
-
-            pool.Clear();
-        }
-
-        if (stateField?.GetValue(null) is IDictionary state)
-        {
-            state.Clear();
-        }
-
-        if (keyLocksField?.GetValue(null) is IDictionary keyLocks)
-        {
-            foreach (DictionaryEntry entry in keyLocks)
-            {
-                if (entry.Value is IDisposable disposable)
-                {
-                    disposable.Dispose();
-                }
-            }
-
-            keyLocks.Clear();
-        }
-
-        if (operationLocksField?.GetValue(null) is IDictionary operationLocks)
-        {
-            foreach (DictionaryEntry entry in operationLocks)
-            {
-                if (entry.Value is IDisposable disposable)
-                {
-                    disposable.Dispose();
-                }
-            }
-
-            operationLocks.Clear();
-        }
+        PlcCommunicationOperatorBase.StopHeartbeat();
+        PlcCommunicationOperatorBase.ResetConnectionPoolPolicyForTestingAsync().GetAwaiter().GetResult();
     }
 
     private static Task? GetHeartbeatTask()
@@ -294,15 +258,6 @@ public class PlcCommunicationOperatorBaseConcurrencyTests
         indexer!.SetValue(state, value, new object[] { key });
     }
 
-    private static async Task InvokePingSnapshotAsync(KeyValuePair<string, IPlcClient>[] snapshot, CancellationToken cancellationToken)
-    {
-        var method = typeof(PlcCommunicationOperatorBase).GetMethod("PingSnapshotAsync", BindingFlags.Static | BindingFlags.NonPublic);
-        method.Should().NotBeNull();
-
-        var task = (Task)method!.Invoke(null, new object[] { snapshot, cancellationToken })!;
-        await task.WaitAsync(TimeSpan.FromSeconds(3));
-    }
-
     private static int GetPrivateStaticInt(string name)
     {
         var field = typeof(PlcCommunicationOperatorBase).GetField(name, BindingFlags.Static | BindingFlags.NonPublic);
@@ -314,22 +269,12 @@ public class PlcCommunicationOperatorBaseConcurrencyTests
 
     private static int GetConnectionKeyLockCount()
     {
-        var keyLocksField = typeof(PlcCommunicationOperatorBase).GetField("_connectionKeyLocks", BindingFlags.Static | BindingFlags.NonPublic);
-        keyLocksField.Should().NotBeNull();
-
-        var keyLocks = keyLocksField!.GetValue(null) as IDictionary;
-        keyLocks.Should().NotBeNull();
-        return keyLocks!.Count;
+        return PlcCommunicationOperatorBase.GetConnectionPoolSnapshot().ConnectionKeyLockCount;
     }
 
     private static int GetOperationLockCount()
     {
-        var operationLocksField = typeof(PlcCommunicationOperatorBase).GetField("_operationLocks", BindingFlags.Static | BindingFlags.NonPublic);
-        operationLocksField.Should().NotBeNull();
-
-        var operationLocks = operationLocksField!.GetValue(null) as IDictionary;
-        operationLocks.Should().NotBeNull();
-        return operationLocks!.Count;
+        return PlcCommunicationOperatorBase.GetConnectionPoolSnapshot().OperationLockCount;
     }
 
     private static void UpdateMax(ref int target, int candidate)
@@ -353,15 +298,16 @@ public class PlcCommunicationOperatorBaseConcurrencyTests
     {
         public TestPlcOperator() : base(NullLogger.Instance)
         {
+            StopHeartbeat();
         }
 
         public override OperatorType OperatorType => OperatorType.SiemensS7Communication;
 
-        public Task<(IPlcClient client, bool isNewConnection)> GetOrCreateConnectionPublicAsync(
+        public Task<PooledPlcConnectionLease> GetOrCreateConnectionPublicAsync(
             string connectionKey,
             Func<IPlcClient> factory)
         {
-            return GetOrCreateConnectionAsync(connectionKey, factory);
+            return AcquireConnectionLeaseAsync(connectionKey, factory);
         }
 
         public Task ExecuteWithConnectionOperationLockPublicAsync(

@@ -256,6 +256,57 @@ public class ImageAcquisitionOperatorTests
     }
 
     [Fact]
+    public async Task ExecuteAsync_RuntimeResourceSelectors_ShouldNotOverrideSignedOperatorParameters()
+    {
+        var filePath = Path.Combine(Path.GetTempPath(), $"runtime-selector-{Guid.NewGuid():N}.png");
+        using var mat = new Mat(5, 7, MatType.CV_8UC3, new Scalar(10, 20, 30));
+        await File.WriteAllBytesAsync(filePath, mat.ToBytes(".png"));
+        try
+        {
+            var op = CreateTestOperator();
+            op.AddParameter(new Parameter(Guid.NewGuid(), "SourceType", "SourceType", string.Empty, "enum", "Invalid"));
+
+            var result = await _operator.ExecuteAsync(op, new Dictionary<string, object>
+            {
+                ["SourceType"] = "File",
+                ["FilePath"] = filePath
+            });
+
+            result.IsSuccess.Should().BeFalse();
+            result.ErrorMessage.Should().Be("SourceType must be File or Camera.");
+        }
+        finally
+        {
+            File.Delete(filePath);
+        }
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_RuntimeFilePath_ShouldNotSupplyUnsignedResourcePath()
+    {
+        var filePath = Path.Combine(Path.GetTempPath(), $"runtime-file-path-{Guid.NewGuid():N}.png");
+        using var mat = new Mat(5, 7, MatType.CV_8UC3, new Scalar(30, 20, 10));
+        await File.WriteAllBytesAsync(filePath, mat.ToBytes(".png"));
+        try
+        {
+            var op = CreateTestOperator();
+            op.AddParameter(new Parameter(Guid.NewGuid(), "SourceType", "SourceType", string.Empty, "enum", "File"));
+
+            var result = await _operator.ExecuteAsync(op, new Dictionary<string, object>
+            {
+                ["FilePath"] = filePath
+            });
+
+            result.IsSuccess.Should().BeFalse();
+            result.ErrorMessage.Should().Be("FilePath is required when SourceType is File and no runtime Image input was provided.");
+        }
+        finally
+        {
+            File.Delete(filePath);
+        }
+    }
+
+    [Fact]
     public async Task ExecuteAsync_WithCameraSource_ShouldIgnoreFilePathAndAcquireCameraFrame()
     {
         var tempFile = Path.Combine(Path.GetTempPath(), $"cv-image-{Guid.NewGuid():N}.png");
@@ -270,8 +321,17 @@ public class ImageAcquisitionOperatorTests
         camera.AcquireSingleFrameAsync().Returns(Task.FromResult(cameraFrame));
 
         var cameraManager = Substitute.For<ICameraManager>();
-        cameraManager.GetBindings().Returns(new List<CameraBindingConfig>());
-        cameraManager.GetOrCreateByBindingAsync("cam-1").Returns(Task.FromResult(camera));
+        cameraManager.GetBindings().Returns(new List<CameraBindingConfig>
+        {
+            new()
+            {
+                Id = "cam-1",
+                SerialNumber = "SN-CAM-1",
+                IsEnabled = true,
+                TriggerMode = "Software"
+            }
+        });
+        var cameraLease = ConfigureCameraLease(cameraManager, "cam-1", camera);
         var sut = new ImageAcquisitionOperator(
             Substitute.For<ILogger<ImageAcquisitionOperator>>(),
             cameraManager);
@@ -292,7 +352,10 @@ public class ImageAcquisitionOperatorTests
             outputData["Width"].Should().Be(12);
             outputData["Height"].Should().Be(6);
             outputData["Source"].Should().Be("camera");
-            await cameraManager.Received(1).GetOrCreateByBindingAsync("cam-1");
+            await cameraManager.Received(1).AcquireByBindingLeaseAsync(
+                "cam-1",
+                Arg.Any<CancellationToken>());
+            cameraLease.DisposeCallCount.Should().Be(1);
             await camera.Received(1).AcquireSingleFrameAsync();
         }
         finally
@@ -313,8 +376,17 @@ public class ImageAcquisitionOperatorTests
         camera.SetGainAsync(Arg.Any<double>()).Returns(Task.CompletedTask);
         camera.AcquireSingleFrameAsync().Returns(Task.FromResult(cameraMat.ToBytes(".png")));
         var cameraManager = Substitute.For<ICameraManager>();
-        cameraManager.GetBindings().Returns([]);
-        cameraManager.GetOrCreateByBindingAsync("alias-camera").Returns(Task.FromResult(camera));
+        cameraManager.GetBindings().Returns(new List<CameraBindingConfig>
+        {
+            new()
+            {
+                Id = "alias-camera",
+                SerialNumber = "SN-ALIAS",
+                IsEnabled = true,
+                TriggerMode = "Software"
+            }
+        });
+        var cameraLease = ConfigureCameraLease(cameraManager, "alias-camera", camera);
         var sut = new ImageAcquisitionOperator(
             Substitute.For<ILogger<ImageAcquisitionOperator>>(),
             cameraManager);
@@ -337,8 +409,66 @@ public class ImageAcquisitionOperatorTests
         var result = await sut.ExecuteAsync(op, new Dictionary<string, object>());
 
         result.IsSuccess.Should().BeTrue(result.ErrorMessage);
-        await cameraManager.Received(1).GetOrCreateByBindingAsync("alias-camera");
+        await cameraManager.Received(1).AcquireByBindingLeaseAsync(
+            "alias-camera",
+            Arg.Any<CancellationToken>());
+        cameraLease.DisposeCallCount.Should().Be(1);
         (result.OutputData!["Image"] as ImageWrapper)?.Release();
+    }
+
+    [Theory]
+    [InlineData("missing-binding")]
+    [InlineData("SN-AUTHORIZED")]
+    [InlineData("disabled-binding")]
+    [InlineData("unbound-camera")]
+    public async Task ExecuteAsync_WithRejectedCameraBinding_ShouldHaveZeroDeviceSideEffects(string requestedId)
+    {
+        var cameraManager = Substitute.For<ICameraManager>();
+        cameraManager.GetBindings().Returns(new List<CameraBindingConfig>
+        {
+            new()
+            {
+                Id = "authorized-binding",
+                SerialNumber = "SN-AUTHORIZED",
+                IsEnabled = true,
+                TriggerMode = "External"
+            },
+            new()
+            {
+                Id = "disabled-binding",
+                SerialNumber = "SN-DISABLED",
+                IsEnabled = false,
+                TriggerMode = "External"
+            },
+            new()
+            {
+                Id = "unbound-camera",
+                SerialNumber = string.Empty,
+                IsEnabled = true,
+                TriggerMode = "External"
+            }
+        });
+        var streamCoordinator = Substitute.For<ICameraFrameStreamCoordinator>();
+        var sut = new ImageAcquisitionOperator(
+            Substitute.For<ILogger<ImageAcquisitionOperator>>(),
+            cameraManager,
+            streamCoordinator);
+        var op = CreateTestOperator();
+        op.AddParameter(new Parameter(Guid.NewGuid(), "SourceType", "SourceType", string.Empty, "enum", "Camera"));
+        op.AddParameter(new Parameter(Guid.NewGuid(), "CameraId", "CameraId", string.Empty, "cameraBinding", requestedId));
+
+        var result = await sut.ExecuteAsync(op, new Dictionary<string, object>());
+
+        result.IsSuccess.Should().BeFalse();
+        await cameraManager.DidNotReceive().GetOrCreateByBindingAsync(Arg.Any<string>());
+        await cameraManager.DidNotReceive().AcquireByBindingLeaseAsync(
+            Arg.Any<string>(),
+            Arg.Any<CancellationToken>());
+        await cameraManager.DidNotReceive().GetOrCreateCameraAsync(Arg.Any<string>());
+        cameraManager.DidNotReceive().GetCamera(Arg.Any<string>());
+        await streamCoordinator.DidNotReceive().AcquireFrameAsync(
+            Arg.Any<string>(),
+            Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -356,7 +486,6 @@ public class ImageAcquisitionOperatorTests
 
         var cameraManager = Substitute.For<ICameraManager>();
         cameraManager.GetBindings().Returns(new List<CameraBindingConfig>());
-        cameraManager.GetOrCreateByBindingAsync("cam-1").Returns(Task.FromResult(camera));
         var sut = new ImageAcquisitionOperator(
             Substitute.For<ILogger<ImageAcquisitionOperator>>(),
             cameraManager);
@@ -376,6 +505,9 @@ public class ImageAcquisitionOperatorTests
         result.OutputData["Height"].Should().Be(4);
         result.OutputData["Source"].Should().Be("provided-image");
         await cameraManager.DidNotReceive().GetOrCreateByBindingAsync("cam-1");
+        await cameraManager.DidNotReceive().AcquireByBindingLeaseAsync(
+            Arg.Any<string>(),
+            Arg.Any<CancellationToken>());
         await camera.DidNotReceive().AcquireSingleFrameAsync();
     }
 
@@ -418,6 +550,9 @@ public class ImageAcquisitionOperatorTests
         result.OutputData["Sequence"].Should().Be(42L);
         result.OutputData["CorrelationId"].Should().Be("corr-42");
         await cameraManager.DidNotReceive().GetOrCreateByBindingAsync(Arg.Any<string>());
+        await cameraManager.DidNotReceive().AcquireByBindingLeaseAsync(
+            Arg.Any<string>(),
+            Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -457,6 +592,9 @@ public class ImageAcquisitionOperatorTests
         result.OutputData["Source"].Should().Be("external");
         await streamCoordinator.Received(1).AcquireFrameAsync("cam-shared", Arg.Any<CancellationToken>());
         await cameraManager.DidNotReceive().GetOrCreateByBindingAsync(Arg.Any<string>());
+        await cameraManager.DidNotReceive().AcquireByBindingLeaseAsync(
+            Arg.Any<string>(),
+            Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -485,6 +623,38 @@ public class ImageAcquisitionOperatorTests
     private static Operator CreateTestOperator()
     {
         return new Operator("TestOperator", OperatorType.ImageAcquisition, 0, 0);
+    }
+
+    private static TrackingCameraLease ConfigureCameraLease(
+        ICameraManager cameraManager,
+        string bindingId,
+        ICamera camera)
+    {
+        var lease = new TrackingCameraLease(camera);
+        cameraManager.AcquireByBindingLeaseAsync(bindingId, Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult<ICameraLease>(lease));
+        return lease;
+    }
+
+    private sealed class TrackingCameraLease : ICameraLease
+    {
+        private int _disposeCallCount;
+
+        public TrackingCameraLease(ICamera camera)
+        {
+            Camera = camera;
+        }
+
+        public ICamera Camera { get; }
+        public int DisposeCallCount => Volatile.Read(ref _disposeCallCount);
+
+        public void Dispose() => Interlocked.Increment(ref _disposeCallCount);
+
+        public ValueTask DisposeAsync()
+        {
+            Dispose();
+            return ValueTask.CompletedTask;
+        }
     }
 }
 

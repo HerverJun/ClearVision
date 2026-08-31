@@ -68,6 +68,12 @@ public static class ApiEndpoints
 
     public class OperatorPreviewRequest
     {
+        public Guid ProjectId { get; set; }
+        public Guid SessionId { get; set; }
+        public long? ExpectedProjectRevision { get; set; }
+        public List<string>? CapabilityManifest { get; set; }
+        public string? ConfirmationId { get; set; }
+        public string? AuditId { get; set; }
         public string ImageBase64 { get; set; } = string.Empty;
         public Dictionary<string, object>? Parameters { get; set; }
     }
@@ -578,11 +584,18 @@ public static class ApiEndpoints
         // 执行检测
         app.MapPost("/api/inspection/execute", async (
             ExecuteInspectionRequest request,
+            HttpContext context,
             Core.Services.IInspectionService service,
             CancellationToken cancellationToken) =>
         {
             try
             {
+                var authority = BuildExecutionRequestAuthority(
+                    context,
+                    request.ExpectedProjectRevision,
+                    request.CapabilityManifest,
+                    request.ConfirmationId,
+                    request.AuditId);
                 if (!string.IsNullOrEmpty(request.ImageBase64))
                 {
                     if (!ImagePayloadDecoder.TryDecodeBytes(request.ImageBase64, "ImageBase64", out var imageData, out var decodeError, out var statusCode))
@@ -594,6 +607,7 @@ public static class ApiEndpoints
                         request.ProjectId,
                         imageData,
                         request.FlowData?.ToEntity(),
+                        authority,
                         cancellationToken);
                     return Results.Ok(ToInspectionExecutionResponse(result));
                 }
@@ -603,6 +617,7 @@ public static class ApiEndpoints
                         request.ProjectId,
                         request.CameraId,
                         request.FlowData?.ToEntity(),
+                        authority,
                         cancellationToken);
                     return Results.Ok(ToInspectionExecutionResponse(result));
                 }
@@ -617,6 +632,7 @@ public static class ApiEndpoints
                         request.ProjectId,
                         (byte[])null!,
                         flow,
+                        authority,
                         cancellationToken);
                     return Results.Ok(ToInspectionExecutionResponse(result));
                 }
@@ -762,12 +778,19 @@ public static class ApiEndpoints
         // 【第二优先级】启动实时检测
         app.MapPost("/api/inspection/realtime/start", async (
             StartRealtimeInspectionRequest request,
+            HttpContext context,
             Core.Services.IInspectionService service,
             WebMessageHandler webMessageHandler,
             CancellationToken cancellationToken) =>
         {
             try
             {
+                var authority = BuildExecutionRequestAuthority(
+                    context,
+                    request.ExpectedProjectRevision,
+                    request.CapabilityManifest,
+                    request.ConfirmationId,
+                    request.AuditId);
                 // 根据运行模式选择启动方式
                 var runMode = request.RunMode?.ToLower() ?? "camera";
                 var requestFlow = request.FlowData?.ToEntity();
@@ -779,6 +802,7 @@ public static class ApiEndpoints
                         request.ProjectId,
                         requestFlow,
                         request.CameraId,
+                        authority,
                         cancellationToken,
                         result => webMessageHandler.NotifyInspectionResult(result, request.ProjectId));
 
@@ -797,6 +821,7 @@ public static class ApiEndpoints
                         request.ProjectId,
                         requestFlow,
                         request.CameraId,
+                        authority,
                         cancellationToken,
                         result => webMessageHandler.NotifyInspectionResult(result, request.ProjectId));
 
@@ -814,6 +839,7 @@ public static class ApiEndpoints
                     await service.StartRealtimeInspectionAsync(
                         request.ProjectId,
                         request.CameraId,
+                        authority,
                         cancellationToken,
                         result => webMessageHandler.NotifyInspectionResult(result, request.ProjectId));
 
@@ -1196,9 +1222,54 @@ public static class ApiEndpoints
         app.MapPost("/api/operators/{type}/preview", async (
             Core.Enums.OperatorType type,
             OperatorPreviewRequest request,
+            HttpContext context,
             OperatorPreviewService previewService,
-            CancellationToken cancellationToken) =>
+            IProjectRepository projectRepository) =>
         {
+            if (request.ProjectId == Guid.Empty || request.SessionId == Guid.Empty)
+            {
+                return Results.BadRequest(new
+                {
+                    Code = "ADMISSION_DRAFT_PROJECT_BINDING_REQUIRED",
+                    Error = "Single-operator preview requires non-empty project and session identifiers."
+                });
+            }
+
+            var project = await projectRepository.GetByIdFreshAsync(request.ProjectId);
+            if (project == null)
+            {
+                return Results.BadRequest(new
+                {
+                    Code = "ADMISSION_PROJECT_NOT_ACTIVE",
+                    Error = "Single-operator preview requires an active project."
+                });
+            }
+
+            if (request.ExpectedProjectRevision is null ||
+                request.ExpectedProjectRevision.Value != project.PersistenceRevision)
+            {
+                return Results.BadRequest(new
+                {
+                    Code = "ADMISSION_DRAFT_REVISION_REQUIRED",
+                    Error = "Single-operator preview requires the current expected project revision."
+                });
+            }
+
+            ExecutionRequestAuthority authority;
+            try
+            {
+                authority = BuildExecutionRequestAuthority(
+                    context,
+                    request.ExpectedProjectRevision,
+                    request.CapabilityManifest,
+                    request.ConfirmationId,
+                    request.AuditId);
+            }
+            catch (ExecutionAdmissionService.ExecutionAdmissionRejectedException ex)
+            {
+                return ToAdmissionFailure(ex.Admission);
+            }
+
             if (!TryDecodeImage(request.ImageBase64, out var image, out var decodeError, out var statusCode))
             {
                 return ImagePayloadDecoder.ToErrorResult(decodeError, statusCode);
@@ -1206,10 +1277,22 @@ public static class ApiEndpoints
 
             using (image)
             {
-                var preview = await previewService.PreviewAsync(type, request.Parameters, image, cancellationToken);
-                return Results.Ok(preview);
+                var preview = await previewService.PreviewAsync(
+                    type,
+                    request.Parameters,
+                    image,
+                    request.ProjectId,
+                    project.PersistenceRevision,
+                    request.SessionId,
+                    authority,
+                    context.RequestAborted);
+                return preview.ErrorCode?.StartsWith("ADMISSION_", StringComparison.Ordinal) == true ||
+                    preview.ErrorCode?.StartsWith("RESOURCE_", StringComparison.Ordinal) == true
+                        ? Results.BadRequest(preview)
+                        : Results.Ok(preview);
             }
-        });
+        })
+        .RequireClearVisionPermission(ClearVisionPermissionPolicies.RequireEngineerOrAdmin);
     }
 
     private static bool TryDecodeImage(string? imageBase64, out Mat image, out string errorMessage, out int statusCode)
@@ -1564,6 +1647,57 @@ public static class ApiEndpoints
             analysisData = TryDeserializeAnalysisData(result.AnalysisDataJson),
             errorMessage = result.ErrorMessage
         };
+    }
+
+    private static ExecutionRequestAuthority BuildExecutionRequestAuthority(
+        HttpContext context,
+        long? expectedProjectRevision,
+        IReadOnlyList<string>? declaredCapabilities,
+        string? confirmationId,
+        string? auditId)
+    {
+        var session = context.Items["CurrentUser"] as ClearVision.Product.Desktop.Middleware.UserSession;
+        if (session == null || string.IsNullOrWhiteSpace(session.UserId))
+        {
+            throw new ExecutionAdmissionService.ExecutionAdmissionRejectedException(
+                ExecutionAdmissionResult.Reject(
+                    "ADMISSION_PRINCIPAL_REQUIRED",
+                    "Execution requires an authenticated user session."));
+        }
+
+        ExecutionCapabilityManifest? manifest = null;
+        if (declaredCapabilities != null)
+        {
+            var capabilities = ExecutionSideEffect.None;
+            foreach (var rawCapability in declaredCapabilities)
+            {
+                var normalized = rawCapability?.Trim();
+                if (string.IsNullOrWhiteSpace(normalized) ||
+                    !Enum.TryParse<ExecutionSideEffect>(normalized, ignoreCase: true, out var parsed) ||
+                    !Enum.IsDefined(parsed))
+                {
+                    throw new ExecutionAdmissionService.ExecutionAdmissionRejectedException(
+                        ExecutionAdmissionResult.Reject(
+                            "ADMISSION_CAPABILITY_MANIFEST_INVALID",
+                            $"Capability '{normalized ?? "<missing>"}' is not recognized."));
+                }
+
+                capabilities |= parsed;
+            }
+
+            manifest = new ExecutionCapabilityManifest(capabilities, isExplicit: true);
+        }
+
+        return new ExecutionRequestAuthority(
+            new ExecutionPrincipal(
+                session.UserId,
+                session.Username,
+                session.Role,
+                IsAuthenticated: true),
+            expectedProjectRevision,
+            manifest,
+            confirmationId,
+            auditId);
     }
 
     private static IResult ToAdmissionFailure(ExecutionAdmissionResult admission)

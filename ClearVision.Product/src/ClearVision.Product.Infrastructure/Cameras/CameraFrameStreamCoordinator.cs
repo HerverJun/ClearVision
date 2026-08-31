@@ -13,12 +13,17 @@ public sealed class CameraFrameStreamCoordinator : ICameraFrameStreamCoordinator
 {
     private static readonly TimeSpan DirectAcquireIdleTimeout = TimeSpan.FromSeconds(5);
     private static readonly TimeSpan DefaultFrameHealthProbeInterval = TimeSpan.FromSeconds(2);
+    private static readonly TimeSpan DefaultPreviewSessionTtl = TimeSpan.FromSeconds(30);
+    private static readonly TimeSpan DefaultPreviewHeartbeatInterval = TimeSpan.FromSeconds(10);
     private readonly ICameraManager _cameraManager;
     private readonly ILogger<CameraFrameStreamCoordinator> _logger;
     private readonly ITriggerInputService _triggerInputService;
     private readonly ISerialPhotoelectricTriggerInputService _serialPhotoelectricTriggerInputService;
     private readonly TimeSpan _frameHealthProbeInterval;
     private readonly TimeSpan _directAcquireIdleTimeout;
+    private readonly TimeSpan _previewSessionTtl;
+    private readonly TimeSpan _previewHeartbeatInterval;
+    private readonly TimeProvider _timeProvider;
     private readonly ConcurrentDictionary<string, ProducerEntry> _producers = new(StringComparer.OrdinalIgnoreCase);
     private readonly ConcurrentDictionary<string, PreviewSessionState> _previewSessions = new(StringComparer.OrdinalIgnoreCase);
     private readonly ConcurrentQueue<ProducerEntry> _retiredProducers = new();
@@ -32,6 +37,7 @@ public sealed class CameraFrameStreamCoordinator : ICameraFrameStreamCoordinator
 
         public string CameraBindingId { get; }
         public SemaphoreSlim Gate { get; } = new(1, 1);
+        public HashSet<string> ActiveStreamLeaseIds { get; } = new(StringComparer.Ordinal);
         public int LeaseCount { get; set; }
         public int PreviewSessionCount { get; set; }
         public bool IsRunning { get; set; }
@@ -48,6 +54,7 @@ public sealed class CameraFrameStreamCoordinator : ICameraFrameStreamCoordinator
         public object SignalGate { get; } = new();
         public TaskCompletionSource<long> NextFrameSignal { get; set; } = CreateFrameSignal();
         public CancellationTokenSource? IdleStopCts { get; set; }
+        public ICameraLease? CameraLease { get; set; }
         public IIndustrialCamera? EventCamera { get; set; }
         public EventHandler<CameraFrameReceivedEventArgs>? FrameReceivedHandler { get; set; }
     }
@@ -56,6 +63,12 @@ public sealed class CameraFrameStreamCoordinator : ICameraFrameStreamCoordinator
     {
         public required string SessionId { get; init; }
         public required string CameraBindingId { get; init; }
+        public required string OwnerHash { get; init; }
+        public object Gate { get; } = new();
+        public CancellationTokenSource LifetimeCts { get; } = new();
+        public ITimer? ExpiryTimer { get; set; }
+        public DateTimeOffset ExpiresAtUtc { get; set; }
+        public bool IsClosing { get; set; }
         public long LastObservedSequence { get; set; }
         public CameraTriggerMode TriggerMode { get; init; }
         public int TargetFrameRateFps { get; init; }
@@ -115,6 +128,29 @@ public sealed class CameraFrameStreamCoordinator : ICameraFrameStreamCoordinator
         ISerialPhotoelectricTriggerInputService serialPhotoelectricTriggerInputService,
         TimeSpan frameHealthProbeInterval,
         TimeSpan directAcquireIdleTimeout)
+        : this(
+            cameraManager,
+            logger,
+            triggerInputService,
+            serialPhotoelectricTriggerInputService,
+            frameHealthProbeInterval,
+            directAcquireIdleTimeout,
+            DefaultPreviewSessionTtl,
+            DefaultPreviewHeartbeatInterval,
+            TimeProvider.System)
+    {
+    }
+
+    internal CameraFrameStreamCoordinator(
+        ICameraManager cameraManager,
+        ILogger<CameraFrameStreamCoordinator> logger,
+        ITriggerInputService triggerInputService,
+        ISerialPhotoelectricTriggerInputService serialPhotoelectricTriggerInputService,
+        TimeSpan frameHealthProbeInterval,
+        TimeSpan directAcquireIdleTimeout,
+        TimeSpan previewSessionTtl,
+        TimeSpan previewHeartbeatInterval,
+        TimeProvider timeProvider)
     {
         _cameraManager = cameraManager;
         _logger = logger;
@@ -126,6 +162,14 @@ public sealed class CameraFrameStreamCoordinator : ICameraFrameStreamCoordinator
         _directAcquireIdleTimeout = directAcquireIdleTimeout > TimeSpan.Zero
             ? directAcquireIdleTimeout
             : DirectAcquireIdleTimeout;
+        _previewSessionTtl = previewSessionTtl > TimeSpan.Zero
+            ? previewSessionTtl
+            : throw new ArgumentOutOfRangeException(nameof(previewSessionTtl));
+        _previewHeartbeatInterval = previewHeartbeatInterval > TimeSpan.Zero &&
+                                    previewHeartbeatInterval < _previewSessionTtl
+            ? previewHeartbeatInterval
+            : throw new ArgumentOutOfRangeException(nameof(previewHeartbeatInterval));
+        _timeProvider = timeProvider ?? throw new ArgumentNullException(nameof(timeProvider));
     }
 
     public async Task<CameraStreamFrame> AcquireFrameAsync(string cameraId, CancellationToken cancellationToken = default)
@@ -152,9 +196,14 @@ public sealed class CameraFrameStreamCoordinator : ICameraFrameStreamCoordinator
         }
 
         CancelAndDisposeIdleStop(idleStopCts);
-        var frame = await WaitForFrameCoreAsync(entry, afterSequence, cancellationToken);
-        await ArmDirectAcquireIdleStopAsync(entry);
-        return frame;
+        try
+        {
+            return await WaitForFrameCoreAsync(entry, afterSequence, cancellationToken);
+        }
+        finally
+        {
+            await ArmDirectAcquireIdleStopAsync(entry);
+        }
     }
 
     public async Task<FrameEnvelope> AcquireFrameEnvelopeAsync(string cameraId, CancellationToken cancellationToken = default)
@@ -178,9 +227,11 @@ public sealed class CameraFrameStreamCoordinator : ICameraFrameStreamCoordinator
         {
             idleStopCts = entry.IdleStopCts;
             entry.IdleStopCts = null;
-            entry.LeaseCount++;
+            var leaseId = Guid.NewGuid().ToString("N");
+            entry.ActiveStreamLeaseIds.Add(leaseId);
+            entry.LeaseCount = entry.ActiveStreamLeaseIds.Count;
             return new CameraStreamLease(
-                Guid.NewGuid().ToString("N"),
+                leaseId,
                 binding.CameraBindingId,
                 binding.TriggerMode,
                 binding.TargetFrameRateFps);
@@ -200,6 +251,21 @@ public sealed class CameraFrameStreamCoordinator : ICameraFrameStreamCoordinator
         if (!_producers.TryGetValue(lease.CameraBindingId, out var entry))
         {
             throw new KeyNotFoundException($"Camera stream producer not found: {lease.CameraBindingId}");
+        }
+
+        await entry.Gate.WaitAsync(cancellationToken);
+        try
+        {
+            if (!IsCurrentProducer(entry) ||
+                !entry.IsRunning ||
+                !entry.ActiveStreamLeaseIds.Contains(lease.LeaseId))
+            {
+                throw new KeyNotFoundException("Camera stream lease was not found.");
+            }
+        }
+        finally
+        {
+            entry.Gate.Release();
         }
 
         return await WaitForFrameCoreAsync(entry, afterSequence, cancellationToken);
@@ -224,10 +290,12 @@ public sealed class CameraFrameStreamCoordinator : ICameraFrameStreamCoordinator
         await entry.Gate.WaitAsync();
         try
         {
-            if (entry.LeaseCount > 0)
+            if (!entry.ActiveStreamLeaseIds.Remove(lease.LeaseId))
             {
-                entry.LeaseCount--;
+                return;
             }
+
+            entry.LeaseCount = entry.ActiveStreamLeaseIds.Count;
 
             if (entry.LeaseCount == 0 && entry.PreviewSessionCount == 0)
             {
@@ -266,90 +334,356 @@ public sealed class CameraFrameStreamCoordinator : ICameraFrameStreamCoordinator
         }
     }
 
-    public async Task<CameraPreviewSession> StartPreviewSessionAsync(string cameraId, CancellationToken cancellationToken = default)
+    public async Task<CameraPreviewSession> StartPreviewSessionAsync(
+        string cameraId,
+        string ownerHash,
+        CancellationToken cancellationToken = default)
     {
+        var normalizedOwnerHash = NormalizePreviewOwnerHash(ownerHash);
         var binding = ResolveBinding(cameraId);
         if (!binding.TriggerMode.IsFrameDriven())
         {
             throw new InvalidOperationException($"Camera binding '{binding.CameraBindingId}' is not configured for continuous preview.");
         }
 
-        var entry = await EnsureProducerAsync(binding, cancellationToken);
-        var sessionId = Guid.NewGuid().ToString("N");
-        CancellationTokenSource? idleStopCts = null;
-
-        await entry.Gate.WaitAsync(cancellationToken);
-        try
+        var configurationSignature = CreateConfigurationSignature(binding);
+        while (true)
         {
-            idleStopCts = entry.IdleStopCts;
-            entry.IdleStopCts = null;
-            entry.PreviewSessionCount++;
-            _previewSessions[sessionId] = new PreviewSessionState
+            var entry = await EnsureProducerAsync(binding, cancellationToken);
+            CancellationTokenSource? idleStopCts = null;
+            PreviewSessionState? state = null;
+            await entry.Gate.WaitAsync(cancellationToken);
+            try
             {
-                SessionId = sessionId,
-                CameraBindingId = binding.CameraBindingId,
-                TriggerMode = binding.TriggerMode,
-                TargetFrameRateFps = binding.TargetFrameRateFps,
-                LastObservedSequence = 0
-            };
-        }
-        finally
-        {
-            entry.Gate.Release();
-            CancelAndDisposeIdleStop(idleStopCts);
-        }
+                if (!IsCurrentProducer(entry) ||
+                    !entry.IsRunning ||
+                    !string.Equals(
+                        entry.ConfigurationSignature,
+                        configurationSignature,
+                        StringComparison.Ordinal))
+                {
+                    continue;
+                }
 
-        return new CameraPreviewSession(sessionId, binding.CameraBindingId, binding.TriggerMode, binding.TargetFrameRateFps);
+                var sessionId = Guid.NewGuid().ToString("N");
+                var expiresAtUtc = _timeProvider.GetUtcNow().Add(_previewSessionTtl);
+                var newState = new PreviewSessionState
+                {
+                    SessionId = sessionId,
+                    CameraBindingId = binding.CameraBindingId,
+                    OwnerHash = normalizedOwnerHash,
+                    TriggerMode = binding.TriggerMode,
+                    TargetFrameRateFps = binding.TargetFrameRateFps,
+                    LastObservedSequence = 0,
+                    ExpiresAtUtc = expiresAtUtc
+                };
+                state = newState;
+                newState.ExpiryTimer = _timeProvider.CreateTimer(
+                    _ => OnPreviewSessionExpiryTimer(newState),
+                    null,
+                    Timeout.InfiniteTimeSpan,
+                    Timeout.InfiniteTimeSpan);
+                idleStopCts = entry.IdleStopCts;
+                entry.IdleStopCts = null;
+                if (!_previewSessions.TryAdd(sessionId, newState))
+                {
+                    throw new InvalidOperationException("Unable to allocate a unique preview session.");
+                }
+
+                entry.PreviewSessionCount++;
+            }
+            catch
+            {
+                state?.ExpiryTimer?.Dispose();
+                state?.LifetimeCts.Dispose();
+                throw;
+            }
+            finally
+            {
+                entry.Gate.Release();
+                CancelAndDisposeIdleStop(idleStopCts);
+            }
+
+            state!.ExpiryTimer!.Change(_previewSessionTtl, Timeout.InfiniteTimeSpan);
+            return new CameraPreviewSession(
+                state.SessionId,
+                binding.CameraBindingId,
+                binding.TriggerMode,
+                binding.TargetFrameRateFps,
+                state.ExpiresAtUtc,
+                checked((int)_previewHeartbeatInterval.TotalMilliseconds));
+        }
     }
 
-    public async Task<CameraStreamFrame> WaitForPreviewFrameAsync(string sessionId, CancellationToken cancellationToken = default)
+    public async Task<CameraStreamFrame> WaitForPreviewFrameAsync(
+        string sessionId,
+        string ownerHash,
+        CancellationToken cancellationToken = default)
     {
-        if (!_previewSessions.TryGetValue(sessionId, out var session))
+        var normalizedSessionId = NormalizePreviewSessionId(sessionId);
+        var normalizedOwnerHash = NormalizePreviewOwnerHash(ownerHash);
+        if (!_previewSessions.TryGetValue(normalizedSessionId, out var session))
         {
-            throw new KeyNotFoundException($"Preview session not found: {sessionId}");
+            throw CreatePreviewSessionNotFoundException();
         }
 
         if (!_producers.TryGetValue(session.CameraBindingId, out var entry))
         {
-            throw new KeyNotFoundException($"Camera stream producer not found: {session.CameraBindingId}");
+            throw CreatePreviewSessionNotFoundException();
         }
 
-        long? afterSequence = session.LastObservedSequence > 0 ? session.LastObservedSequence : null;
-        var frame = await WaitForFrameCoreAsync(entry, afterSequence, cancellationToken);
-        session.LastObservedSequence = frame.Sequence;
-        return frame;
-    }
-
-    public async Task StopPreviewSessionAsync(string sessionId)
-    {
-        if (!_previewSessions.TryRemove(sessionId, out var session))
+        long? afterSequence;
+        CancellationTokenSource linkedCts;
+        var expired = false;
+        lock (session.Gate)
         {
-            return;
-        }
-
-        if (!_producers.TryGetValue(session.CameraBindingId, out var entry))
-        {
-            return;
-        }
-
-        await entry.Gate.WaitAsync();
-        try
-        {
-            if (entry.PreviewSessionCount > 0)
+            if (session.IsClosing ||
+                !string.Equals(session.OwnerHash, normalizedOwnerHash, StringComparison.Ordinal))
             {
-                entry.PreviewSessionCount--;
+                throw CreatePreviewSessionNotFoundException();
             }
 
-            if (entry.LeaseCount == 0 && entry.PreviewSessionCount == 0)
+            if (_timeProvider.GetUtcNow() >= session.ExpiresAtUtc)
             {
-                await StopProducerCoreAsync(entry);
-                RetireProducer(entry);
+                expired = true;
+                linkedCts = new CancellationTokenSource();
+                afterSequence = null;
+            }
+            else
+            {
+                afterSequence = session.LastObservedSequence > 0 ? session.LastObservedSequence : null;
+                linkedCts = CancellationTokenSource.CreateLinkedTokenSource(
+                    cancellationToken,
+                    session.LifetimeCts.Token);
+            }
+        }
+
+        if (expired)
+        {
+            linkedCts.Dispose();
+            if (TryClaimPreviewSession(session, normalizedOwnerHash, requireExpired: true))
+            {
+                await CompletePreviewSessionStopAsync(session, "expired");
+            }
+
+            throw CreatePreviewSessionNotFoundException();
+        }
+
+        using (linkedCts)
+        {
+            var frame = await WaitForFrameCoreAsync(entry, afterSequence, linkedCts.Token);
+            var expiredAfterWait = false;
+            lock (session.Gate)
+            {
+                if (session.IsClosing ||
+                    !string.Equals(session.OwnerHash, normalizedOwnerHash, StringComparison.Ordinal))
+                {
+                    throw CreatePreviewSessionNotFoundException();
+                }
+
+                if (_timeProvider.GetUtcNow() >= session.ExpiresAtUtc)
+                {
+                    expiredAfterWait = true;
+                }
+                else
+                {
+                    session.LastObservedSequence = frame.Sequence;
+                }
+            }
+
+            if (expiredAfterWait)
+            {
+                if (TryClaimPreviewSession(session, normalizedOwnerHash, requireExpired: true))
+                {
+                    await CompletePreviewSessionStopAsync(session, "expired");
+                }
+
+                throw CreatePreviewSessionNotFoundException();
+            }
+
+            return frame;
+        }
+    }
+
+    public async Task<CameraPreviewHeartbeat?> HeartbeatPreviewSessionAsync(
+        string sessionId,
+        string ownerHash,
+        CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        var normalizedSessionId = NormalizePreviewSessionId(sessionId);
+        var normalizedOwnerHash = NormalizePreviewOwnerHash(ownerHash);
+        if (!_previewSessions.TryGetValue(normalizedSessionId, out var session))
+        {
+            return null;
+        }
+
+        DateTimeOffset expiresAtUtc = default;
+        var expired = false;
+        lock (session.Gate)
+        {
+            if (session.IsClosing ||
+                !string.Equals(session.OwnerHash, normalizedOwnerHash, StringComparison.Ordinal))
+            {
+                return null;
+            }
+
+            var now = _timeProvider.GetUtcNow();
+            if (now >= session.ExpiresAtUtc)
+            {
+                expired = true;
+            }
+            else
+            {
+                expiresAtUtc = now.Add(_previewSessionTtl);
+                session.ExpiresAtUtc = expiresAtUtc;
+                session.ExpiryTimer!.Change(_previewSessionTtl, Timeout.InfiniteTimeSpan);
+            }
+        }
+
+        if (expired)
+        {
+            if (TryClaimPreviewSession(session, normalizedOwnerHash, requireExpired: true))
+            {
+                await CompletePreviewSessionStopAsync(session, "expired");
+            }
+
+            return null;
+        }
+
+        return new CameraPreviewHeartbeat(session.SessionId, expiresAtUtc);
+    }
+
+    public async Task<bool> StopPreviewSessionAsync(string sessionId, string ownerHash)
+    {
+        var normalizedSessionId = NormalizePreviewSessionId(sessionId);
+        var normalizedOwnerHash = NormalizePreviewOwnerHash(ownerHash);
+        if (!_previewSessions.TryGetValue(normalizedSessionId, out var session) ||
+            !TryClaimPreviewSession(session, normalizedOwnerHash, requireExpired: false))
+        {
+            return false;
+        }
+
+        await CompletePreviewSessionStopAsync(session, "stopped");
+        return true;
+    }
+
+    private static string NormalizePreviewSessionId(string sessionId)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(sessionId);
+        return sessionId.Trim();
+    }
+
+    private static string NormalizePreviewOwnerHash(string ownerHash)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(ownerHash);
+        return ownerHash.Trim();
+    }
+
+    private static KeyNotFoundException CreatePreviewSessionNotFoundException() =>
+        new("Preview session was not found.");
+
+    private void OnPreviewSessionExpiryTimer(PreviewSessionState session)
+    {
+        _ = ExpirePreviewSessionAsync(session);
+    }
+
+    private async Task ExpirePreviewSessionAsync(PreviewSessionState session)
+    {
+        try
+        {
+            if (!TryClaimPreviewSession(session, ownerHash: null, requireExpired: true))
+            {
+                return;
+            }
+
+            await CompletePreviewSessionStopAsync(session, "expired");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(
+                ex,
+                "Failed to expire abandoned camera preview session. CameraBindingId={CameraBindingId}",
+                session.CameraBindingId);
+        }
+    }
+
+    private bool TryClaimPreviewSession(
+        PreviewSessionState session,
+        string? ownerHash,
+        bool requireExpired)
+    {
+        lock (session.Gate)
+        {
+            if (session.IsClosing ||
+                (ownerHash != null &&
+                 !string.Equals(session.OwnerHash, ownerHash, StringComparison.Ordinal)))
+            {
+                return false;
+            }
+
+            if (requireExpired)
+            {
+                var remaining = session.ExpiresAtUtc - _timeProvider.GetUtcNow();
+                if (remaining > TimeSpan.Zero)
+                {
+                    session.ExpiryTimer!.Change(remaining, Timeout.InfiniteTimeSpan);
+                    return false;
+                }
+            }
+
+            var sessions = (ICollection<KeyValuePair<string, PreviewSessionState>>)_previewSessions;
+            if (!sessions.Remove(new KeyValuePair<string, PreviewSessionState>(session.SessionId, session)))
+            {
+                session.IsClosing = true;
+                return false;
+            }
+
+            session.IsClosing = true;
+            return true;
+        }
+    }
+
+    private async Task CompletePreviewSessionStopAsync(PreviewSessionState session, string reason)
+    {
+        session.ExpiryTimer?.Dispose();
+        session.LifetimeCts.Cancel();
+
+        try
+        {
+            if (!_producers.TryGetValue(session.CameraBindingId, out var entry))
+            {
+                return;
+            }
+
+            await entry.Gate.WaitAsync();
+            try
+            {
+                if (entry.PreviewSessionCount > 0)
+                {
+                    entry.PreviewSessionCount--;
+                }
+
+                if (entry.LeaseCount == 0 && entry.PreviewSessionCount == 0)
+                {
+                    await StopProducerCoreAsync(entry);
+                    RetireProducer(entry);
+                }
+            }
+            finally
+            {
+                entry.Gate.Release();
             }
         }
         finally
         {
-            entry.Gate.Release();
+            session.LifetimeCts.Dispose();
         }
+
+        _logger.LogInformation(
+            "Camera preview session {Reason}. CameraBindingId={CameraBindingId}",
+            reason,
+            session.CameraBindingId);
     }
 
     public bool TryGetLatestFrameEnvelope(string cameraId, out FrameEnvelope? frame)
@@ -410,9 +744,12 @@ public sealed class CameraFrameStreamCoordinator : ICameraFrameStreamCoordinator
 
     public async ValueTask DisposeAsync()
     {
-        foreach (var sessionId in _previewSessions.Keys.ToArray())
+        foreach (var session in _previewSessions.Values.ToArray())
         {
-            await StopPreviewSessionAsync(sessionId);
+            if (TryClaimPreviewSession(session, ownerHash: null, requireExpired: false))
+            {
+                await CompletePreviewSessionStopAsync(session, "disposed");
+            }
         }
 
         foreach (var entry in _producers.Values.ToArray())
@@ -435,25 +772,7 @@ public sealed class CameraFrameStreamCoordinator : ICameraFrameStreamCoordinator
 
     private ResolvedBinding ResolveBinding(string cameraId)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(cameraId);
-        var binding = _cameraManager.FindBinding(cameraId);
-        if (binding == null)
-        {
-            return new ResolvedBinding(
-                cameraId.Trim(),
-                cameraId.Trim(),
-                5000.0,
-                1.0,
-                CameraPixelFormat.Mono8,
-                CameraTriggerMode.Software,
-                CameraHardwareTriggerSourceExtensions.DefaultHardwareTriggerSource,
-                null,
-                null,
-                CameraTriggerModeExtensions.DefaultTargetFrameRateFps,
-                24);
-        }
-
-        binding.Normalize();
+        var binding = _cameraManager.RequireEnabledBinding(cameraId);
         return new ResolvedBinding(
             binding.Id,
             binding.SerialNumber,
@@ -474,35 +793,47 @@ public sealed class CameraFrameStreamCoordinator : ICameraFrameStreamCoordinator
 
     private async Task<ProducerEntry> EnsureProducerAsync(ResolvedBinding binding, CancellationToken cancellationToken)
     {
-        var entry = _producers.GetOrAdd(binding.CameraBindingId, id => new ProducerEntry(id));
-        await entry.Gate.WaitAsync(cancellationToken);
-        try
+        var configurationSignature = CreateConfigurationSignature(binding);
+        while (true)
         {
-            var configurationSignature = CreateConfigurationSignature(binding);
-            if (entry.IsRunning)
+            var entry = _producers.GetOrAdd(binding.CameraBindingId, id => new ProducerEntry(id));
+            await entry.Gate.WaitAsync(cancellationToken);
+            try
             {
-                if (string.Equals(entry.ConfigurationSignature, configurationSignature, StringComparison.Ordinal))
+                if (!IsCurrentProducer(entry))
                 {
-                    return entry;
+                    continue;
                 }
 
-                if (entry.LeaseCount > 0 || entry.PreviewSessionCount > 0 || Volatile.Read(ref entry.PendingFrameWaiters) > 0)
+                if (entry.IsRunning)
                 {
-                    throw new InvalidOperationException(
-                        $"Camera stream '{binding.CameraBindingId}' is running with a different configuration. Stop preview/inspection before applying new camera settings.");
+                    if (string.Equals(entry.ConfigurationSignature, configurationSignature, StringComparison.Ordinal))
+                    {
+                        return entry;
+                    }
+
+                    if (entry.LeaseCount > 0 || entry.PreviewSessionCount > 0 || Volatile.Read(ref entry.PendingFrameWaiters) > 0)
+                    {
+                        throw new InvalidOperationException(
+                            $"Camera stream '{binding.CameraBindingId}' is running with a different configuration. Stop preview/inspection before applying new camera settings.");
+                    }
+
+                    await StopProducerCoreAsync(entry);
                 }
 
-                await StopProducerCoreAsync(entry);
+                await StartProducerCoreAsync(entry, binding, configurationSignature, cancellationToken);
+                return entry;
             }
-
-            await StartProducerCoreAsync(entry, binding, configurationSignature, cancellationToken);
-            return entry;
-        }
-        finally
-        {
-            entry.Gate.Release();
+            finally
+            {
+                entry.Gate.Release();
+            }
         }
     }
+
+    private bool IsCurrentProducer(ProducerEntry entry) =>
+        _producers.TryGetValue(entry.CameraBindingId, out var current) &&
+        ReferenceEquals(current, entry);
 
     private async Task StartProducerCoreAsync(
         ProducerEntry entry,
@@ -510,15 +841,21 @@ public sealed class CameraFrameStreamCoordinator : ICameraFrameStreamCoordinator
         string configurationSignature,
         CancellationToken cancellationToken)
     {
-        var camera = await GetConnectedCameraAsync(binding, cancellationToken);
-        await ApplyCommonCameraSettingsAsync(camera, binding);
-        if (camera is IIndustrialCamera industrialCamera)
-        {
-            await industrialCamera.SetTriggerModeAsync(binding.TriggerMode, binding.HardwareTriggerSource);
-        }
+        var cameraLease = await _cameraManager.AcquireByBindingLeaseAsync(
+            binding.CameraBindingId,
+            cancellationToken);
+        entry.CameraLease = cameraLease;
+        ICamera? camera = null;
 
         try
         {
+            camera = cameraLease.Camera;
+            await ApplyCommonCameraSettingsAsync(camera, binding);
+            if (camera is IIndustrialCamera industrialCamera)
+            {
+                await industrialCamera.SetTriggerModeAsync(binding.TriggerMode, binding.HardwareTriggerSource);
+            }
+
             entry.IsRunning = false;
             entry.SerialNumber = binding.SerialNumber;
             entry.ConfigurationSignature = configurationSignature;
@@ -613,7 +950,7 @@ public sealed class CameraFrameStreamCoordinator : ICameraFrameStreamCoordinator
             binding.TargetFrameRateFps);
     }
 
-    private async Task RollBackFailedProducerStartAsync(ProducerEntry entry, ICamera camera, Exception exception)
+    private async Task RollBackFailedProducerStartAsync(ProducerEntry entry, ICamera? camera, Exception exception)
     {
         try
         {
@@ -629,7 +966,10 @@ public sealed class CameraFrameStreamCoordinator : ICameraFrameStreamCoordinator
 
         try
         {
-            await camera.StopContinuousAcquisitionAsync();
+            if (camera != null)
+            {
+                await camera.StopContinuousAcquisitionAsync();
+            }
         }
         catch (Exception ex)
         {
@@ -648,16 +988,22 @@ public sealed class CameraFrameStreamCoordinator : ICameraFrameStreamCoordinator
         entry.Sequence = 0;
         entry.LastPublishedTicks = 0;
         entry.MinFrameTicks = TimeSpan.TicksPerSecond / CameraTriggerModeExtensions.DefaultTargetFrameRateFps;
+        entry.ActiveStreamLeaseIds.Clear();
+        entry.LeaseCount = 0;
         CompleteFrameWaiters(entry, new InvalidOperationException($"Camera stream '{entry.CameraBindingId}' failed to start.", exception));
+        await ReleaseProducerCameraLeaseAsync(entry);
 
         _logger.LogWarning(exception, "Failed to start shared camera stream. CameraBindingId={CameraBindingId}", entry.CameraBindingId);
     }
 
-    private async Task StopProducerCoreAsync(ProducerEntry entry)
+    private async Task StopProducerCoreAsync(ProducerEntry entry, Exception? completionException = null)
     {
         if (!entry.IsRunning)
         {
-            CompleteFrameWaiters(entry, new OperationCanceledException($"Camera stream '{entry.CameraBindingId}' is not running."));
+            await ReleaseProducerCameraLeaseAsync(entry);
+            CompleteFrameWaiters(
+                entry,
+                completionException ?? new OperationCanceledException($"Camera stream '{entry.CameraBindingId}' is not running."));
             return;
         }
 
@@ -670,7 +1016,7 @@ public sealed class CameraFrameStreamCoordinator : ICameraFrameStreamCoordinator
                 entry.FrameReceivedHandler = null;
             }
 
-            var camera = _cameraManager.GetCamera(entry.SerialNumber);
+            var camera = entry.CameraLease?.Camera;
             if (camera != null)
             {
                 await camera.StopContinuousAcquisitionAsync();
@@ -692,7 +1038,34 @@ public sealed class CameraFrameStreamCoordinator : ICameraFrameStreamCoordinator
             entry.Sequence = 0;
             entry.LastPublishedTicks = 0;
             entry.MinFrameTicks = TimeSpan.TicksPerSecond / CameraTriggerModeExtensions.DefaultTargetFrameRateFps;
-            CompleteFrameWaiters(entry, new OperationCanceledException($"Camera stream '{entry.CameraBindingId}' has stopped."));
+            entry.ActiveStreamLeaseIds.Clear();
+            entry.LeaseCount = 0;
+            await ReleaseProducerCameraLeaseAsync(entry);
+            CompleteFrameWaiters(
+                entry,
+                completionException ?? new OperationCanceledException($"Camera stream '{entry.CameraBindingId}' has stopped."));
+        }
+    }
+
+    private async ValueTask ReleaseProducerCameraLeaseAsync(ProducerEntry entry)
+    {
+        var cameraLease = entry.CameraLease;
+        entry.CameraLease = null;
+        if (cameraLease == null)
+        {
+            return;
+        }
+
+        try
+        {
+            await cameraLease.DisposeAsync();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(
+                ex,
+                "Failed to release shared camera lease. CameraBindingId={CameraBindingId}",
+                entry.CameraBindingId);
         }
     }
 
@@ -809,7 +1182,10 @@ public sealed class CameraFrameStreamCoordinator : ICameraFrameStreamCoordinator
 
     private async Task<CameraStreamFrame> AcquireSoftwareFrameAsync(ResolvedBinding binding, CancellationToken cancellationToken)
     {
-        var camera = await GetConnectedCameraAsync(binding, cancellationToken);
+        await using var cameraLease = await _cameraManager.AcquireByBindingLeaseAsync(
+            binding.CameraBindingId,
+            cancellationToken);
+        var camera = cameraLease.Camera;
         await ApplyCommonCameraSettingsAsync(camera, binding);
         if (camera is IIndustrialCamera industrialCamera)
         {
@@ -831,18 +1207,6 @@ public sealed class CameraFrameStreamCoordinator : ICameraFrameStreamCoordinator
 
         var imageData = await camera.AcquireSingleFrameAsync();
         return CreateFrame(binding.CameraBindingId, imageData, "image/png");
-    }
-
-    private async Task<ICamera> GetConnectedCameraAsync(ResolvedBinding binding, CancellationToken cancellationToken)
-    {
-        cancellationToken.ThrowIfCancellationRequested();
-        var existingCamera = _cameraManager.GetCamera(binding.SerialNumber);
-        if (existingCamera?.IsConnected == true)
-        {
-            return existingCamera;
-        }
-
-        return await _cameraManager.GetOrCreateByBindingAsync(binding.CameraBindingId);
     }
 
     private static async Task ApplyCommonCameraSettingsAsync(ICamera camera, ResolvedBinding binding)
@@ -905,7 +1269,7 @@ public sealed class CameraFrameStreamCoordinator : ICameraFrameStreamCoordinator
                     }
 
                     var message = $"Camera stream '{entry.CameraBindingId}' stopped producing frames because the camera acquisition loop is no longer running.";
-                    MarkProducerFaulted(entry, message);
+                    await MarkProducerFaultedAsync(entry, message);
                     throw new InvalidOperationException(message);
                 }
             }
@@ -930,54 +1294,30 @@ public sealed class CameraFrameStreamCoordinator : ICameraFrameStreamCoordinator
             return entry.EventCamera.IsAcquiring;
         }
 
-        if (!string.IsNullOrWhiteSpace(entry.SerialNumber) &&
-            _cameraManager.GetCamera(entry.SerialNumber) is { } camera)
-        {
-            return camera.IsAcquiring;
-        }
-
-        return true;
+        return entry.CameraLease?.Camera.IsAcquiring == true;
     }
 
-    private void MarkProducerFaulted(ProducerEntry entry, string reason)
+    private async Task MarkProducerFaultedAsync(ProducerEntry entry, string reason)
     {
-        if (!entry.IsRunning)
-        {
-            return;
-        }
-
-        _logger.LogWarning(
-            "Shared camera stream faulted. CameraBindingId={CameraBindingId}, Reason={Reason}",
-            entry.CameraBindingId,
-            reason);
-
+        await entry.Gate.WaitAsync();
         try
         {
-            if (entry.EventCamera != null && entry.FrameReceivedHandler != null)
+            if (!entry.IsRunning)
             {
-                entry.EventCamera.FrameReceived -= entry.FrameReceivedHandler;
+                return;
             }
-        }
-        catch (Exception ex)
-        {
-            _logger.LogDebug(ex, "Failed to detach camera frame event handler after stream fault. CameraBindingId={CameraBindingId}", entry.CameraBindingId);
+
+            _logger.LogWarning(
+                "Shared camera stream faulted. CameraBindingId={CameraBindingId}, Reason={Reason}",
+                entry.CameraBindingId,
+                reason);
+
+            await StopProducerCoreAsync(entry, new InvalidOperationException(reason));
+            RetireProducer(entry);
         }
         finally
         {
-            entry.EventCamera = null;
-            entry.FrameReceivedHandler = null;
-            entry.IdleStopCts?.Cancel();
-            entry.IdleStopCts?.Dispose();
-            entry.IdleStopCts = null;
-            entry.IsRunning = false;
-            entry.SerialNumber = string.Empty;
-            entry.ConfigurationSignature = string.Empty;
-            entry.LatestFrame = null;
-            entry.History = new FrameRingBuffer(24);
-            entry.Sequence = 0;
-            entry.LastPublishedTicks = 0;
-            entry.MinFrameTicks = TimeSpan.TicksPerSecond / CameraTriggerModeExtensions.DefaultTargetFrameRateFps;
-            CompleteFrameWaiters(entry, new InvalidOperationException(reason));
+            entry.Gate.Release();
         }
     }
 

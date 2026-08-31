@@ -428,8 +428,21 @@ public class ProjectServiceTests
         camera.SetGainAsync(Arg.Any<double>()).Returns(Task.CompletedTask);
         camera.AcquireSingleFrameAsync().Returns(Task.FromResult(cameraMat.ToBytes(".png")));
         var cameraManager = Substitute.For<ICameraManager>();
-        cameraManager.GetBindings().Returns([]);
-        cameraManager.GetOrCreateByBindingAsync("line-camera-01").Returns(Task.FromResult(camera));
+        cameraManager.GetBindings().Returns(
+        [
+            new CameraBindingConfig
+            {
+                Id = "line-camera-01",
+                SerialNumber = "SN-CANONICAL",
+                IsEnabled = true
+            }
+        ]);
+        var cameraLease = Substitute.For<ICameraLease>();
+        cameraLease.Camera.Returns(camera);
+        cameraManager.AcquireByBindingLeaseAsync(
+                "line-camera-01",
+                Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(cameraLease));
         var executor = new ImageAcquisitionOperator(
             Substitute.For<ILogger<ImageAcquisitionOperator>>(),
             cameraManager);
@@ -437,7 +450,9 @@ public class ProjectServiceTests
         var execution = await executor.ExecuteAsync(cameraOperator, new Dictionary<string, object>());
 
         execution.IsSuccess.Should().BeTrue(execution.ErrorMessage);
-        await cameraManager.Received(1).GetOrCreateByBindingAsync("line-camera-01");
+        await cameraManager.Received(1).AcquireByBindingLeaseAsync(
+            "line-camera-01",
+            Arg.Any<CancellationToken>());
         (execution.OutputData!["Image"] as ImageWrapper)?.Release();
     }
 

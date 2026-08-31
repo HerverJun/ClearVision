@@ -32,6 +32,9 @@ namespace ClearVision.Product.Infrastructure.Operators;
 [OutputPort("LeftMap2", "Left Rectification Map2", PortDataType.Any)]
 [OutputPort("RightMap1", "Right Rectification Map1", PortDataType.Any)]
 [OutputPort("RightMap2", "Right Rectification Map2", PortDataType.Any)]
+[OutputPort("CalibrationAssetId", "Calibration Asset Id", PortDataType.String)]
+[OutputPort("CalibrationAssetCandidate", "Calibration Asset Candidate", PortDataType.Boolean)]
+[OutputPort("CalibrationContentHash", "Calibration Content Hash", PortDataType.String)]
 [OperatorParam("PatternType", "Pattern Type", "enum", DefaultValue = "Chessboard", Options = new[] { "Chessboard|Chessboard", "CircleGrid|CircleGrid" })]
 [OperatorParam("BoardWidth", "Board Width", "int", DefaultValue = 9, Min = 2, Max = 30)]
 [OperatorParam("BoardHeight", "Board Height", "int", DefaultValue = 6, Min = 2, Max = 30)]
@@ -39,7 +42,7 @@ namespace ClearVision.Product.Infrastructure.Operators;
 [OperatorParam("Mode", "Mode", "enum", DefaultValue = "SinglePair", Options = new[] { "SinglePair|Single Pair", "FolderCalibration|Folder Calibration" })]
 [OperatorParam("LeftImageFolder", "Left Image Folder", "string", DefaultValue = "")]
 [OperatorParam("RightImageFolder", "Right Image Folder", "string", DefaultValue = "")]
-[OperatorParam("CalibrationOutputPath", "Calibration Output Path", "string", DefaultValue = "stereo_calibration_result.json")]
+[OperatorParam("CalibrationAssetId", "Calibration Asset Id", "string", DefaultValue = "")]
 [OperatorParam("MinValidPairs", "Minimum Valid Pairs", "int", DefaultValue = 12, Min = 3, Max = 100)]
 [OperatorParam("ZeroDisparity", "Zero Disparity", "bool", DefaultValue = false)]
 [OperatorParam("Alpha", "Alpha (0=Crop, 1=Preserve)", "double", DefaultValue = 0.0, Min = -1.0, Max = 1.0)]
@@ -68,7 +71,7 @@ public class StereoCalibrationOperator : OperatorBase
         var mode = GetStringParam(@operator, "Mode", "SinglePair");
         var leftFolder = GetStringParam(@operator, "LeftImageFolder", "");
         var rightFolder = GetStringParam(@operator, "RightImageFolder", "");
-        var outputPath = GetStringParam(@operator, "CalibrationOutputPath", "stereo_calibration_result.json");
+        var calibrationAssetId = GetStringParam(@operator, "CalibrationAssetId", string.Empty);
         var minValidPairs = GetIntParam(@operator, "MinValidPairs", 12, 3, 100);
         var zeroDisparity = GetBoolParam(@operator, "ZeroDisparity", false);
         var alpha = GetDoubleParam(@operator, "Alpha", 0.0, -1.0, 1.0);
@@ -79,13 +82,13 @@ public class StereoCalibrationOperator : OperatorBase
         {
             return ExecuteFolderCalibration(
                 patternType, patternSize, squareSize,
-                leftFolder, rightFolder, outputPath,
+                leftFolder, rightFolder, calibrationAssetId,
                 minValidPairs, zeroDisparity, alpha, cancellationToken);
         }
 
         return ExecuteSinglePairCalibration(
             inputs, patternType, patternSize, squareSize,
-            zeroDisparity, alpha);
+            zeroDisparity, alpha, calibrationAssetId);
     }
 
     private Task<OperatorExecutionOutput> ExecuteSinglePairCalibration(
@@ -94,7 +97,8 @@ public class StereoCalibrationOperator : OperatorBase
         Size patternSize,
         double squareSize,
         bool zeroDisparity,
-        double alpha)
+        double alpha,
+        string calibrationAssetId)
     {
         if (!TryGetInputImage(inputs, "LeftImage", out var leftWrapper) || leftWrapper == null)
         {
@@ -183,7 +187,7 @@ public class StereoCalibrationOperator : OperatorBase
 
         var json = CalibrationBundleV2Json.Serialize(bundle);
 
-        return Task.FromResult(OperatorExecutionOutput.Success(CreateImageOutput(resultImage, new Dictionary<string, object>
+        var output = new Dictionary<string, object>
         {
             { "CalibrationData", json },
             { "Found", true },
@@ -191,7 +195,10 @@ public class StereoCalibrationOperator : OperatorBase
             { "RightCornerCount", rightCorners.Length },
             { "Accepted", false },
             { "Message", "Single pair mode: preview only. Use FolderCalibration for accepted stereo bundle." }
-        })));
+        };
+        CalibrationAssetCandidateOutput.AddTo(output, calibrationAssetId, json);
+
+        return Task.FromResult(OperatorExecutionOutput.Success(CreateImageOutput(resultImage, output)));
     }
 
     private Task<OperatorExecutionOutput> ExecuteFolderCalibration(
@@ -200,7 +207,7 @@ public class StereoCalibrationOperator : OperatorBase
         double squareSize,
         string leftFolder,
         string rightFolder,
-        string outputPath,
+        string calibrationAssetId,
         int minValidPairs,
         bool zeroDisparity,
         double alpha,
@@ -361,14 +368,6 @@ public class StereoCalibrationOperator : OperatorBase
             quality);
 
         var json = CalibrationBundleV2Json.Serialize(bundle);
-        try
-        {
-            File.WriteAllText(outputPath, json);
-        }
-        catch (Exception ex)
-        {
-            Logger.LogWarning(ex, "Failed to save calibration file to {Path}", outputPath);
-        }
 
         // 创建可视化结果
         var resultImage = CreateCalibrationResultVisualization(
@@ -403,11 +402,11 @@ public class StereoCalibrationOperator : OperatorBase
             { "ValidPairs", objectPointsList.Count },
             { "TotalPairs", filePairs.Length },
             { "FailedPairs", failedPairKeys.Count },
-            { "OutputPath", outputPath },
             { "Message", quality.Accepted
                 ? $"Stereo calibration accepted. Valid pairs: {objectPointsList.Count}/{filePairs.Length}, Stereo RMS: {calibrationResult.ReprojectionErrorStereo:F4}"
                 : $"Stereo calibration completed but did not pass quality acceptance. Valid pairs: {objectPointsList.Count}/{filePairs.Length}, Stereo RMS: {calibrationResult.ReprojectionErrorStereo:F4}, Max per-view: {quality.MaxError:F4}" }
         };
+        CalibrationAssetCandidateOutput.AddTo(outputData, calibrationAssetId, json);
 
         // 清理资源（输出字典中保留的Mat除外）
         calibrationResult.CameraMatrixLeft = new Mat();

@@ -7,7 +7,6 @@ using ClearVision.Product.Infrastructure.Services;
 using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
 using NSubstitute;
-using OpenCvSharp;
 using DetectionResultValue = ClearVision.Product.Core.ValueObjects.DetectionResult;
 
 namespace ClearVision.Product.Tests.Services;
@@ -15,175 +14,13 @@ namespace ClearVision.Product.Tests.Services;
 [TestClassification(TestDomain.General, TestPurpose.Regression, TestLane.Pr, TestEvidenceType.Contract, TestOracleType.Contract, TestResourceRequirement.None, TestExpectedDuration.Fast, TestFlakyPolicy.Blocking, "product", Suites = "ServicesRegression")]
 public class AutoTuneServiceTests
 {
-    [Fact]
-    public async Task AutoTuneInFlowAsync_UsesTargetBreakpointAndKeepsBestParameters()
-    {
-        var flowExecution = Substitute.For<IFlowExecutionService>();
-        var metricsAnalyzer = Substitute.For<IPreviewMetricsAnalyzer>();
-        var flowNodePreviewService = Substitute.For<IFlowNodePreviewService>();
-        var service = new AutoTuneService(
-            NullLogger<AutoTuneService>.Instance,
-            flowExecution,
-            metricsAnalyzer,
-            flowNodePreviewService);
-
-        var flow = new OperatorFlow("AutoTuneFlow");
-        var targetOperator = new Operator("Threshold", OperatorType.Thresholding, 0, 0);
-        flow.AddOperator(targetOperator);
-
-        var seenOptions = new List<DebugOptions>();
-        var metricsCallCount = 0;
-
-        flowExecution.ExecuteDebugWithSnapshotAsync(
-                Arg.Any<ExecutionSnapshot>(),
-                Arg.Any<DebugOptions>(),
-                Arg.Any<Dictionary<string, object>?>(),
-                Arg.Any<ClearVision.Product.Core.ProjectVariables.ProjectVariableExecutionContext?>(),
-                Arg.Any<CancellationToken>())
-            .Returns(callInfo =>
-            {
-                seenOptions.Add(callInfo.ArgAt<DebugOptions>(1));
-
-                return Task.FromResult(new FlowDebugExecutionResult
-                {
-                    IsSuccess = true,
-                    IntermediateResults = new Dictionary<Guid, Dictionary<string, object>>
-                    {
-                        [targetOperator.Id] = new()
-                        {
-                            ["Image"] = CreateOutputImageBytes()
-                        }
-                    }
-                });
-            });
-
-        metricsAnalyzer.Analyze(Arg.Any<Mat>(), Arg.Any<Dictionary<string, object>?>(), Arg.Any<AutoTuneGoal?>())
-            .Returns(_ =>
-            {
-                metricsCallCount++;
-                return metricsCallCount == 1
-                    ? CreateMetrics(currentBlobCount: 10)
-                    : CreateMetrics(currentBlobCount: 5);
-            });
-
-        var result = await service.AutoTuneInFlowAsync(
-            flow,
-            targetOperator.Id,
-            CreateInputImage(),
-            new Dictionary<string, object> { ["Threshold"] = 100 },
-            new AutoTuneGoal
-            {
-                TargetBlobCount = 5,
-                Tolerance = 0.1
-            },
-            maxIterations: 3,
-            ct: CancellationToken.None);
-
-        result.Success.Should().BeTrue();
-        result.IsGoalAchieved.Should().BeTrue();
-        result.TotalIterations.Should().Be(2);
-        Convert.ToInt32(result.FinalParameters["Threshold"]).Should().Be(178);
-        seenOptions.Should().HaveCount(2);
-        seenOptions.Should().OnlyContain(options =>
-            options.BreakAtOperatorId == targetOperator.Id &&
-            options.EnableIntermediateCache);
-    }
-
-    [Fact]
-    public async Task AutoTuneOperatorAsync_DecodesNormalizedOutputBytes()
-    {
-        var flowExecution = Substitute.For<IFlowExecutionService>();
-        var metricsAnalyzer = Substitute.For<IPreviewMetricsAnalyzer>();
-        var flowNodePreviewService = Substitute.For<IFlowNodePreviewService>();
-        var service = new AutoTuneService(
-            NullLogger<AutoTuneService>.Instance,
-            flowExecution,
-            metricsAnalyzer,
-            flowNodePreviewService);
-
-        flowExecution.ExecuteDebugWithSnapshotAsync(
-                Arg.Any<ExecutionSnapshot>(),
-                Arg.Any<DebugOptions>(),
-                Arg.Any<Dictionary<string, object>?>(),
-                Arg.Any<ClearVision.Product.Core.ProjectVariables.ProjectVariableExecutionContext?>(),
-                Arg.Any<CancellationToken>())
-            .Returns(Task.FromResult(new FlowDebugExecutionResult
-            {
-                IsSuccess = true,
-                OutputData = new Dictionary<string, object>
-                {
-                    ["Image"] = CreateOutputImageBytes()
-                }
-            }));
-
-        metricsAnalyzer.Analyze(
-                Arg.Is<Mat>(mat => !mat.Empty() && mat.Width == 6 && mat.Height == 6),
-                Arg.Any<Dictionary<string, object>?>(),
-                Arg.Any<AutoTuneGoal?>())
-            .Returns(CreateMetrics(currentBlobCount: 5));
-
-        var result = await service.AutoTuneOperatorAsync(
-            OperatorType.Thresholding,
-            CreateInputImage(),
-            new Dictionary<string, object> { ["Threshold"] = 100 },
-            new AutoTuneGoal
-            {
-                TargetBlobCount = 5,
-                Tolerance = 0.1
-            },
-            maxIterations: 1,
-            ct: CancellationToken.None);
-
-        result.Success.Should().BeTrue();
-        result.TotalIterations.Should().Be(1);
-        result.IsGoalAchieved.Should().BeTrue();
-        metricsAnalyzer.Received(1).Analyze(
-            Arg.Any<Mat>(),
-            Arg.Any<Dictionary<string, object>?>(),
-            Arg.Any<AutoTuneGoal?>());
-    }
-
-    private static PreviewMetrics CreateMetrics(int currentBlobCount)
-    {
-        return new PreviewMetrics
-        {
-            OverallScore = currentBlobCount == 5 ? 0.9 : 0.3,
-            Goals = new OptimizationGoals
-            {
-                CurrentBlobCount = currentBlobCount,
-                TargetBlobCount = 5,
-                NoisePenalty = 0,
-                FragmentPenalty = 0,
-                AreaDistributionScore = 0.5,
-                ShapeRegularityScore = 0.5
-            }
-        };
-    }
-
-    private static byte[] CreateInputImage()
-    {
-        using var image = new Mat(6, 6, MatType.CV_8UC3, Scalar.All(255));
-        Cv2.ImEncode(".png", image, out var encoded);
-        return encoded;
-    }
-
-    private static byte[] CreateOutputImageBytes()
-    {
-        using var image = new Mat(6, 6, MatType.CV_8UC1, Scalar.All(255));
-        Cv2.ImEncode(".png", image, out var encoded);
-        return encoded;
-    }
 
     [Fact]
     public async Task AutoTuneScenarioAsync_ShouldOnlyTuneBoxNmsThresholds()
     {
-        var flowExecution = Substitute.For<IFlowExecutionService>();
-        var metricsAnalyzer = Substitute.For<IPreviewMetricsAnalyzer>();
         var flowNodePreviewService = Substitute.For<IFlowNodePreviewService>();
         var service = new AutoTuneService(
             NullLogger<AutoTuneService>.Instance,
-            flowExecution,
-            metricsAnalyzer,
             flowNodePreviewService);
 
         var flow = new OperatorFlow("WireSequenceFlow");
@@ -202,6 +39,10 @@ public class AutoTuneServiceTests
                 Arg.Any<OperatorFlow>(),
                 Arg.Any<Guid>(),
                 Arg.Any<byte[]?>(),
+                Arg.Any<Guid>(),
+                Arg.Any<long>(),
+                Arg.Any<ExecutionRequestAuthority>(),
+                Arg.Any<ClearVision.Product.Core.ProjectVariables.ProjectVariableExecutionContext?>(),
                 Arg.Any<CancellationToken>())
             .Returns(callInfo =>
             {
@@ -273,11 +114,17 @@ public class AutoTuneServiceTests
                     });
             });
 
+        var projectId = Guid.NewGuid();
+        const long persistenceRevision = 7;
+        var authority = CreateAuthority(flow, persistenceRevision);
         var result = await service.AutoTuneScenarioAsync(
             "wire-sequence-terminal",
             flow,
             CreateInputImage(),
             new AutoTuneGoal(),
+            projectId,
+            persistenceRevision,
+            authority,
             maxIterations: 5,
             ct: CancellationToken.None);
 
@@ -295,13 +142,9 @@ public class AutoTuneServiceTests
     [Fact]
     public async Task AutoTuneScenarioAsync_ShouldTuneDeepLearningConfidenceWhenBoxNmsIsAbsent()
     {
-        var flowExecution = Substitute.For<IFlowExecutionService>();
-        var metricsAnalyzer = Substitute.For<IPreviewMetricsAnalyzer>();
         var flowNodePreviewService = Substitute.For<IFlowNodePreviewService>();
         var service = new AutoTuneService(
             NullLogger<AutoTuneService>.Instance,
-            flowExecution,
-            metricsAnalyzer,
             flowNodePreviewService);
 
         var flow = new OperatorFlow("WireSequenceFlow");
@@ -319,6 +162,10 @@ public class AutoTuneServiceTests
                 Arg.Any<OperatorFlow>(),
                 Arg.Any<Guid>(),
                 Arg.Any<byte[]?>(),
+                Arg.Any<Guid>(),
+                Arg.Any<long>(),
+                Arg.Any<ExecutionRequestAuthority>(),
+                Arg.Any<ClearVision.Product.Core.ProjectVariables.ProjectVariableExecutionContext?>(),
                 Arg.Any<CancellationToken>())
             .Returns(callInfo =>
             {
@@ -373,11 +220,17 @@ public class AutoTuneServiceTests
                     });
             });
 
+        var projectId = Guid.NewGuid();
+        const long persistenceRevision = 11;
+        var authority = CreateAuthority(flow, persistenceRevision);
         var result = await service.AutoTuneScenarioAsync(
             "wire-sequence-terminal",
             flow,
             CreateInputImage(),
             new AutoTuneGoal(),
+            projectId,
+            persistenceRevision,
+            authority,
             maxIterations: 5,
             ct: CancellationToken.None);
 
@@ -388,6 +241,118 @@ public class AutoTuneServiceTests
         Convert.ToDouble(result.FinalParameters["DeepLearning.Confidence"]).Should().BeApproximately(0.0d, 0.0001d);
         seenConfidence.Should().Equal(0.05d, 0.0d);
     }
+
+    [Fact]
+    public async Task AutoTuneScenarioAsync_ShouldClampOversizedIterationCountToFive()
+    {
+        var flowNodePreviewService = Substitute.For<IFlowNodePreviewService>();
+        var service = new AutoTuneService(
+            NullLogger<AutoTuneService>.Instance,
+            flowNodePreviewService);
+        var flow = CreateBoxNmsScenarioFlow();
+
+        flowNodePreviewService.PreviewWithMetricsAsync(
+                Arg.Any<OperatorFlow>(),
+                Arg.Any<Guid>(),
+                Arg.Any<byte[]?>(),
+                Arg.Any<Guid>(),
+                Arg.Any<long>(),
+                Arg.Any<ExecutionRequestAuthority>(),
+                Arg.Any<ClearVision.Product.Core.ProjectVariables.ProjectVariableExecutionContext?>(),
+                Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(new FlowNodePreviewWithMetricsResult
+            {
+                Success = true,
+                Outputs = new Dictionary<string, object> { ["IsMatch"] = false },
+                Metrics = new PreviewMetrics { OverallScore = 0.1d },
+                DiagnosticCodes = ["duplicate_detected_class"]
+            }));
+
+        var projectId = Guid.NewGuid();
+        const long persistenceRevision = 13;
+        var authority = CreateAuthority(flow, persistenceRevision);
+        var result = await service.AutoTuneScenarioAsync(
+            "wire-sequence-terminal",
+            flow,
+            CreateInputImage(),
+            new AutoTuneGoal(),
+            projectId,
+            persistenceRevision,
+            authority,
+            maxIterations: 50,
+            ct: CancellationToken.None);
+
+        result.TotalIterations.Should().Be(5);
+        await flowNodePreviewService.Received(5).PreviewWithMetricsAsync(
+            Arg.Any<OperatorFlow>(),
+            Arg.Any<Guid>(),
+            Arg.Any<byte[]?>(),
+            projectId,
+            persistenceRevision,
+            authority,
+            Arg.Any<ClearVision.Product.Core.ProjectVariables.ProjectVariableExecutionContext?>(),
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task AutoTuneScenarioAsync_ShouldObserveCancellationBeforePreviewDispatch()
+    {
+        var flowNodePreviewService = Substitute.For<IFlowNodePreviewService>();
+        var service = new AutoTuneService(
+            NullLogger<AutoTuneService>.Instance,
+            flowNodePreviewService);
+        var flow = CreateBoxNmsScenarioFlow();
+        var projectId = Guid.NewGuid();
+        const long persistenceRevision = 17;
+        var authority = CreateAuthority(flow, persistenceRevision);
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+
+        var act = () => service.AutoTuneScenarioAsync(
+            "wire-sequence-terminal",
+            flow,
+            CreateInputImage(),
+            new AutoTuneGoal(),
+            projectId,
+            persistenceRevision,
+            authority,
+            maxIterations: 5,
+            ct: cancellation.Token);
+
+        await act.Should().ThrowAsync<OperationCanceledException>();
+        await flowNodePreviewService.DidNotReceiveWithAnyArgs().PreviewWithMetricsAsync(
+            Arg.Any<OperatorFlow>(),
+            Arg.Any<Guid>(),
+            Arg.Any<byte[]?>(),
+            Arg.Any<Guid>(),
+            Arg.Any<long>(),
+            Arg.Any<ExecutionRequestAuthority>(),
+            Arg.Any<ClearVision.Product.Core.ProjectVariables.ProjectVariableExecutionContext?>(),
+            Arg.Any<CancellationToken>());
+    }
+
+    private static OperatorFlow CreateBoxNmsScenarioFlow()
+    {
+        var flow = new OperatorFlow("WireSequenceFlow");
+        var boxNms = new Operator("BoxNms", OperatorType.BoxNms, 0, 0);
+        boxNms.AddParameter(new Parameter(Guid.NewGuid(), "ScoreThreshold", "ScoreThreshold", string.Empty, "double", 0.25d));
+        boxNms.AddParameter(new Parameter(Guid.NewGuid(), "IouThreshold", "IouThreshold", string.Empty, "double", 0.45d));
+        var judge = new Operator("Judge", OperatorType.DetectionSequenceJudge, 0, 0);
+        flow.AddOperator(boxNms);
+        flow.AddOperator(judge);
+        flow.Connections.Add(new OperatorConnection(boxNms.Id, Guid.NewGuid(), judge.Id, Guid.NewGuid()));
+        return flow;
+    }
+
+    private static byte[] CreateInputImage() => [1, 2, 3];
+
+    private static ExecutionRequestAuthority CreateAuthority(OperatorFlow flow, long persistenceRevision) =>
+        new(
+            new ExecutionPrincipal("engineer-1", "engineer", "Engineer", IsAuthenticated: true),
+            expectedProjectRevision: persistenceRevision,
+            capabilityManifest: ExecutionCapabilityManifest.Derive(flow, isExplicit: true),
+            confirmationId: Guid.NewGuid().ToString(),
+            auditId: Guid.NewGuid().ToString());
 
     private static double ReadDoubleParam(Operator @operator, string name)
     {

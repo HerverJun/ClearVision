@@ -228,6 +228,14 @@ public class ExecuteInspectionRequest
     /// 流程数据（包含前端编辑过的算子参数）
     /// </summary>
     public OperatorFlowDto? FlowData { get; set; }
+
+    public long? ExpectedProjectRevision { get; set; }
+
+    public List<string>? CapabilityManifest { get; set; }
+
+    public string? ConfirmationId { get; set; }
+
+    public string? AuditId { get; set; }
 }
 
 /// <summary>
@@ -255,6 +263,14 @@ public class StartRealtimeInspectionRequest
     /// 流程数据（流程驱动模式下需要）
     /// </summary>
     public OperatorFlowDto? FlowData { get; set; }
+
+    public long? ExpectedProjectRevision { get; set; }
+
+    public List<string>? CapabilityManifest { get; set; }
+
+    public string? ConfirmationId { get; set; }
+
+    public string? AuditId { get; set; }
 }
 
 /// <summary>

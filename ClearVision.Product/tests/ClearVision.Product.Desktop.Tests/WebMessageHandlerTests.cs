@@ -113,9 +113,8 @@ public class WebMessageHandlerTests
         projectRepository.GetAllAsync().Returns(Task.FromResult<IEnumerable<Project>>(new[] { project }));
         projectRepository.GetByIdAsync(project.Id).Returns(Task.FromResult<Project?>(project));
         flowStorage.LoadFlowJsonAsync(project.Id).Returns(Task.FromResult<string?>(JsonSerializer.Serialize(flowDto)));
-        flowExecutionService.ExecuteOperatorAsync(
-                Arg.Any<GovernedOperatorExecutionContext>(),
-                Arg.Any<Operator>(),
+        flowExecutionService.ExecuteOperatorWithSnapshotAsync(
+                Arg.Any<ExecutionSnapshot>(),
                 Arg.Any<Dictionary<string, object>?>(),
                 Arg.Any<CancellationToken>())
             .Returns(Task.FromResult(new OperatorExecutionResult
@@ -152,9 +151,8 @@ public class WebMessageHandlerTests
 
         response.Success.Should().BeFalse();
         response.Error.Should().Contain("Legacy execution WebMessage");
-        await flowExecutionService.DidNotReceiveWithAnyArgs().ExecuteOperatorAsync(
-            Arg.Any<GovernedOperatorExecutionContext>(),
-            Arg.Any<Operator>(),
+        await flowExecutionService.DidNotReceiveWithAnyArgs().ExecuteOperatorWithSnapshotAsync(
+            Arg.Any<ExecutionSnapshot>(),
             Arg.Any<Dictionary<string, object>?>(),
             Arg.Any<CancellationToken>());
     }
@@ -380,11 +378,8 @@ public class WebMessageHandlerTests
         count.Should().Be(0);
     }
 
-    [Theory]
-    [InlineData(true)]
-    [InlineData(false)]
-    public async Task GenerateFlow_DuplicateRequestOrOwnerSession_ShouldReturnConflictWithoutReplacingActiveTask(
-        bool reuseRequestId)
+    [Fact]
+    public async Task GenerateFlow_DuplicateOwnerSessionRequest_ShouldReturnConflictWithoutReplacingActiveTask()
     {
         var operatorFactory = new OperatorFactory();
         var generationService = Substitute.For<IAiFlowGenerationService>();
@@ -430,8 +425,6 @@ public class WebMessageHandlerTests
 
         const string activeRequestId = "request-active";
         const string activeSessionId = "session-active";
-        var conflictingRequestId = reuseRequestId ? activeRequestId : "request-conflict";
-        var conflictingSessionId = reuseRequestId ? "session-conflict" : activeSessionId;
         var activeTask = handler.DispatchWebMessageAsync(
             CreateAuthenticatedEnvelope(
                 "GenerateFlow",
@@ -447,8 +440,8 @@ public class WebMessageHandlerTests
                 new
                 {
                     description = "must not replace active generation",
-                    requestId = conflictingRequestId,
-                    sessionId = conflictingSessionId
+                    requestId = activeRequestId,
+                    sessionId = activeSessionId
                 }),
             WebMessageAdmissionService.TrustedOrigin);
 
@@ -458,8 +451,8 @@ public class WebMessageHandlerTests
             var conflict = conflictDocument.RootElement;
             conflict.GetProperty("success").GetBoolean().Should().BeFalse();
             conflict.GetProperty("code").GetString().Should().Be(WebMessageErrorCodes.Conflict);
-            conflict.GetProperty("requestId").GetString().Should().Be(conflictingRequestId);
-            conflict.GetProperty("sessionId").GetString().Should().Be(conflictingSessionId);
+            conflict.GetProperty("requestId").GetString().Should().Be(activeRequestId);
+            conflict.GetProperty("sessionId").GetString().Should().Be(activeSessionId);
         }
         generationService.ReceivedCalls()
             .Count(call => call.GetMethodInfo().Name == nameof(IAiFlowGenerationService.GenerateFlowAsync))
@@ -474,6 +467,302 @@ public class WebMessageHandlerTests
             WebMessageAdmissionService.TrustedOrigin);
         await activeTask.WaitAsync(TimeSpan.FromSeconds(5));
         activeToken.IsCancellationRequested.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task GenerateFlow_OldCompletionShouldNotRemoveNewRequestForSameOwnerSession()
+    {
+        var operatorFactory = new OperatorFactory();
+        var generationService = Substitute.For<IAiFlowGenerationService>();
+        var generationLogger = Substitute.For<Microsoft.Extensions.Logging.ILogger<GenerateFlowMessageHandler>>();
+        var authService = CreateAuthService(("token-a", "user-a", UserRole.Engineer.ToString()));
+        var firstStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var secondStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var releaseFirst = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        CancellationToken firstToken = default;
+        CancellationToken secondToken = default;
+        var invocation = 0;
+
+        generationService.GenerateFlowAsync(
+                Arg.Any<AiFlowGenerationRequest>(),
+                Arg.Any<Action<string>>(),
+                Arg.Any<Action<AiStreamChunk>>(),
+                Arg.Any<CancellationToken>(),
+                Arg.Any<Action<GenerateFlowAttachmentReport>>())
+            .Returns(async callInfo =>
+            {
+                var request = callInfo.ArgAt<AiFlowGenerationRequest>(0);
+                var cancellationToken = callInfo.ArgAt<CancellationToken>(3);
+                var currentInvocation = Interlocked.Increment(ref invocation);
+                if (currentInvocation == 1)
+                {
+                    firstToken = cancellationToken;
+                    firstStarted.TrySetResult();
+                    await releaseFirst.Task;
+                    return new AiFlowGenerationResult
+                    {
+                        Success = true,
+                        SessionId = request.SessionId,
+                        CompletionStatus = AiFlowGenerationResult.CompletionStatusCompleted
+                    };
+                }
+
+                secondToken = cancellationToken;
+                secondStarted.TrySetResult();
+                try
+                {
+                    await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
+                }
+                catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+                {
+                }
+
+                return new AiFlowGenerationResult
+                {
+                    Success = false,
+                    SessionId = request.SessionId,
+                    CompletionStatus = AiFlowGenerationResult.CompletionStatusCancelled,
+                    FailureType = AiFlowGenerationResult.FailureTypeUserCancelled
+                };
+            });
+
+        await using var serviceProvider = BuildServiceProvider(services =>
+        {
+            services.AddSingleton(authService);
+            services.AddScoped(_ => generationService);
+            services.AddScoped(_ => generationLogger);
+            services.AddScoped<GenerateFlowMessageHandler>();
+        });
+        using var handler = CreateHandler(serviceProvider, operatorFactory);
+
+        const string sessionId = "shared-session";
+        const string firstRequestId = "request-old";
+        const string secondRequestId = "request-new";
+        var firstTask = handler.DispatchWebMessageAsync(
+            CreateAuthenticatedEnvelope(
+                "GenerateFlow",
+                "token-a",
+                new { description = "old", requestId = firstRequestId, sessionId }),
+            WebMessageAdmissionService.TrustedOrigin);
+        await firstStarted.Task.WaitAsync(TimeSpan.FromSeconds(5));
+
+        var secondTask = handler.DispatchWebMessageAsync(
+            CreateAuthenticatedEnvelope(
+                "GenerateFlow",
+                "token-a",
+                new { description = "new", requestId = secondRequestId, sessionId }),
+            WebMessageAdmissionService.TrustedOrigin);
+        await secondStarted.Task.WaitAsync(TimeSpan.FromSeconds(5));
+
+        releaseFirst.TrySetResult();
+        await firstTask.WaitAsync(TimeSpan.FromSeconds(5));
+        firstToken.IsCancellationRequested.Should().BeFalse();
+        secondToken.IsCancellationRequested.Should().BeFalse();
+
+        await handler.DispatchWebMessageAsync(
+            CreateAuthenticatedEnvelope(
+                "CancelGenerateFlow",
+                "token-a",
+                new { requestId = secondRequestId, sessionId }),
+            WebMessageAdmissionService.TrustedOrigin);
+        await secondTask.WaitAsync(TimeSpan.FromSeconds(5));
+
+        secondToken.IsCancellationRequested.Should().BeTrue();
+    }
+
+    [Fact]
+    public void GenerateFlowRequestRegistry_ShouldScopeAndRemoveExactOwnerSessionRequestTuple()
+    {
+        var registry = new GenerateFlowRequestRegistry<object>();
+        var ownerASessionA = new object();
+        var ownerBSessionA = new object();
+        var ownerASessionB = new object();
+        var identityA = GenerateFlowRequestIdentity.CreateForRegistration("owner-a", "session-a", "request-shared");
+        var identityB = GenerateFlowRequestIdentity.CreateForRegistration("owner-b", "session-a", "request-shared");
+        var identityC = GenerateFlowRequestIdentity.CreateForRegistration("owner-a", "session-b", "request-shared");
+
+        registry.TryRegister(identityA, ownerASessionA).Should().BeTrue();
+        registry.TryRegister(identityB, ownerBSessionA).Should().BeTrue();
+        registry.TryRegister(identityC, ownerASessionB).Should().BeTrue();
+        registry.TryRegister(identityA, new object()).Should().BeFalse();
+
+        registry.TryResolveExact("owner-a", "session-a", "request-shared", out var resolvedA)
+            .Should().BeTrue();
+        resolvedA.Should().BeSameAs(ownerASessionA);
+        registry.TryResolveExact("owner-b", "session-a", "request-shared", out var resolvedB)
+            .Should().BeTrue();
+        resolvedB.Should().BeSameAs(ownerBSessionA);
+        registry.TryResolveExact("owner-a", "session-b", "request-shared", out var resolvedC)
+            .Should().BeTrue();
+        resolvedC.Should().BeSameAs(ownerASessionB);
+        registry.TryResolveExact("owner-b", "session-b", "request-shared", out _)
+            .Should().BeFalse();
+
+        registry.CompareAndRemove(identityA, new object()).Should().BeFalse();
+        registry.TryResolveExact("owner-a", "session-a", "request-shared", out resolvedA)
+            .Should().BeTrue();
+        resolvedA.Should().BeSameAs(ownerASessionA);
+        registry.CompareAndRemove(identityA, ownerASessionA).Should().BeTrue();
+        registry.TryResolveExact("owner-a", "session-a", "request-shared", out _)
+            .Should().BeFalse();
+        registry.Count.Should().Be(2);
+    }
+
+    [Fact]
+    public async Task GenerateFlow_MissingSessionId_ShouldFailBeforeRegistrationOrGeneration()
+    {
+        var operatorFactory = new OperatorFactory();
+        var generationService = Substitute.For<IAiFlowGenerationService>();
+        var generationLogger = Substitute.For<Microsoft.Extensions.Logging.ILogger<GenerateFlowMessageHandler>>();
+        var authService = CreateAuthService(("token-a", "user-a", UserRole.Engineer.ToString()));
+
+        await using var serviceProvider = BuildServiceProvider(services =>
+        {
+            services.AddSingleton(authService);
+            services.AddScoped(_ => generationService);
+            services.AddScoped(_ => generationLogger);
+            services.AddScoped<GenerateFlowMessageHandler>();
+        });
+        using var handler = CreateHandler(serviceProvider, operatorFactory);
+
+        const string requestId = "request-without-session";
+        var dispatchResponse = await handler.DispatchWebMessageAsync(
+            CreateAuthenticatedEnvelope(
+                "GenerateFlow",
+                "token-a",
+                new { description = "must not dispatch", requestId }),
+            WebMessageAdmissionService.TrustedOrigin);
+
+        dispatchResponse.Success.Should().BeTrue();
+        await generationService.DidNotReceiveWithAnyArgs().GenerateFlowAsync(
+            Arg.Any<AiFlowGenerationRequest>(),
+            Arg.Any<Action<string>>(),
+            Arg.Any<Action<AiStreamChunk>>(),
+            Arg.Any<CancellationToken>(),
+            Arg.Any<Action<GenerateFlowAttachmentReport>>());
+
+        using var document = JsonDocument.Parse(GetPendingMessages(handler).Last());
+        var response = document.RootElement;
+        response.GetProperty("success").GetBoolean().Should().BeFalse();
+        response.GetProperty("code").GetString().Should().Be(WebMessageErrorCodes.Validation);
+        response.GetProperty("requestId").GetString().Should().Be(requestId);
+        response.GetProperty("sessionId").ValueKind.Should().Be(JsonValueKind.Null);
+
+        var activeRequestsField = typeof(WebMessageHandler)
+            .GetField("_activeGenerateFlowRequests", BindingFlags.Instance | BindingFlags.NonPublic)!;
+        var activeRequests = activeRequestsField.GetValue(handler)!;
+        ((int)activeRequests.GetType().GetProperty("Count")!.GetValue(activeRequests)!).Should().Be(0);
+    }
+
+    [Fact]
+    public async Task CancelGenerateFlow_WrongOrMissingIdentityShouldCancelNoActiveRequest()
+    {
+        var operatorFactory = new OperatorFactory();
+        var generationService = Substitute.For<IAiFlowGenerationService>();
+        var generationLogger = Substitute.For<Microsoft.Extensions.Logging.ILogger<GenerateFlowMessageHandler>>();
+        var authService = CreateAuthService(("token-a", "user-a", UserRole.Engineer.ToString()));
+        var started = new ConcurrentDictionary<string, TaskCompletionSource>(StringComparer.Ordinal);
+        var tokens = new ConcurrentDictionary<string, CancellationToken>(StringComparer.Ordinal);
+        started["session-a"] = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        started["session-b"] = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        generationService.GenerateFlowAsync(
+                Arg.Any<AiFlowGenerationRequest>(),
+                Arg.Any<Action<string>>(),
+                Arg.Any<Action<AiStreamChunk>>(),
+                Arg.Any<CancellationToken>(),
+                Arg.Any<Action<GenerateFlowAttachmentReport>>())
+            .Returns(async callInfo =>
+            {
+                var request = callInfo.ArgAt<AiFlowGenerationRequest>(0);
+                var sessionId = request.SessionId!;
+                var cancellationToken = callInfo.ArgAt<CancellationToken>(3);
+                tokens[sessionId] = cancellationToken;
+                started[sessionId].TrySetResult();
+                try
+                {
+                    await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
+                }
+                catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+                {
+                }
+
+                return new AiFlowGenerationResult
+                {
+                    Success = false,
+                    SessionId = sessionId,
+                    CompletionStatus = AiFlowGenerationResult.CompletionStatusCancelled,
+                    FailureType = AiFlowGenerationResult.FailureTypeUserCancelled
+                };
+            });
+
+        await using var serviceProvider = BuildServiceProvider(services =>
+        {
+            services.AddSingleton(authService);
+            services.AddScoped(_ => generationService);
+            services.AddScoped(_ => generationLogger);
+            services.AddScoped<GenerateFlowMessageHandler>();
+        });
+        using var handler = CreateHandler(serviceProvider, operatorFactory);
+
+        const string requestA = "request-a";
+        const string requestB = "request-b";
+        var taskA = handler.DispatchWebMessageAsync(
+            CreateAuthenticatedEnvelope(
+                "GenerateFlow",
+                "token-a",
+                new { description = "A", requestId = requestA, sessionId = "session-a" }),
+            WebMessageAdmissionService.TrustedOrigin);
+        await started["session-a"].Task.WaitAsync(TimeSpan.FromSeconds(5));
+        var taskB = handler.DispatchWebMessageAsync(
+            CreateAuthenticatedEnvelope(
+                "GenerateFlow",
+                "token-a",
+                new { description = "B", requestId = requestB, sessionId = "session-b" }),
+            WebMessageAdmissionService.TrustedOrigin);
+        await started["session-b"].Task.WaitAsync(TimeSpan.FromSeconds(5));
+
+        object[] invalidCancellationPayloads =
+        [
+            new { requestId = requestA, sessionId = "wrong-session" },
+            new { requestId = "wrong-request", sessionId = "session-a" },
+            new { sessionId = "session-a" },
+            new { requestId = requestA },
+            new { }
+        ];
+
+        foreach (var payload in invalidCancellationPayloads)
+        {
+            var response = await handler.DispatchWebMessageAsync(
+                CreateAuthenticatedEnvelope(
+                    "CancelGenerateFlow",
+                    "token-a",
+                    payload,
+                    envelopeRequestId: requestA),
+                WebMessageAdmissionService.TrustedOrigin);
+
+            response.Success.Should().BeTrue();
+            tokens.Values.Should().OnlyContain(token => !token.IsCancellationRequested);
+            using var responseDocument = JsonDocument.Parse(GetPendingMessages(handler).Last());
+            responseDocument.RootElement.GetProperty("success").GetBoolean().Should().BeFalse();
+            responseDocument.RootElement.GetProperty("code").GetString().Should().Be(WebMessageErrorCodes.NotFound);
+        }
+
+        await handler.DispatchWebMessageAsync(
+            CreateAuthenticatedEnvelope(
+                "CancelGenerateFlow",
+                "token-a",
+                new { requestId = requestA, sessionId = "session-a" }),
+            WebMessageAdmissionService.TrustedOrigin);
+        await handler.DispatchWebMessageAsync(
+            CreateAuthenticatedEnvelope(
+                "CancelGenerateFlow",
+                "token-a",
+                new { requestId = requestB, sessionId = "session-b" }),
+            WebMessageAdmissionService.TrustedOrigin);
+        await Task.WhenAll(taskA, taskB).WaitAsync(TimeSpan.FromSeconds(5));
+
+        tokens.Values.Should().OnlyContain(token => token.IsCancellationRequested);
     }
 
     [Fact]
@@ -917,11 +1206,12 @@ public class WebMessageHandlerTests
         string token,
         object payload,
         string bindingId = "binding-test",
-        long navigationEpoch = 1) =>
+        long navigationEpoch = 1,
+        string? envelopeRequestId = null) =>
         JsonSerializer.Serialize(new
         {
             messageType,
-            requestId = $"wm-{Guid.NewGuid():N}",
+            requestId = envelopeRequestId ?? $"wm-{Guid.NewGuid():N}",
             payload,
             bridge = new
             {

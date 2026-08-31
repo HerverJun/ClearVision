@@ -15,6 +15,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 namespace ClearVision.Product.Tests.PlcComm;
 
 [TestClassification(TestDomain.Plc, TestPurpose.Regression, TestLane.Pr, TestEvidenceType.Contract, TestOracleType.Contract, TestResourceRequirement.None, TestExpectedDuration.Fast, TestFlakyPolicy.Blocking, "plc", Suites = "PlcRegression")]
+[Collection("PLC Operator Integration")]
 public class PlcCommunicationOperatorBaseBehaviorTests
 {
     [Fact]
@@ -158,6 +159,7 @@ public class PlcCommunicationOperatorBaseBehaviorTests
         public TestPlcOperator()
             : base(NullLogger.Instance)
         {
+            StopHeartbeat();
         }
 
         public override OperatorType OperatorType => OperatorType.SiemensS7Communication;

@@ -16,9 +16,8 @@ namespace ClearVision.Product.Infrastructure.Cameras;
 /// </summary>
 public class CameraManager : ICameraManager, IDisposable
 {
-    private readonly ConcurrentDictionary<string, ICamera> _cameras = new(StringComparer.OrdinalIgnoreCase);
-    private readonly ConcurrentDictionary<string, ICameraProvider> _providers = new(StringComparer.OrdinalIgnoreCase);
-    private readonly ConcurrentDictionary<string, SemaphoreSlim> _cameraLocks = new(StringComparer.OrdinalIgnoreCase);
+    private readonly ConcurrentDictionary<string, ManagedCameraEntry> _cameras = new(StringComparer.OrdinalIgnoreCase);
+    private readonly ConcurrentDictionary<string, CameraLockEntry> _cameraLocks = new(StringComparer.OrdinalIgnoreCase);
     private readonly ILoggerFactory _loggerFactory;
     private readonly ILogger<CameraManager> _logger;
     private readonly Func<string, string?, ICameraProvider?> _providerFactory;
@@ -26,7 +25,17 @@ public class CameraManager : ICameraManager, IDisposable
     private readonly object _bindingsSync = new();
     private List<CameraBindingConfig> _bindings = new();
     private string _activeCameraId = "";
-    private bool _disposed;
+    private int _disposed;
+
+    internal int RetainedCameraLockCount => _cameraLocks.Count;
+
+    internal int GetCameraLockReferenceCount(string cameraId)
+    {
+        var cameraKey = NormalizeCameraKey(cameraId);
+        return _cameraLocks.TryGetValue(cameraKey, out var entry)
+            ? entry.ReferenceCount
+            : 0;
+    }
 
     public CameraManager(ILoggerFactory loggerFactory)
         : this(
@@ -60,53 +69,34 @@ public class CameraManager : ICameraManager, IDisposable
             Manufacturer = d.Manufacturer,
             Model = d.Model,
             ConnectionType = d.InterfaceType,
-            IsConnected = _cameras.ContainsKey(d.SerialNumber)
+            IsConnected = GetCamera(d.SerialNumber) != null
         });
 
         return Task.FromResult(cameraInfos);
     }
 
     /// <summary>
-    /// 获取或创建相机（基于原始序列号）
+    /// 获取或创建相机。参数必须是已加载且启用的服务端绑定 ID。
     /// </summary>
-    public async Task<ICamera> GetOrCreateCameraAsync(string cameraId)
-    {
-        return await GetOrCreateCameraAsync(cameraId, manufacturerHint: null);
-    }
+    public Task<ICamera> GetOrCreateCameraAsync(string cameraId) => GetOrCreateByBindingAsync(cameraId);
 
-    private async Task<ICamera> GetOrCreateCameraAsync(string cameraId, string? manufacturerHint)
+    private async Task<ICamera> GetOrCreateCameraBySerialAsync(
+        string serialNumber,
+        string? manufacturerHint,
+        CancellationToken cancellationToken)
     {
         ThrowIfDisposed();
-        var cameraKey = NormalizeCameraKey(cameraId);
-        if (_cameras.TryGetValue(cameraKey, out var existingCamera))
-        {
-            return existingCamera;
-        }
+        var cameraKey = NormalizeCameraKey(serialNumber);
+        using var cameraLock = await AcquireCameraLockAsync(cameraKey, cancellationToken);
+        var entry = await GetOrCreateCameraEntryUnderLockAsync(cameraKey, manufacturerHint, cancellationToken);
+        return entry.GetActiveCamera();
+    }
 
-        var cameraLock = _cameraLocks.GetOrAdd(cameraKey, _ => new SemaphoreSlim(1, 1));
-        await cameraLock.WaitAsync();
-        try
-        {
-            if (_cameras.TryGetValue(cameraKey, out existingCamera))
-            {
-                return existingCamera;
-            }
-
-            // AutoDetect internally opens the camera and returns a connected provider.
-            var provider = _providerFactory(cameraKey, manufacturerHint);
-            if (provider == null)
-                throw new InvalidOperationException($"Failed to detect camera: {cameraKey}. Check power, connection, and SDK installation.");
-
-            var cameraAdapter = new CameraProviderAdapter(cameraKey, provider, _loggerFactory.CreateLogger<CameraProviderAdapter>());
-            _cameras[cameraKey] = cameraAdapter;
-            _providers[cameraKey] = provider;
-
-            return cameraAdapter;
-        }
-        finally
-        {
-            cameraLock.Release();
-        }
+    public async Task<ICameraLease> AcquireCameraLeaseAsync(
+        string cameraId,
+        CancellationToken cancellationToken = default)
+    {
+        return await AcquireByBindingLeaseAsync(cameraId, cancellationToken);
     }
 
     /// <summary>
@@ -114,48 +104,44 @@ public class CameraManager : ICameraManager, IDisposable
     /// </summary>
     public async Task<ICamera> GetOrCreateByBindingAsync(string bindingId)
     {
-        var bindingKey = NormalizeCameraKey(bindingId);
-        CameraBindingConfig? binding;
-        lock (_bindingsSync)
-        {
-            binding = _bindings.FirstOrDefault(b => b.Id.Equals(bindingKey, StringComparison.OrdinalIgnoreCase));
-        }
-        if (binding == null)
-        {
-            // 如果找不到绑定，尝试直接作为SN处理（向下兼容）
-            return await GetOrCreateCameraAsync(bindingKey);
-        }
-
-        if (string.IsNullOrEmpty(binding.SerialNumber))
-        {
-            throw new InvalidOperationException($"绑定 '{binding.DisplayName}' 未关联物理设备序列号");
-        }
-
-        return await GetOrCreateCameraAsync(binding.SerialNumber, binding.Manufacturer);
+        var resolved = ResolveBinding(bindingId);
+        return await GetOrCreateCameraBySerialAsync(
+            resolved.CameraId,
+            resolved.ManufacturerHint,
+            CancellationToken.None);
     }
 
-    public Task<ICamera> OpenCameraAsync(string cameraId) => GetOrCreateCameraAsync(cameraId);
+    public async Task<ICameraLease> AcquireByBindingLeaseAsync(
+        string bindingId,
+        CancellationToken cancellationToken = default)
+    {
+        ThrowIfDisposed();
+        var resolved = ResolveBinding(bindingId);
+        var cameraKey = NormalizeCameraKey(resolved.CameraId);
+        using var cameraLock = await AcquireCameraLockAsync(cameraKey, cancellationToken);
+        var entry = await GetOrCreateCameraEntryUnderLockAsync(
+            cameraKey,
+            resolved.ManufacturerHint,
+            cancellationToken);
+        return entry.AcquireLease();
+    }
+
+    public Task<ICamera> OpenCameraAsync(string cameraId) => GetOrCreateByBindingAsync(cameraId);
 
     public async Task CloseCameraAsync(string cameraId)
     {
-        var cameraKey = NormalizeCameraKey(cameraId);
-        var cameraLock = _cameraLocks.GetOrAdd(cameraKey, _ => new SemaphoreSlim(1, 1));
-        await cameraLock.WaitAsync();
-        try
+        ThrowIfDisposed();
+        var resolved = ResolveBinding(cameraId);
+        await CloseCameraBySerialAsync(resolved.CameraId);
+    }
+
+    private async Task CloseCameraBySerialAsync(string serialNumber)
+    {
+        var cameraKey = NormalizeCameraKey(serialNumber);
+        using var cameraLock = await AcquireCameraLockAsync(cameraKey, CancellationToken.None);
+        if (_cameras.TryGetValue(cameraKey, out var entry))
         {
-            _providers.TryRemove(cameraKey, out var provider);
-            if (_cameras.TryRemove(cameraKey, out var camera))
-            {
-                camera.Dispose();
-            }
-            else
-            {
-                provider?.Dispose();
-            }
-        }
-        finally
-        {
-            cameraLock.Release();
+            entry.Retire();
         }
     }
 
@@ -166,8 +152,9 @@ public class CameraManager : ICameraManager, IDisposable
             return null;
         }
 
-        _cameras.TryGetValue(cameraId.Trim(), out var camera);
-        return camera;
+        return _cameras.TryGetValue(cameraId.Trim(), out var entry)
+            ? entry.TryGetActiveCamera()
+            : null;
     }
 
     /// <summary>
@@ -182,21 +169,10 @@ public class CameraManager : ICameraManager, IDisposable
 
     private void DisconnectAllCore()
     {
-        foreach (var camera in _cameras.Values)
+        foreach (var entry in _cameras.Values)
         {
-            camera.Dispose();
+            entry.Retire();
         }
-
-        foreach (var (cameraId, provider) in _providers)
-        {
-            if (!_cameras.ContainsKey(cameraId))
-            {
-                provider.Dispose();
-            }
-        }
-
-        _cameras.Clear();
-        _providers.Clear();
     }
 
     // --- 相机绑定管理功能 ---
@@ -261,7 +237,7 @@ public class CameraManager : ICameraManager, IDisposable
                 await camera.StopContinuousAcquisitionAsync();
             }
 
-            await CloseCameraAsync(serialNumber);
+            await CloseCameraBySerialAsync(serialNumber);
         }
 
         lock (_bindingsSync)
@@ -279,19 +255,142 @@ public class CameraManager : ICameraManager, IDisposable
 
     public void Dispose()
     {
-        if (!_disposed)
+        if (Interlocked.Exchange(ref _disposed, 1) == 0)
         {
             DisconnectAllCore();
-            foreach (var cameraLock in _cameraLocks.Values)
-            {
-                cameraLock.Dispose();
-            }
-
-            _cameraLocks.Clear();
-            _disposed = true;
         }
+
         GC.SuppressFinalize(this);
     }
+
+    private async Task<ManagedCameraEntry> GetOrCreateCameraEntryUnderLockAsync(
+        string cameraKey,
+        string? manufacturerHint,
+        CancellationToken cancellationToken)
+    {
+        ThrowIfDisposed();
+
+        while (_cameras.TryGetValue(cameraKey, out var observedEntry))
+        {
+            if (observedEntry.TryGetActiveCamera() != null)
+            {
+                return observedEntry;
+            }
+
+            await observedEntry.DisposalCompleted.WaitAsync(cancellationToken);
+            TryRemoveCameraEntry(cameraKey, observedEntry);
+            ThrowIfDisposed();
+        }
+
+        // AutoDetect internally opens the camera and returns a connected provider.
+        var provider = _providerFactory(cameraKey, manufacturerHint);
+        if (provider == null)
+        {
+            throw new InvalidOperationException(
+                $"Failed to detect camera: {cameraKey}. Check power, connection, and SDK installation.");
+        }
+
+        var cameraAdapter = new CameraProviderAdapter(
+            cameraKey,
+            provider,
+            _loggerFactory.CreateLogger<CameraProviderAdapter>());
+        var createdEntry = new ManagedCameraEntry(
+            cameraAdapter,
+            disposedEntry => TryRemoveCameraEntry(cameraKey, disposedEntry));
+
+        if (!_cameras.TryAdd(cameraKey, createdEntry))
+        {
+            createdEntry.Retire();
+            throw new InvalidOperationException($"Camera '{cameraKey}' was opened concurrently through an uncoordinated path.");
+        }
+
+        if (Volatile.Read(ref _disposed) != 0)
+        {
+            createdEntry.Retire();
+            ThrowIfDisposed();
+        }
+
+        return createdEntry;
+    }
+
+    private (string CameraId, string? ManufacturerHint) ResolveBinding(string bindingId)
+    {
+        var bindingKey = NormalizeCameraKey(bindingId);
+        CameraBindingConfig? binding;
+        lock (_bindingsSync)
+        {
+            binding = _bindings.FirstOrDefault(b =>
+                b.Id.Equals(bindingKey, StringComparison.OrdinalIgnoreCase));
+        }
+
+        if (binding == null)
+        {
+            throw new InvalidOperationException($"Camera binding '{bindingKey}' is not configured.");
+        }
+
+        if (!binding.IsEnabled)
+        {
+            throw new InvalidOperationException($"Camera binding '{bindingKey}' is disabled.");
+        }
+
+        if (string.IsNullOrWhiteSpace(binding.SerialNumber))
+        {
+            throw new InvalidOperationException($"绑定 '{binding.DisplayName}' 未关联物理设备序列号");
+        }
+
+        return (binding.SerialNumber.Trim(), binding.Manufacturer);
+    }
+
+    private async ValueTask<CameraLockLease> AcquireCameraLockAsync(
+        string cameraKey,
+        CancellationToken cancellationToken)
+    {
+        while (true)
+        {
+            var entry = _cameraLocks.GetOrAdd(cameraKey, static _ => new CameraLockEntry());
+            if (!entry.TryAddReference())
+            {
+                TryRemoveCameraLock(cameraKey, entry);
+                continue;
+            }
+
+            try
+            {
+                await entry.Semaphore.WaitAsync(cancellationToken);
+                return new CameraLockLease(this, cameraKey, entry);
+            }
+            catch
+            {
+                ReleaseCameraLockReference(cameraKey, entry);
+                throw;
+            }
+        }
+    }
+
+    private void ReleaseCameraLock(string cameraKey, CameraLockEntry entry)
+    {
+        entry.Semaphore.Release();
+        ReleaseCameraLockReference(cameraKey, entry);
+    }
+
+    private void ReleaseCameraLockReference(string cameraKey, CameraLockEntry entry)
+    {
+        if (!entry.ReleaseReference())
+        {
+            return;
+        }
+
+        TryRemoveCameraLock(cameraKey, entry);
+        entry.Dispose();
+    }
+
+    private bool TryRemoveCameraLock(string cameraKey, CameraLockEntry entry) =>
+        ((ICollection<KeyValuePair<string, CameraLockEntry>>)_cameraLocks)
+        .Remove(new KeyValuePair<string, CameraLockEntry>(cameraKey, entry));
+
+    private bool TryRemoveCameraEntry(string cameraKey, ManagedCameraEntry entry) =>
+        ((ICollection<KeyValuePair<string, ManagedCameraEntry>>)_cameras)
+        .Remove(new KeyValuePair<string, ManagedCameraEntry>(cameraKey, entry));
 
     private static string NormalizeCameraKey(string cameraId)
     {
@@ -341,7 +440,218 @@ public class CameraManager : ICameraManager, IDisposable
 
     private void ThrowIfDisposed()
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
+        ObjectDisposedException.ThrowIf(Volatile.Read(ref _disposed) != 0, this);
+    }
+
+    private sealed class CameraLockEntry : IDisposable
+    {
+        private readonly object _sync = new();
+        private int _references;
+        private bool _retired;
+
+        public SemaphoreSlim Semaphore { get; } = new(1, 1);
+
+        public int ReferenceCount
+        {
+            get
+            {
+                lock (_sync)
+                {
+                    return _references;
+                }
+            }
+        }
+
+        public bool TryAddReference()
+        {
+            lock (_sync)
+            {
+                if (_retired)
+                {
+                    return false;
+                }
+
+                _references++;
+                return true;
+            }
+        }
+
+        public bool ReleaseReference()
+        {
+            lock (_sync)
+            {
+                if (_references <= 0)
+                {
+                    throw new InvalidOperationException("Camera lock reference count underflow.");
+                }
+
+                _references--;
+                if (_references != 0)
+                {
+                    return false;
+                }
+
+                _retired = true;
+                return true;
+            }
+        }
+
+        public void Dispose() => Semaphore.Dispose();
+    }
+
+    private sealed class CameraLockLease : IDisposable
+    {
+        private readonly CameraManager _owner;
+        private readonly string _cameraKey;
+        private CameraLockEntry? _entry;
+
+        public CameraLockLease(CameraManager owner, string cameraKey, CameraLockEntry entry)
+        {
+            _owner = owner;
+            _cameraKey = cameraKey;
+            _entry = entry;
+        }
+
+        public void Dispose()
+        {
+            var entry = Interlocked.Exchange(ref _entry, null);
+            if (entry != null)
+            {
+                _owner.ReleaseCameraLock(_cameraKey, entry);
+            }
+        }
+    }
+
+    private sealed class ManagedCameraEntry
+    {
+        private readonly object _sync = new();
+        private readonly Action<ManagedCameraEntry> _onDisposed;
+        private readonly TaskCompletionSource _disposalCompleted =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private int _leaseCount;
+        private bool _retired;
+        private bool _disposeStarted;
+
+        public ManagedCameraEntry(ICamera camera, Action<ManagedCameraEntry> onDisposed)
+        {
+            Camera = camera;
+            _onDisposed = onDisposed;
+        }
+
+        public ICamera Camera { get; }
+
+        public Task DisposalCompleted => _disposalCompleted.Task;
+
+        public ICamera GetActiveCamera() =>
+            TryGetActiveCamera()
+            ?? throw new InvalidOperationException($"Camera '{Camera.CameraId}' is retiring.");
+
+        public ICamera? TryGetActiveCamera()
+        {
+            lock (_sync)
+            {
+                return _retired ? null : Camera;
+            }
+        }
+
+        public ICameraLease AcquireLease()
+        {
+            lock (_sync)
+            {
+                if (_retired)
+                {
+                    throw new InvalidOperationException($"Camera '{Camera.CameraId}' is retiring.");
+                }
+
+                _leaseCount++;
+                return new ManagedCameraLease(this, Camera);
+            }
+        }
+
+        public void Retire()
+        {
+            var disposeNow = false;
+            lock (_sync)
+            {
+                if (_retired)
+                {
+                    return;
+                }
+
+                _retired = true;
+                if (_leaseCount == 0)
+                {
+                    _disposeStarted = true;
+                    disposeNow = true;
+                }
+            }
+
+            if (disposeNow)
+            {
+                DisposeCamera();
+            }
+        }
+
+        private void ReleaseLease()
+        {
+            var disposeNow = false;
+            lock (_sync)
+            {
+                if (_leaseCount <= 0)
+                {
+                    throw new InvalidOperationException("Camera lease count underflow.");
+                }
+
+                _leaseCount--;
+                if (_retired && _leaseCount == 0 && !_disposeStarted)
+                {
+                    _disposeStarted = true;
+                    disposeNow = true;
+                }
+            }
+
+            if (disposeNow)
+            {
+                DisposeCamera();
+            }
+        }
+
+        private void DisposeCamera()
+        {
+            try
+            {
+                Camera.Dispose();
+            }
+            finally
+            {
+                _onDisposed(this);
+                _disposalCompleted.TrySetResult();
+            }
+        }
+
+        private sealed class ManagedCameraLease : ICameraLease
+        {
+            private ManagedCameraEntry? _owner;
+
+            public ManagedCameraLease(ManagedCameraEntry owner, ICamera camera)
+            {
+                _owner = owner;
+                Camera = camera;
+            }
+
+            public ICamera Camera { get; }
+
+            public void Dispose()
+            {
+                Interlocked.Exchange(ref _owner, null)?.ReleaseLease();
+            }
+
+            public ValueTask DisposeAsync()
+            {
+                Dispose();
+                return ValueTask.CompletedTask;
+            }
+        }
     }
 }
 
@@ -360,6 +670,7 @@ public class CameraProviderAdapter : IIndustrialCamera
     private CameraTriggerMode _currentTriggerMode = CameraTriggerMode.Software;
     private string _currentHardwareTriggerSource = CameraHardwareTriggerSourceExtensions.DefaultHardwareTriggerSource;
     private bool _providerTriggerModeKnown;
+    private int _disposed;
 
     public string CameraId => _cameraId;
     public string Name => _provider.CurrentDevice?.UserDefinedName ?? _cameraId;
@@ -695,9 +1006,20 @@ public class CameraProviderAdapter : IIndustrialCamera
 
     public void Dispose()
     {
-        StopContinuousAcquisitionAsync().GetAwaiter().GetResult();
-        _provider.Dispose();
-        _providerGate.Dispose();
+        if (Interlocked.Exchange(ref _disposed, 1) != 0)
+        {
+            return;
+        }
+
+        try
+        {
+            StopContinuousAcquisitionAsync().GetAwaiter().GetResult();
+        }
+        finally
+        {
+            _provider.Dispose();
+            _providerGate.Dispose();
+        }
     }
 
     private void SetProviderTriggerMode(CameraTriggerMode mode, string? hardwareTriggerSource = null)

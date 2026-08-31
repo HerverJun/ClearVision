@@ -63,6 +63,10 @@ public sealed class SemanticSegmentationOperator : OperatorBase
     private static readonly ConcurrentDictionary<string, CachedSession> SessionCache = new(StringComparer.OrdinalIgnoreCase);
     private static readonly SemaphoreSlim SessionCacheLock = new(1, 1);
 
+    // Test-only race seam. Null in production, so the normal path performs no allocation,
+    // scheduling, or synchronization beyond the single null check.
+    internal static Action<OnnxModelFileIdentity>? InitialModelIdentityObservedForTests { get; set; }
+
     private sealed class CachedSession
     {
         private int _leaseCount;
@@ -403,18 +407,29 @@ public sealed class SemanticSegmentationOperator : OperatorBase
 
     private async Task<SessionLease> GetOrCreateSessionLeaseAsync(string modelPath, string executionProvider, CancellationToken cancellationToken)
     {
-        var resolvedModelPath = Path.GetFullPath(modelPath);
         var effectiveProvider = executionProvider == "cuda" && !GpuAvailabilityChecker.IsCudaAvailable ? "cpu" : executionProvider;
-        var cacheKey = $"{resolvedModelPath}|{effectiveProvider}";
-
-        if (TryAcquireCachedSession(cacheKey, out var lease))
-        {
-            return lease;
-        }
+        var observedIdentity = OnnxModelFileIdentity.Capture(modelPath);
+        InitialModelIdentityObservedForTests?.Invoke(observedIdentity);
 
         await SessionCacheLock.WaitAsync(cancellationToken);
         try
         {
+            // Decide cache hits only from a lock-protected re-observation. Otherwise a replacement
+            // after the initial hash can return the old cached session to a new lease.
+            var currentIdentity = OnnxModelFileIdentity.Capture(observedIdentity.CanonicalPath);
+            var variantPrefix = BuildSessionVariantPrefix(currentIdentity.CanonicalPath, effectiveProvider);
+            var cacheKey = BuildSessionCacheKey(variantPrefix, currentIdentity.ContentSha256);
+
+            if (TryAcquireCachedSession(cacheKey, out var lease))
+            {
+                return lease;
+            }
+
+            // Construct from one immutable snapshot and re-check its exact content key in case the
+            // file changed between the lock-protected hash and the snapshot read.
+            var snapshot = OnnxModelFileIdentity.CaptureSnapshot(currentIdentity.CanonicalPath);
+            variantPrefix = BuildSessionVariantPrefix(snapshot.Identity.CanonicalPath, effectiveProvider);
+            cacheKey = BuildSessionCacheKey(variantPrefix, snapshot.Identity.ContentSha256);
             if (TryAcquireCachedSession(cacheKey, out lease))
             {
                 return lease;
@@ -430,8 +445,9 @@ public sealed class SemanticSegmentationOperator : OperatorBase
                 options.AppendExecutionProvider_CUDA(0);
             }
 
-            var session = new InferenceSession(resolvedModelPath, options);
+            var session = new InferenceSession(snapshot.Content, options);
             var cached = new CachedSession(session);
+            RetireSupersededSessionVersions(variantPrefix, cacheKey);
             SessionCache[cacheKey] = cached;
             EnforceSessionCacheLimit(cacheKey);
 
@@ -452,6 +468,38 @@ public sealed class SemanticSegmentationOperator : OperatorBase
     {
         lease = null!;
         return SessionCache.TryGetValue(cacheKey, out var cached) && cached.TryAcquire(out lease);
+    }
+
+    private static string BuildSessionVariantPrefix(string canonicalPath, string effectiveProvider) =>
+        $"{canonicalPath}|provider:{effectiveProvider}|";
+
+    private static string BuildSessionCacheKey(string variantPrefix, string contentSha256) =>
+        $"{variantPrefix}sha256:{contentSha256}";
+
+    private static void RetireSupersededSessionVersions(string variantPrefix, string protectedKey)
+    {
+        foreach (var candidate in SessionCache
+                     .Where(entry =>
+                         entry.Key.StartsWith(variantPrefix, StringComparison.OrdinalIgnoreCase) &&
+                         !entry.Key.Equals(protectedKey, StringComparison.OrdinalIgnoreCase))
+                     .ToArray())
+        {
+            if (SessionCache.TryRemove(new KeyValuePair<string, CachedSession>(candidate.Key, candidate.Value)))
+            {
+                candidate.Value.Retire();
+            }
+        }
+    }
+
+    internal static void ClearSessionCacheForTests()
+    {
+        foreach (var candidate in SessionCache.ToArray())
+        {
+            if (SessionCache.TryRemove(new KeyValuePair<string, CachedSession>(candidate.Key, candidate.Value)))
+            {
+                candidate.Value.Retire();
+            }
+        }
     }
 
     private static void EnforceSessionCacheLimit(string protectedKey)

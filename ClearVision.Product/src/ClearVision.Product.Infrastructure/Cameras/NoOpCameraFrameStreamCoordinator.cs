@@ -30,13 +30,25 @@ internal sealed class NoOpCameraFrameStreamCoordinator : ICameraFrameStreamCoord
 
     public Task ReleaseIdleStreamAsync(string cameraId) => Task.CompletedTask;
 
-    public Task<CameraPreviewSession> StartPreviewSessionAsync(string cameraId, CancellationToken cancellationToken = default) =>
+    public Task<CameraPreviewSession> StartPreviewSessionAsync(
+        string cameraId,
+        string ownerHash,
+        CancellationToken cancellationToken = default) =>
         throw new NotSupportedException("Shared camera stream coordinator is not available in this context.");
 
-    public Task<CameraStreamFrame> WaitForPreviewFrameAsync(string sessionId, CancellationToken cancellationToken = default) =>
+    public Task<CameraStreamFrame> WaitForPreviewFrameAsync(
+        string sessionId,
+        string ownerHash,
+        CancellationToken cancellationToken = default) =>
         throw new NotSupportedException("Shared camera stream coordinator is not available in this context.");
 
-    public Task StopPreviewSessionAsync(string sessionId) => Task.CompletedTask;
+    public Task<CameraPreviewHeartbeat?> HeartbeatPreviewSessionAsync(
+        string sessionId,
+        string ownerHash,
+        CancellationToken cancellationToken = default) =>
+        Task.FromResult<CameraPreviewHeartbeat?>(null);
+
+    public Task<bool> StopPreviewSessionAsync(string sessionId, string ownerHash) => Task.FromResult(false);
 
     public bool TryGetLatestFrameEnvelope(string cameraId, out FrameEnvelope? frame)
     {

@@ -8,6 +8,7 @@ using ClearVision.Product.Core.Attributes;
 using ClearVision.Product.Core.Entities;
 using ClearVision.Product.Core.Enums;
 using ClearVision.Product.Core.Operators;
+using ClearVision.Product.Core.Services;
 using ClearVision.Product.Infrastructure.Operators.DatabaseWrite;
 using Microsoft.Extensions.Logging;
 
@@ -23,6 +24,7 @@ namespace ClearVision.Product.Infrastructure.Operators;
 [InputPort("RecordId", "记录ID", PortDataType.String, IsRequired = false)]
 [OutputPort("Status", "状态", PortDataType.Boolean)]
 [OutputPort("RecordId", "记录ID", PortDataType.String)]
+[OperatorParam("ProfileId", "数据库Profile", "string", DefaultValue = "")]
 [OperatorParam("ConnectionString", "连接字符串", "string", DefaultValue = "")]
 [OperatorParam("TableName", "表名", "string", DefaultValue = "InspectionResults")]
 [OperatorParam("DbType", "数据库类型", "enum", DefaultValue = "SQLite", Options = new[] { "SQLite|SQLite", "SQLServer|SQLServer", "MySQL|MySQL" })]
@@ -50,10 +52,32 @@ public sealed class DatabaseWriteOperator : OperatorBase
             ["MySQL"] = new MySqlDatabaseWriteProvider()
         };
 
+    private readonly IExecutionResourceProfileResolver _resourceProfileResolver;
+    private readonly Func<string, IDatabaseWriteProvider?> _providerResolver;
+
     public override OperatorType OperatorType => OperatorType.DatabaseWrite;
 
-    public DatabaseWriteOperator(ILogger<DatabaseWriteOperator> logger) : base(logger)
+    public DatabaseWriteOperator(ILogger<DatabaseWriteOperator> logger)
+        : this(logger, DenyAllExecutionResourceProfileResolver.Instance, ResolveProvider)
     {
+    }
+
+    public DatabaseWriteOperator(
+        ILogger<DatabaseWriteOperator> logger,
+        IExecutionResourceProfileResolver resourceProfileResolver)
+        : this(logger, resourceProfileResolver, ResolveProvider)
+    {
+    }
+
+    internal DatabaseWriteOperator(
+        ILogger<DatabaseWriteOperator> logger,
+        IExecutionResourceProfileResolver resourceProfileResolver,
+        Func<string, IDatabaseWriteProvider?> providerResolver)
+        : base(logger)
+    {
+        _resourceProfileResolver = resourceProfileResolver ??
+            throw new ArgumentNullException(nameof(resourceProfileResolver));
+        _providerResolver = providerResolver ?? throw new ArgumentNullException(nameof(providerResolver));
     }
 
     protected override async Task<OperatorExecutionOutput> ExecuteCoreAsync(
@@ -66,23 +90,32 @@ public sealed class DatabaseWriteOperator : OperatorBase
             return OperatorExecutionOutput.Failure("Input 'Data' is required.");
         }
 
-        var dbType = GetRawStringParameter(@operator, "DbType", "SQLite");
-        if (!TryGetProvider(dbType, out var provider))
+        var profileId = GetRawStringParameter(@operator, "ProfileId", string.Empty);
+        var requestedTableName = GetRawStringParameter(@operator, "TableName", "InspectionResults");
+        if (string.IsNullOrWhiteSpace(requestedTableName))
+        {
+            requestedTableName = "InspectionResults";
+        }
+
+        var resolution = _resourceProfileResolver.ResolveDatabase(profileId, requestedTableName);
+        if (!resolution.Resolved || resolution.Resource == null)
+        {
+            return OperatorExecutionOutput.Failure($"{resolution.Code}: {resolution.Message}");
+        }
+
+        var resource = resolution.Resource;
+        if (!TryGetProvider(resource.DbType, out var provider))
         {
             return OperatorExecutionOutput.Failure("DbType must be one of: SQLite, SQLServer, MySQL.");
         }
 
-        var connectionString = GetRawStringParameter(@operator, "ConnectionString", string.Empty);
-        if (string.IsNullOrWhiteSpace(connectionString))
+        if (string.IsNullOrWhiteSpace(resource.ConnectionString))
         {
-            return OperatorExecutionOutput.Failure("ConnectionString cannot be empty.");
+            return OperatorExecutionOutput.Failure("RESOURCE_DATABASE_PROFILE_INVALID: The server database profile is incomplete.");
         }
 
-        var tableName = GetRawStringParameter(@operator, "TableName", "InspectionResults");
-        if (string.IsNullOrWhiteSpace(tableName))
-        {
-            tableName = "InspectionResults";
-        }
+        var connectionString = resource.ConnectionString;
+        var tableName = resource.TableName;
 
         if (!IsValidTableName(tableName))
         {
@@ -125,28 +158,35 @@ public sealed class DatabaseWriteOperator : OperatorBase
 
     public override ValidationResult ValidateParameters(Operator @operator)
     {
-        var dbType = GetRawStringParameter(@operator, "DbType", "SQLite");
-        if (!TryGetProvider(dbType, out _))
+        var profileId = GetRawStringParameter(@operator, "ProfileId", string.Empty);
+        var requestedTableName = GetRawStringParameter(@operator, "TableName", "InspectionResults");
+        if (string.IsNullOrWhiteSpace(requestedTableName))
+        {
+            requestedTableName = "InspectionResults";
+        }
+
+        var resolution = _resourceProfileResolver.ResolveDatabase(profileId, requestedTableName);
+        if (!resolution.Resolved || resolution.Resource == null)
+        {
+            return ValidationResult.Invalid($"{resolution.Code}: {resolution.Message}");
+        }
+
+        var resource = resolution.Resource;
+        if (!TryGetProvider(resource.DbType, out _))
         {
             return ValidationResult.Invalid("DbType must be one of: SQLite, SQLServer, MySQL.");
         }
 
-        var connectionString = GetRawStringParameter(@operator, "ConnectionString", string.Empty);
-        if (string.IsNullOrWhiteSpace(connectionString))
-        {
-            return ValidationResult.Invalid("ConnectionString cannot be empty.");
-        }
-
-        var tableName = GetRawStringParameter(@operator, "TableName", "InspectionResults");
-        if (string.IsNullOrWhiteSpace(tableName))
-        {
-            return ValidationResult.Invalid("TableName cannot be empty.");
-        }
-
-        if (!IsValidTableName(tableName))
+        if (string.IsNullOrWhiteSpace(resource.ConnectionString))
         {
             return ValidationResult.Invalid(
-                $"TableName '{tableName}' is invalid. Only letters, digits and underscore are allowed, and it must start with a letter or underscore.");
+                "RESOURCE_DATABASE_PROFILE_INVALID: The server database profile is incomplete.");
+        }
+
+        if (!IsValidTableName(resource.TableName))
+        {
+            return ValidationResult.Invalid(
+                "The server-authorized TableName is invalid. Only letters, digits and underscore are allowed, and it must start with a letter or underscore.");
         }
 
         return ValidationResult.Valid();
@@ -162,9 +202,10 @@ public sealed class DatabaseWriteOperator : OperatorBase
         return ValidTableNameRegex.IsMatch(tableName);
     }
 
-    private static bool TryGetProvider(string dbType, out IDatabaseWriteProvider provider)
+    private bool TryGetProvider(string dbType, out IDatabaseWriteProvider provider)
     {
-        if (ProviderByDbType.TryGetValue(dbType, out var resolvedProvider))
+        var resolvedProvider = _providerResolver(dbType);
+        if (resolvedProvider != null)
         {
             provider = resolvedProvider;
             return true;
@@ -173,6 +214,9 @@ public sealed class DatabaseWriteOperator : OperatorBase
         provider = null!;
         return false;
     }
+
+    private static IDatabaseWriteProvider? ResolveProvider(string dbType) =>
+        ProviderByDbType.TryGetValue(dbType, out var provider) ? provider : null;
 
     private static string GetRawStringParameter(Operator @operator, string name, string defaultValue)
     {

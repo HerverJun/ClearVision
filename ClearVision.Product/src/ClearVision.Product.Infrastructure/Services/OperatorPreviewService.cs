@@ -3,6 +3,7 @@
 // 提供算子预览执行与结果格式化输出能力
 // 作者：蘅芜君
 using System.Collections;
+using System.Globalization;
 using System.Text.Json;
 using ClearVision.Product.Core.Entities;
 using ClearVision.Product.Core.Enums;
@@ -39,6 +40,10 @@ public sealed class OperatorPreviewService
         OperatorType type,
         Dictionary<string, object>? parameters,
         Mat image,
+        Guid projectId,
+        long projectRevision,
+        Guid sessionId,
+        ExecutionRequestAuthority authority,
         CancellationToken cancellationToken = default)
     {
         if (image == null || image.Empty())
@@ -46,16 +51,45 @@ public sealed class OperatorPreviewService
             return OperatorPreviewResult.Failure("Input image is required.");
         }
 
+        if (projectId == Guid.Empty || projectRevision < 0 || sessionId == Guid.Empty)
+        {
+            return OperatorPreviewResult.Failure(
+                "Single-operator preview requires a valid project, revision, and session binding.",
+                "ADMISSION_DRAFT_PROJECT_BINDING_REQUIRED");
+        }
+
+        ArgumentNullException.ThrowIfNull(authority);
+
         var previewOperator = _operatorFactory.CreateOperator(type, $"{type}_Preview", 0, 0);
         ApplyParameters(previewOperator, parameters);
-        var admission = _executionAdmissionService.ValidateOperator(
-            previewOperator,
+        var previewFlow = new OperatorFlow("Single operator preview");
+        previewFlow.AddOperator(previewOperator);
+        var flowHash = ExecutionFlowIdentity.ComputeFlowHash(previewFlow);
+        var resourceBindings = authority.ResourceBindings
+            .ToDictionary(pair => pair.Key, pair => pair.Value, StringComparer.Ordinal);
+        resourceBindings["ProjectRevision"] = projectRevision.ToString(CultureInfo.InvariantCulture);
+        resourceBindings["FlowHash"] = flowHash;
+        var snapshot = new ExecutionSnapshot(
+            projectId,
+            previewFlow,
+            projectRevision,
+            ExecutionSnapshotSource.Draft,
+            ExecutionRunMode.Preview,
+            resourceBindings,
+            principal: authority.Principal,
+            capabilityManifest: authority.CapabilityManifest,
+            expectedProjectRevision: authority.ExpectedProjectRevision,
+            confirmationId: authority.ConfirmationId,
+            auditId: authority.AuditId,
+            sessionId: sessionId);
+        var admission = _executionAdmissionService.ValidateSnapshot(
+            snapshot,
             ExecutionAdmissionSurface.OperatorPreview);
         if (!admission.IsAllowed)
         {
             return OperatorPreviewResult.Failure(
                 admission.Message,
-                "OperatorPreviewSideEffectBlocked");
+                admission.Code);
         }
 
         var inputs = new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase)
@@ -67,9 +101,8 @@ public sealed class OperatorPreviewService
 
         try
         {
-            execution = await _flowExecutionService.ExecuteOperatorAsync(
-                GovernedOperatorExecutionContext.Preview(),
-                previewOperator,
+            execution = await _flowExecutionService.ExecuteOperatorWithSnapshotAsync(
+                snapshot,
                 inputs,
                 cancellationToken);
 

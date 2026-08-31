@@ -20,7 +20,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 namespace ClearVision.Product.Infrastructure.Operators;
 
 /// <summary>
-/// TCP/IP通信算子 - 复用全局 TCP / 机器人通讯 Profile，兼容旧客户端参数。
+/// TCP/IP通信算子 - 仅允许引用服务端 TCP / 机器人通讯 Profile。
 /// </summary>
 [OperatorMeta(
     DisplayName = "TCP通信",
@@ -34,18 +34,12 @@ namespace ClearVision.Product.Infrastructure.Operators;
 [OutputPort("Status", "状态", PortDataType.Boolean)]
 [OutputPort("NormalizedResponse", "Normalized Response", PortDataType.String)]
 [OperatorParam("ProfileId", "全局Profile", "string", DefaultValue = "")]
-[OperatorParam("UseGlobalProfile", "使用全局Profile", "bool", DefaultValue = false)]
-[OperatorParam("Mode", "模式", "enum", DefaultValue = "Client", Options = new[] { "Client|客户端", "Server|服务器" })]
-[OperatorParam("IpAddress", "IP地址", "string", DefaultValue = "127.0.0.1")]
-[OperatorParam("Port", "端口", "int", DefaultValue = 8080, Min = 1, Max = 65535)]
 [OperatorParam("SendData", "发送数据", "string", DefaultValue = "")]
 [OperatorParam("UseFixedSendData", "固定发送数据", "bool", DefaultValue = false)]
 [OperatorParam("PayloadTemplate", "报文模板", "string", DefaultValue = "")]
 [OperatorParam("DecodeEscapeSequences", "Decode Escape Sequences", "bool", Description = "启用后解析发送报文、分隔符和匹配条件中的 \\r、\\n、\\xHH 等转义序列。", DefaultValue = false)]
 [OperatorParam("WaitResponse", "等待响应", "bool", DefaultValue = true)]
 [OperatorParam("ResponseTimeoutMs", "响应超时(ms)", "int", DefaultValue = 5000, Min = 100, Max = 600000)]
-[OperatorParam("Timeout", "超时(ms)", "int", DefaultValue = 5000, Min = 100, Max = 600000)]
-[OperatorParam("Encoding", "编码", "enum", DefaultValue = "UTF8", Options = new[] { "UTF8|UTF-8", "ASCII|ASCII", "GBK|GBK", "HEX|HEX" })]
 [OutputPort("RequestPayload", "Request Payload", PortDataType.String)]
 [OutputPort("ParseSuccess", "Parse Success", PortDataType.Boolean)]
 [OutputPort("ParsedValue", "Parsed Value", PortDataType.Any)]
@@ -83,24 +77,9 @@ namespace ClearVision.Product.Infrastructure.Operators;
 [OperatorParam("ResponseMatchSource", "Response Match Source", "enum", Description = "选择响应判断的数据来源：原始响应、归一化响应或解析值。", DefaultValue = "Response", Options = new[] { "Response|Raw response", "NormalizedResponse|Normalized response", "ParsedValue|Parsed value" })]
 [OperatorParameterRule(
     "ProfileId",
-    RequiredPolicy = OperatorParameterRequiredPolicy.Optional,
-    RequiredWhenAny = new[] { "UseGlobalProfile==true", "Mode==Server" },
+    RequiredPolicy = OperatorParameterRequiredPolicy.Required,
     ResourceKind = OperatorResourceKind.TcpProfile,
-    ReasonCode = "TCP_PROFILE_REQUIRED_FOR_GLOBAL_OR_SERVER_MODE")]
-[OperatorParameterRule("Mode", DisabledWhenAll = new[] { "ProfileId:not-empty" }, ReasonCode = "TCP_MODE_IGNORED_WHEN_PROFILE_CONFIGURED")]
-[OperatorParameterRule(
-    "IpAddress",
-    RequiredWhenAll = new[] { "ProfileId:empty", "UseGlobalProfile==false", "Mode==Client" },
-    EnabledWhenAll = new[] { "ProfileId:empty", "UseGlobalProfile==false", "Mode==Client" },
-    ResourceKind = OperatorResourceKind.NetworkEndpoint,
-    ReasonCode = "TCP_LEGACY_CLIENT_HOST_REQUIRED")]
-[OperatorParameterRule(
-    "Port",
-    RequiredWhenAll = new[] { "ProfileId:empty", "UseGlobalProfile==false", "Mode==Client" },
-    EnabledWhenAll = new[] { "ProfileId:empty", "UseGlobalProfile==false", "Mode==Client" },
-    ReasonCode = "TCP_LEGACY_CLIENT_PORT_REQUIRED")]
-[OperatorParameterRule("Timeout", EnabledWhenAll = new[] { "ProfileId:empty", "UseGlobalProfile==false", "Mode==Client" }, ReasonCode = "TCP_LEGACY_CLIENT_TIMEOUT_ONLY_WITHOUT_PROFILE")]
-[OperatorParameterRule("Encoding", EnabledWhenAll = new[] { "ProfileId:empty", "UseGlobalProfile==false", "Mode==Client" }, ReasonCode = "TCP_LEGACY_CLIENT_ENCODING_ONLY_WITHOUT_PROFILE")]
+    ReasonCode = "TCP_PROFILE_REQUIRED")]
 [OperatorParameterRule("UseFixedSendData", DisabledWhenAll = new[] { "PayloadTemplate:not-empty" }, ReasonCode = "TCP_PAYLOAD_TEMPLATE_OWNS_PAYLOAD_SELECTION")]
 [OperatorParameterRule("ResponseTimeoutMs", EnabledWhenAll = new[] { "WaitResponse==true" }, ReasonCode = "TCP_RESPONSE_TIMEOUT_ONLY_WHEN_WAITING")]
 [OperatorParameterRule("FailOnParseError", EnabledWhenAll = new[] { "WaitResponse==true" }, ReasonCode = "TCP_PARSE_FAILURE_POLICY_ONLY_WHEN_WAITING")]
@@ -164,19 +143,13 @@ public class TcpCommunicationOperator : OperatorBase
         inputs ??= new Dictionary<string, object>();
         inputs.TryGetValue("Data", out var inputData);
 
-        var mode = NormalizePendingString(GetStringParam(@operator, "Mode", "Client"));
         var profileId = NormalizePendingString(GetStringParam(@operator, "ProfileId", string.Empty)).Trim();
-        var useGlobalProfile = GetBoolParam(@operator, "UseGlobalProfile", false);
-        var ipAddress = GetStringParam(@operator, "IpAddress", "127.0.0.1");
-        var port = GetIntParam(@operator, "Port", 8080, 1, 65535);
         var sendData = NormalizePendingString(GetStringParam(@operator, "SendData", string.Empty));
         var payloadTemplate = NormalizePendingString(GetStringParam(@operator, "PayloadTemplate", string.Empty));
         var useFixedSendData = GetBoolParam(@operator, "UseFixedSendData", false);
         var decodeEscapeSequences = GetBoolParam(@operator, "DecodeEscapeSequences", false);
         var waitResponse = GetBoolParam(@operator, "WaitResponse", true);
         var responseTimeoutMs = GetIntParam(@operator, "ResponseTimeoutMs", 5000, 100, 600000);
-        var timeout = GetIntParam(@operator, "Timeout", 5000, 100, 600000);
-        var encoding = TcpCommunicationProfile.NormalizeEncoding(GetStringParam(@operator, "Encoding", "UTF8"));
         var failOnParseError = GetBoolParam(@operator, "FailOnParseError", false);
         var failOnUnresolvedPayloadPlaceholder = GetBoolParam(@operator, "FailOnUnresolvedPayloadPlaceholder", true);
         var failOnUnexpectedResponse = GetBoolParam(@operator, "FailOnUnexpectedResponse", false);
@@ -196,60 +169,27 @@ public class TcpCommunicationOperator : OperatorBase
             return OperatorExecutionOutput.Failure(string.Join("; ", validation.Errors));
         }
 
+        var profileResolution = await ResolveAuthoritativeProfileAsync(profileId, cancellationToken);
+        if (profileResolution.Profile == null)
+        {
+            return OperatorExecutionOutput.Failure(profileResolution.Error);
+        }
+
+        var profile = profileResolution.Profile;
+
         if (!TryResolvePayload(inputs, inputData, sendData, payloadTemplate, useFixedSendData, failOnUnresolvedPayloadPlaceholder, decodeEscapeSequences, out var payload, out var payloadError))
         {
             return OperatorExecutionOutput.Failure(payloadError);
         }
 
-        TcpDeviceSendResult result;
-        if (!string.IsNullOrWhiteSpace(profileId))
-        {
-            result = await _tcpDeviceManager.SendAsync(
-                profileId,
-                new TcpDeviceSendRequest(
-                    payload,
-                    false,
-                    waitResponse,
-                    responseTimeoutMs),
-                cancellationToken);
-        }
-        else
-        {
-            if (useGlobalProfile)
-            {
-                return OperatorExecutionOutput.Failure("启用全局 Profile 时必须配置 ProfileId。");
-            }
-
-            if (string.Equals(mode, TcpCommunicationProfile.ModeServer, StringComparison.OrdinalIgnoreCase))
-            {
-                return OperatorExecutionOutput.Failure("Server 监听请在全局 TCP 通讯页启动，算子只负责通过已配置 Profile 发送/等待响应。");
-            }
-
-            var legacyProfile = new TcpCommunicationProfile
-            {
-                Id = BuildLegacyProfileId(ipAddress, port),
-                Name = $"Legacy {ipAddress}:{port}",
-                Enabled = true,
-                Mode = TcpCommunicationProfile.ModeClient,
-                RemoteHost = ipAddress,
-                RemotePort = port,
-                Encoding = encoding,
-                FrameMode = IsHexEncoding(encoding)
-                    ? TcpCommunicationProfile.FrameModeHex
-                    : TcpCommunicationProfile.FrameModeRaw,
-                TimeoutMs = timeout,
-                Reconnect = true
-            };
-
-            result = await _tcpDeviceManager.SendTransientAsync(
-                legacyProfile,
-                new TcpDeviceSendRequest(
-                    payload,
-                    IsHexEncoding(encoding),
-                    waitResponse,
-                    responseTimeoutMs),
-                cancellationToken);
-        }
+        var result = await _tcpDeviceManager.SendAsync(
+            profile.Id,
+            new TcpDeviceSendRequest(
+                payload,
+                false,
+                waitResponse,
+                responseTimeoutMs),
+            cancellationToken);
 
         if (!result.Success)
         {
@@ -284,10 +224,8 @@ public class TcpCommunicationOperator : OperatorBase
                     trimResponseBeforeParse,
                     responseStartMarker,
                     responseEndMarker,
-                    profileId,
-                    ipAddress,
-                    port,
-                    string.IsNullOrWhiteSpace(profileId) ? mode : "Profile")
+                    profile.Id,
+                    profile.Mode)
             };
         }
 
@@ -333,10 +271,8 @@ public class TcpCommunicationOperator : OperatorBase
             { "TrimResponseBeforeParse", trimResponseBeforeParse },
             { "ResponseStartMarker", responseStartMarker },
             { "ResponseEndMarker", responseEndMarker },
-            { "Mode", string.IsNullOrWhiteSpace(profileId) ? mode : "Profile" },
-            { "ProfileId", profileId },
-            { "IpAddress", ipAddress },
-            { "Port", port }
+            { "Mode", profile.Mode },
+            { "ProfileId", profile.Id }
         };
 
         if (waitResponse && failOnParseError && !parseResult.Success)
@@ -369,13 +305,7 @@ public class TcpCommunicationOperator : OperatorBase
     public override ValidationResult ValidateParameters(Operator @operator)
     {
         var profileId = NormalizePendingString(GetStringParam(@operator, "ProfileId", string.Empty)).Trim();
-        var useGlobalProfile = GetBoolParam(@operator, "UseGlobalProfile", false);
-        var host = NormalizePendingString(GetStringParam(@operator, "IpAddress", "127.0.0.1"));
-        var port = GetIntParam(@operator, "Port", 8080);
-        var timeout = GetIntParam(@operator, "Timeout", 5000);
         var responseTimeoutMs = GetIntParam(@operator, "ResponseTimeoutMs", 5000);
-        var mode = NormalizePendingString(GetStringParam(@operator, "Mode", "Client"));
-        var encoding = TcpCommunicationProfile.NormalizeEncoding(GetStringParam(@operator, "Encoding", "UTF8"));
         var waitResponse = GetBoolParam(@operator, "WaitResponse", true);
         var responseParseMode = NormalizeResponseParseMode(
             NormalizePendingString(GetStringParam(@operator, "ResponseParseMode", "None")));
@@ -385,62 +315,24 @@ public class TcpCommunicationOperator : OperatorBase
             NormalizePendingString(GetStringParam(@operator, "ResponseMatchSource", "Response")));
         var decodeEscapeSequences = GetBoolParam(@operator, "DecodeEscapeSequences", false);
 
-        if (useGlobalProfile && string.IsNullOrWhiteSpace(profileId))
+        if (OperatorParameterValueSemantics.IsMissing(profileId))
         {
-            return ValidationResult.Invalid("启用全局 Profile 时必须配置 ProfileId。");
+            return ValidationResult.Invalid(
+                "TCP_PROFILE_REQUIRED: TCP execution requires a server-owned ProfileId.");
         }
 
-        if (string.IsNullOrWhiteSpace(profileId) &&
-            mode != TcpCommunicationProfile.ModeClient && mode != TcpCommunicationProfile.ModeServer)
+        if (@operator.Parameters.Any(parameter =>
+                string.Equals(parameter.Name, "IpAddress", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(parameter.Name, "Port", StringComparison.OrdinalIgnoreCase)))
         {
-            return ValidationResult.Invalid("模式必须是 Client 或 Server");
-        }
-
-        if (string.IsNullOrWhiteSpace(profileId) && mode == TcpCommunicationProfile.ModeServer)
-        {
-            return ValidationResult.Invalid("Server 监听请在全局 TCP 通讯页启动。");
-        }
-
-        if (string.IsNullOrWhiteSpace(profileId) &&
-            mode == TcpCommunicationProfile.ModeClient &&
-            !useGlobalProfile)
-        {
-            if (@operator.Parameters.Any(p => p.Name == "IpAddress") &&
-                OperatorParameterValueSemantics.IsMissing(host))
-            {
-                return ValidationResult.Invalid("主机地址不能为空");
-            }
-
-            if (port < 1 || port > 65535)
-            {
-                return ValidationResult.Invalid("端口号必须在 1-65535 之间");
-            }
-        }
-
-        if (string.IsNullOrWhiteSpace(profileId) &&
-            mode == TcpCommunicationProfile.ModeClient &&
-            !useGlobalProfile &&
-            timeout is < TcpCommunicationProfile.MinTimeoutMs or > TcpCommunicationProfile.MaxTimeoutMs)
-        {
-            return ValidationResult.Invalid($"超时时间必须在 {TcpCommunicationProfile.MinTimeoutMs}-{TcpCommunicationProfile.MaxTimeoutMs} ms 之间");
+            return ValidationResult.Invalid(
+                "TCP_RAW_ENDPOINT_FORBIDDEN: IpAddress/Port cannot grant execution authority; use ProfileId.");
         }
 
         if (waitResponse &&
             responseTimeoutMs is < TcpCommunicationProfile.MinTimeoutMs or > TcpCommunicationProfile.MaxTimeoutMs)
         {
             return ValidationResult.Invalid($"响应超时时间必须在 {TcpCommunicationProfile.MinTimeoutMs}-{TcpCommunicationProfile.MaxTimeoutMs} ms 之间");
-        }
-
-        if (string.IsNullOrWhiteSpace(profileId) &&
-            mode == TcpCommunicationProfile.ModeClient &&
-            !useGlobalProfile &&
-            encoding is not (
-                TcpCommunicationProfile.EncodingUtf8 or
-                TcpCommunicationProfile.EncodingAscii or
-                TcpCommunicationProfile.EncodingGbk or
-                TcpCommunicationProfile.EncodingHex))
-        {
-            return ValidationResult.Invalid("编码必须是 UTF8、ASCII、GBK 或 HEX");
         }
 
         if (waitResponse &&
@@ -529,6 +421,43 @@ public class TcpCommunicationOperator : OperatorBase
         }
 
         return ValidationResult.Valid();
+    }
+
+    private async Task<(TcpCommunicationProfile? Profile, string Error)> ResolveAuthoritativeProfileAsync(
+        string profileId,
+        CancellationToken cancellationToken)
+    {
+        var config = await _tcpDeviceManager.GetConfigAsync(cancellationToken);
+        cancellationToken.ThrowIfCancellationRequested();
+
+        var matches = (config?.Profiles ?? [])
+            .Where(profile =>
+                profile != null &&
+                string.Equals(profile.Id?.Trim(), profileId, StringComparison.OrdinalIgnoreCase))
+            .Take(2)
+            .ToArray();
+
+        if (matches.Length == 0)
+        {
+            return (null, $"TCP_PROFILE_NOT_FOUND: Server-owned TCP ProfileId '{profileId}' does not exist.");
+        }
+
+        if (matches.Length != 1)
+        {
+            return (null, $"TCP_PROFILE_AMBIGUOUS: Server-owned TCP ProfileId '{profileId}' is not unique.");
+        }
+
+        var profile = matches[0].CloneNormalized();
+        var validation = TcpCommunicationConfigValidator.ValidateProfileForOperation(profile);
+        if (!validation.IsValid)
+        {
+            var detail = string.Join("; ", validation.Errors.Select(error => error.Message));
+            return (
+                null,
+                $"TCP_PROFILE_DISABLED_OR_INVALID: Server-owned TCP ProfileId '{profileId}' cannot be used. {detail}");
+        }
+
+        return (profile, string.Empty);
     }
 
     private static string NormalizePendingString(string? value)
@@ -1281,8 +1210,6 @@ public class TcpCommunicationOperator : OperatorBase
         string responseStartMarker,
         string responseEndMarker,
         string profileId,
-        string ipAddress,
-        int port,
         string mode)
     {
         return new Dictionary<string, object>
@@ -1312,9 +1239,7 @@ public class TcpCommunicationOperator : OperatorBase
             { "ResponseStartMarker", responseStartMarker },
             { "ResponseEndMarker", responseEndMarker },
             { "Mode", mode },
-            { "ProfileId", profileId },
-            { "IpAddress", ipAddress },
-            { "Port", port }
+            { "ProfileId", profileId }
         };
     }
 
@@ -1732,19 +1657,6 @@ public class TcpCommunicationOperator : OperatorBase
         }
 
         return value.ToString() ?? string.Empty;
-    }
-
-    private static bool IsHexEncoding(string encoding)
-    {
-        return string.Equals(
-            TcpCommunicationProfile.NormalizeEncoding(encoding),
-            TcpCommunicationProfile.EncodingHex,
-            StringComparison.OrdinalIgnoreCase);
-    }
-
-    private static string BuildLegacyProfileId(string ipAddress, int port)
-    {
-        return $"legacy-{ipAddress.Trim()}-{port}".Replace(":", "-", StringComparison.Ordinal);
     }
 
     private sealed record ResponseParseResult(

@@ -2,6 +2,7 @@ using System.Reflection;
 using System.Text.Json;
 using ClearVision.Product.Core.Entities;
 using ClearVision.Product.Core.Enums;
+using ClearVision.Product.Core.Services;
 using ClearVision.Product.Core.ValueObjects;
 using ClearVision.Product.Infrastructure.Operators;
 using FluentAssertions;
@@ -29,22 +30,25 @@ public sealed class DatabaseWriteOperatorTests
     }
 
     [Fact]
-    public void ValidateParameters_Default_ShouldBeInvalid()
+    public void ValidateParameters_DefaultConstructor_ShouldFailClosedWithoutServerResolver()
     {
-        var op = CreateOperator(connectionString: string.Empty);
+        var op = CreateOperator(connectionString: "Data Source=client-supplied.db");
 
         var result = _operator.ValidateParameters(op);
 
         result.IsValid.Should().BeFalse();
-        result.Errors.Should().ContainSingle(error => error.Contains("ConnectionString", StringComparison.OrdinalIgnoreCase));
+        result.Errors.Should().ContainSingle(error =>
+            error.Contains("RESOURCE_CONFIGURATION_UNAVAILABLE", StringComparison.Ordinal));
     }
 
     [Fact]
     public void ValidateParameters_WithValidSqliteConfig_ShouldBeValid()
     {
-        var op = CreateOperator(connectionString: "Data Source=file:test_validate?mode=memory&cache=shared");
+        const string serverConnectionString = "Data Source=file:test_validate?mode=memory&cache=shared";
+        var sut = CreateWithDatabaseProfile(serverConnectionString, "InspectionResults", "SQLite");
+        var op = CreateOperator(connectionString: "Data Source=client-forged.db", dbType: "MySQL");
 
-        var result = _operator.ValidateParameters(op);
+        var result = sut.ValidateParameters(op);
 
         result.IsValid.Should().BeTrue();
     }
@@ -52,40 +56,60 @@ public sealed class DatabaseWriteOperatorTests
     [Fact]
     public void ValidateParameters_WithInvalidDbType_ShouldBeInvalid()
     {
+        var sut = CreateWithDatabaseProfile(
+            "Data Source=file:test_invalid_dbtype?mode=memory&cache=shared",
+            "InspectionResults",
+            "Oracle");
         var op = CreateOperator(
-            connectionString: "Data Source=file:test_invalid_dbtype?mode=memory&cache=shared",
-            dbType: "Oracle");
+            connectionString: "Data Source=client-forged.db",
+            dbType: "SQLite");
 
-        var result = _operator.ValidateParameters(op);
+        var result = sut.ValidateParameters(op);
 
         result.IsValid.Should().BeFalse();
         result.Errors.Should().ContainSingle(error => error.Contains("DbType", StringComparison.OrdinalIgnoreCase));
     }
 
     [Fact]
-    public async Task ExecuteAsync_WithEmptyConnectionString_ShouldFailWithoutFallback()
+    public async Task ExecuteAsync_RejectedProfile_ShouldNotResolveOrInvokeDatabaseProvider()
     {
-        var op = CreateOperator(connectionString: string.Empty, dbType: "MySQL");
+        var resolver = Substitute.For<IExecutionResourceProfileResolver>();
+        resolver.ResolveDatabase(Arg.Any<string>(), Arg.Any<string>()).Returns(
+            ExecutionResourceProfileResolution<ResolvedDatabaseExecutionResource>.Reject(
+                "RESOURCE_DATABASE_PROFILE_NOT_FOUND",
+                "The requested server database profile does not exist."));
+        var providerResolutionCalls = 0;
+        var sut = new DatabaseWriteOperator(
+            Substitute.For<ILogger<DatabaseWriteOperator>>(),
+            resolver,
+            _ =>
+            {
+                providerResolutionCalls++;
+                return null;
+            });
+        var op = CreateOperator(connectionString: "Data Source=client-forged.db", dbType: "MySQL");
         var inputs = new Dictionary<string, object> { ["Data"] = new { Name = "item" } };
 
-        var result = await _operator.ExecuteAsync(op, inputs);
+        var result = await sut.ExecuteAsync(op, inputs);
 
         result.IsSuccess.Should().BeFalse();
-        result.ErrorMessage.Should().Contain("ConnectionString");
+        result.ErrorMessage.Should().Contain("RESOURCE_DATABASE_PROFILE_NOT_FOUND");
+        providerResolutionCalls.Should().Be(0);
     }
 
     [Fact]
-    public async Task ExecuteAsync_WithGeneratedRecordId_ShouldInsertIntoSqlite()
+    public async Task ExecuteAsync_WithForgedRawTarget_ShouldDispatchServerResolvedSqliteProfile()
     {
         var tableName = $"Inspection_{Guid.NewGuid():N}".Substring(0, 20);
-        var connectionString = $"Data Source=file:{Guid.NewGuid():N}?mode=memory&cache=shared";
-        await using var keepAlive = new SqliteConnection(connectionString);
+        var serverConnectionString = $"Data Source=file:{Guid.NewGuid():N}?mode=memory&cache=shared";
+        await using var keepAlive = new SqliteConnection(serverConnectionString);
         await keepAlive.OpenAsync();
 
-        var op = CreateOperator(connectionString, tableName);
+        var sut = CreateWithDatabaseProfile(serverConnectionString, tableName, "SQLite");
+        var op = CreateOperator("Data Source=client-forged.db", tableName, "MySQL");
         var inputs = new Dictionary<string, object> { ["Data"] = new { Code = "A01", Score = 99 } };
 
-        var result = await _operator.ExecuteAsync(op, inputs);
+        var result = await sut.ExecuteAsync(op, inputs);
 
         result.IsSuccess.Should().BeTrue();
         result.OutputData.Should().NotBeNull();
@@ -110,15 +134,16 @@ public sealed class DatabaseWriteOperatorTests
         await keepAlive.OpenAsync();
 
         var op = CreateOperator(connectionString, tableName);
+        var sut = CreateWithDatabaseProfile(connectionString, tableName, "SQLite");
         var recordId = "record-001";
 
-        var firstResult = await _operator.ExecuteAsync(op, new Dictionary<string, object>
+        var firstResult = await sut.ExecuteAsync(op, new Dictionary<string, object>
         {
             ["Data"] = new { Value = 1 },
             ["RecordId"] = recordId
         });
 
-        var secondResult = await _operator.ExecuteAsync(op, new Dictionary<string, object>
+        var secondResult = await sut.ExecuteAsync(op, new Dictionary<string, object>
         {
             ["Data"] = new { Value = 2 },
             ["RecordId"] = recordId
@@ -157,9 +182,11 @@ public sealed class DatabaseWriteOperatorTests
 
         var opA = CreateOperator(connectionStringA, sharedTableName);
         var opB = CreateOperator(connectionStringB, sharedTableName);
+        var sutA = CreateWithDatabaseProfile(connectionStringA, sharedTableName, "SQLite");
+        var sutB = CreateWithDatabaseProfile(connectionStringB, sharedTableName, "SQLite");
 
-        var resultA = await _operator.ExecuteAsync(opA, new Dictionary<string, object> { ["Data"] = new { Name = "A" } });
-        var resultB = await _operator.ExecuteAsync(opB, new Dictionary<string, object> { ["Data"] = new { Name = "B" } });
+        var resultA = await sutA.ExecuteAsync(opA, new Dictionary<string, object> { ["Data"] = new { Name = "A" } });
+        var resultB = await sutB.ExecuteAsync(opB, new Dictionary<string, object> { ["Data"] = new { Name = "B" } });
 
         resultA.IsSuccess.Should().BeTrue();
         resultB.IsSuccess.Should().BeTrue();
@@ -217,6 +244,15 @@ public sealed class DatabaseWriteOperatorTests
 
         op.AddParameter(new Parameter(
             Guid.NewGuid(),
+            "ProfileId",
+            "Database Profile",
+            "Server-owned database profile id",
+            "string",
+            "inspection-db",
+            isRequired: true));
+
+        op.AddParameter(new Parameter(
+            Guid.NewGuid(),
             "ConnectionString",
             "Connection String",
             "Database connection string",
@@ -249,6 +285,24 @@ public sealed class DatabaseWriteOperatorTests
             }));
 
         return op;
+    }
+
+    private static DatabaseWriteOperator CreateWithDatabaseProfile(
+        string connectionString,
+        string tableName,
+        string dbType)
+    {
+        var resolver = Substitute.For<IExecutionResourceProfileResolver>();
+        resolver.ResolveDatabase("inspection-db", tableName).Returns(
+            ExecutionResourceProfileResolution<ResolvedDatabaseExecutionResource>.Allow(
+                new ResolvedDatabaseExecutionResource(
+                    "inspection-db",
+                    dbType,
+                    connectionString,
+                    tableName)));
+        return new DatabaseWriteOperator(
+            Substitute.For<ILogger<DatabaseWriteOperator>>(),
+            resolver);
     }
 
     private static T GetPrivateStaticField<T>(string name)

@@ -1301,7 +1301,6 @@ public sealed class StationSyncHostedService : BackgroundService
         var camera = !string.IsNullOrWhiteSpace(binding.SerialNumber)
             ? _cameraManager.GetCamera(binding.SerialNumber)
             : null;
-        camera ??= _cameraManager.GetCamera(binding.Id);
 
         if (camera?.IsConnected == true)
         {

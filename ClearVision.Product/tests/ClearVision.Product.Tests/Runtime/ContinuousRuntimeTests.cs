@@ -505,6 +505,10 @@ public class ContinuousRuntimeTests
         };
         var stream = new FakeStreamCoordinator(frames);
         var flowExecution = Substitute.For<IFlowExecutionService>();
+        flowExecution.ValidateSnapshotAsync(
+                Arg.Any<ExecutionSnapshot>(),
+                Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(new FlowValidationResult { IsValid = true }));
         flowExecution.ExecuteWithSnapshotAsync(
                 Arg.Any<ExecutionSnapshot>(),
                 Arg.Any<Dictionary<string, object>?>(),
@@ -813,13 +817,25 @@ public class ContinuousRuntimeTests
         return flow.BindStringDecision(op);
     }
 
-    private static ExecutionSnapshot CreateExecutionSnapshot(string name) =>
-        new(
+    private static ExecutionSnapshot CreateExecutionSnapshot(string name)
+    {
+        var flow = CreateDecisionFlow(name);
+        return new ExecutionSnapshot(
             Guid.NewGuid(),
-            CreateDecisionFlow(name),
+            flow,
             persistenceRevision: 1,
             ExecutionSnapshotSource.PersistedProject,
-            ExecutionRunMode.FormalPrimary);
+            ExecutionRunMode.FormalPrimary,
+            resourceBindings: ExecutionResourceBindingManifest.Build(
+                flow,
+                "StoredProject",
+                new Dictionary<string, string> { ["ProjectRevision"] = "1" },
+                new ExecutionExternalResourceManifest("cam-1")),
+            capabilityManifest: new ExecutionCapabilityManifest(
+                ExecutionCapabilityManifest.Derive(flow).Capabilities | ExecutionSideEffect.DeviceRead,
+                isExplicit: false),
+            externalCapabilities: ExecutionSideEffect.DeviceRead);
+    }
 
     private static ProjectGlobalVariableSchema CreateProjectVariableSchema(Guid variableId)
     {
@@ -953,9 +969,10 @@ public class ContinuousRuntimeTests
             return Task.CompletedTask;
         }
         public Task ReleaseIdleStreamAsync(string cameraId) => Task.CompletedTask;
-        public Task<CameraPreviewSession> StartPreviewSessionAsync(string cameraId, CancellationToken cancellationToken = default) => throw new NotSupportedException();
-        public Task<CameraStreamFrame> WaitForPreviewFrameAsync(string sessionId, CancellationToken cancellationToken = default) => throw new NotSupportedException();
-        public Task StopPreviewSessionAsync(string sessionId) => Task.CompletedTask;
+        public Task<CameraPreviewSession> StartPreviewSessionAsync(string cameraId, string ownerHash, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+        public Task<CameraStreamFrame> WaitForPreviewFrameAsync(string sessionId, string ownerHash, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+        public Task<CameraPreviewHeartbeat?> HeartbeatPreviewSessionAsync(string sessionId, string ownerHash, CancellationToken cancellationToken = default) => Task.FromResult<CameraPreviewHeartbeat?>(null);
+        public Task<bool> StopPreviewSessionAsync(string sessionId, string ownerHash) => Task.FromResult(false);
         public bool TryGetLatestFrameEnvelope(string cameraId, out FrameEnvelope? frame)
         {
             frame = _frames.LastOrDefault();
@@ -1041,12 +1058,15 @@ public class ContinuousRuntimeTests
             return ExecuteCoreAsync(inputData);
         }
 
-        public Task<OperatorExecutionResult> ExecuteOperatorAsync(
-            GovernedOperatorExecutionContext context,
-            Operator @operator,
+        public Task<OperatorExecutionResult> ExecuteOperatorWithSnapshotAsync(
+            ExecutionSnapshot snapshot,
             Dictionary<string, object>? inputs = null,
             CancellationToken cancellationToken = default) => throw new NotSupportedException();
         public FlowValidationResult ValidateSnapshot(ExecutionSnapshot snapshot) => new() { IsValid = true };
+        public Task<FlowValidationResult> ValidateSnapshotAsync(
+            ExecutionSnapshot snapshot,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult(new FlowValidationResult { IsValid = true });
         public FlowExecutionStatus? GetExecutionStatus(Guid flowId) => null;
         public Task CancelExecutionAsync(Guid flowId) => Task.CompletedTask;
         public Task<FlowDebugExecutionResult> ExecuteDebugWithSnapshotAsync(ExecutionSnapshot snapshot, DebugOptions options, Dictionary<string, object>? inputData = null, ProjectVariableExecutionContext? projectVariables = null, CancellationToken cancellationToken = default) => throw new NotSupportedException();

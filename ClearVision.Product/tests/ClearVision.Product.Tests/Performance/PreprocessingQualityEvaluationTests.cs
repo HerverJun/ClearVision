@@ -13,8 +13,12 @@ namespace ClearVision.Product.Tests.Performance;
 
 [TestClassification(TestDomain.Preprocessing, TestPurpose.Robustness, TestLane.Nightly, TestEvidenceType.StatisticalDistribution, TestOracleType.Metamorphic, TestResourceRequirement.RepositoryAsset, TestExpectedDuration.Long, TestFlakyPolicy.Blocking, "operator-quality")]
 [Trait("Category", "Sprint7_Benchmark")]
-public class PreprocessingQualityEvaluationTests
+public class PreprocessingQualityEvaluationTests : IDisposable
 {
+    private readonly IDisposable _authorityScope = TestExecutionAuthorityScope.Enter();
+
+    public void Dispose() => _authorityScope.Dispose();
+
     [Fact]
     public async Task Evaluate_PreprocessingQuality_ShouldGenerateReferenceAndRealSampleReport()
     {

@@ -5,6 +5,7 @@
 
 using ClearVision.Product.Core.Entities;
 using ClearVision.Product.Core.Enums;
+using ClearVision.Product.Core.Operators;
 using ClearVision.Product.Core.Services;
 using ClearVision.Product.Core.ValueObjects;
 using ClearVision.Product.Infrastructure.Operators;
@@ -22,7 +23,7 @@ namespace ClearVision.Product.Tests.Operators;
 public class Sprint2_ForEachTests
 {
     private readonly ILogger<ForEachOperator> _loggerMock;
-    private readonly IFlowExecutionEngine _flowExecutorMock;
+    private readonly IFlowExecutionService _flowExecutorMock;
     private readonly IServiceProvider _scopedServiceProviderMock;
     private readonly IServiceScope _serviceScopeMock;
     private readonly IServiceScopeFactory _serviceScopeFactoryMock;
@@ -31,14 +32,20 @@ public class Sprint2_ForEachTests
     public Sprint2_ForEachTests()
     {
         _loggerMock = Substitute.For<ILogger<ForEachOperator>>();
-        _flowExecutorMock = Substitute.For<IFlowExecutionEngine>();
+        _flowExecutorMock = Substitute.For<IFlowExecutionService>();
         _scopedServiceProviderMock = Substitute.For<IServiceProvider>();
         _serviceScopeMock = Substitute.For<IServiceScope>();
         _serviceScopeFactoryMock = Substitute.For<IServiceScopeFactory>();
-        _scopedServiceProviderMock.GetService(typeof(IFlowExecutionEngine)).Returns(_flowExecutorMock);
+        _scopedServiceProviderMock.GetService(typeof(IFlowExecutionService)).Returns(_flowExecutorMock);
         _serviceScopeMock.ServiceProvider.Returns(_scopedServiceProviderMock);
         _serviceScopeFactoryMock.CreateScope().Returns(_serviceScopeMock);
         _operator = new ForEachOperator(_loggerMock, _serviceScopeFactoryMock);
+        _flowExecutorMock.ExecuteWithSnapshotAsync(
+                Arg.Any<ExecutionSnapshot>(),
+                Arg.Any<Dictionary<string, object>>(),
+                false,
+                Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(SuccessfulChildResult()));
     }
 
     /// <summary>
@@ -69,8 +76,8 @@ public class Sprint2_ForEachTests
         var maxConcurrentExecutions = 0;
 
         // 模拟子图执行 - 每个耗时 50ms
-        _flowExecutorMock.ExecuteFlowAsync(
-                Arg.Any<OperatorFlow>(),
+        _flowExecutorMock.ExecuteWithSnapshotAsync(
+                Arg.Any<ExecutionSnapshot>(),
                 Arg.Any<Dictionary<string, object>>(),
                 false,
                 Arg.Any<CancellationToken>())
@@ -88,17 +95,17 @@ public class Sprint2_ForEachTests
             });
 
         // 设置子图
-        _operator.SubGraph = new OperatorFlow("SubGraph");
+        SetSubGraph(op, new OperatorFlow("SubGraph"));
 
         // 执行
         var stopwatch = System.Diagnostics.Stopwatch.StartNew();
-        var result = await _operator.ExecuteAsync(op, inputs);
+        var result = await ExecuteWithStoredAuthorityAsync(op, inputs);
         stopwatch.Stop();
 
         Assert.True(result.IsSuccess);
         Assert.True(maxConcurrentExecutions > 1, "Parallel mode should execute more than one sub-flow at a time.");
-        await _flowExecutorMock.Received(15).ExecuteFlowAsync(
-                Arg.Any<OperatorFlow>(),
+        await _flowExecutorMock.Received(15).ExecuteWithSnapshotAsync(
+                Arg.Any<ExecutionSnapshot>(),
                 Arg.Any<Dictionary<string, object>>(),
                 false,
                 Arg.Any<CancellationToken>());
@@ -128,8 +135,8 @@ public class Sprint2_ForEachTests
         };
 
         var executionTimes = new List<DateTime>();
-        _flowExecutorMock.ExecuteFlowAsync(
-                Arg.Any<OperatorFlow>(),
+        _flowExecutorMock.ExecuteWithSnapshotAsync(
+                Arg.Any<ExecutionSnapshot>(),
                 Arg.Any<Dictionary<string, object>>(),
                 false,
                 Arg.Any<CancellationToken>())
@@ -148,10 +155,10 @@ public class Sprint2_ForEachTests
             });
 
         // 设置子图
-        _operator.SubGraph = new OperatorFlow("SubGraph");
+        SetSubGraph(op, new OperatorFlow("SubGraph"));
 
         // 执行
-        var result = await _operator.ExecuteAsync(op, inputs);
+        var result = await ExecuteWithStoredAuthorityAsync(op, inputs);
 
         // 验证
         Assert.True(result.IsSuccess);
@@ -191,8 +198,8 @@ public class Sprint2_ForEachTests
         };
 
         var executionCount = 0;
-        _flowExecutorMock.ExecuteFlowAsync(
-                Arg.Any<OperatorFlow>(),
+        _flowExecutorMock.ExecuteWithSnapshotAsync(
+                Arg.Any<ExecutionSnapshot>(),
                 Arg.Any<Dictionary<string, object>>(),
                 false,
                 Arg.Any<CancellationToken>())
@@ -222,10 +229,10 @@ public class Sprint2_ForEachTests
             });
 
         // 设置子图
-        _operator.SubGraph = new OperatorFlow("SubGraph");
+        SetSubGraph(op, new OperatorFlow("SubGraph"));
 
         // 执行
-        var result = await _operator.ExecuteAsync(op, inputs);
+        var result = await ExecuteWithStoredAuthorityAsync(op, inputs);
 
         // 验证：只执行了 3 次（0, 1, 2）
         Assert.Equal(3, executionCount);
@@ -256,8 +263,8 @@ public class Sprint2_ForEachTests
         }
 
         var executionCount = 0;
-        _flowExecutorMock.ExecuteFlowAsync(
-                Arg.Any<OperatorFlow>(),
+        _flowExecutorMock.ExecuteWithSnapshotAsync(
+                Arg.Any<ExecutionSnapshot>(),
                 Arg.Any<Dictionary<string, object>>(),
                 false,
                 Arg.Any<CancellationToken>())
@@ -272,9 +279,9 @@ public class Sprint2_ForEachTests
                         OutputData = new Dictionary<string, object> { ["Result"] = true }
                     });
             });
-        _operator.SubGraph = new OperatorFlow("SubGraph");
+        SetSubGraph(op, new OperatorFlow("SubGraph"));
 
-        await _operator.ExecuteAsync(op, new Dictionary<string, object> { ["Items"] = items });
+        await ExecuteWithStoredAuthorityAsync(op, new Dictionary<string, object> { ["Items"] = items });
 
         Assert.Equal(expectedExecutionCount, executionCount);
     }
@@ -309,8 +316,8 @@ public class Sprint2_ForEachTests
             { "Items", new List<object> { 1 } }
         };
 
-        _flowExecutorMock.ExecuteFlowAsync(
-                Arg.Any<OperatorFlow>(),
+        _flowExecutorMock.ExecuteWithSnapshotAsync(
+                Arg.Any<ExecutionSnapshot>(),
                 Arg.Any<Dictionary<string, object>>(),
                 false,
                 Arg.Any<CancellationToken>())
@@ -320,17 +327,141 @@ public class Sprint2_ForEachTests
                 OutputData = new Dictionary<string, object> { { "Result", true } }
             }));
 
-        _operator.SubGraph = new OperatorFlow("ScopedSubGraph");
+        SetSubGraph(op, new OperatorFlow("ScopedSubGraph"));
 
-        var result = await _operator.ExecuteAsync(op, inputs);
+        var result = await ExecuteWithStoredAuthorityAsync(op, inputs);
 
         Assert.True(result.IsSuccess);
         _serviceScopeFactoryMock.Received(1).CreateScope();
-        await _flowExecutorMock.Received(1).ExecuteFlowAsync(
-            Arg.Any<OperatorFlow>(),
+        await _flowExecutorMock.Received(1).ExecuteWithSnapshotAsync(
+            Arg.Any<ExecutionSnapshot>(),
             Arg.Any<Dictionary<string, object>>(),
             false,
             Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task ForEach_WithoutCapturedSnapshot_FailsClosedBeforeGovernedService()
+    {
+        var op = CreateOperator();
+        SetSubGraph(op, new OperatorFlow("PureChild"));
+
+        var result = await _operator.ExecuteAsync(
+            op,
+            new Dictionary<string, object> { ["Items"] = new[] { 1 } });
+
+        Assert.False(result.IsSuccess);
+        Assert.Contains("ADMISSION_NESTED_EXECUTION_AUTHORITY_REQUIRED", result.ErrorMessage);
+        await _flowExecutorMock.DidNotReceiveWithAnyArgs().ExecuteWithSnapshotAsync(
+            default!, default, default, default);
+    }
+
+    [Fact]
+    public async Task ForEach_ChildCapabilityMissingFromOuterManifest_FailsBeforeDispatch()
+    {
+        var op = CreateOperator(new Dictionary<string, object> { ["IoMode"] = "Sequential" });
+        var child = CreateHttpChild();
+        SetSubGraph(op, child);
+        var outerFlow = CreateOuterFlow(op);
+        var bindings = ExecutionResourceBindingManifest.Build(
+            outerFlow,
+            "StoredProject",
+            new Dictionary<string, string> { ["ProjectRevision"] = "7" });
+        var snapshot = new ExecutionSnapshot(
+            Guid.NewGuid(),
+            outerFlow,
+            7,
+            ExecutionSnapshotSource.PersistedProject,
+            ExecutionRunMode.FormalPrimary,
+            bindings,
+            principal: new ExecutionPrincipal("engineer", "Engineer", "Engineer", true),
+            capabilityManifest: new ExecutionCapabilityManifest(ExecutionSideEffect.None, false));
+
+        using var authority = ExecutionAuthorityContext.Enter(snapshot);
+        var result = await _operator.ExecuteAsync(
+            op,
+            new Dictionary<string, object> { ["Items"] = new[] { 1 } });
+
+        Assert.False(result.IsSuccess);
+        Assert.Contains("ADMISSION_NESTED_CAPABILITY_NOT_DECLARED", result.ErrorMessage);
+        await _flowExecutorMock.DidNotReceiveWithAnyArgs().ExecuteWithSnapshotAsync(
+            default!, default, default, default);
+    }
+
+    [Fact]
+    public async Task ForEach_DraftPreviewIoChild_FailsBeforeDispatch()
+    {
+        var op = CreateOperator(new Dictionary<string, object> { ["IoMode"] = "Sequential" });
+        SetSubGraph(op, CreateHttpChild());
+        var outerFlow = CreateOuterFlow(op);
+        const long revision = 11;
+        var flowHash = ExecutionFlowIdentity.ComputeFlowHash(outerFlow);
+        var bindings = ExecutionResourceBindingManifest.Build(
+            outerFlow,
+            "Draft",
+            new Dictionary<string, string>
+            {
+                ["ProjectRevision"] = revision.ToString(),
+                ["FlowHash"] = flowHash
+            });
+        var snapshot = new ExecutionSnapshot(
+            Guid.NewGuid(),
+            outerFlow,
+            revision,
+            ExecutionSnapshotSource.Draft,
+            ExecutionRunMode.Preview,
+            bindings,
+            principal: new ExecutionPrincipal("engineer", "Engineer", "Engineer", true),
+            capabilityManifest: ExecutionCapabilityManifest.Derive(outerFlow, isExplicit: true),
+            expectedProjectRevision: revision,
+            confirmationId: "confirm-preview",
+            auditId: "audit-preview");
+
+        using var authority = ExecutionAuthorityContext.Enter(snapshot);
+        var result = await _operator.ExecuteAsync(
+            op,
+            new Dictionary<string, object> { ["Items"] = new[] { 1 } });
+
+        Assert.False(result.IsSuccess);
+        Assert.Contains("ADMISSION_DRAFT_PREVIEW_SIDE_EFFECT_BLOCKED", result.ErrorMessage);
+        await _flowExecutorMock.DidNotReceiveWithAnyArgs().ExecuteWithSnapshotAsync(
+            default!, default, default, default);
+    }
+
+    [Fact]
+    public async Task ForEach_StoredIoChild_InheritsIdentityAndScopedResourceEvidence()
+    {
+        var op = CreateOperator(new Dictionary<string, object> { ["IoMode"] = "Sequential" });
+        var child = CreateHttpChild();
+        SetSubGraph(op, child);
+        var snapshot = CreateStoredSnapshot(op);
+        ExecutionSnapshot? captured = null;
+        _flowExecutorMock.ExecuteWithSnapshotAsync(
+                Arg.Do<ExecutionSnapshot>(value => captured = value),
+                Arg.Any<Dictionary<string, object>>(),
+                false,
+                Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(SuccessfulChildResult()));
+
+        using var authority = ExecutionAuthorityContext.Enter(snapshot);
+        var result = await _operator.ExecuteAsync(
+            op,
+            new Dictionary<string, object> { ["Items"] = new[] { 1 } });
+
+        Assert.True(result.IsSuccess);
+        Assert.NotNull(captured);
+        Assert.Equal(snapshot.ProjectId, captured!.ProjectId);
+        Assert.Equal(snapshot.SessionId, captured.SessionId);
+        Assert.Equal(snapshot.RunId, captured.RunId);
+        Assert.Equal(snapshot.Source, captured.Source);
+        Assert.Equal(snapshot.RunMode, captured.RunMode);
+        Assert.Equal(snapshot.Principal, captured.Principal);
+        Assert.Equal(ExecutionFlowIdentity.ComputeFlowHash(child), captured.FlowHash);
+        var resourceKey = $"Resource:{child.Operators.Single().Id:N}";
+        Assert.Equal(snapshot.ResourceBindings[resourceKey], captured.ResourceBindings[resourceKey]);
+        Assert.DoesNotContain(
+            captured.ResourceBindings.Keys,
+            key => key.StartsWith("Resource:", StringComparison.Ordinal) && key != resourceKey);
     }
 
     /// <summary>
@@ -447,4 +578,80 @@ public class Sprint2_ForEachTests
 
         return op;
     }
+
+    private async Task<OperatorExecutionOutput> ExecuteWithStoredAuthorityAsync(
+        Operator op,
+        Dictionary<string, object> inputs)
+    {
+        using var authority = ExecutionAuthorityContext.Enter(CreateStoredSnapshot(op));
+        return await _operator.ExecuteAsync(op, inputs);
+    }
+
+    private static ExecutionSnapshot CreateStoredSnapshot(Operator op)
+    {
+        const long revision = 7;
+        var flow = CreateOuterFlow(op);
+        var bindings = ExecutionResourceBindingManifest.Build(
+            flow,
+            "StoredProject",
+            new Dictionary<string, string> { ["ProjectRevision"] = revision.ToString() });
+        return new ExecutionSnapshot(
+            Guid.NewGuid(),
+            flow,
+            revision,
+            ExecutionSnapshotSource.PersistedProject,
+            ExecutionRunMode.FormalPrimary,
+            bindings,
+            principal: new ExecutionPrincipal("engineer", "Engineer", "Engineer", true),
+            sessionId: Guid.NewGuid(),
+            runId: Guid.NewGuid());
+    }
+
+    private static OperatorFlow CreateOuterFlow(Operator op)
+    {
+        var flow = new OperatorFlow("OuterFlow");
+        flow.AddOperator(op);
+        return flow;
+    }
+
+    private static void SetSubGraph(Operator op, OperatorFlow child)
+    {
+        var existing = op.Parameters.FirstOrDefault(parameter =>
+            string.Equals(parameter.Name, "SubGraph", StringComparison.OrdinalIgnoreCase));
+        if (existing == null)
+        {
+            op.AddParameter(new Parameter(
+                Guid.NewGuid(),
+                "SubGraph",
+                "SubGraph",
+                "Governed child graph",
+                "object",
+                child,
+                isRequired: true));
+            return;
+        }
+
+        existing.SetValue(child);
+    }
+
+    private static OperatorFlow CreateHttpChild()
+    {
+        var child = new OperatorFlow("HttpChild");
+        var http = new Operator(Guid.NewGuid(), "NestedHttp", OperatorType.HttpRequest, 0, 0);
+        http.AddParameter(new Parameter(
+            Guid.NewGuid(),
+            "Url",
+            "Url",
+            string.Empty,
+            "string",
+            "https://approved.example.test/api"));
+        child.AddOperator(http);
+        return child;
+    }
+
+    private static FlowExecutionResult SuccessfulChildResult() => new()
+    {
+        IsSuccess = true,
+        OutputData = new Dictionary<string, object> { ["Result"] = true }
+    };
 }

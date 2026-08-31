@@ -5,6 +5,7 @@ using System.Net.Sockets;
 using System.Text.Json;
 using ClearVision.Product.Core.Entities;
 using ClearVision.Product.Core.Enums;
+using ClearVision.Product.Core.Services;
 using ClearVision.Product.Core.ValueObjects;
 using ClearVision.Product.Infrastructure.Operators;
 using FluentAssertions;
@@ -22,6 +23,7 @@ public sealed class DatabaseWriteOperatorMultiDbIntegrationTests : IAsyncLifetim
     private const string SqlServerPassword = "StrongPassw0rd!";
     private const string MySqlPassword = "StrongPassw0rd!";
     private readonly DatabaseWriteOperator _operator;
+    private readonly TestExecutionResourceProfileResolver _profileResolver;
     private readonly DockerDatabaseContainer _sqlServerContainer;
     private readonly DockerDatabaseContainer _mySqlContainer;
     private bool _dockerAvailable;
@@ -30,7 +32,10 @@ public sealed class DatabaseWriteOperatorMultiDbIntegrationTests : IAsyncLifetim
 
     public DatabaseWriteOperatorMultiDbIntegrationTests()
     {
-        _operator = new DatabaseWriteOperator(Substitute.For<ILogger<DatabaseWriteOperator>>());
+        _profileResolver = new TestExecutionResourceProfileResolver();
+        _operator = new DatabaseWriteOperator(
+            Substitute.For<ILogger<DatabaseWriteOperator>>(),
+            _profileResolver);
         _sqlServerContainer = DockerDatabaseContainer.CreateSqlServer(SqlServerPassword);
         _mySqlContainer = DockerDatabaseContainer.CreateMariaDb(MySqlPassword);
     }
@@ -205,12 +210,23 @@ public sealed class DatabaseWriteOperatorMultiDbIntegrationTests : IAsyncLifetim
         return true;
     }
 
-    private static Operator CreateOperator(
+    private Operator CreateOperator(
         string connectionString,
         string tableName,
         string dbType)
     {
+        var profileId = $"integration-{Guid.NewGuid():N}";
+        _profileResolver.AddDatabase(profileId, dbType, connectionString, tableName);
         var op = new Operator("DatabaseWriteIntegration", OperatorType.DatabaseWrite, 0, 0);
+
+        op.AddParameter(new Parameter(
+            Guid.NewGuid(),
+            "ProfileId",
+            "Database Profile",
+            "Server-owned database profile id",
+            "string",
+            profileId,
+            isRequired: true));
 
         op.AddParameter(new Parameter(
             Guid.NewGuid(),
@@ -246,6 +262,46 @@ public sealed class DatabaseWriteOperatorMultiDbIntegrationTests : IAsyncLifetim
             }));
 
         return op;
+    }
+
+    private sealed class TestExecutionResourceProfileResolver : IExecutionResourceProfileResolver
+    {
+        private readonly Dictionary<string, ResolvedDatabaseExecutionResource> _databaseProfiles =
+            new(StringComparer.OrdinalIgnoreCase);
+
+        public void AddDatabase(string profileId, string dbType, string connectionString, string tableName)
+        {
+            _databaseProfiles.Add(
+                profileId,
+                new ResolvedDatabaseExecutionResource(profileId, dbType, connectionString, tableName));
+        }
+
+        public ExecutionResourceProfileResolution<ResolvedDatabaseExecutionResource> ResolveDatabase(
+            string profileId,
+            string requestedTableName)
+        {
+            if (_databaseProfiles.TryGetValue(profileId, out var resource) &&
+                string.Equals(resource.TableName, requestedTableName, StringComparison.OrdinalIgnoreCase))
+            {
+                return ExecutionResourceProfileResolution<ResolvedDatabaseExecutionResource>.Allow(resource);
+            }
+
+            return ExecutionResourceProfileResolution<ResolvedDatabaseExecutionResource>.Reject(
+                "RESOURCE_DATABASE_PROFILE_NOT_FOUND",
+                "The requested test profile does not exist.");
+        }
+
+        public ExecutionResourceProfileResolution<ResolvedSerialExecutionResource> ResolveSerial(string profileId) =>
+            ExecutionResourceProfileResolution<ResolvedSerialExecutionResource>.Reject(
+                "RESOURCE_SERIAL_PROFILE_NOT_FOUND",
+                "The requested test profile does not exist.");
+
+        public ExecutionResourceProfileResolution<ResolvedPlcExecutionResource> ResolvePlc(
+            string profileId,
+            PlcExecutionResourceRequest request) =>
+            ExecutionResourceProfileResolution<ResolvedPlcExecutionResource>.Reject(
+                "RESOURCE_PLC_PROFILE_NOT_FOUND",
+                "The requested test profile does not exist.");
     }
 
     private sealed class DockerDatabaseContainer : IAsyncDisposable

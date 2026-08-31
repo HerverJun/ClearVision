@@ -8,6 +8,7 @@ import httpClient from '../../core/messaging/httpClient.js';
 import webMessageBridge from '../../core/messaging/webMessageBridge.js';
 import { createSignal } from '../../core/state/store.js';
 import { getStoredToken } from '../auth/authStorage.js';
+import { getCurrentProject } from '../project/projectManager.js';
 import { buildSseHeaders, buildSseUrl, parseSseFrame } from './inspectionSseClient.mjs';
 import { normalizeCanonicalOutcome } from './canonicalOutcome.mjs';
 
@@ -945,6 +946,11 @@ class InspectionController {
         try {
             let result;
             const flowData = this.getCurrentFlowData();
+            const draftAuthority = flowData
+                ? this.createDraftExecutionAuthority(flowData, {
+                    externalCameraBindingId: imageData ? null : this.cameraId
+                })
+                : {};
 
             if (imageData) {
                 const base64Data = imageData instanceof Uint8Array
@@ -952,18 +958,21 @@ class InspectionController {
                     : imageData;
 
                 result = await httpClient.post('/inspection/execute', {
+                    ...draftAuthority,
                     projectId: this.projectId,
                     imageBase64: base64Data,
                     flowData
                 });
             } else if (this.cameraId) {
                 result = await httpClient.post('/inspection/execute', {
+                    ...draftAuthority,
                     projectId: this.projectId,
                     cameraId: this.cameraId,
                     flowData
                 });
             } else {
                 result = await httpClient.post('/inspection/execute', {
+                    ...draftAuthority,
                     projectId: this.projectId,
                     flowData
                 });
@@ -998,8 +1007,12 @@ class InspectionController {
             this.abortController = new AbortController();
 
             const flowData = this.getCurrentFlowData();
+            const draftAuthority = flowData
+                ? this.createDraftExecutionAuthority(flowData, { externalCameraBindingId: this.cameraId })
+                : {};
             
             await httpClient.post('/inspection/realtime/start', {
+                ...draftAuthority,
                 projectId: this.projectId,
                 cameraId: this.cameraId,
                 runMode: 'camera',
@@ -1035,6 +1048,9 @@ class InspectionController {
             }
 
             await httpClient.post('/inspection/realtime/start', {
+                ...this.createDraftExecutionAuthority(flowData, {
+                    externalCameraBindingId: this.cameraId || null
+                }),
                 projectId: this.projectId,
                 cameraId: this.cameraId || null,
                 runMode: 'flow',
@@ -1105,6 +1121,7 @@ class InspectionController {
             debugInspectionLog('[InspectionController] 请求预览节点:', targetNodeId);
 
             const result = await httpClient.post('/flows/preview-node', {
+                ...this.createDraftExecutionAuthority(flowData),
                 projectId: this.projectId,
                 targetNodeId: targetNodeId,
                 debugSessionId: options.debugSessionId || this.generateSessionId(),
@@ -1146,8 +1163,10 @@ class InspectionController {
             if (!flowData) {
                 throw new Error('无法获取流程数据');
             }
+            const authority = this.createAutoTuneDraftAuthority();
 
             const result = await httpClient.post('/autotune/flow-node/preview', {
+                ...authority,
                 flowId: flowData.id || this.projectId || this.generateSessionId(),
                 targetNodeId,
                 flowData,
@@ -1172,8 +1191,10 @@ class InspectionController {
             if (!flowData) {
                 throw new Error('无法获取流程数据');
             }
+            const authority = this.createAutoTuneDraftAuthority();
 
             const result = await httpClient.post('/autotune/scenario', {
+                ...authority,
                 scenarioKey: options.scenarioKey || 'wire-sequence-terminal',
                 flowData,
                 inputImageBase64: options.inputImageBase64 || null,
@@ -1196,6 +1217,127 @@ class InspectionController {
     /**
      * 【Phase 3】生成调试会话ID
      */
+    createAutoTuneDraftAuthority() {
+        const project = getCurrentProject();
+        const projectId = project?.id ?? project?.Id ?? this.projectId;
+        const expectedProjectRevision = Number(project?.persistenceRevision ?? project?.PersistenceRevision);
+        if (!projectId || !Number.isInteger(expectedProjectRevision) || expectedProjectRevision < 0) {
+            throw new Error('自动调参需要已保存工程及其当前版本，请先保存工程');
+        }
+
+        const confirmationId = this.generateSessionId();
+        let auditId = this.generateSessionId();
+        while (auditId === confirmationId) {
+            auditId = this.generateSessionId();
+        }
+
+        return {
+            projectId,
+            expectedProjectRevision,
+            declaredCapabilities: 0,
+            confirmationId,
+            auditId
+        };
+    }
+
+    createDraftExecutionAuthority(flowData, { externalCameraBindingId = null } = {}) {
+        const project = getCurrentProject();
+        const projectId = project?.id ?? project?.Id ?? this.projectId;
+        const expectedProjectRevision = Number(project?.persistenceRevision ?? project?.PersistenceRevision);
+        if (!projectId || !Number.isInteger(expectedProjectRevision) || expectedProjectRevision < 0) {
+            throw new Error('执行草稿需要已保存工程及其当前版本，请先保存工程');
+        }
+
+        const confirmationId = this.generateSessionId();
+        let auditId = this.generateSessionId();
+        while (auditId === confirmationId) {
+            auditId = this.generateSessionId();
+        }
+
+        const capabilityManifest = this.deriveExecutionCapabilities(flowData);
+        if (externalCameraBindingId && !this.shouldBypassExternalCameraInput(flowData) &&
+            !capabilityManifest.includes('DeviceRead')) {
+            capabilityManifest.push('DeviceRead');
+            capabilityManifest.sort();
+        }
+
+        return {
+            expectedProjectRevision,
+            capabilityManifest,
+            confirmationId,
+            auditId
+        };
+    }
+
+    shouldBypassExternalCameraInput(flowData) {
+        const operators = Array.isArray(flowData?.operators)
+            ? flowData.operators
+            : (Array.isArray(flowData?.Operators) ? flowData.Operators : []);
+        let hasExplicitFileSource = false;
+        const readParameter = (operator, name) => {
+            const parameters = Array.isArray(operator?.parameters)
+                ? operator.parameters
+                : (Array.isArray(operator?.Parameters) ? operator.Parameters : []);
+            const parameter = parameters.find(item =>
+                String(item?.name ?? item?.Name ?? '').toLowerCase() === name.toLowerCase());
+            return parameter?.value ?? parameter?.Value ?? parameter?.defaultValue ?? parameter?.DefaultValue;
+        };
+
+        for (const operator of operators) {
+            if (String(operator?.type ?? operator?.Type ?? '') !== 'ImageAcquisition') continue;
+            const sourceType = String(readParameter(operator, 'SourceType') ?? '').split('|')[0].trim().toLowerCase();
+            const cameraBindingId = String(readParameter(operator, 'CameraId') ?? '').trim();
+            if (sourceType === 'camera' || (!sourceType && cameraBindingId)) return false;
+            const filePath = String(readParameter(operator, 'FilePath') ?? '').trim();
+            if ((!sourceType || sourceType === 'file') && filePath) hasExplicitFileSource = true;
+        }
+
+        return hasExplicitFileSource;
+    }
+
+    deriveExecutionCapabilities(flowData) {
+        const capabilities = new Set();
+        const operators = Array.isArray(flowData?.operators)
+            ? flowData.operators
+            : (Array.isArray(flowData?.Operators) ? flowData.Operators : []);
+        const networkTypes = new Set([
+            'HttpRequest', 'TcpCommunication', 'SerialCommunication', 'ModbusCommunication',
+            'ModbusRtuCommunication', 'SiemensS7Communication', 'MitsubishiMcCommunication',
+            'OmronFinsCommunication', 'MqttPublish', 'DatabaseWrite'
+        ]);
+        const deviceWriteTypes = new Set([
+            'CameraCalibration', 'FisheyeCalibration', 'StereoCalibration', 'NPointCalibration',
+            'TranslationRotationCalibration', 'HandEyeCalibration', 'CalibrationLoader', 'TriggerModule'
+        ]);
+        const readParameter = (operator, name) => {
+            const parameters = Array.isArray(operator?.parameters)
+                ? operator.parameters
+                : (Array.isArray(operator?.Parameters) ? operator.Parameters : []);
+            const parameter = parameters.find(item =>
+                String(item?.name ?? item?.Name ?? '').toLowerCase() === name.toLowerCase());
+            return parameter?.value ?? parameter?.Value ?? parameter?.defaultValue ?? parameter?.DefaultValue;
+        };
+
+        operators.forEach(operator => {
+            if ((operator?.isEnabled ?? operator?.IsEnabled) === false) return;
+            const type = String(operator?.type ?? operator?.Type ?? '');
+            if (networkTypes.has(type)) capabilities.add('NetworkWrite');
+            if (deviceWriteTypes.has(type)) capabilities.add('DeviceWrite');
+            if (type === 'ImageSave' || type === 'TextSave' ||
+                (type === 'ResultOutput' && String(readParameter(operator, 'SaveToFile')).toLowerCase() === 'true')) {
+                capabilities.add('FileWrite');
+            }
+            if (type === 'ImageAcquisition') {
+                const sourceType = String(readParameter(operator, 'SourceType') ?? '').split('|')[0].trim().toLowerCase();
+                if (sourceType === 'camera') capabilities.add('DeviceRead');
+                else if (String(readParameter(operator, 'FilePath') ?? '').trim()) capabilities.add('FileRead');
+            }
+            if (type === 'VariableWrite' || type === 'VariableIncrement') capabilities.add('StateWrite');
+        });
+
+        return Array.from(capabilities).sort();
+    }
+
     generateSessionId() {
         const cryptoRef = globalThis.crypto;
         if (cryptoRef && typeof cryptoRef.randomUUID === 'function') {

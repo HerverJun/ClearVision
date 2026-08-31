@@ -171,7 +171,7 @@ async function installApiRoutes(page: Page, state: ReturnType<typeof createApiSt
       await fulfillJson({
         success: state.plcTestMode !== 'failure',
         message: state.plcTestMode === 'failure' ? '连接失败：目标无响应。' : '连接成功。',
-        protocol: payload.protocol,
+        protocol: payload.profileId,
       });
       return;
     }
@@ -421,11 +421,7 @@ test('PLC communication settings payloads, errors, connection test states, and r
   await delayedConnection;
   await expect(page.locator('#btn-plc-test')).toBeEnabled();
   await expect(page.locator('#plc-connection-badge')).toContainText('连接正常');
-  expect(state.plcTestRequests.at(-1)).toMatchObject({
-    protocol: 'FINS',
-    ipAddress: '10.10.10.33',
-    port: 9603,
-  });
+  expect(state.plcTestRequests.at(-1)).toEqual({ profileId: 'FINS' });
 
   state.plcTestMode = 'failure';
   await page.locator('#btn-plc-test').click();

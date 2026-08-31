@@ -36,6 +36,9 @@ namespace ClearVision.Product.Infrastructure.Operators;
 [OutputPort("AllPointMaxCalibrationError", "All-point Max Calibration Error", PortDataType.Float)]
 [OutputPort("InlierIndices", "Inlier Indices", PortDataType.Any)]
 [OutputPort("OutlierIndices", "Outlier Indices", PortDataType.Any)]
+[OutputPort("CalibrationAssetId", "Calibration Asset Id", PortDataType.String)]
+[OutputPort("CalibrationAssetCandidate", "Calibration Asset Candidate", PortDataType.Boolean)]
+[OutputPort("CalibrationContentHash", "Calibration Content Hash", PortDataType.String)]
 [OperatorParam("CalibrationPoints", "Calibration Points", "string", DefaultValue = "[]")]
 [OperatorParam("Method", "Method", "enum", DefaultValue = "LeastSquares", Options = new[] { "LeastSquares|LeastSquares", "SVD|SVD" })]
 [OperatorParam("RobustMode", "Robust Mode", "enum", DefaultValue = "None", Options = new[] { "None|None", "Ransac|RANSAC", "Huber|Huber" })]
@@ -43,7 +46,7 @@ namespace ClearVision.Product.Infrastructure.Operators;
 [OperatorParam("RobustMaxIterations", "Robust Max Iterations", "int", DefaultValue = 256, Min = 1, Max = 10000)]
 [OperatorParam("RobustMinInlierRatio", "Robust Minimum Inlier Ratio", "double", DefaultValue = 0.5, Min = 0.1, Max = 1.0)]
 [OperatorParam("HuberDelta", "Huber Delta", "double", DefaultValue = 0.15, Min = 1e-12, Max = 1000000000000.0)]
-[OperatorParam("SavePath", "Save Path", "file", DefaultValue = "", IsRequired = false)]
+[OperatorParam("CalibrationAssetId", "Calibration Asset Id", "string", DefaultValue = "")]
 public class TranslationRotationCalibrationOperator : OperatorBase
 {
     private const double DegenerateThreshold = 1e-12;
@@ -191,10 +194,6 @@ public class TranslationRotationCalibrationOperator : OperatorBase
         };
 
         var calibrationData = CalibrationBundleV2Json.Serialize(bundle);
-        if (!string.IsNullOrWhiteSpace(configuration.SavePath))
-        {
-            TrySaveCalibrationBundle(configuration.SavePath, calibrationData);
-        }
 
         var output = new Dictionary<string, object>
         {
@@ -215,6 +214,10 @@ public class TranslationRotationCalibrationOperator : OperatorBase
             ["Residuals"] = residualOutput,
             ["Diagnostics"] = diagnostics
         };
+        CalibrationAssetCandidateOutput.AddTo(
+            output,
+            GetStringParam(@operator, "CalibrationAssetId", string.Empty),
+            calibrationData);
 
         if (TryGetInputImage(inputs, out var imageWrapper) && imageWrapper != null)
         {
@@ -289,7 +292,6 @@ public class TranslationRotationCalibrationOperator : OperatorBase
 
         configuration = new FitConfiguration(
             GetStringParam(@operator, "CalibrationPoints", string.Empty),
-            GetStringParam(@operator, "SavePath", string.Empty),
             solveMethod,
             robustMode,
             GetDoubleParam(@operator, "RobustResidualThreshold", 0.30, 1e-12, 1e12),
@@ -955,20 +957,6 @@ public class TranslationRotationCalibrationOperator : OperatorBase
         return false;
     }
 
-    private void TrySaveCalibrationBundle(string savePath, string calibrationData)
-    {
-        try
-        {
-            var dir = Path.GetDirectoryName(savePath);
-            if (!string.IsNullOrWhiteSpace(dir)) Directory.CreateDirectory(dir);
-            File.WriteAllText(savePath, calibrationData);
-        }
-        catch (Exception ex)
-        {
-            Logger.LogWarning(ex, "Failed to save calibration bundle to {Path}", savePath);
-        }
-    }
-
     private static void DrawPoints(Mat image, IReadOnlyList<CalibrationPoint> points, IReadOnlyList<int> outlierPositions)
     {
         var outliers = outlierPositions.ToHashSet();
@@ -1048,7 +1036,6 @@ public class TranslationRotationCalibrationOperator : OperatorBase
     private sealed record AngleResolution(AngleConstraint Constraint, IReadOnlyList<int> EligiblePositions, IReadOnlyList<int> AngleOutlierOriginalIndices);
     private sealed record FitConfiguration(
         string PointsJson,
-        string SavePath,
         SolveMethod SolveMethod,
         RobustFitMode RobustMode,
         double ResidualThreshold,

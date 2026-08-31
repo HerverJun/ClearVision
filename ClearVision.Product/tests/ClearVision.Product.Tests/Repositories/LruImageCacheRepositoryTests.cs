@@ -56,4 +56,50 @@ public class LruImageCacheRepositoryTests
         (await cache.GetAsync(ids[0])).Should().BeNull("old images should be evicted when pending pressure reaches the budget");
         (await cache.GetAsync(ids[^1])).Should().NotBeNull("the latest inspection image should remain available for preview");
     }
+
+    [Fact]
+    public async Task UploadPressure_ShouldNeverEvictAuthoritativeResultImages()
+    {
+        const int namespaceBudget = 128;
+        var cache = new LruImageCacheRepository(namespaceBudget, queueCapacity: 32);
+        var authority = new ResultImageCacheAuthority(Guid.NewGuid(), Guid.NewGuid());
+        var resultId = await cache.AddResultAsync(new byte[96], "png", authority);
+        var uploadIds = new List<Guid>();
+
+        for (var index = 0; index < 20; index++)
+        {
+            uploadIds.Add(await cache.AddAsync(Enumerable.Repeat((byte)index, 64).ToArray(), "png"));
+        }
+
+        var result = await cache.GetEntryAsync(resultId);
+        result.Should().NotBeNull();
+        result!.Authority.Should().Be(authority);
+        (await cache.GetAsync(uploadIds[0])).Should().BeNull("upload eviction remains confined to the upload namespace");
+        (await cache.GetAsync(uploadIds[^1])).Should().NotBeNull();
+
+        var statistics = cache.GetStatistics();
+        statistics.UploadSizeInBytes.Should().BeLessThanOrEqualTo(namespaceBudget);
+        statistics.ResultSizeInBytes.Should().BeLessThanOrEqualTo(namespaceBudget);
+        statistics.ResultEntries.Should().Be(1);
+    }
+
+    [Fact]
+    public async Task ResultPressure_ShouldNeverEvictUploadImages()
+    {
+        const int namespaceBudget = 128;
+        var cache = new LruImageCacheRepository(namespaceBudget, queueCapacity: 32);
+        var uploadId = await cache.AddAsync(new byte[96], "png");
+
+        for (var index = 0; index < 20; index++)
+        {
+            await cache.AddResultAsync(
+                Enumerable.Repeat((byte)index, 64).ToArray(),
+                "png",
+                new ResultImageCacheAuthority(Guid.NewGuid(), Guid.NewGuid()));
+        }
+
+        var upload = await cache.GetEntryAsync(uploadId);
+        upload.Should().NotBeNull();
+        upload!.Authority.Should().BeNull();
+    }
 }

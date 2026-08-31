@@ -59,7 +59,9 @@ public class SoftTriggerCaptureEndpointTests
 
         response.StatusCode.Should().Be(HttpStatusCode.NotFound);
         (await response.Content.ReadAsStringAsync()).Should().Contain("Camera binding not found");
-        await cameraManager.DidNotReceive().GetOrCreateByBindingAsync(Arg.Any<string>());
+        await cameraManager.DidNotReceive().AcquireByBindingLeaseAsync(
+            Arg.Any<string>(),
+            Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -85,7 +87,9 @@ public class SoftTriggerCaptureEndpointTests
         captureResponse.StatusCode.Should().Be(HttpStatusCode.Forbidden);
         serialTestResponse.StatusCode.Should().Be(HttpStatusCode.Forbidden);
         serialPortsResponse.StatusCode.Should().Be(HttpStatusCode.Forbidden);
-        await cameraManager.DidNotReceive().GetOrCreateByBindingAsync(Arg.Any<string>());
+        await cameraManager.DidNotReceive().AcquireByBindingLeaseAsync(
+            Arg.Any<string>(),
+            Arg.Any<CancellationToken>());
         await serialTriggerInput.DidNotReceive().WaitForSerialPhotoelectricAsync(
             Arg.Any<SerialPhotoelectricTriggerOptions>(),
             Arg.Any<CancellationToken>());
@@ -110,7 +114,7 @@ public class SoftTriggerCaptureEndpointTests
 
         var cameraManager = Substitute.For<ICameraManager>();
         cameraManager.GetBindings().Returns(new List<CameraBindingConfig> { binding });
-        cameraManager.GetOrCreateByBindingAsync(bindingId).Returns(Task.FromResult(camera));
+        var cameraLease = ConfigureCameraLease(cameraManager, bindingId, camera);
 
         await using var host = await SoftTriggerTestHost.CreateAsync(cameraManager);
         var response = await host.Client.PostAsJsonAsync("/api/cameras/soft-trigger-capture", new { cameraBindingId = bindingId });
@@ -125,7 +129,10 @@ public class SoftTriggerCaptureEndpointTests
         var bodyBytes = await response.Content.ReadAsByteArrayAsync();
         bodyBytes.Should().Equal(ValidPngBytes);
 
-        await cameraManager.Received(1).GetOrCreateByBindingAsync(bindingId);
+        await cameraManager.Received(1).AcquireByBindingLeaseAsync(
+            bindingId,
+            Arg.Any<CancellationToken>());
+        cameraLease.DisposeCallCount.Should().Be(1);
         await camera.Received(1).SetExposureTimeAsync(binding.ExposureTimeUs);
         await camera.Received(1).SetGainAsync(binding.GainDb);
         await camera.Received(1).AcquireSingleFrameAsync();
@@ -155,7 +162,7 @@ public class SoftTriggerCaptureEndpointTests
 
         var cameraManager = Substitute.For<ICameraManager>();
         cameraManager.GetBindings().Returns(new List<CameraBindingConfig> { binding });
-        cameraManager.GetOrCreateByBindingAsync(bindingId).Returns(Task.FromResult(camera));
+        ConfigureCameraLease(cameraManager, bindingId, camera);
 
         var triggerInput = Substitute.For<ITriggerInputService>();
         triggerInput
@@ -211,7 +218,7 @@ public class SoftTriggerCaptureEndpointTests
 
         var cameraManager = Substitute.For<ICameraManager>();
         cameraManager.GetBindings().Returns(new List<CameraBindingConfig> { binding });
-        cameraManager.GetOrCreateByBindingAsync(bindingId).Returns(Task.FromResult(camera));
+        ConfigureCameraLease(cameraManager, bindingId, camera);
 
         var serialTriggerInput = Substitute.For<ISerialPhotoelectricTriggerInputService>();
         serialTriggerInput
@@ -248,8 +255,31 @@ public class SoftTriggerCaptureEndpointTests
     [Fact]
     public async Task SerialPhotoelectricTest_WithValidRequest_ShouldWaitForSerialSignalWithoutCamera()
     {
+        const string bindingId = "saved-serial-binding";
+        const long revision = 17;
         var cameraManager = Substitute.For<ICameraManager>();
         cameraManager.GetBindings().Returns(new List<CameraBindingConfig>());
+        var appConfig = new AppConfig
+        {
+            Revision = revision,
+            Cameras =
+            [
+                new CameraBindingConfig
+                {
+                    Id = bindingId,
+                    DisplayName = "Saved Serial Trigger",
+                    SerialNumber = "SN-SERIAL",
+                    IsEnabled = true,
+                    TriggerMode = "Software",
+                    SoftwareTriggerSource = "SerialPhotoelectric",
+                    SerialPhotoelectricPortName = "COM3",
+                    SerialPhotoelectricBaudRate = 9600,
+                    SerialPhotoelectricDebounceMs = 120,
+                    SerialPhotoelectricTimeoutMs = 5000,
+                    IgnoreSerialPhotoelectricTriggerWhileBusy = false
+                }
+            ]
+        };
 
         var serialTriggerInput = Substitute.For<ISerialPhotoelectricTriggerInputService>();
         serialTriggerInput
@@ -266,13 +296,12 @@ public class SoftTriggerCaptureEndpointTests
 
         await using var host = await SoftTriggerTestHost.CreateAsync(
             cameraManager,
-            serialPhotoelectricTriggerInputService: serialTriggerInput);
+            serialPhotoelectricTriggerInputService: serialTriggerInput,
+            appConfig: appConfig);
         var response = await host.Client.PostAsJsonAsync("/api/trigger-input/test-serial-photoelectric", new
         {
-            portName = " com3 ",
-            baudRate = 9600,
-            debounceMs = 120,
-            timeoutMs = 5000
+            cameraBindingId = bindingId,
+            expectedRevision = revision
         });
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
@@ -280,7 +309,7 @@ public class SoftTriggerCaptureEndpointTests
         body.Should().Contain("COM3");
         await serialTriggerInput.Received(1).WaitForSerialPhotoelectricAsync(
             Arg.Is<SerialPhotoelectricTriggerOptions>(options =>
-                options.CameraBindingId == "settings-serial-photoelectric-test" &&
+                options.CameraBindingId == bindingId &&
                 options.PortName == "COM3" &&
                 options.BaudRate == 9600 &&
                 options.DebounceMs == 120 &&
@@ -288,7 +317,9 @@ public class SoftTriggerCaptureEndpointTests
                 options.IgnoreWhileBusy == false &&
                 options.AcceptPendingSignalsAfterUtc.HasValue),
             Arg.Any<CancellationToken>());
-        await cameraManager.DidNotReceive().GetOrCreateByBindingAsync(Arg.Any<string>());
+        await cameraManager.DidNotReceive().AcquireByBindingLeaseAsync(
+            Arg.Any<string>(),
+            Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -329,7 +360,7 @@ public class SoftTriggerCaptureEndpointTests
 
         var cameraManager = Substitute.For<ICameraManager>();
         cameraManager.GetBindings().Returns(new List<CameraBindingConfig> { binding });
-        cameraManager.GetOrCreateByBindingAsync(bindingId).Returns(Task.FromResult(camera));
+        ConfigureCameraLease(cameraManager, bindingId, camera);
 
         var triggerInput = Substitute.For<ITriggerInputService>();
         triggerInput
@@ -379,7 +410,9 @@ public class SoftTriggerCaptureEndpointTests
 
         response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
         (await response.Content.ReadAsStringAsync()).Should().Contain("不是 Software 触发模式");
-        await cameraManager.DidNotReceive().GetOrCreateByBindingAsync(Arg.Any<string>());
+        await cameraManager.DidNotReceive().AcquireByBindingLeaseAsync(
+            Arg.Any<string>(),
+            Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -401,13 +434,14 @@ public class SoftTriggerCaptureEndpointTests
 
         var cameraManager = Substitute.For<ICameraManager>();
         cameraManager.GetBindings().Returns(new List<CameraBindingConfig> { binding });
-        cameraManager.GetOrCreateByBindingAsync(bindingId).Returns(Task.FromResult(camera));
+        var cameraLease = ConfigureCameraLease(cameraManager, bindingId, camera);
 
         await using var host = await SoftTriggerTestHost.CreateAsync(cameraManager);
         var response = await host.Client.PostAsJsonAsync("/api/cameras/soft-trigger-capture", new { cameraBindingId = bindingId });
 
         response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
         (await response.Content.ReadAsStringAsync()).Should().Contain("Camera frame metadata parse failed.");
+        cameraLease.DisposeCallCount.Should().Be(1);
     }
 
     [Fact]
@@ -429,13 +463,124 @@ public class SoftTriggerCaptureEndpointTests
 
         var cameraManager = Substitute.For<ICameraManager>();
         cameraManager.GetBindings().Returns(new List<CameraBindingConfig> { binding });
-        cameraManager.GetOrCreateByBindingAsync(bindingId).Returns(Task.FromResult(camera));
+        var cameraLease = ConfigureCameraLease(cameraManager, bindingId, camera);
 
         await using var host = await SoftTriggerTestHost.CreateAsync(cameraManager);
         var response = await host.Client.PostAsJsonAsync("/api/cameras/soft-trigger-capture", new { cameraBindingId = bindingId });
 
         response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
         (await response.Content.ReadAsStringAsync()).Should().Contain("相机超时");
+        cameraLease.DisposeCallCount.Should().Be(1);
+    }
+
+    [Fact]
+    public async Task SerialPhotoelectricTest_WithClientRawTarget_ShouldFailClosedBeforeHandler()
+    {
+        var cameraManager = Substitute.For<ICameraManager>();
+        cameraManager.GetBindings().Returns(new List<CameraBindingConfig>());
+        var serialTriggerInput = Substitute.For<ISerialPhotoelectricTriggerInputService>();
+        var appConfig = new AppConfig { Revision = 9 };
+
+        await using var host = await SoftTriggerTestHost.CreateAsync(
+            cameraManager,
+            serialPhotoelectricTriggerInputService: serialTriggerInput,
+            appConfig: appConfig);
+        var response = await host.Client.PostAsJsonAsync("/api/trigger-input/test-serial-photoelectric", new
+        {
+            cameraBindingId = "saved-binding",
+            expectedRevision = 9,
+            portName = "COM99",
+            baudRate = 115200
+        });
+
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        (await response.Content.ReadAsStringAsync()).Should().Contain("SERIAL_PHOTOELECTRIC_RAW_TARGET_FORBIDDEN");
+        await serialTriggerInput.DidNotReceive().WaitForSerialPhotoelectricAsync(
+            Arg.Any<SerialPhotoelectricTriggerOptions>(),
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task SerialPhotoelectricTest_WithStaleRevision_ShouldFailClosedBeforeHandler()
+    {
+        var cameraManager = Substitute.For<ICameraManager>();
+        cameraManager.GetBindings().Returns(new List<CameraBindingConfig>());
+        var serialTriggerInput = Substitute.For<ISerialPhotoelectricTriggerInputService>();
+        var appConfig = new AppConfig { Revision = 12 };
+
+        await using var host = await SoftTriggerTestHost.CreateAsync(
+            cameraManager,
+            serialPhotoelectricTriggerInputService: serialTriggerInput,
+            appConfig: appConfig);
+        var response = await host.Client.PostAsJsonAsync("/api/trigger-input/test-serial-photoelectric", new
+        {
+            cameraBindingId = "saved-binding",
+            expectedRevision = 11
+        });
+
+        response.StatusCode.Should().Be(HttpStatusCode.Conflict);
+        (await response.Content.ReadAsStringAsync()).Should().Contain("SERIAL_PHOTOELECTRIC_BINDING_REVISION_STALE");
+        await serialTriggerInput.DidNotReceive().WaitForSerialPhotoelectricAsync(
+            Arg.Any<SerialPhotoelectricTriggerOptions>(),
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task SerialPhotoelectricTest_WithUnknownBinding_ShouldFailClosedBeforeHandler()
+    {
+        var cameraManager = Substitute.For<ICameraManager>();
+        cameraManager.GetBindings().Returns(new List<CameraBindingConfig>());
+        var serialTriggerInput = Substitute.For<ISerialPhotoelectricTriggerInputService>();
+        var appConfig = new AppConfig { Revision = 12, Cameras = [] };
+
+        await using var host = await SoftTriggerTestHost.CreateAsync(
+            cameraManager,
+            serialPhotoelectricTriggerInputService: serialTriggerInput,
+            appConfig: appConfig);
+        var response = await host.Client.PostAsJsonAsync("/api/trigger-input/test-serial-photoelectric", new
+        {
+            cameraBindingId = "forged-binding",
+            expectedRevision = 12
+        });
+
+        response.StatusCode.Should().Be(HttpStatusCode.NotFound);
+        (await response.Content.ReadAsStringAsync()).Should().Contain("SERIAL_PHOTOELECTRIC_BINDING_NOT_FOUND");
+        await serialTriggerInput.DidNotReceive().WaitForSerialPhotoelectricAsync(
+            Arg.Any<SerialPhotoelectricTriggerOptions>(),
+            Arg.Any<CancellationToken>());
+    }
+
+    private static TrackingCameraLease ConfigureCameraLease(
+        ICameraManager cameraManager,
+        string bindingId,
+        ICamera camera)
+    {
+        var lease = new TrackingCameraLease(camera);
+        cameraManager
+            .AcquireByBindingLeaseAsync(bindingId, Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult<ICameraLease>(lease));
+        return lease;
+    }
+
+    private sealed class TrackingCameraLease : ICameraLease
+    {
+        private int _disposeCallCount;
+
+        public TrackingCameraLease(ICamera camera)
+        {
+            Camera = camera;
+        }
+
+        public ICamera Camera { get; }
+        public int DisposeCallCount => Volatile.Read(ref _disposeCallCount);
+
+        public void Dispose() => Interlocked.Increment(ref _disposeCallCount);
+
+        public ValueTask DisposeAsync()
+        {
+            Dispose();
+            return ValueTask.CompletedTask;
+        }
     }
 
     private sealed class SoftTriggerTestHost : IAsyncDisposable
@@ -454,7 +599,8 @@ public class SoftTriggerCaptureEndpointTests
             ICameraManager cameraManager,
             ITriggerInputService? triggerInputService = null,
             ISerialPhotoelectricTriggerInputService? serialPhotoelectricTriggerInputService = null,
-            string role = "Engineer")
+            string role = "Engineer",
+            AppConfig? appConfig = null)
         {
             var builder = WebApplication.CreateBuilder(new WebApplicationOptions
             {
@@ -467,9 +613,12 @@ public class SoftTriggerCaptureEndpointTests
             builder.Services.AddSingleton(triggerInputService ?? Substitute.For<ITriggerInputService>());
             builder.Services.AddSingleton(serialPhotoelectricTriggerInputService ?? Substitute.For<ISerialPhotoelectricTriggerInputService>());
 
+            var currentConfig = appConfig ?? new AppConfig();
             var configService = Substitute.For<IConfigurationService>();
-            configService.LoadAsync().Returns(Task.FromResult(new AppConfig()));
-            configService.GetCurrent().Returns(new AppConfig());
+            configService.ReadAsync(Arg.Any<CancellationToken>()).Returns(Task.FromResult(
+                new AppConfigReadResult(AppConfigReadStatus.Healthy, currentConfig)));
+            configService.LoadAsync().Returns(Task.FromResult(currentConfig));
+            configService.GetCurrent().Returns(currentConfig);
             configService.SaveAsync(Arg.Any<AppConfig>()).Returns(Task.CompletedTask);
             builder.Services.AddSingleton(configService);
 

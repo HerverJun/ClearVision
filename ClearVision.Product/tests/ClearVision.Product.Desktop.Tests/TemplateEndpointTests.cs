@@ -4,6 +4,7 @@ using System.Reflection;
 using System.Text.Json;
 using ClearVision.Product.Core.Entities;
 using ClearVision.Product.Core.Enums;
+using ClearVision.Product.Core.Interfaces;
 using ClearVision.Product.Core.Services;
 using ClearVision.Product.Desktop.Endpoints;
 using ClearVision.Product.Infrastructure.AI;
@@ -191,6 +192,7 @@ public sealed class TemplateEndpointTests
             builder.Services.AddSingleton(Substitute.For<IOperatorFactory>());
             builder.Services.AddSingleton(new ParameterRecommender());
             builder.Services.AddSingleton(Substitute.For<IFlowExecutionService>());
+            builder.Services.AddSingleton(Substitute.For<IProjectRepository>());
             var admissionService = Substitute.For<IExecutionAdmissionService>();
             admissionService
                 .ValidateOperator(Arg.Any<Operator>(), Arg.Any<ExecutionAdmissionSurface>())

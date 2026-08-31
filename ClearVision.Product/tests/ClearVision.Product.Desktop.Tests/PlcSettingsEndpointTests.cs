@@ -279,35 +279,81 @@ public class PlcSettingsEndpointTests
     }
 
     [Theory]
-    [InlineData("S7", "S7-1200", 0, 1)]
-    [InlineData("MC", null, null, null)]
-    [InlineData("FINS", null, null, null)]
-    public async Task PostTestConnection_ShouldDispatchSupportedProtocols(
+    [InlineData("S7", "S7://192.0.2.10:1102?cpu=S7-1500&rack=2&slot=3")]
+    [InlineData("MC", "MC://192.0.2.20:5502")]
+    [InlineData("FINS", "FINS://192.0.2.30:19600")]
+    public async Task PostTestConnection_ShouldDispatchOnlyPersistedProfile(
         string protocol,
-        string? cpuType,
-        int? rack,
-        int? slot)
+        string expectedConnectionString)
     {
-        await using var host = await PlcSettingsTestHost.CreateAsync(new AppConfig());
-        var payload = new
+        var config = new AppConfig
         {
-            protocol,
-            ipAddress = "127.0.0.1",
-            port = 65500,
-            cpuType,
-            rack,
-            slot
+            Communication = new CommunicationConfig
+            {
+                ActiveProtocol = protocol,
+                S7 = new S7CommunicationProfile
+                {
+                    IpAddress = "192.0.2.10",
+                    Port = 1102,
+                    CpuType = "S7-1500",
+                    Rack = 2,
+                    Slot = 3
+                },
+                Mc = new PlcCommunicationProfile { IpAddress = "192.0.2.20", Port = 5502 },
+                Fins = new PlcCommunicationProfile { IpAddress = "192.0.2.30", Port = 19600 }
+            }
         };
+        var probe = Substitute.For<IPlcConnectionTestProbe>();
+        probe.TestAsync(Arg.Any<string>(), Arg.Any<Microsoft.Extensions.Logging.ILogger>(), Arg.Any<CancellationToken>())
+            .Returns(true);
+        await using var host = await PlcSettingsTestHost.CreateAsync(config, probe: probe);
 
         using var response = await host.Client.PostAsync(
             "/api/plc/test-connection",
-            new StringContent(JsonSerializer.Serialize(payload), Encoding.UTF8, "application/json"));
+            new StringContent(
+                JsonSerializer.Serialize(new { profileId = protocol }),
+                Encoding.UTF8,
+                "application/json"));
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
 
         using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
-        document.RootElement.GetProperty("success").GetBoolean().Should().BeFalse();
+        document.RootElement.GetProperty("success").GetBoolean().Should().BeTrue();
         document.RootElement.GetProperty("protocol").GetString().Should().Be(protocol);
+        await probe.Received(1).TestAsync(
+            expectedConnectionString,
+            Arg.Any<Microsoft.Extensions.Logging.ILogger>(),
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task PostTestConnection_WithRawTargetEvenForAdmin_ShouldRejectBeforeProbe()
+    {
+        var probe = Substitute.For<IPlcConnectionTestProbe>();
+        await using var host = await PlcSettingsTestHost.CreateAsync(new AppConfig(), probe: probe);
+
+        using var response = await host.Client.PostAsync(
+            "/api/plc/test-connection",
+            new StringContent(
+                JsonSerializer.Serialize(new
+                {
+                    profileId = "S7",
+                    protocol = "S7",
+                    ipAddress = "203.0.113.44",
+                    port = 102,
+                    cpuType = "S7-1500",
+                    rack = 0,
+                    slot = 1
+                }),
+                Encoding.UTF8,
+                "application/json"));
+
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        (await response.Content.ReadAsStringAsync()).Should().Contain("PLC_RAW_TARGET_FORBIDDEN");
+        await probe.DidNotReceive().TestAsync(
+            Arg.Any<string>(),
+            Arg.Any<Microsoft.Extensions.Logging.ILogger>(),
+            Arg.Any<CancellationToken>());
     }
 
     private sealed class PlcSettingsTestHost : IAsyncDisposable
@@ -325,7 +371,10 @@ public class PlcSettingsEndpointTests
 
         public InMemoryAppConfigAuthority ConfigurationService { get; }
 
-        public static async Task<PlcSettingsTestHost> CreateAsync(AppConfig initialConfig, string? role = "Admin")
+        public static async Task<PlcSettingsTestHost> CreateAsync(
+            AppConfig initialConfig,
+            string? role = "Admin",
+            IPlcConnectionTestProbe? probe = null)
         {
             var builder = WebApplication.CreateBuilder(new WebApplicationOptions
             {
@@ -337,6 +386,10 @@ public class PlcSettingsEndpointTests
             initialConfig.Normalize();
             var configService = new InMemoryAppConfigAuthority(initialConfig);
             builder.Services.AddSingleton<ClearVision.Product.Core.Interfaces.IConfigurationService>(configService);
+            if (probe != null)
+            {
+                builder.Services.AddSingleton(probe);
+            }
 
             var app = builder.Build();
             app.Use(async (context, next) =>

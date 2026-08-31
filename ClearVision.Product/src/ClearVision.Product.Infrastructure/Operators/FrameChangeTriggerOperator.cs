@@ -5,6 +5,7 @@ using ClearVision.Product.Core.Attributes;
 using ClearVision.Product.Core.Entities;
 using ClearVision.Product.Core.Enums;
 using ClearVision.Product.Core.Operators;
+using ClearVision.Product.Core.Services;
 using Microsoft.Extensions.Logging;
 using OpenCvSharp;
 
@@ -53,7 +54,7 @@ public sealed class FrameChangeTriggerOperator : OperatorBase, IDisposable
     private static readonly TimeSpan StateTtl = TimeSpan.FromMinutes(30);
     private static readonly TimeSpan CleanupInterval = TimeSpan.FromMinutes(5);
 
-    private readonly ConcurrentDictionary<Guid, FrameChangeState> _states = new();
+    private readonly ConcurrentDictionary<ExecutionStateKey, FrameChangeState> _states = new();
     private readonly object _cleanupSync = new();
     private DateTime _lastCleanupUtc = DateTime.MinValue;
 
@@ -105,12 +106,13 @@ public sealed class FrameChangeTriggerOperator : OperatorBase, IDisposable
                 ConsecutiveChangedFrames: 0,
                 NoChangeFrames: 0);
             return Task.FromResult(OperatorExecutionOutput.Success(
-                CreatePassThroughOutput(src, disabledDecision, roi, @operator.Id)));
+                CreatePassThroughOutput(src, disabledDecision, roi, ExecutionStateKey.ForOperator(@operator.Id))));
         }
 
         var shortCircuitWhenNotTriggered = ReadBoolParam(@operator, "ShortCircuitWhenNotTriggered", true);
         var nowUtc = DateTime.UtcNow;
-        var state = _states.GetOrAdd(@operator.Id, static _ => new FrameChangeState());
+        var stateKey = ExecutionStateKey.ForOperator(@operator.Id);
+        var state = _states.GetOrAdd(stateKey, static _ => new FrameChangeState());
         FrameChangeTriggerDecision decision;
 
         using var grayRoi = FrameChangeTriggerKernel.BuildGrayRoi(src, roi, options);
@@ -122,7 +124,7 @@ public sealed class FrameChangeTriggerOperator : OperatorBase, IDisposable
 
         TryCleanupStaleStates(nowUtc);
 
-        var output = CreatePassThroughOutput(src, decision, roi, @operator.Id);
+        var output = CreatePassThroughOutput(src, decision, roi, stateKey);
 
         return Task.FromResult(
             decision.Triggered || !shortCircuitWhenNotTriggered
@@ -212,8 +214,8 @@ public sealed class FrameChangeTriggerOperator : OperatorBase, IDisposable
     private Dictionary<string, object> CreatePassThroughOutput(
         Mat src,
         FrameChangeTriggerDecision decision,
-        Rect roi,
-        Guid operatorId)
+        OpenCvSharp.Rect roi,
+        ExecutionStateKey stateKey)
     {
         var output = CreateImageOutput(src.Clone(), new Dictionary<string, object>
         {
@@ -235,12 +237,12 @@ public sealed class FrameChangeTriggerOperator : OperatorBase, IDisposable
         output["RoiY"] = roi.Y;
         output["RoiW"] = roi.Width;
         output["RoiH"] = roi.Height;
-        output["StateScope"] = "OperatorInstance";
-        output["StateKey"] = operatorId;
+        output["StateScope"] = "Project/Session/Flow/Run/Operator";
+        output["StateKey"] = stateKey.ToString();
         return output;
     }
 
-    private Rect ResolveRoi(Operator @operator, Mat src)
+    private OpenCvSharp.Rect ResolveRoi(Operator @operator, Mat src)
     {
         var x = ReadIntParam(@operator, "RoiX", 0);
         var y = ReadIntParam(@operator, "RoiY", 0);

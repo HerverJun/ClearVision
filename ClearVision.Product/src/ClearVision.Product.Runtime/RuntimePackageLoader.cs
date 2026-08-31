@@ -28,7 +28,7 @@ public sealed class RuntimePackageLoader
             throw new RuntimePackageException("运行包路径不能为空。");
         }
 
-        var normalizedRoot = Path.GetFullPath(packageRoot);
+        var normalizedRoot = RuntimePathGuard.ResolveApprovedPackageRoot(packageRoot);
         if (!Directory.Exists(normalizedRoot))
         {
             throw new RuntimePackageException($"运行包目录不存在：{normalizedRoot}");
@@ -94,16 +94,28 @@ public sealed class RuntimePackageLoader
             package.AssetContext = await LoadAssetContextAsync(manifest, normalizedRoot, cancellationToken);
             package.PackageFlow = CloneFlow(flow);
             RebasePackageRelativeFileParameters(package.Flow, normalizedRoot);
+            var executionFlow = package.Flow.ToEntity();
+            var executionIdentityFlow = package.PackageFlow.ToEntity();
+            var resourceBindings = ExecutionResourceBindingManifest.Build(
+                executionFlow,
+                "RuntimePackage",
+                new Dictionary<string, string>
+                {
+                    ["PackageRoot"] = normalizedRoot,
+                    ["PackageId"] = manifest.PackageId,
+                    ["PackageRevision"] = manifest.SourceProjectRevision.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                    ["PackageFlowHash"] = ExecutionFlowIdentity.ComputeFlowHash(executionIdentityFlow)
+                });
             package.ExecutionSnapshot = new ExecutionSnapshot(
                 ResolveSnapshotProjectId(manifest),
-                package.Flow.ToEntity(),
+                executionFlow,
                 manifest.SourceProjectRevision,
                 ExecutionSnapshotSource.RuntimePackage,
                 ExecutionRunMode.StationRuntime,
-                new Dictionary<string, string> { ["PackageRoot"] = normalizedRoot },
+                resourceBindings,
                 runtimePackageId: manifest.PackageId,
                 globalVariables: globalVariables,
-                executionIdentityFlow: package.PackageFlow.ToEntity());
+                executionIdentityFlow: executionIdentityFlow);
 
             _logger.LogInformation(
                 "Loaded runtime package {PackageId} from {PackageRoot}",

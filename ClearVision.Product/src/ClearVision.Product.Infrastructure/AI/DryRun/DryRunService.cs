@@ -15,6 +15,11 @@ namespace ClearVision.Product.Infrastructure.AI.DryRun;
 /// </summary>
 public class DryRunService
 {
+    internal const int MaxInputCount = 64;
+    internal const int MaxBinaryInputBytes = 16 * 1024 * 1024;
+    internal const int MaxStringInputCharacters = 1024 * 1024;
+    internal const int MaxTotalInputBytes = 16 * 1024 * 1024;
+
     private readonly IFlowExecutionService _flowExecutionService;
 
     public DryRunService(IFlowExecutionService flowExecutionService)
@@ -46,6 +51,11 @@ public class DryRunService
         ProjectVariableExecutionContext? projectVariables,
         CancellationToken cancellationToken = default)
     {
+        ArgumentNullException.ThrowIfNull(flow);
+        ArgumentNullException.ThrowIfNull(testInputs);
+        ArgumentNullException.ThrowIfNull(stubRegistry);
+        cancellationToken.ThrowIfCancellationRequested();
+
         var result = new DryRunResult
         {
             StartTime = DateTime.UtcNow,
@@ -53,32 +63,86 @@ public class DryRunService
             FlowName = flow.Name
         };
 
-        // 设置全局 DryRun 上下文
-        DryRunContext.Current = new DryRunContext
+        Dictionary<string, object> boundedInputs;
+        try
+        {
+            boundedInputs = new Dictionary<string, object>(testInputs, StringComparer.Ordinal);
+        }
+        catch
+        {
+            return CompleteRejected(
+                result,
+                "ADMISSION_DRY_RUN_INPUT_INVALID",
+                "Dry-run inputs could not be captured safely.");
+        }
+
+        var inputViolation = ValidateInputs(boundedInputs);
+        if (inputViolation != null)
+        {
+            return CompleteRejected(result, "ADMISSION_DRY_RUN_INPUT_BOUNDS", inputViolation);
+        }
+
+        // This is an internal, offline-only preview authority. Every run gets
+        // an isolated synthetic project/session/run identity, an explicit
+        // derived capability manifest, and distinct confirmation/audit ids.
+        // Preview policy remains authoritative and rejects every external I/O
+        // capability before an operator handler can be selected.
+        var snapshot = CreateSandboxSnapshot(flow);
+        var authority = ExecutionAuthorityMatrix.Validate(snapshot);
+        if (!authority.Allowed)
+        {
+            return CompleteRejected(result, authority.Code, authority.Message);
+        }
+
+        FlowValidationResult? validation;
+        try
+        {
+            validation = _flowExecutionService.ValidateSnapshot(snapshot);
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch
+        {
+            return CompleteRejected(
+                result,
+                "ADMISSION_DRY_RUN_VALIDATION_UNAVAILABLE",
+                "Dry-run flow validation is unavailable.");
+        }
+
+        if (validation is not { IsValid: true })
+        {
+            var message = validation?.Errors.Count > 0
+                ? string.Join("; ", validation.Errors)
+                : "Dry-run flow validation failed closed.";
+            return CompleteRejected(result, "ADMISSION_DRY_RUN_FLOW_INVALID", message);
+        }
+
+        var previousContext = DryRunContext.Current;
+        var runContext = new DryRunContext
         {
             IsDryRun = true,
             StubRegistry = stubRegistry,
-            BranchExecutionCounts = new Dictionary<string, int>()
+            BranchExecutionCounts = new Dictionary<string, int>(),
+            SnapshotId = snapshot.SnapshotId,
+            SessionId = snapshot.SessionId,
+            RunId = snapshot.RunId
         };
+        DryRunContext.Current = runContext;
 
         try
         {
-            var snapshot = new ExecutionSnapshot(
-                flow.Id == Guid.Empty ? Guid.NewGuid() : flow.Id,
-                flow,
-                persistenceRevision: 0,
-                ExecutionSnapshotSource.Draft,
-                ExecutionRunMode.Preview);
             // 执行流程
             var flowResult = projectVariables == null
                 ? await _flowExecutionService.ExecuteWithSnapshotAsync(
                     snapshot,
-                    testInputs,
+                    boundedInputs,
                     enableParallel: false,
                     cancellationToken)
                 : await _flowExecutionService.ExecuteWithSnapshotAsync(
                     snapshot,
-                    testInputs,
+                    boundedInputs,
                     new ProjectVariableExecutionContext(
                         projectVariables.Session,
                         projectVariables.BindingIndex,
@@ -91,7 +155,7 @@ public class DryRunService
             result.IsSuccess = flowResult.IsSuccess;
 
             // 收集分支覆盖信息
-            result.BranchExecutionCounts = DryRunContext.Current.BranchExecutionCounts;
+            result.BranchExecutionCounts = runContext.BranchExecutionCounts;
             result.TotalBranches = result.BranchExecutionCounts.Count;
             result.CoveredBranches = result.BranchExecutionCounts.Count(x => x.Value > 0);
             result.CoveragePercentage = result.TotalBranches > 0
@@ -100,12 +164,100 @@ public class DryRunService
         }
         finally
         {
-            DryRunContext.Current = null;
+            DryRunContext.Current = previousContext;
         }
 
         result.EndTime = DateTime.UtcNow;
         result.DurationMs = (result.EndTime - result.StartTime).TotalMilliseconds;
 
+        return result;
+    }
+
+    private static ExecutionSnapshot CreateSandboxSnapshot(OperatorFlow flow)
+    {
+        const long revision = 0;
+        var sessionId = Guid.NewGuid();
+        var runId = Guid.NewGuid();
+        var flowHash = ExecutionFlowIdentity.ComputeFlowHash(flow);
+        return new ExecutionSnapshot(
+            Guid.NewGuid(),
+            flow,
+            revision,
+            ExecutionSnapshotSource.Draft,
+            ExecutionRunMode.Preview,
+            new Dictionary<string, string>
+            {
+                ["ProjectRevision"] = revision.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                ["FlowHash"] = flowHash,
+                ["ExecutionScope"] = "OfflineDryRun"
+            },
+            principal: new ExecutionPrincipal(
+                $"dry-run:{sessionId:N}",
+                "AI Dry-Run Sandbox",
+                "Engineer",
+                IsAuthenticated: true),
+            capabilityManifest: ExecutionCapabilityManifest.Derive(flow, isExplicit: true),
+            expectedProjectRevision: revision,
+            confirmationId: Guid.NewGuid().ToString("D"),
+            auditId: Guid.NewGuid().ToString("D"),
+            sessionId: sessionId,
+            runId: runId);
+    }
+
+    private static string? ValidateInputs(IReadOnlyDictionary<string, object> inputs)
+    {
+        if (inputs.Count > MaxInputCount)
+        {
+            return $"Dry-run input count exceeds the hard limit of {MaxInputCount}.";
+        }
+
+        long totalInputBytes = 0;
+        foreach (var (name, value) in inputs)
+        {
+            if (string.IsNullOrWhiteSpace(name))
+            {
+                return "Dry-run input names must be non-empty.";
+            }
+
+            switch (value)
+            {
+                case byte[] bytes:
+                    if (bytes.Length > MaxBinaryInputBytes)
+                    {
+                        return $"Dry-run binary input '{name}' exceeds the hard size limit.";
+                    }
+                    totalInputBytes += bytes.Length;
+                    break;
+                case string text:
+                    if (text.Length > MaxStringInputCharacters)
+                    {
+                        return $"Dry-run text input '{name}' exceeds the hard size limit.";
+                    }
+                    totalInputBytes += (long)text.Length * sizeof(char);
+                    break;
+                case Stream:
+                    return $"Dry-run input '{name}' cannot carry a live stream or file handle.";
+            }
+
+            if (totalInputBytes > MaxTotalInputBytes)
+            {
+                return $"Dry-run inputs exceed the total hard budget of {MaxTotalInputBytes} bytes.";
+            }
+        }
+
+        return null;
+    }
+
+    private static DryRunResult CompleteRejected(DryRunResult result, string code, string message)
+    {
+        result.IsSuccess = false;
+        result.FlowResult = new FlowExecutionResult
+        {
+            IsSuccess = false,
+            ErrorMessage = $"{code}: {message}"
+        };
+        result.EndTime = DateTime.UtcNow;
+        result.DurationMs = (result.EndTime - result.StartTime).TotalMilliseconds;
         return result;
     }
 
@@ -154,22 +306,24 @@ public class DryRunService
 }
 
 /// <summary>
-/// DryRun 全局上下文
+/// DryRun async-flow-local 上下文
 /// </summary>
 public class DryRunContext
 {
-    [ThreadStatic]
-    private static DryRunContext? _current;
+    private static readonly AsyncLocal<DryRunContext?> CurrentContext = new();
 
     public static DryRunContext? Current
     {
-        get => _current;
-        set => _current = value;
+        get => CurrentContext.Value;
+        set => CurrentContext.Value = value;
     }
 
     public bool IsDryRun { get; set; }
     public DryRunStubRegistry? StubRegistry { get; set; }
     public Dictionary<string, int> BranchExecutionCounts { get; set; } = new();
+    public Guid SnapshotId { get; set; }
+    public Guid SessionId { get; set; }
+    public Guid RunId { get; set; }
 
     /// <summary>
     /// 记录分支执行

@@ -66,7 +66,8 @@ public sealed class ContinuousInspectionWorker
         IImageCacheRepository? imageCacheRepository = null,
         IProjectVariableSession? projectVariableSession = null,
         ProjectVariableBindingIndex? projectVariableBindingIndex = null,
-        ProjectVariableCommitHandler? projectVariableCommitHandler = null)
+        ProjectVariableCommitHandler? projectVariableCommitHandler = null,
+        ProjectSaveCoordinator? projectSaveCoordinator = null)
     {
         ArgumentNullException.ThrowIfNull(executionSnapshot);
         if (mode != ContinuousInspectionMode.Primary ||
@@ -81,6 +82,22 @@ public sealed class ContinuousInspectionWorker
         ArgumentException.ThrowIfNullOrWhiteSpace(cameraId);
         ArgumentNullException.ThrowIfNull(config);
         config.Normalize();
+
+        var validation = await flowExecution.ValidateSnapshotAsync(executionSnapshot, cancellationToken);
+        if (!validation.IsValid)
+        {
+            throw new InvalidOperationException(
+                $"ADMISSION_EXECUTION_SNAPSHOT_INVALID: {string.Join("; ", validation.Errors)}");
+        }
+
+        var authoritativeCameraBindingId = ResolveAuthoritativeExternalCameraBinding(executionSnapshot);
+        if (!string.Equals(cameraId.Trim(), authoritativeCameraBindingId, StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException(
+                "ADMISSION_EXTERNAL_CAMERA_BINDING_MISMATCH: Continuous camera does not match the immutable execution snapshot.");
+        }
+
+        cameraId = authoritativeCameraBindingId;
 
         await using var scheduler = new InferenceScheduler(config.SchedulerQueueLength, _logger);
         using var detector = new FrameDifferenceArrivalDetector();
@@ -237,7 +254,21 @@ public sealed class ContinuousInspectionWorker
         while (!cancellationToken.IsCancellationRequested)
         {
             var restartRequested = false;
-            var lease = await streamCoordinator.AcquireStreamLeaseAsync(cameraId, cancellationToken);
+            CameraStreamLease lease;
+            var access = projectSaveCoordinator == null
+                ? null
+                : await projectSaveCoordinator.AcquireProjectAccessAsync(projectId, cancellationToken);
+            await using (access)
+            {
+                validation = await flowExecution.ValidateSnapshotAsync(executionSnapshot, cancellationToken);
+                if (!validation.IsValid)
+                {
+                    throw new InvalidOperationException(
+                        $"ADMISSION_EXECUTION_SNAPSHOT_INVALID: {string.Join("; ", validation.Errors)}");
+                }
+
+                lease = await streamCoordinator.AcquireStreamLeaseAsync(cameraId, cancellationToken);
+            }
 
             // 1. 创建基于 Bounded 背压的帧收集 Channel (包含 Frame 和 TrackId 元组)
             var frameChannel = Channel.CreateBounded<(ClearVision.Product.Core.Streaming.FrameEnvelope Frame, string TrackId)>(new BoundedChannelOptions(config.SchedulerQueueLength > 0 ? config.SchedulerQueueLength : 100)
@@ -399,6 +430,19 @@ public sealed class ContinuousInspectionWorker
 
             await Task.Delay(CameraStreamRestartDelay, cancellationToken);
         }
+    }
+
+    private static string ResolveAuthoritativeExternalCameraBinding(ExecutionSnapshot snapshot)
+    {
+        if (!snapshot.ExternalCapabilities.HasFlag(ExecutionSideEffect.DeviceRead) ||
+            !snapshot.ResourceBindings.TryGetValue("CameraBindingId", out var cameraBindingId) ||
+            string.IsNullOrWhiteSpace(cameraBindingId))
+        {
+            throw new InvalidOperationException(
+                "ADMISSION_EXTERNAL_CAMERA_BINDING_REQUIRED: Continuous inspection requires a server-bound snapshot camera.");
+        }
+
+        return cameraBindingId.Trim();
     }
 
     private static bool IsRecoverableCameraStreamFault(InvalidOperationException exception)

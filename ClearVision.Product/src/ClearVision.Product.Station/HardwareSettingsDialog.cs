@@ -733,10 +733,11 @@ public sealed class HardwareSettingsDialog : Form
 
     private async Task TestPlcConnectionAsync()
     {
-        CommitActivePlcProfile();
         _plcStatusLabel.ForeColor = Color.DimGray;
-        _plcStatusLabel.Text = "正在测试 PLC 连接...";
-        var result = await _settingsService.TestPlcConnectionAsync(_communication, CancellationToken.None);
+        _plcStatusLabel.Text = "正在测试已保存的 PLC Profile...";
+        var result = await _settingsService.TestPlcConnectionAsync(
+            _communication.ActiveProtocol,
+            CancellationToken.None);
         _plcStatusLabel.ForeColor = result.Success ? Color.SeaGreen : Color.Firebrick;
         _plcStatusLabel.Text = result.Message;
     }

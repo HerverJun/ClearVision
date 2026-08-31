@@ -9,19 +9,16 @@ namespace ClearVision.Product.Core.Services;
 public interface IFlowNodePreviewService
 {
     /// <summary>
-    /// 执行目标节点上游子图并返回结构化预览结果
+    /// Executes a target-node preview only with an explicit project/revision/principal authority.
     /// </summary>
     Task<FlowNodePreviewWithMetricsResult> PreviewWithMetricsAsync(
         OperatorFlow flow,
         Guid targetNodeId,
         byte[]? inputImage,
-        CancellationToken ct = default);
-
-    Task<FlowNodePreviewWithMetricsResult> PreviewWithMetricsAsync(
-        OperatorFlow flow,
-        Guid targetNodeId,
-        byte[]? inputImage,
-        ProjectVariableExecutionContext? projectVariables,
+        Guid projectId,
+        long persistenceRevision,
+        ExecutionRequestAuthority authority,
+        ProjectVariableExecutionContext? projectVariables = null,
         CancellationToken ct = default);
 }
 

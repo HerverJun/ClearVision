@@ -321,7 +321,7 @@ test('PLC current-protocol save payload excludes unsaved drafts from other proto
   assert.equal(allProfilesPayload.mc.ipAddress, '10.10.10.22');
 });
 
-test('PLC connection test sends current protocol form values and restores loading state', async () => {
+test('PLC connection test sends only the persisted profile id and restores loading state', async () => {
   const view = createView({
     ...baseCommunication(),
     activeProtocol: 'MC'
@@ -353,14 +353,7 @@ test('PLC connection test sends current protocol form values and restores loadin
     settingsApi.testPlcConnection = originalTestConnection;
   }
 
-  assert.deepEqual(capturedPayloads, [{
-    protocol: 'MC',
-    ipAddress: '10.20.30.40',
-    port: 5010,
-    cpuType: null,
-    rack: null,
-    slot: null
-  }]);
+  assert.deepEqual(capturedPayloads, [{ profileId: 'MC' }]);
   assert.equal(button.disabled, false);
   assert.equal(button.plcTestLabel.textContent, '连接测试');
   assert.equal(view.plcConnectionStatus, 'connected');

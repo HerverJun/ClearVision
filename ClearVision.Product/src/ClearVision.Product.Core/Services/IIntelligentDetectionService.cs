@@ -31,13 +31,17 @@ public interface IIntelligentDetectionService
         CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// 自适应曝光调整
+    /// Executes a retry policy only for an already captured authoritative
+    /// stored-project or runtime-package snapshot. The camera argument is a
+    /// server binding id and must match the snapshot resource binding.
     /// </summary>
-    /// <param name="camera">相机实例</param>
-    /// <param name="imageBrightness">当前图像亮度</param>
-    /// <param name="targetBrightness">目标亮度</param>
-    /// <returns>调整后的曝光时间</returns>
-    Task<double> AdjustExposureAsync(ICamera camera, double imageBrightness, double targetBrightness = 128.0);
+    Task<DetectionResult> ExecuteWithRetryAsync(
+        ICameraManager cameraManager,
+        string cameraBindingId,
+        IFlowExecutionService flowService,
+        ExecutionSnapshot snapshot,
+        RetryPolicy policy,
+        CancellationToken cancellationToken = default);
 
     /// <summary>
     /// 计算图像亮度

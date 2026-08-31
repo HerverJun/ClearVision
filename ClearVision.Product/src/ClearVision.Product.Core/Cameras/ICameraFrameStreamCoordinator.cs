@@ -17,9 +17,19 @@ public interface ICameraFrameStreamCoordinator : IAsyncDisposable
         CancellationToken cancellationToken = default);
     Task ReleaseStreamLeaseAsync(CameraStreamLease lease);
     Task ReleaseIdleStreamAsync(string cameraId);
-    Task<CameraPreviewSession> StartPreviewSessionAsync(string cameraId, CancellationToken cancellationToken = default);
-    Task<CameraStreamFrame> WaitForPreviewFrameAsync(string sessionId, CancellationToken cancellationToken = default);
-    Task StopPreviewSessionAsync(string sessionId);
+    Task<CameraPreviewSession> StartPreviewSessionAsync(
+        string cameraId,
+        string ownerHash,
+        CancellationToken cancellationToken = default);
+    Task<CameraStreamFrame> WaitForPreviewFrameAsync(
+        string sessionId,
+        string ownerHash,
+        CancellationToken cancellationToken = default);
+    Task<CameraPreviewHeartbeat?> HeartbeatPreviewSessionAsync(
+        string sessionId,
+        string ownerHash,
+        CancellationToken cancellationToken = default);
+    Task<bool> StopPreviewSessionAsync(string sessionId, string ownerHash);
     bool TryGetLatestFrameEnvelope(string cameraId, out FrameEnvelope? frame);
     IReadOnlyList<FrameEnvelope> GetFrameEnvelopeWindow(string cameraId, long centerSequence, int before, int after);
     RingBufferStats SnapshotFrameBufferStats(string cameraId);
@@ -48,7 +58,13 @@ public sealed record CameraPreviewSession(
     string SessionId,
     string CameraBindingId,
     CameraTriggerMode TriggerMode,
-    int TargetFrameRateFps);
+    int TargetFrameRateFps,
+    DateTimeOffset ExpiresAtUtc,
+    int HeartbeatIntervalMs);
+
+public sealed record CameraPreviewHeartbeat(
+    string SessionId,
+    DateTimeOffset ExpiresAtUtc);
 
 public sealed record RingBufferStats(
     int Capacity,

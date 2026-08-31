@@ -150,6 +150,48 @@ public sealed class StationSyncHostedServiceTests
             health.CameraStatusSummary.Should().Contain("Connected");
             health.CameraStatusSummary.Should().Contain("Station Camera A");
             health.CameraStatusSummary.Should().Contain("SN-A");
+            cameraManager.DidNotReceive().GetCamera("cam-a");
+        }
+        finally
+        {
+            if (Directory.Exists(root))
+            {
+                Directory.Delete(root, recursive: true);
+            }
+        }
+    }
+
+    [Fact]
+    public async Task Health_WhenBindingHasNoServerSerial_ShouldNotTreatBindingIdAsRuntimeCameraTarget()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "ClearVisionStationSyncHealthCameraAuthorityTests", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+
+        var forgedCamera = Substitute.For<ICamera>();
+        forgedCamera.IsConnected.Returns(true);
+        var cameraManager = Substitute.For<ICameraManager>();
+        cameraManager.GetBindings().Returns(new List<CameraBindingConfig>
+        {
+            new()
+            {
+                Id = "cam-unbound",
+                DisplayName = "Unbound Camera",
+                SerialNumber = string.Empty,
+                IsEnabled = true
+            }
+        });
+        cameraManager.GetCamera("cam-unbound").Returns(forgedCamera);
+
+        try
+        {
+            await using var fixture = CreateFixture(root, outboundQueueCapacity: 4, cameraManager);
+            var export = await ExportCameraRuntimePackageAsync(root, "cam-unbound");
+            await fixture.RuntimeHost.LoadPackageAsync(export.PackageRootPath);
+
+            var health = InvokeBuildHealth(fixture);
+
+            health.CameraStatusSummary.Should().Contain("Disconnected");
+            cameraManager.DidNotReceive().GetCamera("cam-unbound");
         }
         finally
         {
@@ -399,8 +441,12 @@ public sealed class StationSyncHostedServiceTests
             LogDirectory = Path.Combine(root, "logs")
         });
 
+        var flowExecution = Substitute.For<IFlowExecutionService>();
+        flowExecution.ValidateSnapshot(Arg.Any<ExecutionSnapshot>())
+            .Returns(new FlowValidationResult { IsValid = true });
+
         var runtimeHost = new RuntimeHost(
-            Substitute.For<IFlowExecutionService>(),
+            flowExecution,
             new RuntimePackageLoader(new RuntimePackageValidator(), NullLogger<RuntimePackageLoader>.Instance),
             new RuntimeResultNormalizer(),
             NullLogger<RuntimeHost>.Instance);
@@ -609,6 +655,7 @@ public sealed class StationSyncHostedServiceTests
                 Type = OperatorType.SiemensS7Communication,
                 Parameters =
                 [
+                    CreateParameter("ProfileId", "string", "S7"),
                     CreateParameter("IpAddress", "string", "192.168.10.25"),
                     CreateParameter("Port", "int", 102),
                     CreateParameter("CpuType", "enum", "S71200"),

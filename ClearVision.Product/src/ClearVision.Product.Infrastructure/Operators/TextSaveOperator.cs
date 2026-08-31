@@ -2,7 +2,6 @@
 // 文本保存算子
 // 将流程文本结果按格式写入文件系统
 // 作者：蘅芜君
-using System.Collections.Concurrent;
 using System.Text;
 using System.Text.Json;
 using ClearVision.Product.Core.Attributes;
@@ -33,7 +32,15 @@ namespace ClearVision.Product.Infrastructure.Operators;
 [OperatorParam("Encoding", "Encoding", "enum", DefaultValue = "UTF8", Options = new[] { "UTF8|UTF8", "GBK|GBK" })]
 public class TextSaveOperator : OperatorBase
 {
-    private static readonly ConcurrentDictionary<string, SemaphoreSlim> FileLocks = new(StringComparer.OrdinalIgnoreCase);
+    // A fixed stripe table gives every canonical path a stable serialization gate without retaining
+    // attacker- or template-controlled path strings for the lifetime of the process.
+    private const int FileLockStripeCount = 256;
+    private static readonly SemaphoreSlim[] FileLockStripes = Enumerable
+        .Range(0, FileLockStripeCount)
+        .Select(static _ => new SemaphoreSlim(1, 1))
+        .ToArray();
+
+    internal static int RetainedFileLockCount => FileLockStripes.Length;
 
     public override OperatorType OperatorType => OperatorType.TextSave;
 
@@ -197,20 +204,41 @@ public class TextSaveOperator : OperatorBase
         Encoding encoding,
         CancellationToken cancellationToken)
     {
-        var fileLock = FileLocks.GetOrAdd(filePath, _ => new SemaphoreSlim(1, 1));
+        await ExecuteWithFileLockAsync(
+            filePath,
+            async token =>
+            {
+                var fileMode = appendMode ? FileMode.Append : FileMode.Create;
+                await using var stream = new FileStream(
+                    filePath,
+                    fileMode,
+                    FileAccess.Write,
+                    FileShare.Read,
+                    bufferSize: 4096,
+                    options: FileOptions.Asynchronous);
+                await using var writer = new StreamWriter(stream, encoding);
+                await writer.WriteAsync(content.AsMemory(), token);
+            },
+            cancellationToken);
+    }
+
+    internal static async Task ExecuteWithFileLockAsync(
+        string filePath,
+        Func<CancellationToken, Task> action,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(filePath);
+        ArgumentNullException.ThrowIfNull(action);
+
+        var canonicalPath = Path.GetFullPath(filePath);
+        var hash = StringComparer.OrdinalIgnoreCase.GetHashCode(canonicalPath);
+        var stripeIndex = (int)((uint)hash % (uint)FileLockStripes.Length);
+        var fileLock = FileLockStripes[stripeIndex];
+
         await fileLock.WaitAsync(cancellationToken);
         try
         {
-            var fileMode = appendMode ? FileMode.Append : FileMode.Create;
-            await using var stream = new FileStream(
-                filePath,
-                fileMode,
-                FileAccess.Write,
-                FileShare.Read,
-                bufferSize: 4096,
-                options: FileOptions.Asynchronous);
-            await using var writer = new StreamWriter(stream, encoding);
-            await writer.WriteAsync(content.AsMemory(), cancellationToken);
+            await action(cancellationToken);
         }
         finally
         {

@@ -84,6 +84,7 @@ const settingsApi = {
     listSerialPhotoelectricPorts: () => httpClient.get('/trigger-input/serial-photoelectric-ports'),
     testSerialPhotoelectric: payload => httpClient.post('/trigger-input/test-serial-photoelectric', payload),
     startContinuousPreview: payload => httpClient.post('/cameras/continuous-preview/start', payload),
+    heartbeatContinuousPreview: payload => httpClient.post('/cameras/continuous-preview/heartbeat', payload),
     stopContinuousPreview: payload => httpClient.post('/cameras/continuous-preview/stop', payload),
     fetchContinuousPreviewFrame: (sessionId, cacheKey, options) =>
         httpClient.getForBlob(`/cameras/continuous-preview/frame/${encodeURIComponent(sessionId)}?_=${cacheKey}`, options),

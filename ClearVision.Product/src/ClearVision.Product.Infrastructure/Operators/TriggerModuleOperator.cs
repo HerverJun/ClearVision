@@ -7,6 +7,7 @@ using ClearVision.Product.Core.Attributes;
 using ClearVision.Product.Core.Entities;
 using ClearVision.Product.Core.Enums;
 using ClearVision.Product.Core.Operators;
+using ClearVision.Product.Core.Services;
 using Microsoft.Extensions.Logging;
 
 namespace ClearVision.Product.Infrastructure.Operators;
@@ -30,7 +31,7 @@ public class TriggerModuleOperator : OperatorBase
     private static readonly TimeSpan StateTtl = TimeSpan.FromMinutes(30);
     private static readonly TimeSpan CleanupInterval = TimeSpan.FromMinutes(5);
 
-    private readonly ConcurrentDictionary<Guid, TriggerModuleState> _states = new();
+    private readonly ConcurrentDictionary<ExecutionStateKey, TriggerModuleState> _states = new();
     private readonly object _cleanupSync = new();
     private DateTime _lastCleanupUtc = DateTime.MinValue;
 
@@ -58,7 +59,8 @@ public class TriggerModuleOperator : OperatorBase
 
         var triggered = false;
         var count = 0;
-        var state = _states.GetOrAdd(@operator.Id, static _ => new TriggerModuleState());
+        var stateKey = ExecutionStateKey.ForOperator(@operator.Id);
+        var state = _states.GetOrAdd(stateKey, static _ => new TriggerModuleState());
 
         lock (state.SyncRoot)
         {
@@ -92,8 +94,8 @@ public class TriggerModuleOperator : OperatorBase
             { "Triggered", triggered },
             { "Timestamp", now.ToString("O") },
             { "TriggerCount", count },
-            { "StateScope", "OperatorInstance" },
-            { "StateKey", @operator.Id }
+            { "StateScope", "Project/Session/Flow/Run/Operator" },
+            { "StateKey", stateKey.ToString() }
         };
 
         return Task.FromResult(OperatorExecutionOutput.Success(output));

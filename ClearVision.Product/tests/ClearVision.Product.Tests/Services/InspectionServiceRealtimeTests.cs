@@ -28,12 +28,14 @@ public class InspectionServiceRealtimeTests
     {
         var context = CreateContext();
         var projectId = Guid.NewGuid();
+        var flow = CreateDecisionFlow("Realtime");
 
         await context.Service.StartRealtimeInspectionFlowAsync(
             projectId,
-            CreateDecisionFlow("Realtime"),
+            flow,
             cameraId: null,
-            CancellationToken.None);
+            authority: CreateDraftAuthority(flow),
+            cancellationToken: CancellationToken.None);
 
         await WaitUntilAsync(
             () => context.Coordinator.GetState(projectId)?.Status == RuntimeStatus.Running,
@@ -50,12 +52,14 @@ public class InspectionServiceRealtimeTests
     {
         var context = CreateContext();
         var projectId = Guid.NewGuid();
+        var firstFlow = CreateDecisionFlow("Realtime");
 
         await context.Service.StartRealtimeInspectionFlowAsync(
             projectId,
-            CreateDecisionFlow("Realtime"),
+            firstFlow,
             cameraId: null,
-            CancellationToken.None);
+            authority: CreateDraftAuthority(firstFlow),
+            cancellationToken: CancellationToken.None);
 
         await WaitUntilAsync(
             () => context.Coordinator.GetState(projectId)?.Status == RuntimeStatus.Running,
@@ -63,11 +67,13 @@ public class InspectionServiceRealtimeTests
 
         await context.Service.StopRealtimeInspectionAsync(projectId);
 
+        var restartFlow = CreateDecisionFlow("Realtime-Restart");
         await context.Service.StartRealtimeInspectionFlowAsync(
             projectId,
-            CreateDecisionFlow("Realtime-Restart"),
+            restartFlow,
             cameraId: null,
-            CancellationToken.None);
+            authority: CreateDraftAuthority(restartFlow),
+            cancellationToken: CancellationToken.None);
 
         await WaitUntilAsync(
             () => context.Coordinator.GetState(projectId)?.Status is RuntimeStatus.Starting or RuntimeStatus.Running,
@@ -95,12 +101,14 @@ public class InspectionServiceRealtimeTests
             });
         var service = CreateService(coordinator, worker);
         var projectId = Guid.NewGuid();
+        var flow = CreateDecisionFlow("Realtime-Start-Failure");
 
         var act = async () => await service.StartRealtimeInspectionFlowAsync(
             projectId,
-            CreateDecisionFlow("Realtime-Start-Failure"),
+            flow,
             cameraId: null,
-            cancellation.Token);
+            authority: CreateDraftAuthority(flow),
+            cancellationToken: cancellation.Token);
 
         await act.Should().ThrowAsync<InvalidOperationException>()
             .WithMessage("实时检测启动失败，请重试");
@@ -110,9 +118,33 @@ public class InspectionServiceRealtimeTests
     }
 
     [Fact]
-    public async Task StartRealtimeInspectionFlowAsync_WithInlineSideEffectFlow_ShouldStartOfficiallyWithoutAdmissionBlock()
+    public async Task StartRealtimeInspectionFlowAsync_LegacyInlineDraft_ShouldFailClosedBeforeWorkerDispatch()
     {
-        // 检测页“连续运行”属于正式运行：内联 TextSave 写盘算子放行，正常注册会话并启动 Worker。
+        var coordinator = new InspectionRuntimeCoordinator(NullLogger<InspectionRuntimeCoordinator>.Instance);
+        var worker = Substitute.For<IInspectionWorker>();
+        var service = CreateService(coordinator, worker);
+        var projectId = Guid.NewGuid();
+
+        var act = () => service.StartRealtimeInspectionFlowAsync(
+            projectId,
+            CreateDecisionFlow("legacy-inline-draft"),
+            cameraId: null,
+            CancellationToken.None);
+
+        await act.Should().ThrowAsync<ExecutionAdmissionService.ExecutionAdmissionRejectedException>()
+            .WithMessage("*ADMISSION_DRAFT_REVISION_REQUIRED*");
+        await worker.DidNotReceiveWithAnyArgs().TryStartRunAsync(
+            default,
+            default!,
+            default,
+            default);
+        coordinator.GetState(projectId).Should().BeNull();
+    }
+
+    [Fact]
+    public async Task StartRealtimeInspectionAsync_WithStoredSideEffectFlow_ShouldStartOfficiallyWithoutAdmissionBlock()
+    {
+        // Industrial side effects remain available through the authoritative stored-project source.
         var coordinator = new InspectionRuntimeCoordinator(NullLogger<InspectionRuntimeCoordinator>.Instance);
         var worker = Substitute.For<IInspectionWorker>();
         worker.TryStartRunAsync(
@@ -121,19 +153,23 @@ public class InspectionServiceRealtimeTests
                 Arg.Any<string?>(),
                 Arg.Any<ExecutionSnapshot?>())
             .Returns(Task.FromResult(true));
-        var service = CreateService(coordinator, worker);
         var projectId = Guid.NewGuid();
+        var storedProject = new Project("stored-side-effect-realtime-project");
+        storedProject.UpdateFlow(CreateSideEffectFlow(OperatorType.TextSave));
+        var service = CreateService(coordinator, worker, storedProject);
 
-        await service.StartRealtimeInspectionFlowAsync(
+        await service.StartRealtimeInspectionAsync(
             projectId,
-            CreateSideEffectFlow(OperatorType.TextSave),
             cameraId: null,
-            CancellationToken.None);
+            authority: CreateStoredOperatorAuthority(),
+            cancellationToken: CancellationToken.None);
 
         await worker.Received(1).TryStartRunAsync(
             Arg.Any<Guid>(),
             Arg.Is<ExecutionSnapshot>(snapshot =>
                 snapshot.ProjectId == projectId &&
+                snapshot.Source == ExecutionSnapshotSource.PersistedProject &&
+                snapshot.Principal.IsOperator &&
                 snapshot.CreateExecutionFlow().Operators.Any(op => op.Type == OperatorType.TextSave)),
             Arg.Any<string?>(),
             Arg.Any<ExecutionSnapshot?>());
@@ -163,7 +199,8 @@ public class InspectionServiceRealtimeTests
             projectId,
             flow,
             cameraId: null,
-            CancellationToken.None);
+            authority: CreateDraftAuthority(flow),
+            cancellationToken: CancellationToken.None);
 
         captured.Should().NotBeNull();
         captured!.DecisionConfigurationHash.Should().Be(
@@ -174,6 +211,14 @@ public class InspectionServiceRealtimeTests
     private static TestContext CreateContext()
     {
         var flowExecution = Substitute.For<IFlowExecutionService>();
+        flowExecution.ValidateSnapshot(Arg.Any<ExecutionSnapshot>()).Returns(new FlowValidationResult
+        {
+            IsValid = true
+        });
+        flowExecution.ValidateSnapshotAsync(
+                Arg.Any<ExecutionSnapshot>(),
+                Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(new FlowValidationResult { IsValid = true }));
         flowExecution.ExecuteWithSnapshotAsync(
                 Arg.Any<ExecutionSnapshot>(),
                 Arg.Any<Dictionary<string, object>?>(),
@@ -185,7 +230,9 @@ public class InspectionServiceRealtimeTests
         var resultChannelWriter = Substitute.For<IInspectionResultChannelWriter>();
         var resultRepository = Substitute.For<IInspectionResultRepository>();
         var projectRepository = Substitute.For<IProjectRepository>();
-        projectRepository.GetByIdFreshAsync(Arg.Any<Guid>()).Returns(new Project("active-realtime-project"));
+        var project = new Project("active-realtime-project");
+        projectRepository.GetByIdFreshAsync(Arg.Any<Guid>()).Returns(project);
+        projectRepository.GetWithFlowAsync(Arg.Any<Guid>()).Returns(project);
         var configurationService = Substitute.For<IConfigurationService>();
         var lifetime = Substitute.For<IHostApplicationLifetime>();
         lifetime.ApplicationStopping.Returns(CancellationToken.None);
@@ -229,13 +276,16 @@ public class InspectionServiceRealtimeTests
 
     private static InspectionService CreateService(
         IInspectionRuntimeCoordinator coordinator,
-        IInspectionWorker worker)
+        IInspectionWorker worker,
+        Project? project = null)
     {
         var flowExecution = Substitute.For<IFlowExecutionService>();
         var imageAcquisition = Substitute.For<IImageAcquisitionService>();
         var resultRepository = Substitute.For<IInspectionResultRepository>();
         var projectRepository = Substitute.For<IProjectRepository>();
-        projectRepository.GetByIdFreshAsync(Arg.Any<Guid>()).Returns(new Project("active-realtime-project"));
+        project ??= new Project("active-realtime-project");
+        projectRepository.GetByIdFreshAsync(Arg.Any<Guid>()).Returns(project);
+        projectRepository.GetWithFlowAsync(Arg.Any<Guid>()).Returns(project);
         var configurationService = Substitute.For<IConfigurationService>();
         configurationService.GetCurrent().Returns(new AppConfig());
 
@@ -286,6 +336,16 @@ public class InspectionServiceRealtimeTests
         flow.AddOperator(op);
         return flow.BindStringDecision(op);
     }
+
+    private static ExecutionRequestAuthority CreateDraftAuthority(OperatorFlow flow) => new(
+        new ExecutionPrincipal("engineer-realtime-tests", "Realtime Tests", "Engineer", IsAuthenticated: true),
+        expectedProjectRevision: 0,
+        capabilityManifest: ExecutionCapabilityManifest.Derive(flow, isExplicit: true),
+        confirmationId: $"confirmation-{Guid.NewGuid():N}",
+        auditId: $"audit-{Guid.NewGuid():N}");
+
+    private static ExecutionRequestAuthority CreateStoredOperatorAuthority() => new(
+        new ExecutionPrincipal("operator-realtime-tests", "Realtime Operator", "Operator", IsAuthenticated: true));
 
     private sealed record TestContext(
         ServiceProvider Provider,

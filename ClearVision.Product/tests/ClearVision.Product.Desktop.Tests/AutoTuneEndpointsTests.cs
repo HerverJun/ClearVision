@@ -6,6 +6,7 @@ using ClearVision.Product.Application.Services;
 using ClearVision.Product.Core.Entities;
 using ClearVision.Product.Core.Enums;
 using ClearVision.Product.Core.Interfaces;
+using ClearVision.Product.Core.ProjectVariables;
 using ClearVision.Product.Core.Services;
 using ClearVision.Product.Desktop.Endpoints;
 using ClearVision.Product.Desktop.Middleware;
@@ -58,6 +59,198 @@ public class AutoTuneEndpointsTests
         document.RootElement.GetArrayLength().Should().BeGreaterThan(0);
     }
 
+    [Theory]
+    [InlineData("/api/autotune/operator")]
+    [InlineData("/api/autotune/flow-node")]
+    public async Task RemovedAutoTuneExecutionRoutes_ShouldReturnNotFoundWithoutDispatch(string route)
+    {
+        var previewService = Substitute.For<IFlowNodePreviewService>();
+        var autoTuneService = Substitute.For<IAutoTuneService>();
+        await using var host = await AutoTuneEndpointTestHost.CreateAsync(previewService, autoTuneService);
+
+        using var response = await host.Client.PostAsJsonAsync(route, new { });
+
+        response.StatusCode.Should().Be(System.Net.HttpStatusCode.NotFound);
+        await previewService.DidNotReceiveWithAnyArgs().PreviewWithMetricsAsync(
+            Arg.Any<OperatorFlow>(),
+            Arg.Any<Guid>(),
+            Arg.Any<byte[]?>(),
+            Arg.Any<Guid>(),
+            Arg.Any<long>(),
+            Arg.Any<ExecutionRequestAuthority>(),
+            Arg.Any<ProjectVariableExecutionContext?>(),
+            Arg.Any<CancellationToken>());
+        await autoTuneService.DidNotReceiveWithAnyArgs().AutoTuneScenarioAsync(
+            Arg.Any<string>(),
+            Arg.Any<OperatorFlow>(),
+            Arg.Any<byte[]>(),
+            Arg.Any<AutoTuneGoal>(),
+            Arg.Any<Guid>(),
+            Arg.Any<long>(),
+            Arg.Any<ExecutionRequestAuthority>(),
+            Arg.Any<int>(),
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task OperatorRole_ShouldNotExecuteRetainedAutoTuneSurfaces()
+    {
+        var nodeId = Guid.NewGuid();
+        var previewService = Substitute.For<IFlowNodePreviewService>();
+        var autoTuneService = Substitute.For<IAutoTuneService>();
+        await using var host = await AutoTuneEndpointTestHost.CreateAsync(
+            previewService,
+            autoTuneService,
+            role: "Operator");
+
+        using var previewResponse = await host.Client.PostAsJsonAsync(
+            "/api/autotune/flow-node/preview",
+            CreatePreviewRequest(host.Project, nodeId, OperatorType.DetectionSequenceJudge));
+        using var scenarioResponse = await host.Client.PostAsJsonAsync(
+            "/api/autotune/scenario",
+            CreateScenarioRequest(host.Project, nodeId));
+
+        previewResponse.StatusCode.Should().Be(System.Net.HttpStatusCode.Forbidden);
+        scenarioResponse.StatusCode.Should().Be(System.Net.HttpStatusCode.Forbidden);
+        await previewService.DidNotReceiveWithAnyArgs().PreviewWithMetricsAsync(
+            Arg.Any<OperatorFlow>(),
+            Arg.Any<Guid>(),
+            Arg.Any<byte[]?>(),
+            Arg.Any<Guid>(),
+            Arg.Any<long>(),
+            Arg.Any<ExecutionRequestAuthority>(),
+            Arg.Any<ProjectVariableExecutionContext?>(),
+            Arg.Any<CancellationToken>());
+        await autoTuneService.DidNotReceiveWithAnyArgs().AutoTuneScenarioAsync(
+            Arg.Any<string>(),
+            Arg.Any<OperatorFlow>(),
+            Arg.Any<byte[]>(),
+            Arg.Any<AutoTuneGoal>(),
+            Arg.Any<Guid>(),
+            Arg.Any<long>(),
+            Arg.Any<ExecutionRequestAuthority>(),
+            Arg.Any<int>(),
+            Arg.Any<CancellationToken>());
+    }
+
+    [Theory]
+    [InlineData("missing-project", "ADMISSION_DRAFT_REVISION_REQUIRED")]
+    [InlineData("missing-revision", "ADMISSION_DRAFT_REVISION_REQUIRED")]
+    [InlineData("missing-confirmation", "ADMISSION_DRAFT_CONFIRMATION_REQUIRED")]
+    [InlineData("invalid-audit", "ADMISSION_DRAFT_CONFIRMATION_REQUIRED")]
+    [InlineData("same-authority-ids", "ADMISSION_DRAFT_CONFIRMATION_REQUIRED")]
+    [InlineData("missing-capabilities", "ADMISSION_DRAFT_CAPABILITY_CONFIRMATION_REQUIRED")]
+    [InlineData("forged-capabilities", "ADMISSION_CAPABILITY_MANIFEST_MISMATCH")]
+    [InlineData("unknown-project", "ADMISSION_PROJECT_NOT_ACTIVE")]
+    public async Task FlowNodePreview_ShouldRejectInvalidDraftAuthorityBeforeDispatch(
+        string mutation,
+        string expectedCode)
+    {
+        var nodeId = Guid.NewGuid();
+        var previewService = Substitute.For<IFlowNodePreviewService>();
+        var autoTuneService = Substitute.For<IAutoTuneService>();
+        await using var host = await AutoTuneEndpointTestHost.CreateAsync(previewService, autoTuneService);
+        var request = CreatePreviewRequest(host.Project, nodeId, OperatorType.DetectionSequenceJudge);
+
+        switch (mutation)
+        {
+            case "missing-project":
+                request.ProjectId = Guid.Empty;
+                break;
+            case "missing-revision":
+                request.ExpectedProjectRevision = null;
+                break;
+            case "missing-confirmation":
+                request.ConfirmationId = null;
+                break;
+            case "invalid-audit":
+                request.AuditId = "not-a-uuid";
+                break;
+            case "same-authority-ids":
+                request.AuditId = request.ConfirmationId;
+                break;
+            case "missing-capabilities":
+                request.DeclaredCapabilities = null;
+                break;
+            case "forged-capabilities":
+                request.DeclaredCapabilities = ExecutionSideEffect.FileRead;
+                break;
+            case "unknown-project":
+                request.ProjectId = Guid.NewGuid();
+                break;
+            default:
+                throw new ArgumentOutOfRangeException(nameof(mutation), mutation, null);
+        }
+
+        using var response = await host.Client.PostAsJsonAsync("/api/autotune/flow-node/preview", request);
+        var payload = await response.Content.ReadAsStringAsync();
+
+        response.IsSuccessStatusCode.Should().BeFalse(payload);
+        payload.Should().Contain(expectedCode);
+        await previewService.DidNotReceiveWithAnyArgs().PreviewWithMetricsAsync(
+            Arg.Any<OperatorFlow>(),
+            Arg.Any<Guid>(),
+            Arg.Any<byte[]?>(),
+            Arg.Any<Guid>(),
+            Arg.Any<long>(),
+            Arg.Any<ExecutionRequestAuthority>(),
+            Arg.Any<ProjectVariableExecutionContext?>(),
+            Arg.Any<CancellationToken>());
+        await autoTuneService.DidNotReceiveWithAnyArgs().AutoTuneScenarioAsync(
+            Arg.Any<string>(),
+            Arg.Any<OperatorFlow>(),
+            Arg.Any<byte[]>(),
+            Arg.Any<AutoTuneGoal>(),
+            Arg.Any<Guid>(),
+            Arg.Any<long>(),
+            Arg.Any<ExecutionRequestAuthority>(),
+            Arg.Any<int>(),
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task RetainedAutoTuneSurfaces_ShouldRejectDeletedOrStaleProjectBeforeDispatch()
+    {
+        var nodeId = Guid.NewGuid();
+        var previewService = Substitute.For<IFlowNodePreviewService>();
+        var autoTuneService = Substitute.For<IAutoTuneService>();
+        await using var host = await AutoTuneEndpointTestHost.CreateAsync(previewService, autoTuneService);
+
+        var staleScenario = CreateScenarioRequest(host.Project, nodeId);
+        staleScenario.ExpectedProjectRevision = host.Project.PersistenceRevision + 1;
+        using var staleResponse = await host.Client.PostAsJsonAsync("/api/autotune/scenario", staleScenario);
+        var stalePayload = await staleResponse.Content.ReadAsStringAsync();
+        staleResponse.StatusCode.Should().Be(System.Net.HttpStatusCode.Conflict, stalePayload);
+        stalePayload.Should().Contain("ADMISSION_DRAFT_REVISION_STALE");
+
+        host.Project.MarkAsDeleted();
+        var deletedPreview = CreatePreviewRequest(host.Project, nodeId, OperatorType.DetectionSequenceJudge);
+        using var deletedResponse = await host.Client.PostAsJsonAsync("/api/autotune/flow-node/preview", deletedPreview);
+        var deletedPayload = await deletedResponse.Content.ReadAsStringAsync();
+        deletedResponse.StatusCode.Should().Be(System.Net.HttpStatusCode.BadRequest, deletedPayload);
+        deletedPayload.Should().Contain("ADMISSION_PROJECT_NOT_ACTIVE");
+
+        await previewService.DidNotReceiveWithAnyArgs().PreviewWithMetricsAsync(
+            Arg.Any<OperatorFlow>(),
+            Arg.Any<Guid>(),
+            Arg.Any<byte[]?>(),
+            Arg.Any<Guid>(),
+            Arg.Any<long>(),
+            Arg.Any<ExecutionRequestAuthority>(),
+            Arg.Any<ProjectVariableExecutionContext?>(),
+            Arg.Any<CancellationToken>());
+        await autoTuneService.DidNotReceiveWithAnyArgs().AutoTuneScenarioAsync(
+            Arg.Any<string>(),
+            Arg.Any<OperatorFlow>(),
+            Arg.Any<byte[]>(),
+            Arg.Any<AutoTuneGoal>(),
+            Arg.Any<Guid>(),
+            Arg.Any<long>(),
+            Arg.Any<ExecutionRequestAuthority>(),
+            Arg.Any<int>(),
+            Arg.Any<CancellationToken>());
+    }
+
     [Fact]
     public async Task FlowNodePreview_ShouldReturnMetricsDiagnosticCodesAndSuggestions()
     {
@@ -69,6 +262,10 @@ public class AutoTuneEndpointsTests
                 Arg.Any<OperatorFlow>(),
                 Arg.Any<Guid>(),
                 Arg.Any<byte[]?>(),
+                Arg.Any<Guid>(),
+                Arg.Any<long>(),
+                Arg.Any<ExecutionRequestAuthority>(),
+                Arg.Any<ProjectVariableExecutionContext?>(),
                 Arg.Any<CancellationToken>())
             .Returns(Task.FromResult(new FlowNodePreviewWithMetricsResult
             {
@@ -101,13 +298,9 @@ public class AutoTuneEndpointsTests
 
         await using var host = await AutoTuneEndpointTestHost.CreateAsync(previewService, autoTuneService);
 
-        using var response = await host.Client.PostAsJsonAsync("/api/autotune/flow-node/preview", new FlowNodePreviewRequest
-        {
-            FlowId = Guid.NewGuid(),
-            TargetNodeId = targetNodeId,
-            InputImageBase64 = Convert.ToBase64String(new byte[] { 9, 9, 9 }),
-            FlowData = CreateFlowData(targetNodeId, OperatorType.DetectionSequenceJudge)
-        });
+        var request = CreatePreviewRequest(host.Project, targetNodeId, OperatorType.DetectionSequenceJudge);
+        request.InputImageBase64 = Convert.ToBase64String(new byte[] { 9, 9, 9 });
+        using var response = await host.Client.PostAsJsonAsync("/api/autotune/flow-node/preview", request);
 
         response.StatusCode.Should().Be(System.Net.HttpStatusCode.OK);
         using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
@@ -130,6 +323,10 @@ public class AutoTuneEndpointsTests
                 Arg.Any<OperatorFlow>(),
                 Arg.Any<Guid>(),
                 Arg.Any<byte[]?>(),
+                Arg.Any<Guid>(),
+                Arg.Any<long>(),
+                Arg.Any<ExecutionRequestAuthority>(),
+                Arg.Any<ProjectVariableExecutionContext?>(),
                 Arg.Any<CancellationToken>())
             .Returns(Task.FromResult(new FlowNodePreviewWithMetricsResult
             {
@@ -158,12 +355,9 @@ public class AutoTuneEndpointsTests
 
         await using var host = await AutoTuneEndpointTestHost.CreateAsync(previewService, autoTuneService);
 
-        using var response = await host.Client.PostAsJsonAsync("/api/autotune/flow-node/preview", new FlowNodePreviewRequest
-        {
-            FlowId = Guid.NewGuid(),
-            TargetNodeId = targetNodeId,
-            FlowData = CreateFlowData(targetNodeId, OperatorType.DetectionSequenceJudge)
-        });
+        using var response = await host.Client.PostAsJsonAsync(
+            "/api/autotune/flow-node/preview",
+            CreatePreviewRequest(host.Project, targetNodeId, OperatorType.DetectionSequenceJudge));
 
         response.StatusCode.Should().Be(System.Net.HttpStatusCode.OK);
         using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
@@ -182,21 +376,22 @@ public class AutoTuneEndpointsTests
 
         await using var host = await AutoTuneEndpointTestHost.CreateAsync(previewService, autoTuneService);
 
-        using var response = await host.Client.PostAsJsonAsync("/api/autotune/flow-node/preview", new FlowNodePreviewRequest
-        {
-            FlowId = Guid.NewGuid(),
-            TargetNodeId = targetNodeId,
-            FlowData = CreateFlowData(targetNodeId, OperatorType.HttpRequest)
-        });
+        using var response = await host.Client.PostAsJsonAsync(
+            "/api/autotune/flow-node/preview",
+            CreatePreviewRequest(host.Project, targetNodeId, OperatorType.HttpRequest));
 
         var payload = await response.Content.ReadAsStringAsync();
         response.StatusCode.Should().Be(System.Net.HttpStatusCode.BadRequest, payload);
         payload.Should().Contain("ADMISSION_AUTOTUNE_PREVIEW_SIDE_EFFECT_BLOCKED");
-        payload.Should().Contain("外部设备、网络服务或执行文件系统写入");
+        payload.Should().Contain("NetworkWrite");
         await previewService.DidNotReceiveWithAnyArgs().PreviewWithMetricsAsync(
             Arg.Any<OperatorFlow>(),
             Arg.Any<Guid>(),
             Arg.Any<byte[]?>(),
+            Arg.Any<Guid>(),
+            Arg.Any<long>(),
+            Arg.Any<ExecutionRequestAuthority>(),
+            Arg.Any<ProjectVariableExecutionContext?>(),
             Arg.Any<CancellationToken>());
     }
 
@@ -212,7 +407,9 @@ public class AutoTuneEndpointsTests
 
         await using var host = await AutoTuneEndpointTestHost.CreateAsync(previewService, autoTuneService);
 
-        using var response = await host.Client.PostAsJsonAsync("/api/autotune/flow-node/preview", new FlowNodePreviewRequest
+        using var response = await host.Client.PostAsJsonAsync(
+            "/api/autotune/flow-node/preview",
+            WithAuthority(new FlowNodePreviewRequest
         {
             FlowId = Guid.NewGuid(),
             TargetNodeId = targetNodeId,
@@ -270,7 +467,7 @@ public class AutoTuneEndpointsTests
                     }
                 ]
             }
-        });
+        }, host.Project));
 
         var payload = await response.Content.ReadAsStringAsync();
         response.StatusCode.Should().Be(System.Net.HttpStatusCode.BadRequest, payload);
@@ -280,11 +477,15 @@ public class AutoTuneEndpointsTests
             Arg.Any<OperatorFlow>(),
             Arg.Any<Guid>(),
             Arg.Any<byte[]?>(),
+            Arg.Any<Guid>(),
+            Arg.Any<long>(),
+            Arg.Any<ExecutionRequestAuthority>(),
+            Arg.Any<ProjectVariableExecutionContext?>(),
             Arg.Any<CancellationToken>());
     }
 
     [Fact]
-    public async Task FlowNodePreview_ShouldPreserveCanvasSerializedImageAcquisitionParameters()
+    public async Task FlowNodePreview_ShouldRejectCanvasSerializedFileAcquisitionBeforePreviewService()
     {
         var acquisitionId = Guid.NewGuid();
         var targetNodeId = Guid.NewGuid();
@@ -305,6 +506,10 @@ public class AutoTuneEndpointsTests
                 Arg.Any<OperatorFlow>(),
                 Arg.Any<Guid>(),
                 Arg.Any<byte[]?>(),
+                Arg.Any<Guid>(),
+                Arg.Any<long>(),
+                Arg.Any<ExecutionRequestAuthority>(),
+                Arg.Any<ProjectVariableExecutionContext?>(),
                 Arg.Any<CancellationToken>())
             .Returns(callInfo =>
             {
@@ -320,6 +525,11 @@ public class AutoTuneEndpointsTests
 
         using var response = await host.Client.PostAsJsonAsync("/api/autotune/flow-node/preview", new
         {
+            projectId = host.Project.Id,
+            expectedProjectRevision = host.Project.PersistenceRevision,
+            declaredCapabilities = ExecutionSideEffect.FileRead,
+            confirmationId = Guid.NewGuid().ToString(),
+            auditId = Guid.NewGuid().ToString(),
             flowId = Guid.NewGuid(),
             targetNodeId = targetNodeId,
             flowData = new
@@ -379,11 +589,269 @@ public class AutoTuneEndpointsTests
             }
         });
 
-        response.StatusCode.Should().Be(System.Net.HttpStatusCode.OK);
-        capturedFlow.Should().NotBeNull();
-        var acquisition = capturedFlow!.Operators.Single(op => op.Id == acquisitionId);
-        acquisition.Parameters.Single(p => p.Name == "SourceType").GetValue().Should().Be("File");
-        acquisition.Parameters.Single(p => p.Name == "FilePath").GetValue().Should().Be("demo.png");
+        var payload = await response.Content.ReadAsStringAsync();
+        response.StatusCode.Should().Be(System.Net.HttpStatusCode.BadRequest, payload);
+        payload.Should().Contain("ADMISSION_AUTOTUNE_PREVIEW_SIDE_EFFECT_BLOCKED");
+        payload.Should().Contain("FilePath");
+        capturedFlow.Should().BeNull();
+        await previewService.DidNotReceiveWithAnyArgs().PreviewWithMetricsAsync(
+            Arg.Any<OperatorFlow>(),
+            Arg.Any<Guid>(),
+            Arg.Any<byte[]?>(),
+            Arg.Any<Guid>(),
+            Arg.Any<long>(),
+            Arg.Any<ExecutionRequestAuthority>(),
+            Arg.Any<ProjectVariableExecutionContext?>(),
+            Arg.Any<CancellationToken>());
+    }
+
+    [Theory]
+    [InlineData(OperatorType.HttpRequest)]
+    [InlineData(OperatorType.DatabaseWrite)]
+    [InlineData(OperatorType.TcpCommunication)]
+    public async Task ScenarioAutoTune_ShouldRejectExternalIoBeforeService(OperatorType operatorType)
+    {
+        var nodeId = Guid.NewGuid();
+        var previewService = Substitute.For<IFlowNodePreviewService>();
+        var autoTuneService = Substitute.For<IAutoTuneService>();
+        await using var host = await AutoTuneEndpointTestHost.CreateAsync(previewService, autoTuneService);
+        var request = CreateScenarioRequest(host.Project, nodeId);
+        request.FlowData = CreateFlowData(nodeId, operatorType);
+
+        using var response = await host.Client.PostAsJsonAsync("/api/autotune/scenario", request);
+
+        var payload = await response.Content.ReadAsStringAsync();
+        response.StatusCode.Should().Be(System.Net.HttpStatusCode.BadRequest, payload);
+        payload.Should().Contain("ADMISSION_AUTOTUNE_PREVIEW_SIDE_EFFECT_BLOCKED");
+        await autoTuneService.DidNotReceiveWithAnyArgs().AutoTuneScenarioAsync(
+            Arg.Any<string>(),
+            Arg.Any<OperatorFlow>(),
+            Arg.Any<byte[]>(),
+            Arg.Any<AutoTuneGoal>(),
+            Arg.Any<Guid>(),
+            Arg.Any<long>(),
+            Arg.Any<ExecutionRequestAuthority>(),
+            Arg.Any<int>(),
+            Arg.Any<CancellationToken>());
+    }
+
+    [Theory]
+    [InlineData("Camera", null)]
+    [InlineData("File", "model-input.png")]
+    public async Task ScenarioAutoTune_ShouldRejectRawAcquisitionAuthorityBeforeService(
+        string sourceType,
+        string? filePath)
+    {
+        var nodeId = Guid.NewGuid();
+        var previewService = Substitute.For<IFlowNodePreviewService>();
+        var autoTuneService = Substitute.For<IAutoTuneService>();
+        await using var host = await AutoTuneEndpointTestHost.CreateAsync(previewService, autoTuneService);
+        var request = CreateScenarioRequest(host.Project, nodeId);
+        request.FlowData = CreateImageAcquisitionFlowData(nodeId, sourceType, filePath);
+
+        using var response = await host.Client.PostAsJsonAsync("/api/autotune/scenario", request);
+
+        var payload = await response.Content.ReadAsStringAsync();
+        response.StatusCode.Should().Be(System.Net.HttpStatusCode.BadRequest, payload);
+        payload.Should().Contain("ADMISSION_AUTOTUNE_PREVIEW_SIDE_EFFECT_BLOCKED");
+        await autoTuneService.DidNotReceiveWithAnyArgs().AutoTuneScenarioAsync(
+            Arg.Any<string>(),
+            Arg.Any<OperatorFlow>(),
+            Arg.Any<byte[]>(),
+            Arg.Any<AutoTuneGoal>(),
+            Arg.Any<Guid>(),
+            Arg.Any<long>(),
+            Arg.Any<ExecutionRequestAuthority>(),
+            Arg.Any<int>(),
+            Arg.Any<CancellationToken>());
+    }
+
+    [Theory]
+    [InlineData(-1)]
+    [InlineData(0)]
+    [InlineData(6)]
+    [InlineData(1000)]
+    public async Task ScenarioAutoTune_ShouldRejectIterationLimitBeforeService(int maxIterations)
+    {
+        var nodeId = Guid.NewGuid();
+        var previewService = Substitute.For<IFlowNodePreviewService>();
+        var autoTuneService = Substitute.For<IAutoTuneService>();
+        await using var host = await AutoTuneEndpointTestHost.CreateAsync(previewService, autoTuneService);
+        var request = CreateScenarioRequest(host.Project, nodeId);
+        request.MaxIterations = maxIterations;
+
+        using var response = await host.Client.PostAsJsonAsync("/api/autotune/scenario", request);
+
+        var payload = await response.Content.ReadAsStringAsync();
+        response.StatusCode.Should().Be(System.Net.HttpStatusCode.BadRequest, payload);
+        payload.Should().Contain("AUTOTUNE_ITERATION_LIMIT_EXCEEDED");
+        await autoTuneService.DidNotReceiveWithAnyArgs().AutoTuneScenarioAsync(
+            Arg.Any<string>(),
+            Arg.Any<OperatorFlow>(),
+            Arg.Any<byte[]>(),
+            Arg.Any<AutoTuneGoal>(),
+            Arg.Any<Guid>(),
+            Arg.Any<long>(),
+            Arg.Any<ExecutionRequestAuthority>(),
+            Arg.Any<int>(),
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task ScenarioAutoTune_ShouldRejectConcurrentRequestWithoutDispatchAndReleaseLease()
+    {
+        var nodeId = Guid.NewGuid();
+        var previewService = Substitute.For<IFlowNodePreviewService>();
+        var autoTuneService = Substitute.For<IAutoTuneService>();
+        var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var gate = new AutoTuneExecutionGate(1, 1, TimeSpan.FromSeconds(5));
+
+        autoTuneService.AutoTuneScenarioAsync(
+                Arg.Any<string>(),
+                Arg.Any<OperatorFlow>(),
+                Arg.Any<byte[]>(),
+                Arg.Any<AutoTuneGoal>(),
+                Arg.Any<Guid>(),
+                Arg.Any<long>(),
+                Arg.Any<ExecutionRequestAuthority>(),
+                Arg.Any<int>(),
+                Arg.Any<CancellationToken>())
+            .Returns(async callInfo =>
+            {
+                entered.TrySetResult();
+                await release.Task.WaitAsync(callInfo.Arg<CancellationToken>());
+                return new ScenarioAutoTuneResult
+                {
+                    Success = true,
+                    ScenarioKey = "wire-sequence-terminal"
+                };
+            });
+
+        await using var host = await AutoTuneEndpointTestHost.CreateAsync(
+            previewService,
+            autoTuneService,
+            executionGate: gate);
+
+        var firstRequest = host.Client.PostAsJsonAsync("/api/autotune/scenario", CreateScenarioRequest(host.Project, nodeId));
+        await entered.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        using var secondResponse = await host.Client.PostAsJsonAsync("/api/autotune/scenario", CreateScenarioRequest(host.Project, nodeId));
+
+        var secondPayload = await secondResponse.Content.ReadAsStringAsync();
+        secondResponse.StatusCode.Should().Be(System.Net.HttpStatusCode.TooManyRequests, secondPayload);
+        secondPayload.Should().Contain("AUTOTUNE_CONCURRENCY_LIMIT_EXCEEDED");
+        await autoTuneService.Received(1).AutoTuneScenarioAsync(
+            Arg.Any<string>(),
+            Arg.Any<OperatorFlow>(),
+            Arg.Any<byte[]>(),
+            Arg.Any<AutoTuneGoal>(),
+            Arg.Any<Guid>(),
+            Arg.Any<long>(),
+            Arg.Any<ExecutionRequestAuthority>(),
+            Arg.Any<int>(),
+            Arg.Any<CancellationToken>());
+
+        release.TrySetResult();
+        using var firstResponse = await firstRequest.WaitAsync(TimeSpan.FromSeconds(5));
+        firstResponse.StatusCode.Should().Be(System.Net.HttpStatusCode.OK);
+        gate.ActiveCount.Should().Be(0);
+    }
+
+    [Fact]
+    public async Task FlowNodePreview_ShouldEnforceServerDeadlineAndPassCancellationToken()
+    {
+        var nodeId = Guid.NewGuid();
+        var previewService = Substitute.For<IFlowNodePreviewService>();
+        var autoTuneService = Substitute.For<IAutoTuneService>();
+        var observedToken = new TaskCompletionSource<CancellationToken>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var gate = new AutoTuneExecutionGate(1, 1, TimeSpan.FromMilliseconds(50));
+
+        previewService.PreviewWithMetricsAsync(
+                Arg.Any<OperatorFlow>(),
+                Arg.Any<Guid>(),
+                Arg.Any<byte[]?>(),
+                Arg.Any<Guid>(),
+                Arg.Any<long>(),
+                Arg.Any<ExecutionRequestAuthority>(),
+                Arg.Any<ProjectVariableExecutionContext?>(),
+                Arg.Any<CancellationToken>())
+            .Returns(async callInfo =>
+            {
+                var token = callInfo.Arg<CancellationToken>();
+                observedToken.TrySetResult(token);
+                await Task.Delay(Timeout.InfiniteTimeSpan, token);
+                return new FlowNodePreviewWithMetricsResult();
+            });
+
+        await using var host = await AutoTuneEndpointTestHost.CreateAsync(
+            previewService,
+            autoTuneService,
+            executionGate: gate);
+
+        using var response = await host.Client.PostAsJsonAsync(
+            "/api/autotune/flow-node/preview",
+            CreatePreviewRequest(host.Project, nodeId, OperatorType.DetectionSequenceJudge));
+
+        var payload = await response.Content.ReadAsStringAsync();
+        response.StatusCode.Should().Be(System.Net.HttpStatusCode.RequestTimeout, payload);
+        payload.Should().Contain("AUTOTUNE_DEADLINE_EXCEEDED");
+        (await observedToken.Task.WaitAsync(TimeSpan.FromSeconds(5))).IsCancellationRequested.Should().BeTrue();
+        gate.ActiveCount.Should().Be(0);
+    }
+
+    [Fact]
+    public async Task ScenarioAutoTune_ShouldPropagateRequestAbortedToService()
+    {
+        var nodeId = Guid.NewGuid();
+        var previewService = Substitute.For<IFlowNodePreviewService>();
+        var autoTuneService = Substitute.For<IAutoTuneService>();
+        var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var cancellationObserved = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var gate = new AutoTuneExecutionGate(1, 1, TimeSpan.FromSeconds(10));
+
+        autoTuneService.AutoTuneScenarioAsync(
+                Arg.Any<string>(),
+                Arg.Any<OperatorFlow>(),
+                Arg.Any<byte[]>(),
+                Arg.Any<AutoTuneGoal>(),
+                Arg.Any<Guid>(),
+                Arg.Any<long>(),
+                Arg.Any<ExecutionRequestAuthority>(),
+                Arg.Any<int>(),
+                Arg.Any<CancellationToken>())
+            .Returns(async callInfo =>
+            {
+                var token = callInfo.Arg<CancellationToken>();
+                using var registration = token.Register(() => cancellationObserved.TrySetResult());
+                entered.TrySetResult();
+                await Task.Delay(Timeout.InfiniteTimeSpan, token);
+                return new ScenarioAutoTuneResult();
+            });
+
+        await using var host = await AutoTuneEndpointTestHost.CreateAsync(
+            previewService,
+            autoTuneService,
+            executionGate: gate);
+        using var request = new HttpRequestMessage(HttpMethod.Post, "/api/autotune/scenario")
+        {
+            Content = JsonContent.Create(CreateScenarioRequest(host.Project, nodeId))
+        };
+        using var requestCancellation = new CancellationTokenSource();
+
+        var sendTask = host.Client.SendAsync(request, requestCancellation.Token);
+        await entered.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        requestCancellation.Cancel();
+
+        await cancellationObserved.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        try
+        {
+            using var response = await sendTask;
+            response.StatusCode.Should().Be((System.Net.HttpStatusCode)499);
+        }
+        catch (OperationCanceledException)
+        {
+            // TestServer may surface the client cancellation instead of the endpoint's 499 response.
+        }
     }
 
     [Fact]
@@ -398,6 +866,9 @@ public class AutoTuneEndpointsTests
                 Arg.Any<OperatorFlow>(),
                 Arg.Any<byte[]>(),
                 Arg.Any<AutoTuneGoal>(),
+                Arg.Any<Guid>(),
+                Arg.Any<long>(),
+                Arg.Any<ExecutionRequestAuthority>(),
                 Arg.Any<int>(),
                 Arg.Any<CancellationToken>())
             .Returns(Task.FromResult(new ScenarioAutoTuneResult
@@ -436,12 +907,9 @@ public class AutoTuneEndpointsTests
 
         await using var host = await AutoTuneEndpointTestHost.CreateAsync(previewService, autoTuneService);
 
-        using var response = await host.Client.PostAsJsonAsync("/api/autotune/scenario", new ScenarioAutoTuneRequest
-        {
-            ScenarioKey = "wire-sequence-terminal",
-            InputImageBase64 = Convert.ToBase64String(new byte[] { 7, 8, 9 }),
-            FlowData = CreateFlowData(targetNodeId, OperatorType.DetectionSequenceJudge)
-        });
+        using var response = await host.Client.PostAsJsonAsync(
+            "/api/autotune/scenario",
+            CreateScenarioRequest(host.Project, targetNodeId));
 
         response.StatusCode.Should().Be(System.Net.HttpStatusCode.OK);
         using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
@@ -450,6 +918,71 @@ public class AutoTuneEndpointsTests
         document.RootElement.GetProperty("finalParameters").GetProperty("BoxNms.ScoreThreshold").GetDouble().Should().BeApproximately(0.2d, 0.001d);
         document.RootElement.GetProperty("finalParameters").GetProperty("BoxNms.IouThreshold").GetDouble().Should().BeApproximately(0.4d, 0.001d);
         document.RootElement.GetProperty("finalPreview").GetProperty("success").GetBoolean().Should().BeTrue();
+    }
+
+    private static ScenarioAutoTuneRequest CreateScenarioRequest(Project project, Guid nodeId) =>
+        WithAuthority(new ScenarioAutoTuneRequest
+        {
+            ScenarioKey = "wire-sequence-terminal",
+            InputImageBase64 = Convert.ToBase64String([7, 8, 9]),
+            MaxIterations = 5,
+            FlowData = CreateFlowData(nodeId, OperatorType.DetectionSequenceJudge)
+        }, project);
+
+    private static FlowNodePreviewRequest CreatePreviewRequest(
+        Project project,
+        Guid nodeId,
+        OperatorType type) =>
+        WithAuthority(new FlowNodePreviewRequest
+        {
+            FlowId = Guid.NewGuid(),
+            TargetNodeId = nodeId,
+            FlowData = CreateFlowData(nodeId, type)
+        }, project);
+
+    private static T WithAuthority<T>(
+        T request,
+        Project project,
+        ExecutionSideEffect capabilities = ExecutionSideEffect.None)
+        where T : AutoTuneDraftAuthorityRequest
+    {
+        request.ProjectId = project.Id;
+        request.ExpectedProjectRevision = project.PersistenceRevision;
+        request.DeclaredCapabilities = capabilities;
+        request.ConfirmationId = Guid.NewGuid().ToString();
+        request.AuditId = Guid.NewGuid().ToString();
+        return request;
+    }
+
+    private static FlowDataDto CreateImageAcquisitionFlowData(
+        Guid nodeId,
+        string sourceType,
+        string? filePath)
+    {
+        var parameters = new Dictionary<string, object>
+        {
+            ["SourceType"] = sourceType
+        };
+        if (!string.IsNullOrWhiteSpace(filePath))
+        {
+            parameters["FilePath"] = filePath;
+        }
+
+        return new FlowDataDto
+        {
+            Id = Guid.NewGuid(),
+            Name = "RawAcquisitionAuthority",
+            Operators =
+            [
+                new CanvasOperatorDataDto
+                {
+                    Id = nodeId,
+                    Name = "Acquire",
+                    Type = "ImageAcquisition",
+                    Parameters = parameters
+                }
+            ]
+        };
     }
 
     private static FlowDataDto CreateFlowData(Guid nodeId, OperatorType type)
@@ -475,18 +1008,24 @@ public class AutoTuneEndpointsTests
     {
         private readonly WebApplication _app;
 
-        private AutoTuneEndpointTestHost(WebApplication app, HttpClient client)
+        private AutoTuneEndpointTestHost(WebApplication app, HttpClient client, Project project)
         {
             _app = app;
             Client = client;
+            Project = project;
         }
 
         public HttpClient Client { get; }
+        public Project Project { get; }
 
         public static async Task<AutoTuneEndpointTestHost> CreateAsync(
             IFlowNodePreviewService previewService,
-            IAutoTuneService autoTuneService)
+            IAutoTuneService autoTuneService,
+            string role = "Engineer",
+            AutoTuneExecutionGate? executionGate = null,
+            Project? project = null)
         {
+            project ??= new Project("AutoTune endpoint project");
             var builder = WebApplication.CreateBuilder(new WebApplicationOptions
             {
                 EnvironmentName = Environments.Development
@@ -496,8 +1035,12 @@ public class AutoTuneEndpointsTests
             builder.Services.AddLogging();
             builder.Services.AddSingleton(previewService);
             builder.Services.AddSingleton(autoTuneService);
+            builder.Services.AddSingleton(executionGate ?? new AutoTuneExecutionGate());
             builder.Services.AddSingleton(Substitute.For<IPreviewMetricsAnalyzer>());
+            builder.Services.AddSingleton(new TestPrincipal(role));
             var projectRepository = Substitute.For<IProjectRepository>();
+            projectRepository.GetByIdFreshAsync(project.Id).Returns(project);
+            builder.Services.AddSingleton(projectRepository);
             builder.Services.AddSingleton<IExecutionAdmissionService>(new ExecutionAdmissionService(projectRepository));
             builder.Services
                 .AddAuthentication(TestAuthHandler.SchemeName)
@@ -510,7 +1053,7 @@ public class AutoTuneEndpointsTests
             app.MapAutoTuneEndpoints();
             await app.StartAsync();
 
-            return new AutoTuneEndpointTestHost(app, app.GetTestClient());
+            return new AutoTuneEndpointTestHost(app, app.GetTestClient(), project);
         }
 
         public static async Task<AutoTuneEndpointTestHost> CreateWithDesktopAuthAsync(
@@ -527,8 +1070,12 @@ public class AutoTuneEndpointsTests
             builder.Services.AddLogging();
             builder.Services.AddSingleton(previewService);
             builder.Services.AddSingleton(autoTuneService);
+            builder.Services.AddSingleton(new AutoTuneExecutionGate());
             builder.Services.AddSingleton(Substitute.For<IPreviewMetricsAnalyzer>());
             var projectRepository = Substitute.For<IProjectRepository>();
+            var project = new Project("AutoTune desktop auth project");
+            projectRepository.GetByIdFreshAsync(project.Id).Returns(project);
+            builder.Services.AddSingleton(projectRepository);
             builder.Services.AddSingleton<IExecutionAdmissionService>(new ExecutionAdmissionService(projectRepository));
             builder.Services.AddSingleton(authService);
 
@@ -537,7 +1084,7 @@ public class AutoTuneEndpointsTests
             app.MapAutoTuneEndpoints();
             await app.StartAsync();
 
-            return new AutoTuneEndpointTestHost(app, app.GetTestClient());
+            return new AutoTuneEndpointTestHost(app, app.GetTestClient(), project);
         }
 
         public async ValueTask DisposeAsync()
@@ -555,21 +1102,28 @@ public class AutoTuneEndpointsTests
         public TestAuthHandler(
             IOptionsMonitor<AuthenticationSchemeOptions> options,
             ILoggerFactory logger,
-            UrlEncoder encoder)
+            UrlEncoder encoder,
+            TestPrincipal principal)
             : base(options, logger, encoder)
         {
+            _principal = principal;
         }
+
+        private readonly TestPrincipal _principal;
 
         protected override Task<AuthenticateResult> HandleAuthenticateAsync()
         {
             var identity = new ClaimsIdentity(
             [
                 new Claim(ClaimTypes.NameIdentifier, "test-user"),
-                new Claim(ClaimTypes.Name, "test-user")
+                new Claim(ClaimTypes.Name, "test-user"),
+                new Claim(ClaimTypes.Role, _principal.Role)
             ], SchemeName);
             var principal = new ClaimsPrincipal(identity);
             var ticket = new AuthenticationTicket(principal, SchemeName);
             return Task.FromResult(AuthenticateResult.Success(ticket));
         }
     }
+
+    private sealed record TestPrincipal(string Role);
 }

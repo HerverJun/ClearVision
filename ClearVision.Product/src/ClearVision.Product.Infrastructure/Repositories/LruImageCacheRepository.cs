@@ -8,27 +8,41 @@ namespace ClearVision.Product.Infrastructure.Repositories;
 public class LruImageCacheRepository : BackgroundService, IImageCacheRepository
 {
     private readonly Dictionary<Guid, CacheEntry> _cache = new();
-    private readonly LinkedList<Guid> _accessOrder = new();
+    private readonly LinkedList<Guid> _uploadAccessOrder = new();
+    private readonly LinkedList<Guid> _resultAccessOrder = new();
     private readonly ConcurrentDictionary<Guid, CacheEntry> _pendingAdds = new();
     private readonly Channel<Guid> _addQueue;
     private readonly object _lock = new();
     private readonly object _admissionLock = new();
-    private readonly long _maxSizeInBytes;
-    private long _currentSizeInBytes;
-    private long _pendingSizeInBytes;
+    private readonly long _uploadMaxSizeInBytes;
+    private readonly long _resultMaxSizeInBytes;
+    private long _uploadCurrentSizeInBytes;
+    private long _resultCurrentSizeInBytes;
+    private long _uploadPendingSizeInBytes;
+    private long _resultPendingSizeInBytes;
     private long _hitCount;
     private long _missCount;
 
     public LruImageCacheRepository(
         long maxSizeInBytes = 100 * 1024 * 1024,
-        int queueCapacity = 512)
+        int queueCapacity = 512,
+        long? resultMaxSizeInBytes = null)
     {
         if (maxSizeInBytes <= 0)
         {
             throw new ArgumentOutOfRangeException(nameof(maxSizeInBytes));
         }
 
-        _maxSizeInBytes = maxSizeInBytes;
+        if (resultMaxSizeInBytes is <= 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(resultMaxSizeInBytes));
+        }
+
+        // Upload/preview images and authoritative result images intentionally
+        // have independent budgets. Pressure in one namespace can never evict
+        // an entry from the other namespace.
+        _uploadMaxSizeInBytes = maxSizeInBytes;
+        _resultMaxSizeInBytes = resultMaxSizeInBytes ?? maxSizeInBytes;
         _addQueue = Channel.CreateBounded<Guid>(new BoundedChannelOptions(Math.Max(1, queueCapacity))
         {
             FullMode = BoundedChannelFullMode.Wait,
@@ -63,10 +77,12 @@ public class LruImageCacheRepository : BackgroundService, IImageCacheRepository
     {
         ArgumentNullException.ThrowIfNull(imageData);
 
-        if (imageData.Length > _maxSizeInBytes)
+        var isResult = authority != null;
+        var partitionLimit = GetPartitionLimit(isResult);
+        if (imageData.Length > partitionLimit)
         {
             throw new ArgumentException(
-                $"Image size {imageData.Length} exceeds cache limit {_maxSizeInBytes}.",
+                $"Image size {imageData.Length} exceeds its cache namespace limit {partitionLimit}.",
                 nameof(imageData));
         }
 
@@ -79,24 +95,25 @@ public class LruImageCacheRepository : BackgroundService, IImageCacheRepository
             CreatedAt = now,
             LastAccessedAt = now,
             SizeInBytes = imageData.Length,
-            Authority = authority
+            Authority = authority,
+            IsResult = isResult
         };
 
         lock (_admissionLock)
         {
-            if (GetRetainedSizeInBytes() + entry.SizeInBytes > _maxSizeInBytes)
+            if (GetRetainedSizeInBytes(isResult) + entry.SizeInBytes > partitionLimit)
             {
                 DrainQueuedPendingAdds();
             }
 
-            if (GetRetainedSizeInBytes() + entry.SizeInBytes > _maxSizeInBytes)
+            if (GetRetainedSizeInBytes(isResult) + entry.SizeInBytes > partitionLimit)
             {
                 CommitEntry(id, entry);
                 return Task.FromResult(id);
             }
 
             _pendingAdds[id] = entry;
-            Interlocked.Add(ref _pendingSizeInBytes, entry.SizeInBytes);
+            AddPendingSize(entry, entry.SizeInBytes);
 
             if (!_addQueue.Writer.TryWrite(id))
             {
@@ -127,8 +144,9 @@ public class LruImageCacheRepository : BackgroundService, IImageCacheRepository
             if (_cache.TryGetValue(id, out var entry))
             {
                 entry.LastAccessedAt = DateTime.UtcNow;
-                _accessOrder.Remove(id);
-                _accessOrder.AddFirst(id);
+                var accessOrder = GetAccessOrder(entry.IsResult);
+                accessOrder.Remove(id);
+                accessOrder.AddFirst(id);
                 Interlocked.Increment(ref _hitCount);
                 return Task.FromResult<CachedImage?>(ToCachedImage(entry));
             }
@@ -183,16 +201,25 @@ public class LruImageCacheRepository : BackgroundService, IImageCacheRepository
         lock (_lock)
         {
             var pendingCount = _pendingAdds.Count;
-            var pendingSize = Interlocked.Read(ref _pendingSizeInBytes);
+            var uploadPendingSize = Interlocked.Read(ref _uploadPendingSizeInBytes);
+            var resultPendingSize = Interlocked.Read(ref _resultPendingSizeInBytes);
             var hits = Interlocked.Read(ref _hitCount);
             var misses = Interlocked.Read(ref _missCount);
             var total = hits + misses;
+            var pendingUploadCount = _pendingAdds.Count(item => !item.Value.IsResult);
+            var pendingResultCount = pendingCount - pendingUploadCount;
 
             return new CacheStatistics
             {
                 TotalEntries = _cache.Count + pendingCount,
-                CurrentSizeInBytes = _currentSizeInBytes + pendingSize,
-                MaxSizeInBytes = _maxSizeInBytes,
+                CurrentSizeInBytes = _uploadCurrentSizeInBytes + _resultCurrentSizeInBytes + uploadPendingSize + resultPendingSize,
+                MaxSizeInBytes = _uploadMaxSizeInBytes + _resultMaxSizeInBytes,
+                UploadEntries = _cache.Count(item => !item.Value.IsResult) + pendingUploadCount,
+                ResultEntries = _cache.Count(item => item.Value.IsResult) + pendingResultCount,
+                UploadSizeInBytes = _uploadCurrentSizeInBytes + uploadPendingSize,
+                ResultSizeInBytes = _resultCurrentSizeInBytes + resultPendingSize,
+                UploadMaxSizeInBytes = _uploadMaxSizeInBytes,
+                ResultMaxSizeInBytes = _resultMaxSizeInBytes,
                 HitCount = hits,
                 MissCount = misses,
                 HitRate = total > 0 ? (double)hits / total : 0
@@ -210,8 +237,10 @@ public class LruImageCacheRepository : BackgroundService, IImageCacheRepository
         lock (_lock)
         {
             _cache.Clear();
-            _accessOrder.Clear();
-            _currentSizeInBytes = 0;
+            _uploadAccessOrder.Clear();
+            _resultAccessOrder.Clear();
+            _uploadCurrentSizeInBytes = 0;
+            _resultCurrentSizeInBytes = 0;
         }
     }
 
@@ -248,7 +277,7 @@ public class LruImageCacheRepository : BackgroundService, IImageCacheRepository
             return;
         }
 
-        Interlocked.Add(ref _pendingSizeInBytes, -entry.SizeInBytes);
+        AddPendingSize(entry, -entry.SizeInBytes);
         CommitEntry(id, entry);
     }
 
@@ -256,14 +285,15 @@ public class LruImageCacheRepository : BackgroundService, IImageCacheRepository
     {
         lock (_lock)
         {
-            while (_currentSizeInBytes + entry.SizeInBytes > _maxSizeInBytes && _accessOrder.Count > 0)
+            var accessOrder = GetAccessOrder(entry.IsResult);
+            while (GetCurrentSize(entry.IsResult) + entry.SizeInBytes > GetPartitionLimit(entry.IsResult) && accessOrder.Count > 0)
             {
-                EvictLeastRecentlyUsed();
+                EvictLeastRecentlyUsed(entry.IsResult);
             }
 
             _cache[id] = entry;
-            _accessOrder.AddFirst(id);
-            _currentSizeInBytes += entry.SizeInBytes;
+            accessOrder.AddFirst(id);
+            AddCurrentSize(entry, entry.SizeInBytes);
         }
     }
 
@@ -275,11 +305,13 @@ public class LruImageCacheRepository : BackgroundService, IImageCacheRepository
         }
     }
 
-    private long GetRetainedSizeInBytes()
+    private long GetRetainedSizeInBytes(bool isResult)
     {
         lock (_lock)
         {
-            return _currentSizeInBytes + Interlocked.Read(ref _pendingSizeInBytes);
+            return GetCurrentSize(isResult) + (isResult
+                ? Interlocked.Read(ref _resultPendingSizeInBytes)
+                : Interlocked.Read(ref _uploadPendingSizeInBytes));
         }
     }
 
@@ -287,18 +319,19 @@ public class LruImageCacheRepository : BackgroundService, IImageCacheRepository
     {
         if (_pendingAdds.TryRemove(id, out var entry))
         {
-            Interlocked.Add(ref _pendingSizeInBytes, -entry.SizeInBytes);
+            AddPendingSize(entry, -entry.SizeInBytes);
         }
     }
 
-    private void EvictLeastRecentlyUsed()
+    private void EvictLeastRecentlyUsed(bool isResult)
     {
-        if (_accessOrder.Last is null)
+        var accessOrder = GetAccessOrder(isResult);
+        if (accessOrder.Last is null)
         {
             return;
         }
 
-        RemoveEntry(_accessOrder.Last.Value);
+        RemoveEntry(accessOrder.Last.Value);
     }
 
     private void RemoveEntry(Guid id)
@@ -306,8 +339,41 @@ public class LruImageCacheRepository : BackgroundService, IImageCacheRepository
         if (_cache.TryGetValue(id, out var entry))
         {
             _cache.Remove(id);
-            _accessOrder.Remove(id);
-            _currentSizeInBytes -= entry.SizeInBytes;
+            GetAccessOrder(entry.IsResult).Remove(id);
+            AddCurrentSize(entry, -entry.SizeInBytes);
+        }
+    }
+
+    private LinkedList<Guid> GetAccessOrder(bool isResult) =>
+        isResult ? _resultAccessOrder : _uploadAccessOrder;
+
+    private long GetPartitionLimit(bool isResult) =>
+        isResult ? _resultMaxSizeInBytes : _uploadMaxSizeInBytes;
+
+    private long GetCurrentSize(bool isResult) =>
+        isResult ? _resultCurrentSizeInBytes : _uploadCurrentSizeInBytes;
+
+    private void AddCurrentSize(CacheEntry entry, long delta)
+    {
+        if (entry.IsResult)
+        {
+            _resultCurrentSizeInBytes += delta;
+        }
+        else
+        {
+            _uploadCurrentSizeInBytes += delta;
+        }
+    }
+
+    private void AddPendingSize(CacheEntry entry, long delta)
+    {
+        if (entry.IsResult)
+        {
+            Interlocked.Add(ref _resultPendingSizeInBytes, delta);
+        }
+        else
+        {
+            Interlocked.Add(ref _uploadPendingSizeInBytes, delta);
         }
     }
 
@@ -322,6 +388,7 @@ public class LruImageCacheRepository : BackgroundService, IImageCacheRepository
         public DateTime LastAccessedAt { get; set; }
         public long SizeInBytes { get; init; }
         public ResultImageCacheAuthority? Authority { get; init; }
+        public bool IsResult { get; init; }
     }
 }
 
@@ -330,6 +397,12 @@ public class CacheStatistics
     public int TotalEntries { get; set; }
     public long CurrentSizeInBytes { get; set; }
     public long MaxSizeInBytes { get; set; }
+    public int UploadEntries { get; set; }
+    public int ResultEntries { get; set; }
+    public long UploadSizeInBytes { get; set; }
+    public long ResultSizeInBytes { get; set; }
+    public long UploadMaxSizeInBytes { get; set; }
+    public long ResultMaxSizeInBytes { get; set; }
     public long HitCount { get; set; }
     public long MissCount { get; set; }
     public double HitRate { get; set; }

@@ -114,7 +114,11 @@ public class InspectionServiceSingleRunTests
             flowStorage,
             NullLogger<InspectionService>.Instance);
 
-        await service.ExecuteSingleAsync(projectId, new byte[] { 1, 2, 3 }, explicitFlow);
+        await service.ExecuteSingleAsync(
+            projectId,
+            new byte[] { 1, 2, 3 },
+            explicitFlow,
+            CreateDraftAuthority(explicitFlow));
 
         executedFlow.Should().NotBeNull();
         executedFlow!.Operators.Should().ContainSingle(operatorEntity => operatorEntity.Name == "client-flow");
@@ -188,7 +192,11 @@ public class InspectionServiceSingleRunTests
             NullLogger<InspectionService>.Instance,
             imagePersistence);
 
-        var result = await service.ExecuteSingleAsync(projectId, inputImage, explicitFlow);
+        var result = await service.ExecuteSingleAsync(
+            projectId,
+            inputImage,
+            explicitFlow,
+            CreateDraftAuthority(explicitFlow));
 
         result.OutputImage.Should().Equal(inputImage);
         result.ImageId.Should().Be(imageId);
@@ -262,7 +270,11 @@ public class InspectionServiceSingleRunTests
             Substitute.For<IProjectFlowStorage>(),
             NullLogger<InspectionService>.Instance);
 
-        var act = async () => await service.ExecuteSingleAsync(projectId, new byte[] { 1 }, flow);
+        var act = async () => await service.ExecuteSingleAsync(
+            projectId,
+            new byte[] { 1 },
+            flow,
+            CreateDraftAuthority(flow));
 
         await act.Should().ThrowAsync<InvalidOperationException>()
             .WithMessage("ADMISSION_DECISION_BINDING_REQUIRED:*");
@@ -312,9 +324,9 @@ public class InspectionServiceSingleRunTests
     }
 
     [Fact]
-    public async Task ExecuteSingleAsync_WithInlineSideEffectOperator_ShouldRunOfficiallyWithoutAdmissionBlock()
+    public async Task ExecuteSingleAsync_WithInlineSideEffectOperator_ShouldRejectBeforeDispatch()
     {
-        // 检测页“运行流程”属于正式运行：内联流程声明的 TextSave 等写盘算子必须放行，不再当预览副作用拦截。
+        // 客户端内联 Draft 不能将 TextSave 参数升级为正式文件写入 authority。
         var projectId = Guid.NewGuid();
         var flowExecution = Substitute.For<IFlowExecutionService>();
         var resultRepository = Substitute.For<IInspectionResultRepository>();
@@ -356,17 +368,21 @@ public class InspectionServiceSingleRunTests
             flowStorage,
             NullLogger<InspectionService>.Instance);
 
-        var result = await service.ExecuteSingleAsync(projectId, new byte[] { 1, 2, 3 }, CreateSideEffectFlow(OperatorType.TextSave));
+        var inlineFlow = CreateSideEffectFlow(OperatorType.TextSave);
+        var act = () => service.ExecuteSingleAsync(
+            projectId,
+            new byte[] { 1, 2, 3 },
+            inlineFlow,
+            CreateDraftAuthority(inlineFlow));
 
-        result.Status.Should().Be(InspectionStatus.OK);
-        executedFlow.Should().NotBeNull();
-        executedFlow!.Operators.Should().ContainSingle(op => op.Type == OperatorType.TextSave);
-        await flowExecution.Received(1).ExecuteWithSnapshotAsync(
+        await act.Should().ThrowAsync<ExecutionAdmissionService.ExecutionAdmissionRejectedException>()
+            .WithMessage("ADMISSION_DRAFT_EXTERNAL_RESOURCE_FORBIDDEN:*");
+        await flowExecution.DidNotReceiveWithAnyArgs().ExecuteWithSnapshotAsync(
             Arg.Any<ExecutionSnapshot>(),
             Arg.Any<Dictionary<string, object>?>(),
             Arg.Any<bool>(),
             Arg.Any<CancellationToken>());
-        await resultRepository.Received(1).AddAsync(Arg.Any<InspectionResult>());
+        await resultRepository.DidNotReceive().AddAsync(Arg.Any<InspectionResult>());
     }
 
     [Fact]
@@ -579,7 +595,11 @@ public class InspectionServiceSingleRunTests
             flowStorage,
             NullLogger<InspectionService>.Instance);
 
-        var result = await service.ExecuteSingleAsync(projectId, new byte[] { 1, 2, 3 }, explicitFlow);
+        var result = await service.ExecuteSingleAsync(
+            projectId,
+            new byte[] { 1, 2, 3 },
+            explicitFlow,
+            CreateDraftAuthority(explicitFlow));
 
         result.Status.Should().Be(InspectionStatus.NotInspected);
         result.ErrorMessage.Should().BeNull();
@@ -772,7 +792,11 @@ public class InspectionServiceSingleRunTests
             flowStorage,
             NullLogger<InspectionService>.Instance);
 
-        var result = await service.ExecuteSingleAsync(projectId, new byte[] { 9, 9, 9 }, explicitFlow);
+        var result = await service.ExecuteSingleAsync(
+            projectId,
+            new byte[] { 9, 9, 9 },
+            explicitFlow,
+            CreateDraftAuthority(explicitFlow));
 
         result.Status.Should().Be(InspectionStatus.Error);
         result.ErrorMessage.Should().Contain("not Boolean");
@@ -825,7 +849,11 @@ public class InspectionServiceSingleRunTests
             flowStorage,
             NullLogger<InspectionService>.Instance);
 
-        var result = await service.ExecuteSingleAsync(projectId, new byte[] { 7, 8, 9 }, explicitFlow);
+        var result = await service.ExecuteSingleAsync(
+            projectId,
+            new byte[] { 7, 8, 9 },
+            explicitFlow,
+            CreateDraftAuthority(explicitFlow));
 
         result.Status.Should().Be(InspectionStatus.NotInspected);
         result.ErrorMessage.Should().BeNull();
@@ -883,7 +911,11 @@ public class InspectionServiceSingleRunTests
             flowStorage,
             NullLogger<InspectionService>.Instance);
 
-        var result = await service.ExecuteSingleAsync(projectId, new byte[] { 1, 3, 5 }, explicitFlow);
+        var result = await service.ExecuteSingleAsync(
+            projectId,
+            new byte[] { 1, 3, 5 },
+            explicitFlow,
+            CreateDraftAuthority(explicitFlow));
 
         result.Status.Should().Be(InspectionStatus.Error);
         result.GetOutcome().Decision.Should().Be(DecisionOutcome.Invalid);
@@ -955,7 +987,11 @@ public class InspectionServiceSingleRunTests
             imagePersistence,
             evidenceManifestService: evidenceManifest);
 
-        var result = await service.ExecuteSingleAsync(projectId, new byte[] { 1, 3, 5 }, explicitFlow);
+        var result = await service.ExecuteSingleAsync(
+            projectId,
+            new byte[] { 1, 3, 5 },
+            explicitFlow,
+            CreateDraftAuthority(explicitFlow));
 
         result.Status.Should().Be(InspectionStatus.NG);
         result.OutputImage.Should().Equal(outputImage);
@@ -1047,7 +1083,11 @@ public class InspectionServiceSingleRunTests
             imagePersistence,
             evidenceManifestService: evidenceManifest);
 
-        var result = await service.ExecuteSingleAsync(projectId, new byte[] { 1, 3, 5 }, explicitFlow);
+        var result = await service.ExecuteSingleAsync(
+            projectId,
+            new byte[] { 1, 3, 5 },
+            explicitFlow,
+            CreateDraftAuthority(explicitFlow));
 
         result.OutputImage.Should().Equal(outputImage);
         persistedResult.Should().NotBeNull();
@@ -1124,7 +1164,11 @@ public class InspectionServiceSingleRunTests
 
         try
         {
-            result = await service.ExecuteSingleAsync(projectId, new byte[] { 1, 3, 5 }, explicitFlow);
+            result = await service.ExecuteSingleAsync(
+                projectId,
+                new byte[] { 1, 3, 5 },
+                explicitFlow,
+                CreateDraftAuthority(explicitFlow));
 
             var savedPath = FindSavedImagePath(
                 InspectionImagePersistencePaths.GetFallbackImageSaveRoot(),
@@ -1179,7 +1223,11 @@ public class InspectionServiceSingleRunTests
             flowStorage,
             NullLogger<InspectionService>.Instance);
 
-        var result = await service.ExecuteSingleAsync(projectId, new byte[] { 2, 4, 6 }, explicitFlow);
+        var result = await service.ExecuteSingleAsync(
+            projectId,
+            new byte[] { 2, 4, 6 },
+            explicitFlow,
+            CreateDraftAuthority(explicitFlow));
 
         result.Status.Should().Be(InspectionStatus.Error);
         result.ErrorMessage.Should().Be("flow exploded");
@@ -1200,9 +1248,12 @@ public class InspectionServiceSingleRunTests
         var coordinator = Substitute.For<IInspectionRuntimeCoordinator>();
         var worker = Substitute.For<IInspectionWorker>();
         var flowStorage = Substitute.For<IProjectFlowStorage>();
-        var explicitFlow = CreateFlow("camera-flow");
+        var storedFlow = CreateFlow("camera-flow");
         var project = new Project("active-inline-project");
+        project.UpdateFlow(storedFlow);
         projectRepository.GetByIdFreshAsync(projectId).Returns(project);
+        projectRepository.GetWithFlowAsync(projectId).Returns(project);
+        ConfigureAuthorizedCameraBinding(configurationService, flowExecution);
 
         imageAcquisition
             .AcquireFromCameraAsync("camera-1", Arg.Any<CancellationToken>())
@@ -1224,16 +1275,16 @@ public class InspectionServiceSingleRunTests
             flowStorage,
             NullLogger<InspectionService>.Instance);
 
-        var result = await service.ExecuteSingleAsync(projectId, "camera-1", explicitFlow);
+        var result = await service.ExecuteSingleAsync(projectId, "camera-1", flow: null);
 
         result.Status.Should().Be(InspectionStatus.Error);
         result.ErrorMessage.Should().Contain("camera offline");
         result.ExecutionSnapshotId.Should().NotBeNull();
-        result.FlowVersionHash.Should().Be(ExecutionFlowIdentity.ComputeFlowHash(explicitFlow));
+        result.FlowVersionHash.Should().Be(ExecutionFlowIdentity.ComputeFlowHash(storedFlow));
         result.ProjectPersistenceRevision.Should().Be(project.PersistenceRevision);
         result.DecisionConfigurationHash.Should().Be(
-            ExecutionFlowIdentity.ComputeDecisionConfigurationHash(explicitFlow.DecisionConfiguration));
-        result.ExecutionSource.Should().Be(ExecutionSnapshotSource.Draft.ToString());
+            ExecutionFlowIdentity.ComputeDecisionConfigurationHash(storedFlow.DecisionConfiguration));
+        result.ExecutionSource.Should().Be(ExecutionSnapshotSource.PersistedProject.ToString());
         result.ExecutionRunMode.Should().Be(ExecutionRunMode.FormalPrimary.ToString());
         result.SessionId.Should().NotBeNull();
         await resultRepository.Received(1).AddAsync(Arg.Is<InspectionResult>(item =>
@@ -1266,6 +1317,7 @@ public class InspectionServiceSingleRunTests
         project.UpdateFlow(storedFlow);
         projectRepository.GetByIdFreshAsync(projectId).Returns(project);
         projectRepository.GetWithFlowAsync(projectId).Returns(project);
+        ConfigureAuthorizedCameraBinding(configurationService, flowExecution);
         imageAcquisition.AcquireFromCameraAsync("camera-1", Arg.Any<CancellationToken>())
             .Returns(Task.FromResult(CreateCameraImageDto()));
         OperatorFlow? executedFlow = null;
@@ -1327,11 +1379,12 @@ public class InspectionServiceSingleRunTests
         var coordinator = Substitute.For<IInspectionRuntimeCoordinator>();
         var worker = Substitute.For<IInspectionWorker>();
         var flowStorage = Substitute.For<IProjectFlowStorage>();
-        var storedFlow = CreateImageAcquisitionFlow("Camera", string.Empty, "stored-camera-binding");
+        var storedFlow = CreateImageAcquisitionFlow("Camera", string.Empty, "camera-1");
         var project = new Project("stored-camera-acquisition-project");
         project.UpdateFlow(storedFlow);
         projectRepository.GetByIdFreshAsync(projectId).Returns(project);
         projectRepository.GetWithFlowAsync(projectId).Returns(project);
+        ConfigureAuthorizedCameraBinding(configurationService, flowExecution);
         imageAcquisition.AcquireFromCameraAsync("camera-1", Arg.Any<CancellationToken>())
             .Returns(Task.FromResult(CreateCameraImageDto()));
         OperatorFlow? executedFlow = null;
@@ -1374,9 +1427,9 @@ public class InspectionServiceSingleRunTests
     }
 
     [Fact]
-    public async Task ExecuteSingleAsync_WithCameraIdAndInlineTextSaveFlow_ShouldRunOfficiallyWithoutAdmissionBlock()
+    public async Task ExecuteSingleAsync_WithCameraIdAndInlineTextSaveFlow_ShouldRejectBeforeCameraOrDispatch()
     {
-        // 相机驱动的检测页正式运行：内联 TextSave 写盘算子放行，先采集相机再执行流程。
+        // 客户端 Draft 不得将 TextSave 的文件写入参数提升为正式 authority。
         var projectId = Guid.NewGuid();
         var flowExecution = Substitute.For<IFlowExecutionService>();
         var resultRepository = Substitute.For<IInspectionResultRepository>();
@@ -1387,25 +1440,8 @@ public class InspectionServiceSingleRunTests
         var worker = Substitute.For<IInspectionWorker>();
         var flowStorage = Substitute.For<IProjectFlowStorage>();
         projectRepository.GetByIdFreshAsync(projectId).Returns(new Project("active-inline-project"));
-        imageAcquisition.AcquireFromCameraAsync("camera-1", Arg.Any<CancellationToken>())
-            .Returns(Task.FromResult(CreateCameraImageDto()));
-        OperatorFlow? executedFlow = null;
-
-        flowExecution
-            .ExecuteWithSnapshotAsync(Arg.Any<ExecutionSnapshot>(), Arg.Any<Dictionary<string, object>?>(), Arg.Any<bool>(), Arg.Any<CancellationToken>())
-            .Returns(callInfo =>
-            {
-                executedFlow = callInfo.Arg<ExecutionSnapshot>().CreateExecutionFlow();
-                return Task.FromResult(new FlowExecutionResult
-                {
-                    IsSuccess = true,
-                    ExecutionTimeMs = 10,
-                    OutputData = new Dictionary<string, object> { ["JudgmentResult"] = "OK" }
-                });
-            });
-        resultRepository
-            .AddAsync(Arg.Any<InspectionResult>())
-            .Returns(callInfo => Task.FromResult(callInfo.Arg<InspectionResult>()));
+        ConfigureAuthorizedCameraBinding(configurationService, flowExecution);
+        var inlineFlow = CreateSideEffectFlow(OperatorType.TextSave);
 
         var service = new InspectionService(
             resultRepository,
@@ -1420,21 +1456,21 @@ public class InspectionServiceSingleRunTests
             flowStorage,
             NullLogger<InspectionService>.Instance);
 
-        var result = await service.ExecuteSingleAsync(
+        var act = () => service.ExecuteSingleAsync(
             projectId,
             "camera-1",
-            CreateSideEffectFlow(OperatorType.TextSave));
+            inlineFlow,
+            CreateDraftAuthority(inlineFlow, ExecutionSideEffect.DeviceRead));
 
-        result.Status.Should().Be(InspectionStatus.OK);
-        executedFlow.Should().NotBeNull();
-        executedFlow!.Operators.Should().ContainSingle(op => op.Type == OperatorType.TextSave);
-        await flowExecution.Received(1).ExecuteWithSnapshotAsync(
+        await act.Should().ThrowAsync<ExecutionAdmissionService.ExecutionAdmissionRejectedException>()
+            .WithMessage("ADMISSION_DRAFT_EXTERNAL_RESOURCE_FORBIDDEN:*");
+        await flowExecution.DidNotReceiveWithAnyArgs().ExecuteWithSnapshotAsync(
             Arg.Any<ExecutionSnapshot>(),
             Arg.Any<Dictionary<string, object>?>(),
             Arg.Any<bool>(),
             Arg.Any<CancellationToken>());
-        await imageAcquisition.Received(1).AcquireFromCameraAsync("camera-1", Arg.Any<CancellationToken>());
-        await resultRepository.Received(1).AddAsync(Arg.Any<InspectionResult>());
+        await imageAcquisition.DidNotReceive().AcquireFromCameraAsync(Arg.Any<string>(), Arg.Any<CancellationToken>());
+        await resultRepository.DidNotReceive().AddAsync(Arg.Any<InspectionResult>());
     }
 
     [Fact]
@@ -1457,6 +1493,7 @@ public class InspectionServiceSingleRunTests
         project.UpdateGlobalVariables(schema);
         projectRepository.GetByIdFreshAsync(projectId).Returns(project);
         projectRepository.GetWithFlowAsync(projectId).Returns(project);
+        ConfigureAuthorizedCameraBinding(configurationService, flowExecution);
         imageAcquisition.AcquireFromCameraAsync("camera-1", Arg.Any<CancellationToken>())
             .Returns(Task.FromResult(CreateCameraImageDto()));
         ProjectVariableExecutionContext? capturedContext = null;
@@ -1510,10 +1547,9 @@ public class InspectionServiceSingleRunTests
     }
 
     [Fact]
-    public async Task ExecuteSingleAsync_WithCameraIdAndFileSourceInlineFlow_ShouldRunFromFileWithoutAdmissionBlock()
+    public async Task ExecuteSingleAsync_WithCameraIdAndFileSourceInlineFlow_ShouldRejectBeforeDispatch()
     {
-        // 复现并修复缺陷：检测页文件样张流程正式运行时，ImageAcquisition FilePath 不再被准入拦截。
-        // File 图源会跳过相机预采集，直接由算子读本地文件执行。
+        // 客户端 Draft 不能把 FilePath 作为文件读取 authority，即使调用方同时传入有效相机 binding。
         var projectId = Guid.NewGuid();
         var flowExecution = Substitute.For<IFlowExecutionService>();
         var resultRepository = Substitute.For<IInspectionResultRepository>();
@@ -1525,23 +1561,7 @@ public class InspectionServiceSingleRunTests
         var flowStorage = Substitute.For<IProjectFlowStorage>();
         var explicitFlow = CreateImageAcquisitionFlow("File", @"C:\images\latest.png", "stale-camera");
         projectRepository.GetByIdFreshAsync(projectId).Returns(new Project("active-inline-project"));
-        OperatorFlow? executedFlow = null;
-
-        flowExecution
-            .ExecuteWithSnapshotAsync(Arg.Any<ExecutionSnapshot>(), Arg.Any<Dictionary<string, object>?>(), Arg.Any<bool>(), Arg.Any<CancellationToken>())
-            .Returns(callInfo =>
-            {
-                executedFlow = callInfo.Arg<ExecutionSnapshot>().CreateExecutionFlow();
-                return Task.FromResult(new FlowExecutionResult
-                {
-                    IsSuccess = true,
-                    ExecutionTimeMs = 11,
-                    OutputData = new Dictionary<string, object> { ["JudgmentResult"] = "OK" }
-                });
-            });
-        resultRepository
-            .AddAsync(Arg.Any<InspectionResult>())
-            .Returns(callInfo => Task.FromResult(callInfo.Arg<InspectionResult>()));
+        ConfigureAuthorizedCameraBinding(configurationService, flowExecution);
 
         var service = new InspectionService(
             resultRepository,
@@ -1556,25 +1576,27 @@ public class InspectionServiceSingleRunTests
             flowStorage,
             NullLogger<InspectionService>.Instance);
 
-        var result = await service.ExecuteSingleAsync(projectId, "camera-1", explicitFlow);
+        var act = () => service.ExecuteSingleAsync(
+            projectId,
+            "camera-1",
+            explicitFlow,
+            CreateDraftAuthority(explicitFlow));
 
-        result.Status.Should().Be(InspectionStatus.OK);
-        executedFlow.Should().NotBeSameAs(explicitFlow);
-        ExecutionFlowIdentity.ComputeFlowHash(executedFlow!).Should().Be(ExecutionFlowIdentity.ComputeFlowHash(explicitFlow));
-        await flowExecution.Received(1).ExecuteWithSnapshotAsync(
+        await act.Should().ThrowAsync<ExecutionAdmissionService.ExecutionAdmissionRejectedException>()
+            .WithMessage("ADMISSION_DRAFT_EXTERNAL_RESOURCE_FORBIDDEN:*");
+        await flowExecution.DidNotReceiveWithAnyArgs().ExecuteWithSnapshotAsync(
             Arg.Any<ExecutionSnapshot>(),
             Arg.Any<Dictionary<string, object>?>(),
             Arg.Any<bool>(),
             Arg.Any<CancellationToken>());
-        // File 图源跳过相机预采集。
-        _ = imageAcquisition.DidNotReceive().AcquireFromCameraAsync(Arg.Any<string>(), Arg.Any<CancellationToken>());
-        await resultRepository.Received(1).AddAsync(Arg.Any<InspectionResult>());
+        await imageAcquisition.DidNotReceive().AcquireFromCameraAsync(Arg.Any<string>(), Arg.Any<CancellationToken>());
+        await resultRepository.DidNotReceive().AddAsync(Arg.Any<InspectionResult>());
     }
 
     [Fact]
-    public async Task ExecuteSingleAsync_WithInlineFileImageAcquisitionImageSaveAndResultOutputFlow_ShouldRunOfficially()
+    public async Task ExecuteSingleAsync_WithInlineFileImageAcquisitionImageSaveAndResultOutputFlow_ShouldRejectBeforeDispatch()
     {
-        // 检测页文件样张流程正式运行：ImageAcquisition(File) + ImageSave + ResultOutput(SaveToFile) 全链路放行，可跑到写盘算子。
+        // 文件读取/写入只能由 authoritative StoredProject 或 RuntimePackage 声明，不能来自客户端 Draft。
         var projectId = Guid.NewGuid();
         var flowExecution = Substitute.For<IFlowExecutionService>();
         var resultRepository = Substitute.For<IInspectionResultRepository>();
@@ -1589,23 +1611,6 @@ public class InspectionServiceSingleRunTests
             (OperatorType.ImageAcquisition, [("SourceType", "File"), ("FilePath", @"C:\images\sample.png")]),
             (OperatorType.ImageSave, []),
             (OperatorType.ResultOutput, [("SaveToFile", true)]));
-        OperatorFlow? executedFlow = null;
-
-        flowExecution
-            .ExecuteWithSnapshotAsync(Arg.Any<ExecutionSnapshot>(), Arg.Any<Dictionary<string, object>?>(), Arg.Any<bool>(), Arg.Any<CancellationToken>())
-            .Returns(callInfo =>
-            {
-                executedFlow = callInfo.Arg<ExecutionSnapshot>().CreateExecutionFlow();
-                return Task.FromResult(new FlowExecutionResult
-                {
-                    IsSuccess = true,
-                    ExecutionTimeMs = 12,
-                    OutputData = new Dictionary<string, object> { ["JudgmentResult"] = "OK" }
-                });
-            });
-        resultRepository
-            .AddAsync(Arg.Any<InspectionResult>())
-            .Returns(callInfo => Task.FromResult(callInfo.Arg<InspectionResult>()));
 
         var service = new InspectionService(
             resultRepository,
@@ -1620,22 +1625,26 @@ public class InspectionServiceSingleRunTests
             flowStorage,
             NullLogger<InspectionService>.Instance);
 
-        var result = await service.ExecuteSingleAsync(projectId, new byte[] { 1, 2, 3 }, inlineFlow);
+        var act = () => service.ExecuteSingleAsync(
+            projectId,
+            new byte[] { 1, 2, 3 },
+            inlineFlow,
+            CreateDraftAuthority(inlineFlow));
 
-        result.Status.Should().Be(InspectionStatus.OK);
-        executedFlow.Should().NotBeSameAs(inlineFlow);
-        ExecutionFlowIdentity.ComputeFlowHash(executedFlow!).Should().Be(ExecutionFlowIdentity.ComputeFlowHash(inlineFlow));
-        executedFlow!.Operators.Select(op => op.Type).Should().Contain(new[]
-        {
-            OperatorType.ImageAcquisition, OperatorType.ImageSave, OperatorType.ResultOutput
-        });
-        await resultRepository.Received(1).AddAsync(Arg.Any<InspectionResult>());
+        await act.Should().ThrowAsync<ExecutionAdmissionService.ExecutionAdmissionRejectedException>()
+            .WithMessage("ADMISSION_DRAFT_EXTERNAL_RESOURCE_FORBIDDEN:*");
+        await flowExecution.DidNotReceiveWithAnyArgs().ExecuteWithSnapshotAsync(
+            Arg.Any<ExecutionSnapshot>(),
+            Arg.Any<Dictionary<string, object>?>(),
+            Arg.Any<bool>(),
+            Arg.Any<CancellationToken>());
+        await resultRepository.DidNotReceive().AddAsync(Arg.Any<InspectionResult>());
     }
 
     [Fact]
-    public async Task ExecuteSingleAsync_WithInlineTcpAndPlcFlow_ShouldRunOfficiallyWithoutTouchingDevices()
+    public async Task ExecuteSingleAsync_WithInlineTcpAndPlcFlow_ShouldRejectBeforeDispatch()
     {
-        // 检测页正式运行：TCP/PLC 通讯算子在准入层放行；算子被 mock，不真实连设备。
+        // 客户端 Draft 不得以未绑定的 TCP/PLC 参数获取网络或设备 authority。
         var projectId = Guid.NewGuid();
         var flowExecution = Substitute.For<IFlowExecutionService>();
         var resultRepository = Substitute.For<IInspectionResultRepository>();
@@ -1649,23 +1658,6 @@ public class InspectionServiceSingleRunTests
         var inlineFlow = CreateDetectionRunFlow(
             (OperatorType.TcpCommunication, []),
             (OperatorType.SiemensS7Communication, []));
-        OperatorFlow? executedFlow = null;
-
-        flowExecution
-            .ExecuteWithSnapshotAsync(Arg.Any<ExecutionSnapshot>(), Arg.Any<Dictionary<string, object>?>(), Arg.Any<bool>(), Arg.Any<CancellationToken>())
-            .Returns(callInfo =>
-            {
-                executedFlow = callInfo.Arg<ExecutionSnapshot>().CreateExecutionFlow();
-                return Task.FromResult(new FlowExecutionResult
-                {
-                    IsSuccess = true,
-                    ExecutionTimeMs = 12,
-                    OutputData = new Dictionary<string, object> { ["JudgmentResult"] = "OK" }
-                });
-            });
-        resultRepository
-            .AddAsync(Arg.Any<InspectionResult>())
-            .Returns(callInfo => Task.FromResult(callInfo.Arg<InspectionResult>()));
 
         var service = new InspectionService(
             resultRepository,
@@ -1680,17 +1672,20 @@ public class InspectionServiceSingleRunTests
             flowStorage,
             NullLogger<InspectionService>.Instance);
 
-        var result = await service.ExecuteSingleAsync(projectId, new byte[] { 1, 2, 3 }, inlineFlow);
+        var act = () => service.ExecuteSingleAsync(
+            projectId,
+            new byte[] { 1, 2, 3 },
+            inlineFlow,
+            CreateDraftAuthority(inlineFlow));
 
-        result.Status.Should().Be(InspectionStatus.OK);
-        executedFlow.Should().NotBeSameAs(inlineFlow);
-        ExecutionFlowIdentity.ComputeFlowHash(executedFlow!).Should().Be(ExecutionFlowIdentity.ComputeFlowHash(inlineFlow));
-        await flowExecution.Received(1).ExecuteWithSnapshotAsync(
+        await act.Should().ThrowAsync<ExecutionAdmissionService.ExecutionAdmissionRejectedException>()
+            .WithMessage("ADMISSION_DRAFT_EXTERNAL_RESOURCE_FORBIDDEN:*");
+        await flowExecution.DidNotReceiveWithAnyArgs().ExecuteWithSnapshotAsync(
             Arg.Any<ExecutionSnapshot>(),
             Arg.Any<Dictionary<string, object>?>(),
             Arg.Any<bool>(),
             Arg.Any<CancellationToken>());
-        await resultRepository.Received(1).AddAsync(Arg.Any<InspectionResult>());
+        await resultRepository.DidNotReceive().AddAsync(Arg.Any<InspectionResult>());
     }
 
     private static OperatorFlow CreateDetectionRunFlow(
@@ -1715,6 +1710,49 @@ public class InspectionServiceSingleRunTests
         }
 
         return flow.BindStringDecision(flow.Operators.Last());
+    }
+
+    private static ExecutionRequestAuthority CreateDraftAuthority(
+        OperatorFlow flow,
+        ExecutionSideEffect additionalCapabilities = ExecutionSideEffect.None)
+    {
+        var manifest = ExecutionCapabilityManifest.Derive(flow, isExplicit: true);
+        return new ExecutionRequestAuthority(
+            new ExecutionPrincipal("single-run-test-engineer", "Single Run Test Engineer", "Engineer", true),
+            expectedProjectRevision: 0,
+            capabilityManifest: new ExecutionCapabilityManifest(
+                manifest.Capabilities | additionalCapabilities,
+                isExplicit: true),
+            confirmationId: Guid.NewGuid().ToString("D"),
+            auditId: Guid.NewGuid().ToString("D"));
+    }
+
+    private static void ConfigureAuthorizedCameraBinding(
+        IConfigurationService configurationService,
+        IFlowExecutionService flowExecution,
+        string cameraBindingId = "camera-1")
+    {
+        configurationService.GetCurrent().Returns(new AppConfig
+        {
+            Cameras = new List<CameraBindingConfig>
+            {
+                new()
+                {
+                    Id = cameraBindingId,
+                    SerialNumber = "SN-SINGLE-RUN",
+                    IsEnabled = true
+                }
+            }
+        });
+        var validation = new FlowValidationResult
+        {
+            IsValid = true
+        };
+        flowExecution.ValidateSnapshot(Arg.Any<ExecutionSnapshot>()).Returns(validation);
+        flowExecution.ValidateSnapshotAsync(
+                Arg.Any<ExecutionSnapshot>(),
+                Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(validation));
     }
 
     private static string FindSavedImagePath(string root, InspectionResult result, string extension)
@@ -1772,10 +1810,12 @@ public class InspectionServiceSingleRunTests
             Substitute.For<IProjectFlowStorage>(),
             NullLogger<InspectionService>.Instance);
 
+        var flow = CreateResultSelectionFlow(resultOutputData);
         return await service.ExecuteSingleAsync(
             projectId,
             new byte[] { 1, 2, 3 },
-            CreateResultSelectionFlow(resultOutputData));
+            flow,
+            CreateDraftAuthority(flow));
     }
 
     private static IOperatorExecutor CreateStaticOutputExecutor(

@@ -3,6 +3,7 @@ using System.Linq;
 using System.Reflection;
 using ClearVision.Product.Core.Entities;
 using ClearVision.Product.Core.Enums;
+using ClearVision.Product.Core.ValueObjects;
 using ClearVision.Product.Infrastructure.Calibration;
 using ClearVision.Product.Infrastructure.Operators;
 using FluentAssertions;
@@ -51,8 +52,11 @@ public class StereoCalibrationOperatorTests
     public async Task ExecuteAsync_WithValidImages_ShouldReturnSuccess()
     {
         var op = new Operator("StereoCalibration", OperatorType.StereoCalibration, 0, 0);
-        using var leftImage = TestHelpers.CreateTestImage();
-        using var rightImage = TestHelpers.CreateTestImage();
+        var legacyOutputPath = Path.Combine(Path.GetTempPath(), $"stereo-raw-output-{Guid.NewGuid():N}.json");
+        op.AddParameter(TestHelpers.CreateParameter("CalibrationAssetId", "stereo-calibration-asset", "string"));
+        op.AddParameter(TestHelpers.CreateParameter("CalibrationOutputPath", legacyOutputPath, "string"));
+        using var leftImage = CreateChessboardImage(9, 6, 40);
+        using var rightImage = CreateChessboardImage(9, 6, 40);
         var inputs = new Dictionary<string, object>
         {
             { "LeftImage", leftImage },
@@ -61,6 +65,10 @@ public class StereoCalibrationOperatorTests
 
         var result = await _operator.ExecuteAsync(op, inputs);
         result.IsSuccess.Should().BeTrue();
+        CalibrationAssetCandidateAssertions.ShouldMatchGovernedSavePayload(
+            result.OutputData!,
+            "stereo-calibration-asset");
+        File.Exists(legacyOutputPath).Should().BeFalse();
     }
 
     [Fact]
@@ -206,6 +214,29 @@ public class StereoCalibrationOperatorTests
     {
         using var image = new Mat(16, 16, MatType.CV_8UC1, Scalar.Black);
         Cv2.ImWrite(path, image);
+    }
+
+    private static ImageWrapper CreateChessboardImage(int boardWidth, int boardHeight, int squareSize)
+    {
+        var rows = boardHeight + 1;
+        var columns = boardWidth + 1;
+        var image = new Mat(rows * squareSize, columns * squareSize, MatType.CV_8UC3, Scalar.White);
+
+        for (var row = 0; row < rows; row++)
+        for (var column = 0; column < columns; column++)
+        {
+            if (((row + column) & 1) == 0)
+            {
+                Cv2.Rectangle(
+                    image,
+                    new Rect(column * squareSize, row * squareSize, squareSize, squareSize),
+                    Scalar.Black,
+                    -1);
+            }
+        }
+
+        Cv2.GaussianBlur(image, image, new Size(3, 3), 0);
+        return new ImageWrapper(image);
     }
 
     private static List<Point3f[]> CreateSyntheticObjectPointViews()

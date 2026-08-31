@@ -8,6 +8,7 @@ using ClearVision.Product.Core.Attributes;
 using ClearVision.Product.Core.Entities;
 using ClearVision.Product.Core.Enums;
 using ClearVision.Product.Core.Operators;
+using ClearVision.Product.Core.Services;
 using Microsoft.Extensions.Logging;
 namespace ClearVision.Product.Infrastructure.Operators;
 
@@ -22,9 +23,9 @@ namespace ClearVision.Product.Infrastructure.Operators;
     IconName = "fins",
     Version = "1.0.1"
 )]
-[OperatorParameterRule("IpAddress", RequiredWhenAll = new[] { "UseGlobalFallback==false" }, ResourceKind = OperatorResourceKind.PlcEndpoint, ReasonCode = "OMRON_OPERATOR_IP_REQUIRED_WITHOUT_GLOBAL_FALLBACK")]
-[OperatorParameterRule("Port", RequiredWhenAll = new[] { "UseGlobalFallback==false" }, ReasonCode = "OMRON_OPERATOR_PORT_REQUIRED_WITHOUT_GLOBAL_FALLBACK")]
+[OperatorParameterRule("ProfileId", RequiredPolicy = OperatorParameterRequiredPolicy.Required, ResourceKind = OperatorResourceKind.PlcProfile, ReasonCode = "OMRON_PLC_PROFILE_REQUIRED")]
 [OperatorParameterRule("Address", RequiredPolicy = OperatorParameterRequiredPolicy.Required, ResourceKind = OperatorResourceKind.PlcAddress, ReasonCode = "OMRON_PLC_ADDRESS_REQUIRED")]
+[OperatorParameterRule("Operation", RequiredPolicy = OperatorParameterRequiredPolicy.Required, ReasonCode = "OMRON_PLC_OPERATION_REQUIRED")]
 [OperatorParameterRule("Length", EnabledWhenAll = new[] { "Operation==Read" }, HiddenWhenAll = new[] { "Operation!=Read" }, IgnoredWhenAll = new[] { "Operation!=Read" }, ReasonCode = "OMRON_READ_LENGTH_ONLY_FOR_READ")]
 [OperatorParameterRule("WriteValue", RequiredPolicy = OperatorParameterRequiredPolicy.Optional, EnabledWhenAll = new[] { "Operation==Write" }, HiddenWhenAll = new[] { "Operation!=Write" }, IgnoredWhenAll = new[] { "Operation!=Write" }, ReasonCode = "OMRON_WRITE_VALUE_ONLY_FOR_WRITE")]
 [OperatorParameterRule("PollingMode", EnabledWhenAll = new[] { "Operation==Read" }, HiddenWhenAll = new[] { "Operation!=Read" }, IgnoredWhenAll = new[] { "Operation!=Read" }, ReasonCode = "OMRON_POLLING_ONLY_FOR_READ")]
@@ -35,12 +36,9 @@ namespace ClearVision.Product.Infrastructure.Operators;
 [InputPort("Data", "数据", PortDataType.Any, IsRequired = false)]
 [OutputPort("Response", "响应", PortDataType.String)]
 [OutputPort("Status", "状态", PortDataType.Boolean)]
-[OperatorParam("IpAddress", "IP地址", "string", DefaultValue = "192.168.250.1")]
-[OperatorParam("Port", "端口", "int", DefaultValue = 9600, Min = 1, Max = 65535)]
-[OperatorParam("UseGlobalFallback", "允许全局回退", "bool", DefaultValue = false, Description = "启用后缺失的IP/Port可回退到全局通信配置")]
+[OperatorParam("ProfileId", "PLC Profile", "string", DefaultValue = "")]
 [OperatorParam("Address", "PLC地址", "string", DefaultValue = "DM100")]
 [OperatorParam("Length", "读取长度", "int", DefaultValue = 1, Min = 1, Max = 999)]
-[OperatorParam("DataType", "数据类型", "enum", DefaultValue = "Word", Options = new[] { "Bit|位 (Bool)", "Word|字 (Word/UInt16)", "Int16|短整型 (Int16)", "DWord|双字 (DWord/UInt32)", "Int32|整型 (Int32)", "Float|浮点 (Float)", "Double|双精度 (Double)" })]
 [OperatorParam("Operation", "操作", "enum", DefaultValue = "Read", Options = new[] { "Read|读取", "Write|写入" })]
 [OperatorParam("WriteValue", "写入值", "string", DefaultValue = "")]
 [OperatorParam("PollingMode", "轮询模式", "enum", Description = "读取时是否启用轮询等待", DefaultValue = "None", Options = new[] { "None|不等待", "WaitForValue|等待指定值" })]
@@ -55,16 +53,31 @@ public class OmronFinsCommunicationOperator : PlcCommunicationOperatorBase
     public override OperatorType OperatorType => OperatorType.OmronFinsCommunication;
 
     public OmronFinsCommunicationOperator(ILogger<OmronFinsCommunicationOperator> logger)
-        : this(logger, CreateClient)
+        : this(logger, DenyAllExecutionResourceProfileResolver.Instance, CreateClient)
+    {
+    }
+
+    public OmronFinsCommunicationOperator(
+        ILogger<OmronFinsCommunicationOperator> logger,
+        IExecutionResourceProfileResolver executionResourceProfileResolver)
+        : this(logger, executionResourceProfileResolver, CreateClient)
     {
     }
 
     internal OmronFinsCommunicationOperator(
         ILogger<OmronFinsCommunicationOperator> logger,
         Func<string, int, IPlcClient> clientFactory)
-        : base(logger)
+        : this(logger, DenyAllExecutionResourceProfileResolver.Instance, clientFactory)
     {
-        _clientFactory = clientFactory;
+    }
+
+    internal OmronFinsCommunicationOperator(
+        ILogger<OmronFinsCommunicationOperator> logger,
+        IExecutionResourceProfileResolver executionResourceProfileResolver,
+        Func<string, int, IPlcClient> clientFactory)
+        : base(logger, executionResourceProfileResolver)
+    {
+        _clientFactory = clientFactory ?? throw new ArgumentNullException(nameof(clientFactory));
     }
 
     protected override async Task<OperatorExecutionOutput> ExecuteCoreAsync(
@@ -72,13 +85,21 @@ public class OmronFinsCommunicationOperator : PlcCommunicationOperatorBase
         Dictionary<string, object>? inputs,
         CancellationToken cancellationToken)
     {
-        // 获取参数
-        var operatorIpAddress = GetStringParam(@operator, "IpAddress", "");
-        var operatorPort = GetIntParam(@operator, "Port", 0);
-        var useGlobalFallback = GetBoolParam(@operator, "UseGlobalFallback", false);
-        var address = GetStringParam(@operator, "Address", "DM100");
+        var forbiddenRawTarget = FindForbiddenRawTargetParameter(
+            @operator,
+            "IpAddress",
+            "Port",
+            "UseGlobalFallback",
+            "DataType");
+        if (forbiddenRawTarget != null)
+        {
+            return CreateFailureOutput(
+                $"PLC_RAW_TARGET_FORBIDDEN: {forbiddenRawTarget} cannot grant execution authority; use ProfileId and an allow-listed Address/Operation binding.");
+        }
+
+        var profileId = GetStringParam(@operator, "ProfileId", string.Empty);
+        var requestedAddress = GetStringParam(@operator, "Address", "DM100");
         var length = GetIntParam(@operator, "Length", 1, 1, 999);
-        var dataType = GetStringParam(@operator, "DataType", "Word");
         var operation = GetStringParam(@operator, "Operation", "Read");
         var pollingMode = GetStringParam(@operator, "PollingMode", "None");
         var pollingCondition = GetStringParam(@operator, "PollingCondition", "Equal");
@@ -105,26 +126,39 @@ public class OmronFinsCommunicationOperator : PlcCommunicationOperatorBase
                 $"PLC_POLLING_CONDITION_INVALID: PollingCondition must be one of: {string.Join(", ", PlcOperatorParameterContract.SupportedPollingConditions)}.");
         }
 
-        var logIp = string.IsNullOrWhiteSpace(operatorIpAddress) ? "(unset)" : operatorIpAddress;
-        var logPort = operatorPort;
+        var logIp = "(unresolved)";
+        var logPort = 0;
 
         try
         {
-            var (ipAddress, port, _, connectionSource) = ResolveConnectionSettings(
-                operatorIpAddress,
-                operatorPort,
-                "FINS",
-                useGlobalFallback);
+            var resolution = ResolveExecutionResource(
+                profileId,
+                ExecutionPlcProtocols.OmronFins,
+                requestedAddress,
+                operation,
+                PlcOperatorParameterContract.IsRead(operation) ? length : 1);
+            if (!resolution.Resolved || resolution.Resource == null)
+            {
+                return CreateFailureOutput($"{resolution.Code}: {resolution.Message}");
+            }
+
+            var resource = resolution.Resource;
+            var ipAddress = resource.Host;
+            var port = resource.Port;
+            var address = resource.Address;
+            var dataType = resource.DataType;
             logIp = ipAddress;
             logPort = port;
 
             // 构建连接键
             var connectionKey = $"FINS:{ipAddress}:{port}";
 
-            // 获取或创建连接
-            var (client, _) = await GetOrCreateConnectionAsync(
+            // 获取带生命周期保护的池连接；最后一个 lease 释放后才物理关闭。
+            await using var connectionLease = await AcquireConnectionLeaseAsync(
                 connectionKey,
-                () => _clientFactory(ipAddress, port));
+                () => _clientFactory(ipAddress, port),
+                cancellationToken);
+            var client = connectionLease.Client;
 
             if (PlcOperatorParameterContract.IsRead(operation))
             {
@@ -143,7 +177,7 @@ public class OmronFinsCommunicationOperator : PlcCommunicationOperatorBase
                             pollingInterval,
                             cancellationToken),
                         cancellationToken);
-                    AttachConnectionAuditInfo(pollingOutput, connectionSource);
+                    AttachConnectionAuditInfo(pollingOutput, "ServerProfile");
                     return pollingOutput;
                 }
 
@@ -151,7 +185,7 @@ public class OmronFinsCommunicationOperator : PlcCommunicationOperatorBase
                     connectionKey,
                     () => ExecuteReadAsync(client, address, dataType, (ushort)length, cancellationToken),
                     cancellationToken);
-                AttachConnectionAuditInfo(readOutput, connectionSource);
+                AttachConnectionAuditInfo(readOutput, "ServerProfile");
                 return readOutput;
             }
 
@@ -162,7 +196,7 @@ public class OmronFinsCommunicationOperator : PlcCommunicationOperatorBase
                     connectionKey,
                     () => ExecuteWriteAsync(client, address, dataType, writeValue, cancellationToken),
                     cancellationToken);
-                AttachConnectionAuditInfo(writeOutput, connectionSource);
+                AttachConnectionAuditInfo(writeOutput, "ServerProfile");
                 return writeOutput;
             }
 
@@ -263,9 +297,19 @@ public class OmronFinsCommunicationOperator : PlcCommunicationOperatorBase
 
     public override ValidationResult ValidateParameters(Operator @operator)
     {
-        var operatorIpAddress = GetStringParam(@operator, "IpAddress", "");
-        var operatorPort = GetIntParam(@operator, "Port", 0);
-        var useGlobalFallback = GetBoolParam(@operator, "UseGlobalFallback", false);
+        var forbiddenRawTarget = FindForbiddenRawTargetParameter(
+            @operator,
+            "IpAddress",
+            "Port",
+            "UseGlobalFallback",
+            "DataType");
+        if (forbiddenRawTarget != null)
+        {
+            return ValidationResult.Invalid(
+                $"PLC_RAW_TARGET_FORBIDDEN: {forbiddenRawTarget} cannot grant execution authority; use ProfileId and an allow-listed Address/Operation binding.");
+        }
+
+        var profileId = GetStringParam(@operator, "ProfileId", string.Empty);
         var address = GetStringParam(@operator, "Address", "");
         var length = GetIntParam(@operator, "Length", 1);
         var operation = GetStringParam(@operator, "Operation", "Read");
@@ -291,20 +335,22 @@ public class OmronFinsCommunicationOperator : PlcCommunicationOperatorBase
                 $"PLC_POLLING_CONDITION_INVALID: PollingCondition must be one of: {string.Join(", ", PlcOperatorParameterContract.SupportedPollingConditions)}.");
         }
 
-        try
-        {
-            ResolveConnectionSettings(operatorIpAddress, operatorPort, "FINS", useGlobalFallback);
-        }
-        catch (Exception ex)
-        {
-            return ValidationResult.Invalid(ex.Message);
-        }
-
         if (string.IsNullOrWhiteSpace(address))
             return ValidationResult.Invalid("PLC地址不能为空");
 
         if (PlcOperatorParameterContract.IsRead(operation) && (length < 1 || length > 999))
             return ValidationResult.Invalid("读取长度必须在 1-999 之间");
+
+        var resolution = ResolveExecutionResource(
+            profileId,
+            ExecutionPlcProtocols.OmronFins,
+            address,
+            operation,
+            PlcOperatorParameterContract.IsRead(operation) ? length : 1);
+        if (!resolution.Resolved || resolution.Resource == null)
+        {
+            return ValidationResult.Invalid($"{resolution.Code}: {resolution.Message}");
+        }
 
         return ValidationResult.Valid();
     }

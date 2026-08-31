@@ -1,6 +1,3 @@
-using System.Net;
-using System.Net.Sockets;
-using System.Text;
 using System.Text.Json;
 using ClearVision.Product.Core.Entities;
 using ClearVision.Product.Core.Enums;
@@ -42,31 +39,43 @@ public class TcpCommunicationOperatorTests
     }
 
     [Fact]
-    public void ValidateParameters_Default_ShouldBeValid()
+    public void ValidateParameters_Default_ShouldRequireServerOwnedProfile()
     {
         var op = new Operator("test", OperatorType.TcpCommunication, 0, 0);
-        _operator.ValidateParameters(op).IsValid.Should().BeTrue();
+
+        var result = _operator.ValidateParameters(op);
+
+        result.IsValid.Should().BeFalse();
+        result.Errors.Should().ContainSingle().Which.Should().StartWith("TCP_PROFILE_REQUIRED:");
     }
 
     [Fact]
-    public void Metadata_ShouldDefaultFailOnUnresolvedPayloadPlaceholderToTrue()
+    public void Metadata_ShouldExposeProfileOnlyAuthorityAndPayloadDefaults()
     {
         var metadata = new OperatorFactory().GetMetadata(OperatorType.TcpCommunication)!;
 
         var parameter = metadata.Parameters.Single(p => p.Name == "FailOnUnresolvedPayloadPlaceholder");
+        var profileParameter = metadata.Parameters.Single(p => p.Name == "ProfileId");
 
         parameter.DefaultValue.Should().Be(true);
+        profileParameter.IsRequired.Should().BeTrue();
+        foreach (var legacyTargetParameter in new[] { "UseGlobalProfile", "Mode", "IpAddress", "Port", "Timeout", "Encoding" })
+        {
+            metadata.Parameters.Should().NotContain(p => p.Name == legacyTargetParameter);
+        }
     }
 
     [Fact]
-    public void ValidateParameters_WithInvalidPort_ShouldReturnInvalid()
+    public void ValidateParameters_WithRawPort_ShouldReturnInvalid()
     {
         var op = new Operator("test", OperatorType.TcpCommunication, 0, 0);
+        op.AddParameter(TestHelpers.CreateParameter("ProfileId", "robot-main", "string"));
         op.AddParameter(new(Guid.NewGuid(), "Port", "Port", "", "int", 70000, 0, 65535, true));
 
         var result = _operator.ValidateParameters(op);
 
         result.IsValid.Should().BeFalse();
+        result.Errors.Should().ContainSingle().Which.Should().StartWith("TCP_RAW_ENDPOINT_FORBIDDEN:");
     }
 
     [Fact]
@@ -78,13 +87,13 @@ public class TcpCommunicationOperatorTests
         var result = _operator.ValidateParameters(op);
 
         result.IsValid.Should().BeFalse();
-        result.Errors.Should().Contain(error => error.Contains("全局 TCP 通讯页", StringComparison.Ordinal));
+        result.Errors.Should().ContainSingle().Which.Should().StartWith("TCP_PROFILE_REQUIRED:");
     }
 
     [Fact]
     public async Task PendingGlobalProfile_ShouldFailBeforeAnyNetworkCall()
     {
-        var manager = Substitute.For<ITcpDeviceManager>();
+        var manager = CreateProfileManager();
         var sut = new TcpCommunicationOperator(Substitute.For<ILogger<TcpCommunicationOperator>>(), manager);
         var op = new Operator("tcp-pending-profile", OperatorType.TcpCommunication, 0, 0);
         op.AddParameter(TestHelpers.CreateParameter("UseGlobalProfile", true, "bool"));
@@ -94,6 +103,7 @@ public class TcpCommunicationOperatorTests
         var result = await sut.ExecuteAsync(op, new Dictionary<string, object> { ["Data"] = "PING" });
 
         result.IsSuccess.Should().BeFalse();
+        await manager.DidNotReceive().GetConfigAsync(Arg.Any<CancellationToken>());
         await manager.DidNotReceive().SendAsync(
             Arg.Any<string>(),
             Arg.Any<TcpDeviceSendRequest>(),
@@ -107,7 +117,7 @@ public class TcpCommunicationOperatorTests
     [Fact]
     public async Task ProfileMode_ShouldIgnoreDisabledLegacyModeTimeoutAndEncoding()
     {
-        var manager = Substitute.For<ITcpDeviceManager>();
+        var manager = CreateProfileManager();
         TcpDeviceSendRequest? capturedRequest = null;
         manager
             .SendAsync(
@@ -141,7 +151,7 @@ public class TcpCommunicationOperatorTests
     [Fact]
     public async Task WaitResponseFalse_ShouldIgnoreAllStaleResponseRules()
     {
-        var manager = Substitute.For<ITcpDeviceManager>();
+        var manager = CreateProfileManager();
         TcpDeviceSendRequest? capturedRequest = null;
         manager
             .SendAsync(
@@ -176,6 +186,7 @@ public class TcpCommunicationOperatorTests
     public void ValidateParameters_KeyValueDelimiterAlternatives_ShouldMatchAtLeastOneContract()
     {
         var valid = new Operator("tcp-key-value-valid", OperatorType.TcpCommunication, 0, 0);
+        valid.AddParameter(TestHelpers.CreateParameter("ProfileId", "robot-main", "string"));
         valid.AddParameter(TestHelpers.CreateParameter("ResponseParseMode", "KeyValue", "string"));
         valid.AddParameter(TestHelpers.CreateParameter("ResponseKeyValuePairDelimiter", string.Empty, "string"));
         valid.AddParameter(TestHelpers.CreateParameter("ResponseKeyValuePairDelimiters", ",", "string"));
@@ -184,6 +195,7 @@ public class TcpCommunicationOperatorTests
         _operator.ValidateParameters(valid).IsValid.Should().BeTrue();
 
         var invalid = new Operator("tcp-key-value-invalid", OperatorType.TcpCommunication, 0, 0);
+        invalid.AddParameter(TestHelpers.CreateParameter("ProfileId", "robot-main", "string"));
         invalid.AddParameter(TestHelpers.CreateParameter("ResponseParseMode", "KeyValue", "string"));
         invalid.AddParameter(TestHelpers.CreateParameter("ResponseKeyValuePairDelimiter", string.Empty, "string"));
         invalid.AddParameter(TestHelpers.CreateParameter("ResponseKeyValuePairDelimiters", string.Empty, "string"));
@@ -193,21 +205,25 @@ public class TcpCommunicationOperatorTests
     }
 
     [Fact]
-    public async Task ExecuteAsync_WithUnsupportedInlineServerMode_ShouldReturnFailure()
+    public async Task ExecuteAsync_WithoutProfile_ShouldReturnFailureBeforeNetworkCall()
     {
+        var manager = CreateProfileManager();
+        var sut = new TcpCommunicationOperator(Substitute.For<ILogger<TcpCommunicationOperator>>(), manager);
         var op = new Operator("test", OperatorType.TcpCommunication, 0, 0);
         op.AddParameter(TestHelpers.CreateParameter("Mode", "Server", "string"));
 
-        var result = await _operator.ExecuteAsync(op, new Dictionary<string, object>());
+        var result = await sut.ExecuteAsync(op, new Dictionary<string, object>());
 
         result.IsSuccess.Should().BeFalse();
-        result.ErrorMessage.Should().Contain("全局 TCP 通讯页");
+        result.ErrorMessage.Should().StartWith("TCP_PROFILE_REQUIRED:");
+        await manager.DidNotReceive().GetConfigAsync(Arg.Any<CancellationToken>());
+        await AssertNoSendAsync(manager);
     }
 
     [Fact]
     public async Task ExecuteAsync_WithProfileId_ShouldSendThroughGlobalManager()
     {
-        var manager = Substitute.For<ITcpDeviceManager>();
+        var manager = CreateProfileManager();
         TcpDeviceSendRequest? capturedRequest = null;
         manager
             .SendAsync(
@@ -229,6 +245,9 @@ public class TcpCommunicationOperatorTests
         result.IsSuccess.Should().BeTrue();
         capturedRequest.Should().NotBeNull();
         capturedRequest!.Payload.Should().Be("from-input");
+        result.OutputData!.Should().NotContainKey("IpAddress");
+        result.OutputData!.Should().NotContainKey("Port");
+        await manager.Received(1).GetConfigAsync(Arg.Any<CancellationToken>());
         await manager.Received(1).SendAsync("robot-main", Arg.Any<TcpDeviceSendRequest>(), Arg.Any<CancellationToken>());
         await manager.DidNotReceive().SendTransientAsync(Arg.Any<TcpCommunicationProfile>(), Arg.Any<TcpDeviceSendRequest>(), Arg.Any<CancellationToken>());
     }
@@ -236,7 +255,7 @@ public class TcpCommunicationOperatorTests
     [Fact]
     public async Task ExecuteAsync_WithPayloadTemplate_ShouldResolveNamedAndNestedInputs()
     {
-        var manager = Substitute.For<ITcpDeviceManager>();
+        var manager = CreateProfileManager();
         TcpDeviceSendRequest? capturedRequest = null;
         manager
             .SendAsync(
@@ -270,7 +289,7 @@ public class TcpCommunicationOperatorTests
     [Fact]
     public async Task ExecuteAsync_WithDefaultFailParameterAndMissingPlaceholder_ShouldFailBeforeSend()
     {
-        var manager = Substitute.For<ITcpDeviceManager>();
+        var manager = CreateProfileManager();
         var sut = new TcpCommunicationOperator(Substitute.For<ILogger<TcpCommunicationOperator>>(), manager);
         var op = new Operator("tcp-template", OperatorType.TcpCommunication, 0, 0);
         op.AddParameter(TestHelpers.CreateParameter("ProfileId", "robot-main", "string"));
@@ -288,7 +307,7 @@ public class TcpCommunicationOperatorTests
     [Fact]
     public async Task ExecuteAsync_WithOmittedFailParameterAndMissingPlaceholder_ShouldFailBeforeSend()
     {
-        var manager = Substitute.For<ITcpDeviceManager>();
+        var manager = CreateProfileManager();
         var sut = new TcpCommunicationOperator(Substitute.For<ILogger<TcpCommunicationOperator>>(), manager);
         var op = new Operator("tcp-template", OperatorType.TcpCommunication, 0, 0);
         op.AddParameter(TestHelpers.CreateParameter("ProfileId", "robot-main", "string"));
@@ -305,7 +324,7 @@ public class TcpCommunicationOperatorTests
     [Fact]
     public async Task ExecuteAsync_WithExplicitFalseFailParameterAndMissingPlaceholder_ShouldPreserveAndSend()
     {
-        var manager = Substitute.For<ITcpDeviceManager>();
+        var manager = CreateProfileManager();
         TcpDeviceSendRequest? capturedRequest = null;
         manager
             .SendAsync(
@@ -331,7 +350,7 @@ public class TcpCommunicationOperatorTests
     [Fact]
     public async Task ExecuteAsync_WithDataPlaceholder_ShouldResolveAndSendInputData()
     {
-        var manager = Substitute.For<ITcpDeviceManager>();
+        var manager = CreateProfileManager();
         TcpDeviceSendRequest? capturedRequest = null;
         manager
             .SendAsync(
@@ -359,7 +378,7 @@ public class TcpCommunicationOperatorTests
     [MemberData(nameof(NestedResultPayloads))]
     public async Task ExecuteAsync_WithNestedResultPlaceholder_ShouldResolveAndSend(string caseName, object resultInput, string expectedScore)
     {
-        var manager = Substitute.For<ITcpDeviceManager>();
+        var manager = CreateProfileManager();
         TcpDeviceSendRequest? capturedRequest = null;
         manager
             .SendAsync(
@@ -386,7 +405,7 @@ public class TcpCommunicationOperatorTests
     [Fact]
     public async Task ExecuteAsync_WithSendDataPlaceholder_ShouldResolveAndSendStaticSendData()
     {
-        var manager = Substitute.For<ITcpDeviceManager>();
+        var manager = CreateProfileManager();
         TcpDeviceSendRequest? capturedRequest = null;
         manager
             .SendAsync(
@@ -411,7 +430,7 @@ public class TcpCommunicationOperatorTests
     [Fact]
     public async Task ExecuteAsync_WithDecodedPayloadTemplate_ShouldSendControlCharacters()
     {
-        var manager = Substitute.For<ITcpDeviceManager>();
+        var manager = CreateProfileManager();
         TcpDeviceSendRequest? capturedRequest = null;
         manager
             .SendAsync(
@@ -440,7 +459,7 @@ public class TcpCommunicationOperatorTests
     [Fact]
     public async Task ExecuteAsync_WithStrictPayloadTemplateAndMissingPlaceholder_ShouldFailBeforeSend()
     {
-        var manager = Substitute.For<ITcpDeviceManager>();
+        var manager = CreateProfileManager();
         var sut = new TcpCommunicationOperator(Substitute.For<ILogger<TcpCommunicationOperator>>(), manager);
         var op = new Operator("tcp-template", OperatorType.TcpCommunication, 0, 0);
         op.AddParameter(TestHelpers.CreateParameter("ProfileId", "robot-main", "string"));
@@ -467,7 +486,7 @@ public class TcpCommunicationOperatorTests
     [Fact]
     public async Task ExecuteAsync_WithKeyValueResponseParse_ShouldExposeSelectedField()
     {
-        var manager = Substitute.For<ITcpDeviceManager>();
+        var manager = CreateProfileManager();
         manager
             .SendAsync("robot-main", Arg.Any<TcpDeviceSendRequest>(), Arg.Any<CancellationToken>())
             .Returns(Task.FromResult(TcpDeviceSendResult.Ok("ok", "code=OK;score=98.5;count=12")));
@@ -493,7 +512,7 @@ public class TcpCommunicationOperatorTests
     [Fact]
     public async Task ExecuteAsync_WithDecodedKeyValuePairDelimiter_ShouldParseLfSeparatedPairs()
     {
-        var manager = Substitute.For<ITcpDeviceManager>();
+        var manager = CreateProfileManager();
         manager
             .SendAsync("robot-main", Arg.Any<TcpDeviceSendRequest>(), Arg.Any<CancellationToken>())
             .Returns(Task.FromResult(TcpDeviceSendResult.Ok("ok", "code=OK\nscore=98.5\nstatus=PASS")));
@@ -521,7 +540,7 @@ public class TcpCommunicationOperatorTests
     [Fact]
     public async Task ExecuteAsync_WithAdditionalKeyValueDelimiters_ShouldParseMixedResponse()
     {
-        var manager = Substitute.For<ITcpDeviceManager>();
+        var manager = CreateProfileManager();
         manager
             .SendAsync("robot-main", Arg.Any<TcpDeviceSendRequest>(), Arg.Any<CancellationToken>())
             .Returns(Task.FromResult(TcpDeviceSendResult.Ok("ok", "code=OK,score:98.5\nstatus=PASS")));
@@ -553,7 +572,7 @@ public class TcpCommunicationOperatorTests
     [Fact]
     public async Task ExecuteAsync_WithExpectedRawResponse_ShouldExposeAcceptedStatus()
     {
-        var manager = Substitute.For<ITcpDeviceManager>();
+        var manager = CreateProfileManager();
         manager
             .SendAsync("robot-main", Arg.Any<TcpDeviceSendRequest>(), Arg.Any<CancellationToken>())
             .Returns(Task.FromResult(TcpDeviceSendResult.Ok("ok", "ACK:OK;score=98.5")));
@@ -578,7 +597,7 @@ public class TcpCommunicationOperatorTests
     [Fact]
     public async Task ExecuteAsync_WithIgnoreCaseExpectedResponse_ShouldAcceptLowercaseAck()
     {
-        var manager = Substitute.For<ITcpDeviceManager>();
+        var manager = CreateProfileManager();
         manager
             .SendAsync("robot-main", Arg.Any<TcpDeviceSendRequest>(), Arg.Any<CancellationToken>())
             .Returns(Task.FromResult(TcpDeviceSendResult.Ok("ok", "ack:ok;score=98.5")));
@@ -604,7 +623,7 @@ public class TcpCommunicationOperatorTests
     [Fact]
     public async Task ExecuteAsync_WithDecodedExpectedResponse_ShouldMatchControlCharacters()
     {
-        var manager = Substitute.For<ITcpDeviceManager>();
+        var manager = CreateProfileManager();
         manager
             .SendAsync("robot-main", Arg.Any<TcpDeviceSendRequest>(), Arg.Any<CancellationToken>())
             .Returns(Task.FromResult(TcpDeviceSendResult.Ok("ok", "ACK\r\n")));
@@ -630,7 +649,7 @@ public class TcpCommunicationOperatorTests
     [Fact]
     public async Task ExecuteAsync_WithRejectedRawResponse_ShouldKeepTransportSuccessButStatusFalse()
     {
-        var manager = Substitute.For<ITcpDeviceManager>();
+        var manager = CreateProfileManager();
         manager
             .SendAsync("robot-main", Arg.Any<TcpDeviceSendRequest>(), Arg.Any<CancellationToken>())
             .Returns(Task.FromResult(TcpDeviceSendResult.Ok("ok", "ACK:NG;ERR=5")));
@@ -653,7 +672,7 @@ public class TcpCommunicationOperatorTests
     [Fact]
     public async Task ExecuteAsync_WithIgnoreCaseRejectedParsedValue_ShouldRejectLowercaseNg()
     {
-        var manager = Substitute.For<ITcpDeviceManager>();
+        var manager = CreateProfileManager();
         manager
             .SendAsync("robot-main", Arg.Any<TcpDeviceSendRequest>(), Arg.Any<CancellationToken>())
             .Returns(Task.FromResult(TcpDeviceSendResult.Ok("ok", "code=ng;score=98.5")));
@@ -684,7 +703,7 @@ public class TcpCommunicationOperatorTests
     [Fact]
     public async Task ExecuteAsync_WithDecodedRejectedResponse_ShouldRejectControlCharacter()
     {
-        var manager = Substitute.For<ITcpDeviceManager>();
+        var manager = CreateProfileManager();
         manager
             .SendAsync("robot-main", Arg.Any<TcpDeviceSendRequest>(), Arg.Any<CancellationToken>())
             .Returns(Task.FromResult(TcpDeviceSendResult.Ok("ok", "\u0015")));
@@ -710,7 +729,7 @@ public class TcpCommunicationOperatorTests
     [Fact]
     public async Task ExecuteAsync_WithExpectedParsedValueAndFailOnUnexpectedResponse_ShouldReturnFailureWithDiagnostics()
     {
-        var manager = Substitute.For<ITcpDeviceManager>();
+        var manager = CreateProfileManager();
         manager
             .SendAsync("robot-main", Arg.Any<TcpDeviceSendRequest>(), Arg.Any<CancellationToken>())
             .Returns(Task.FromResult(TcpDeviceSendResult.Ok("ok", "code=NG;score=98.5")));
@@ -742,7 +761,7 @@ public class TcpCommunicationOperatorTests
     [Fact]
     public async Task ExecuteAsync_WithJsonPathResponseParse_ShouldExposeNestedValue()
     {
-        var manager = Substitute.For<ITcpDeviceManager>();
+        var manager = CreateProfileManager();
         manager
             .SendAsync("robot-main", Arg.Any<TcpDeviceSendRequest>(), Arg.Any<CancellationToken>())
             .Returns(Task.FromResult(TcpDeviceSendResult.Ok("ok", """{"result":{"ok":true,"code":7}}""")));
@@ -767,7 +786,7 @@ public class TcpCommunicationOperatorTests
     [Fact]
     public async Task ExecuteAsync_WithJsonPathRequiredArrayField_ShouldAcceptIndexedField()
     {
-        var manager = Substitute.For<ITcpDeviceManager>();
+        var manager = CreateProfileManager();
         manager
             .SendAsync("robot-main", Arg.Any<TcpDeviceSendRequest>(), Arg.Any<CancellationToken>())
             .Returns(Task.FromResult(TcpDeviceSendResult.Ok("ok", """{"results":[{"score":97.0},{"score":98.5,"status":"OK"}]}""")));
@@ -795,7 +814,7 @@ public class TcpCommunicationOperatorTests
     [Fact]
     public async Task ExecuteAsync_WithIgnoreCaseRegexResponseParse_ShouldExposeNamedField()
     {
-        var manager = Substitute.For<ITcpDeviceManager>();
+        var manager = CreateProfileManager();
         manager
             .SendAsync("robot-main", Arg.Any<TcpDeviceSendRequest>(), Arg.Any<CancellationToken>())
             .Returns(Task.FromResult(TcpDeviceSendResult.Ok("ok", "ack:ok;score=98.5")));
@@ -824,7 +843,7 @@ public class TcpCommunicationOperatorTests
     [Fact]
     public async Task ExecuteAsync_WithDelimitedFieldNames_ShouldExposeNamedFields()
     {
-        var manager = Substitute.For<ITcpDeviceManager>();
+        var manager = CreateProfileManager();
         manager
             .SendAsync("robot-main", Arg.Any<TcpDeviceSendRequest>(), Arg.Any<CancellationToken>())
             .Returns(Task.FromResult(TcpDeviceSendResult.Ok("ok", "SN001,98.5,OK")));
@@ -854,7 +873,7 @@ public class TcpCommunicationOperatorTests
     [Fact]
     public async Task ExecuteAsync_WithDecodedCrLfDelimitedResponse_ShouldExposeNamedFields()
     {
-        var manager = Substitute.For<ITcpDeviceManager>();
+        var manager = CreateProfileManager();
         manager
             .SendAsync("robot-main", Arg.Any<TcpDeviceSendRequest>(), Arg.Any<CancellationToken>())
             .Returns(Task.FromResult(TcpDeviceSendResult.Ok("ok", "SN001\r\n98.5\r\nOK")));
@@ -884,7 +903,7 @@ public class TcpCommunicationOperatorTests
     [Fact]
     public async Task ExecuteAsync_WithAdditionalDelimitedResponseDelimiters_ShouldExposeNamedFields()
     {
-        var manager = Substitute.For<ITcpDeviceManager>();
+        var manager = CreateProfileManager();
         manager
             .SendAsync("robot-main", Arg.Any<TcpDeviceSendRequest>(), Arg.Any<CancellationToken>())
             .Returns(Task.FromResult(TcpDeviceSendResult.Ok("ok", "SN001,98.5\nOK")));
@@ -916,7 +935,7 @@ public class TcpCommunicationOperatorTests
     [Fact]
     public async Task ExecuteAsync_WithFramedDelimitedResponse_ShouldParseNormalizedPayload()
     {
-        var manager = Substitute.For<ITcpDeviceManager>();
+        var manager = CreateProfileManager();
         manager
             .SendAsync("robot-main", Arg.Any<TcpDeviceSendRequest>(), Arg.Any<CancellationToken>())
             .Returns(Task.FromResult(TcpDeviceSendResult.Ok("ok", "\u0002 SN001,98.5,OK \u0003\r\n")));
@@ -958,7 +977,7 @@ public class TcpCommunicationOperatorTests
     [Fact]
     public async Task ExecuteAsync_WithStrictResponseFrameAndMissingStartMarker_ShouldReturnFailureWithDiagnostics()
     {
-        var manager = Substitute.For<ITcpDeviceManager>();
+        var manager = CreateProfileManager();
         manager
             .SendAsync("robot-main", Arg.Any<TcpDeviceSendRequest>(), Arg.Any<CancellationToken>())
             .Returns(Task.FromResult(TcpDeviceSendResult.Ok("ok", "SN001,98.5,OK")));
@@ -1017,7 +1036,7 @@ public class TcpCommunicationOperatorTests
         var accessor = new ProjectVariableExecutionContextAccessor();
         using var scope = accessor.BeginScope(new ProjectVariableExecutionContext(session, ProjectVariableBindingIndex.Build(schema), Guid.NewGuid()));
 
-        var manager = Substitute.For<ITcpDeviceManager>();
+        var manager = CreateProfileManager();
         manager
             .SendAsync("robot-main", Arg.Any<TcpDeviceSendRequest>(), Arg.Any<CancellationToken>())
             .Returns(Task.FromResult(TcpDeviceSendResult.Ok("ok", "SN001,98.5,OK")));
@@ -1093,7 +1112,7 @@ public class TcpCommunicationOperatorTests
     [Fact]
     public async Task ExecuteAsync_WithDelimitedMissingNamedField_ShouldExposeParseFailure()
     {
-        var manager = Substitute.For<ITcpDeviceManager>();
+        var manager = CreateProfileManager();
         manager
             .SendAsync("robot-main", Arg.Any<TcpDeviceSendRequest>(), Arg.Any<CancellationToken>())
             .Returns(Task.FromResult(TcpDeviceSendResult.Ok("ok", "SN001,98.5")));
@@ -1122,7 +1141,7 @@ public class TcpCommunicationOperatorTests
     [Fact]
     public async Task ExecuteAsync_WithRequiredDelimitedFieldsAndShortResponse_ShouldExposeMissingFields()
     {
-        var manager = Substitute.For<ITcpDeviceManager>();
+        var manager = CreateProfileManager();
         manager
             .SendAsync("robot-main", Arg.Any<TcpDeviceSendRequest>(), Arg.Any<CancellationToken>())
             .Returns(Task.FromResult(TcpDeviceSendResult.Ok("ok", "SN001,98.5")));
@@ -1152,7 +1171,7 @@ public class TcpCommunicationOperatorTests
     [Fact]
     public async Task ExecuteAsync_WithRequiredKeyValueFields_ShouldRemainParseSuccess()
     {
-        var manager = Substitute.For<ITcpDeviceManager>();
+        var manager = CreateProfileManager();
         manager
             .SendAsync("robot-main", Arg.Any<TcpDeviceSendRequest>(), Arg.Any<CancellationToken>())
             .Returns(Task.FromResult(TcpDeviceSendResult.Ok("ok", "code=OK;score=98.5;status=PASS")));
@@ -1178,7 +1197,7 @@ public class TcpCommunicationOperatorTests
     [Fact]
     public async Task ExecuteAsync_WithFailOnParseError_ShouldReturnFailureWithDiagnosticOutputs()
     {
-        var manager = Substitute.For<ITcpDeviceManager>();
+        var manager = CreateProfileManager();
         manager
             .SendAsync("robot-main", Arg.Any<TcpDeviceSendRequest>(), Arg.Any<CancellationToken>())
             .Returns(Task.FromResult(TcpDeviceSendResult.Ok("ok", "SN001,98.5")));
@@ -1212,7 +1231,7 @@ public class TcpCommunicationOperatorTests
     [Fact]
     public async Task ExecuteAsync_WithFixedWidthResponseParse_ShouldExposeNamedFields()
     {
-        var manager = Substitute.For<ITcpDeviceManager>();
+        var manager = CreateProfileManager();
         manager
             .SendAsync("robot-main", Arg.Any<TcpDeviceSendRequest>(), Arg.Any<CancellationToken>())
             .Returns(Task.FromResult(TcpDeviceSendResult.Ok("ok", "SN001098.5OK")));
@@ -1242,7 +1261,7 @@ public class TcpCommunicationOperatorTests
     [Fact]
     public async Task ExecuteAsync_WithShortFixedWidthResponse_ShouldExposeParseFailure()
     {
-        var manager = Substitute.For<ITcpDeviceManager>();
+        var manager = CreateProfileManager();
         manager
             .SendAsync("robot-main", Arg.Any<TcpDeviceSendRequest>(), Arg.Any<CancellationToken>())
             .Returns(Task.FromResult(TcpDeviceSendResult.Ok("ok", "SN00198")));
@@ -1271,6 +1290,7 @@ public class TcpCommunicationOperatorTests
     public void ValidateParameters_WithInvalidRegexResponseParsePattern_ShouldReturnInvalid()
     {
         var op = new Operator("tcp-parse", OperatorType.TcpCommunication, 0, 0);
+        op.AddParameter(TestHelpers.CreateParameter("ProfileId", "robot-main", "string"));
         op.AddParameter(TestHelpers.CreateParameter("ResponseParseMode", "Regex", "string"));
         op.AddParameter(TestHelpers.CreateParameter("ResponseRegexPattern", "(", "string"));
 
@@ -1284,6 +1304,7 @@ public class TcpCommunicationOperatorTests
     public void ValidateParameters_WithInvalidResponseMatchRegex_ShouldReturnInvalid()
     {
         var op = new Operator("tcp-match", OperatorType.TcpCommunication, 0, 0);
+        op.AddParameter(TestHelpers.CreateParameter("ProfileId", "robot-main", "string"));
         op.AddParameter(TestHelpers.CreateParameter("ResponseMatchMode", "Regex", "string"));
         op.AddParameter(TestHelpers.CreateParameter("ExpectedResponse", "(", "string"));
 
@@ -1297,6 +1318,7 @@ public class TcpCommunicationOperatorTests
     public void ValidateParameters_WithInvalidFixedWidthResponseFieldWidths_ShouldReturnInvalid()
     {
         var op = new Operator("tcp-parse", OperatorType.TcpCommunication, 0, 0);
+        op.AddParameter(TestHelpers.CreateParameter("ProfileId", "robot-main", "string"));
         op.AddParameter(TestHelpers.CreateParameter("ResponseParseMode", "FixedWidth", "string"));
         op.AddParameter(TestHelpers.CreateParameter("ResponseFieldWidths", "5,0,A", "string"));
 
@@ -1307,51 +1329,35 @@ public class TcpCommunicationOperatorTests
     }
 
     [Fact]
-    public async Task ExecuteAsync_WithInputData_ShouldOverrideSendDataForLegacyFallback()
+    public async Task ExecuteAsync_WithRawIpPortAndValidProfile_ShouldFailBeforeAnyDispatch()
     {
-        var manager = Substitute.For<ITcpDeviceManager>();
-        TcpDeviceSendRequest? capturedRequest = null;
-        TcpCommunicationProfile? capturedProfile = null;
-        manager
-            .SendTransientAsync(
-                Arg.Do<TcpCommunicationProfile>(profile => capturedProfile = profile),
-                Arg.Do<TcpDeviceSendRequest>(request => capturedRequest = request),
-                Arg.Any<CancellationToken>())
-            .Returns(Task.FromResult(TcpDeviceSendResult.Ok("ok", "ACK")));
+        var manager = CreateProfileManager();
         var sut = new TcpCommunicationOperator(Substitute.For<ILogger<TcpCommunicationOperator>>(), manager);
-        var op = new Operator("tcp-legacy", OperatorType.TcpCommunication, 0, 0);
-        op.AddParameter(TestHelpers.CreateParameter("IpAddress", "127.0.0.1", "string"));
+        var op = new Operator("tcp-raw-target", OperatorType.TcpCommunication, 0, 0);
+        op.AddParameter(TestHelpers.CreateParameter("ProfileId", "robot-main", "string"));
+        op.AddParameter(TestHelpers.CreateParameter("IpAddress", "203.0.113.77", "string"));
         op.AddParameter(TestHelpers.CreateParameter("Port", 9100, "int"));
-        op.AddParameter(TestHelpers.CreateParameter("SendData", "from-send-data", "string"));
 
-        var result = await sut.ExecuteAsync(op, new Dictionary<string, object>
-        {
-            ["Data"] = "from-input"
-        });
+        var result = await sut.ExecuteAsync(op, new Dictionary<string, object> { ["Data"] = "PING" });
 
-        result.IsSuccess.Should().BeTrue();
-        capturedProfile.Should().NotBeNull();
-        capturedProfile!.RemoteHost.Should().Be("127.0.0.1");
-        capturedProfile.RemotePort.Should().Be(9100);
-        capturedRequest.Should().NotBeNull();
-        capturedRequest!.Payload.Should().Be("from-input");
+        result.IsSuccess.Should().BeFalse();
+        result.ErrorMessage.Should().StartWith("TCP_RAW_ENDPOINT_FORBIDDEN:");
+        await manager.DidNotReceive().GetConfigAsync(Arg.Any<CancellationToken>());
+        await AssertNoSendAsync(manager);
     }
 
     [Fact]
-    public async Task ExecuteAsync_WithCompleteRawResponse_ShouldReceiveFullResponseAndParse()
+    public async Task ExecuteAsync_WithAuthoritativeProfileResponse_ShouldReceiveFullResponseAndParse()
     {
-        var manager = Substitute.For<ITcpDeviceManager>();
-        manager.SendTransientAsync(
-                Arg.Any<TcpCommunicationProfile>(),
+        var manager = CreateProfileManager();
+        manager.SendAsync(
+                "robot-main",
                 Arg.Any<TcpDeviceSendRequest>(),
                 Arg.Any<CancellationToken>())
             .Returns(Task.FromResult(TcpDeviceSendResult.Ok("ok", "ACK:OK;score=98.5")));
         var sut = new TcpCommunicationOperator(Substitute.For<ILogger<TcpCommunicationOperator>>(), manager);
         var op = new Operator("tcp-complete", OperatorType.TcpCommunication, 0, 0);
-        op.AddParameter(TestHelpers.CreateParameter("Mode", "Client", "string"));
-        op.AddParameter(TestHelpers.CreateParameter("IpAddress", "127.0.0.1", "string"));
-        op.AddParameter(TestHelpers.CreateParameter("Port", 9100, "int"));
-        op.AddParameter(TestHelpers.CreateParameter("Timeout", 2500, "int"));
+        op.AddParameter(TestHelpers.CreateParameter("ProfileId", "robot-main", "string"));
         op.AddParameter(TestHelpers.CreateParameter("ResponseTimeoutMs", 2500, "int"));
         op.AddParameter(TestHelpers.CreateParameter("ExpectedResponse", "ACK:OK", "string"));
         op.AddParameter(TestHelpers.CreateParameter("ResponseMatchMode", "Contains", "string"));
@@ -1369,42 +1375,80 @@ public class TcpCommunicationOperatorTests
         result.OutputData!["ResponseAccepted"].Should().Be(true);
         result.OutputData["ParseSuccess"].Should().Be(true);
         result.OutputData["ParsedValue"].Should().Be(98.5);
-        await manager.Received(1).SendTransientAsync(
-            Arg.Is<TcpCommunicationProfile>(profile => profile.RemoteHost == "127.0.0.1" && profile.RemotePort == 9100),
+        await manager.Received(1).SendAsync(
+            "robot-main",
             Arg.Is<TcpDeviceSendRequest>(request => request.Payload == "READ" && request.WaitResponse),
+            Arg.Any<CancellationToken>());
+        await manager.DidNotReceive().SendTransientAsync(
+            Arg.Any<TcpCommunicationProfile>(),
+            Arg.Any<TcpDeviceSendRequest>(),
             Arg.Any<CancellationToken>());
     }
 
     [Fact]
-    public async Task ExecuteAsync_WithLegacyIpPortSendData_ShouldRemainCompatible()
+    public async Task ExecuteAsync_WithUnknownProfile_ShouldFailBeforeAnyDispatch()
     {
-        using var listener = new TcpListener(IPAddress.Loopback, 0);
-        listener.Start();
-        var port = ((IPEndPoint)listener.LocalEndpoint).Port;
-        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
-        var serverTask = RunSingleEchoServerAsync(listener, cts.Token);
+        var manager = CreateProfileManager();
+        var sut = new TcpCommunicationOperator(Substitute.For<ILogger<TcpCommunicationOperator>>(), manager);
+        var op = new Operator("tcp-forged-profile", OperatorType.TcpCommunication, 0, 0);
+        op.AddParameter(TestHelpers.CreateParameter("ProfileId", "forged-profile", "string"));
 
-        try
-        {
-            var op = new Operator("tcp-legacy", OperatorType.TcpCommunication, 0, 0);
-            op.AddParameter(TestHelpers.CreateParameter("Mode", "Client", "string"));
-            op.AddParameter(TestHelpers.CreateParameter("IpAddress", "127.0.0.1", "string"));
-            op.AddParameter(TestHelpers.CreateParameter("Port", port, "int"));
-            op.AddParameter(TestHelpers.CreateParameter("SendData", "PING", "string"));
-            op.AddParameter(TestHelpers.CreateParameter("Timeout", 2500, "int"));
-            op.AddParameter(TestHelpers.CreateParameter("ResponseTimeoutMs", 2500, "int"));
+        var result = await sut.ExecuteAsync(op, new Dictionary<string, object> { ["Data"] = "PING" });
 
-            var result = await _operator.ExecuteAsync(op, cancellationToken: cts.Token);
+        result.IsSuccess.Should().BeFalse();
+        result.ErrorMessage.Should().StartWith("TCP_PROFILE_NOT_FOUND:");
+        await manager.Received(1).GetConfigAsync(Arg.Any<CancellationToken>());
+        await AssertNoSendAsync(manager);
+    }
 
-            result.IsSuccess.Should().BeTrue();
-            GetResponse(result).Should().Be("PONG");
-        }
-        finally
-        {
-            cts.Cancel();
-            listener.Stop();
-            await IgnoreServerTerminationAsync(serverTask);
-        }
+    [Fact]
+    public async Task ExecuteAsync_WithDisabledProfile_ShouldFailBeforeAnyDispatch()
+    {
+        var manager = CreateProfileManager(CreateProfile(enabled: false));
+        var sut = new TcpCommunicationOperator(Substitute.For<ILogger<TcpCommunicationOperator>>(), manager);
+        var op = new Operator("tcp-disabled-profile", OperatorType.TcpCommunication, 0, 0);
+        op.AddParameter(TestHelpers.CreateParameter("ProfileId", "robot-main", "string"));
+
+        var result = await sut.ExecuteAsync(op, new Dictionary<string, object> { ["Data"] = "PING" });
+
+        result.IsSuccess.Should().BeFalse();
+        result.ErrorMessage.Should().StartWith("TCP_PROFILE_DISABLED_OR_INVALID:");
+        await manager.Received(1).GetConfigAsync(Arg.Any<CancellationToken>());
+        await AssertNoSendAsync(manager);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_WithInvalidProfile_ShouldFailBeforeAnyDispatch()
+    {
+        var invalidProfile = CreateProfile();
+        invalidProfile.RemotePort = 0;
+        var manager = CreateProfileManager(invalidProfile);
+        var sut = new TcpCommunicationOperator(Substitute.For<ILogger<TcpCommunicationOperator>>(), manager);
+        var op = new Operator("tcp-invalid-profile", OperatorType.TcpCommunication, 0, 0);
+        op.AddParameter(TestHelpers.CreateParameter("ProfileId", "robot-main", "string"));
+
+        var result = await sut.ExecuteAsync(op, new Dictionary<string, object> { ["Data"] = "PING" });
+
+        result.IsSuccess.Should().BeFalse();
+        result.ErrorMessage.Should().StartWith("TCP_PROFILE_DISABLED_OR_INVALID:");
+        await manager.Received(1).GetConfigAsync(Arg.Any<CancellationToken>());
+        await AssertNoSendAsync(manager);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_WithDuplicateProfileId_ShouldFailBeforeAnyDispatch()
+    {
+        var manager = CreateProfileManager(CreateProfile(), CreateProfile());
+        var sut = new TcpCommunicationOperator(Substitute.For<ILogger<TcpCommunicationOperator>>(), manager);
+        var op = new Operator("tcp-duplicate-profile", OperatorType.TcpCommunication, 0, 0);
+        op.AddParameter(TestHelpers.CreateParameter("ProfileId", "robot-main", "string"));
+
+        var result = await sut.ExecuteAsync(op, new Dictionary<string, object> { ["Data"] = "PING" });
+
+        result.IsSuccess.Should().BeFalse();
+        result.ErrorMessage.Should().StartWith("TCP_PROFILE_AMBIGUOUS:");
+        await manager.Received(1).GetConfigAsync(Arg.Any<CancellationToken>());
+        await AssertNoSendAsync(manager);
     }
 
     private static string GetResponse(OperatorExecutionOutput result)
@@ -1415,35 +1459,47 @@ public class TcpCommunicationOperatorTests
         return outputData["Response"].Should().BeOfType<string>().Subject;
     }
 
-    private static async Task RunSingleEchoServerAsync(TcpListener listener, CancellationToken cancellationToken)
+    private static ITcpDeviceManager CreateProfileManager(params TcpCommunicationProfile[] profiles)
     {
-        using var client = await listener.AcceptTcpClientAsync(cancellationToken);
-        using var stream = client.GetStream();
-        var buffer = new byte[4];
-        var read = await stream.ReadAsync(buffer.AsMemory(0, buffer.Length), cancellationToken);
-        Encoding.UTF8.GetString(buffer, 0, read).Should().Be("PING");
-        var response = Encoding.UTF8.GetBytes("PONG");
-        await stream.WriteAsync(response, cancellationToken);
-        await stream.FlushAsync(cancellationToken);
+        if (profiles.Length == 0)
+        {
+            profiles = [CreateProfile()];
+        }
+
+        var manager = Substitute.For<ITcpDeviceManager>();
+        manager.GetConfigAsync(Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(new TcpCommunicationConfig
+            {
+                Profiles = profiles.ToList()
+            }));
+        return manager;
     }
 
-    private static async Task IgnoreServerTerminationAsync(Task serverTask)
+    private static TcpCommunicationProfile CreateProfile(
+        string id = "robot-main",
+        bool enabled = true)
     {
-        try
+        return new TcpCommunicationProfile
         {
-            await serverTask;
-        }
-        catch (OperationCanceledException)
-        {
-            // Expected on test cleanup.
-        }
-        catch (SocketException)
-        {
-            // Listener stop during cleanup can interrupt Accept.
-        }
-        catch (ObjectDisposedException)
-        {
-            // Listener/stream may already be disposed during cleanup.
-        }
+            Id = id,
+            Name = "Robot",
+            Enabled = enabled,
+            Mode = TcpCommunicationProfile.ModeClient,
+            RemoteHost = "192.0.2.10",
+            RemotePort = 9100,
+            TimeoutMs = 5000
+        };
+    }
+
+    private static async Task AssertNoSendAsync(ITcpDeviceManager manager)
+    {
+        await manager.DidNotReceive().SendAsync(
+            Arg.Any<string>(),
+            Arg.Any<TcpDeviceSendRequest>(),
+            Arg.Any<CancellationToken>());
+        await manager.DidNotReceive().SendTransientAsync(
+            Arg.Any<TcpCommunicationProfile>(),
+            Arg.Any<TcpDeviceSendRequest>(),
+            Arg.Any<CancellationToken>());
     }
 }

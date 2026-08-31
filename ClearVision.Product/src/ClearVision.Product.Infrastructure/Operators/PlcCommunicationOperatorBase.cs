@@ -15,16 +15,44 @@ using Microsoft.Extensions.Logging;
 
 namespace ClearVision.Product.Infrastructure.Operators;
 
+public sealed record PlcConnectionPoolSnapshot(
+    int Capacity,
+    int PooledCount,
+    int ConnectedCount,
+    int ActiveLeaseCount,
+    int RetiringCount,
+    int PendingConnectionCount,
+    int ConnectionKeyLockCount,
+    int ConnectionKeyLockReferenceCount,
+    int OperationLockCount,
+    int OperationLockReferenceCount,
+    long IdleEvictionCount,
+    long CapacityEvictionCount,
+    long DisconnectedRemovalCount);
+
 /// <summary>
 /// PLC通信算子基类
 /// </summary>
 public abstract class PlcCommunicationOperatorBase : OperatorBase
 {
+    private readonly IExecutionResourceProfileResolver _executionResourceProfileResolver;
+
     // ─── 静态连接池 ───────────────────────────────────────────
-    private static readonly Dictionary<string, IPlcClient> _connectionPool = new();
+    private const int DefaultMaxPooledConnections = 32;
+    private static readonly TimeSpan DefaultMaxIdleConnectionAge = TimeSpan.FromMinutes(10);
+    private static readonly Dictionary<string, PooledConnectionEntry> _connectionPool = new(StringComparer.Ordinal);
     private static readonly SemaphoreSlim _poolLock = new(1, 1);
     private static readonly ConcurrentDictionary<string, RefCountedSemaphore> _connectionKeyLocks = new(StringComparer.Ordinal);
     private static readonly ConcurrentDictionary<string, RefCountedSemaphore> _operationLocks = new(StringComparer.Ordinal);
+    private static readonly ConcurrentDictionary<PooledConnectionEntry, byte> _retiringConnections = new();
+    private static TimeProvider _poolTimeProvider = TimeProvider.System;
+    private static TimeSpan _maxIdleConnectionAge = DefaultMaxIdleConnectionAge;
+    private static int _maxPooledConnections = DefaultMaxPooledConnections;
+    private static int _pendingConnectionCount;
+    private static long _poolGeneration;
+    private static long _idleEvictionCount;
+    private static long _capacityEvictionCount;
+    private static long _disconnectedRemovalCount;
 
     // ─── 心跳巡检 ─────────────────────────────────────────────
     private static readonly object _heartbeatGate = new();
@@ -55,10 +83,40 @@ public abstract class PlcCommunicationOperatorBase : OperatorBase
     private static CommunicationConfig _cachedCommunicationConfig = new();
     private static DateTime _cachedCommunicationConfigAtUtc = DateTime.MinValue;
 
-    protected PlcCommunicationOperatorBase(ILogger logger) : base(logger)
+    protected PlcCommunicationOperatorBase(ILogger logger)
+        : this(logger, DenyAllExecutionResourceProfileResolver.Instance)
     {
+    }
+
+    protected PlcCommunicationOperatorBase(
+        ILogger logger,
+        IExecutionResourceProfileResolver executionResourceProfileResolver)
+        : base(logger)
+    {
+        _executionResourceProfileResolver = executionResourceProfileResolver ??
+            throw new ArgumentNullException(nameof(executionResourceProfileResolver));
         // 首次创建算子时自动启动心跳巡检
         StartHeartbeat(logger);
+    }
+
+    protected ExecutionResourceProfileResolution<ResolvedPlcExecutionResource> ResolveExecutionResource(
+        string profileId,
+        string protocol,
+        string address,
+        string operation,
+        int elementCount = 1) =>
+        _executionResourceProfileResolver.ResolvePlc(
+            profileId,
+            new PlcExecutionResourceRequest(protocol, address, operation, elementCount));
+
+    protected static string? FindForbiddenRawTargetParameter(
+        Operator @operator,
+        params string[] parameterNames)
+    {
+        ArgumentNullException.ThrowIfNull(@operator);
+        return @operator.Parameters
+            .FirstOrDefault(parameter => parameterNames.Contains(parameter.Name, StringComparer.OrdinalIgnoreCase))
+            ?.Name;
     }
 
     // ─── 心跳管理 ─────────────────────────────────────────────
@@ -142,11 +200,11 @@ public abstract class PlcCommunicationOperatorBase : OperatorBase
             try
             {
                 var snapshot = new Dictionary<string, bool>(StringComparer.Ordinal);
-                foreach (var (key, client) in _connectionPool)
+                foreach (var (key, entry) in _connectionPool)
                 {
                     var isAlive = _lastKnownState.TryGetValue(key, out var knownState)
                         ? knownState
-                        : client.IsConnected;
+                        : entry.Client.IsConnected;
                     snapshot[key] = isAlive;
                 }
 
@@ -161,6 +219,82 @@ public abstract class PlcCommunicationOperatorBase : OperatorBase
         return _lastKnownState.ToDictionary(pair => pair.Key, pair => pair.Value, StringComparer.Ordinal);
     }
 
+    public static PlcConnectionPoolSnapshot GetConnectionPoolSnapshot()
+    {
+        _poolLock.Wait();
+        try
+        {
+            var retiring = _retiringConnections.Keys.ToArray();
+            return new PlcConnectionPoolSnapshot(
+                Capacity: _maxPooledConnections,
+                PooledCount: _connectionPool.Count,
+                ConnectedCount: _connectionPool.Values.Count(entry => entry.Client.IsConnected),
+                ActiveLeaseCount: _connectionPool.Values.Sum(entry => entry.LeaseCount)
+                    + retiring.Sum(entry => entry.LeaseCount),
+                RetiringCount: retiring.Length,
+                PendingConnectionCount: _pendingConnectionCount,
+                ConnectionKeyLockCount: _connectionKeyLocks.Count,
+                ConnectionKeyLockReferenceCount: _connectionKeyLocks.Values.Sum(entry => entry.ReferenceCount),
+                OperationLockCount: _operationLocks.Count,
+                OperationLockReferenceCount: _operationLocks.Values.Sum(entry => entry.ReferenceCount),
+                IdleEvictionCount: Interlocked.Read(ref _idleEvictionCount),
+                CapacityEvictionCount: Interlocked.Read(ref _capacityEvictionCount),
+                DisconnectedRemovalCount: Interlocked.Read(ref _disconnectedRemovalCount));
+        }
+        finally
+        {
+            _poolLock.Release();
+        }
+    }
+
+    internal static async Task ConfigureConnectionPoolForTestingAsync(
+        int capacity,
+        TimeSpan maxIdleConnectionAge,
+        TimeProvider timeProvider)
+    {
+        ArgumentOutOfRangeException.ThrowIfLessThan(capacity, 1);
+        if (maxIdleConnectionAge <= TimeSpan.Zero)
+        {
+            throw new ArgumentOutOfRangeException(nameof(maxIdleConnectionAge));
+        }
+
+        ArgumentNullException.ThrowIfNull(timeProvider);
+        await ClearConnectionPoolAsync();
+        await _poolLock.WaitAsync();
+        try
+        {
+            _maxPooledConnections = capacity;
+            _maxIdleConnectionAge = maxIdleConnectionAge;
+            _poolTimeProvider = timeProvider;
+            _idleEvictionCount = 0;
+            _capacityEvictionCount = 0;
+            _disconnectedRemovalCount = 0;
+        }
+        finally
+        {
+            _poolLock.Release();
+        }
+    }
+
+    internal static async Task ResetConnectionPoolPolicyForTestingAsync()
+    {
+        await ClearConnectionPoolAsync();
+        await _poolLock.WaitAsync();
+        try
+        {
+            _maxPooledConnections = DefaultMaxPooledConnections;
+            _maxIdleConnectionAge = DefaultMaxIdleConnectionAge;
+            _poolTimeProvider = TimeProvider.System;
+            _idleEvictionCount = 0;
+            _capacityEvictionCount = 0;
+            _disconnectedRemovalCount = 0;
+        }
+        finally
+        {
+            _poolLock.Release();
+        }
+    }
+
     public static void InvalidateGlobalConfigurationCache()
     {
         lock (_configLock)
@@ -172,39 +306,26 @@ public abstract class PlcCommunicationOperatorBase : OperatorBase
 
     public static async Task ClearConnectionPoolAsync()
     {
-        KeyValuePair<string, IPlcClient>[] snapshot;
+        PooledConnectionEntry[] snapshot;
         await _poolLock.WaitAsync();
         try
         {
-            snapshot = _connectionPool.ToArray();
+            _poolGeneration++;
+            snapshot = _connectionPool.Values.ToArray();
             _connectionPool.Clear();
             _lastKnownState.Clear();
+            foreach (var entry in snapshot)
+            {
+                _retiringConnections.TryAdd(entry, 0);
+                entry.Retire();
+            }
         }
         finally
         {
             _poolLock.Release();
         }
 
-        foreach (var (_, client) in snapshot)
-        {
-            try
-            {
-                await client.DisconnectAsync();
-            }
-            catch
-            {
-                // Ignore disconnect failures while resetting local station settings.
-            }
-
-            try
-            {
-                client.Dispose();
-            }
-            catch
-            {
-                // Ignore dispose failures while resetting local station settings.
-            }
-        }
+        await Task.WhenAll(snapshot.Select(entry => entry.DisposalCompleted));
     }
 
     public static async Task ResetRuntimeConfigurationAsync()
@@ -226,21 +347,7 @@ public abstract class PlcCommunicationOperatorBase : OperatorBase
             {
                 await Task.Delay(GetHeartbeatIntervalMs(), ct);
 
-                // 获取连接池快照（避免遍历期间集合被修改）
-                KeyValuePair<string, IPlcClient>[] snapshot;
-                if (!await _poolLock.WaitAsync(200, ct))
-                {
-                    // 200ms 内拿不到池锁，说明有算子正在建立连接，跳过本轮
-                    continue;
-                }
-                try
-                {
-                    snapshot = _connectionPool.ToArray();
-                }
-                finally
-                {
-                    _poolLock.Release();
-                }
+                var snapshot = await AcquireHeartbeatLeasesAsync(ct);
 
                 if (snapshot.Length == 0)
                     continue;
@@ -260,30 +367,41 @@ public abstract class PlcCommunicationOperatorBase : OperatorBase
         _heartbeatLogger?.LogInformation("[Heartbeat] 心跳巡检已停止");
     }
 
-    private static async Task PingSnapshotAsync(KeyValuePair<string, IPlcClient>[] snapshot, CancellationToken ct)
+    private static async Task PingSnapshotAsync(PooledPlcConnectionLease[] snapshot, CancellationToken ct)
     {
         if (snapshot.Length == 1)
         {
-            var (key, client) = snapshot[0];
-            await PingClientAsync(key, client, ct);
+            await PingClientAsync(snapshot[0], ct);
             return;
         }
 
-        await Parallel.ForEachAsync(
-            snapshot,
-            new ParallelOptions
+        try
+        {
+            await Parallel.ForEachAsync(
+                snapshot,
+                new ParallelOptions
+                {
+                    MaxDegreeOfParallelism = MaxHeartbeatConcurrency,
+                    CancellationToken = ct
+                },
+                async (lease, token) => await PingClientAsync(lease, token));
+        }
+        finally
+        {
+            foreach (var lease in snapshot)
             {
-                MaxDegreeOfParallelism = MaxHeartbeatConcurrency,
-                CancellationToken = ct
-            },
-            async (entry, token) => await PingClientAsync(entry.Key, entry.Value, token));
+                await lease.DisposeAsync();
+            }
+        }
     }
 
     /// <summary>
     /// 对单个客户端执行 Ping 检测
     /// </summary>
-    private static async Task PingClientAsync(string key, IPlcClient client, CancellationToken ct)
+    private static async Task PingClientAsync(PooledPlcConnectionLease lease, CancellationToken ct)
     {
+        var key = lease.ConnectionKey;
+        var client = lease.Client;
         bool isAlive;
 
         try
@@ -302,44 +420,41 @@ public abstract class PlcCommunicationOperatorBase : OperatorBase
             // Ping 超时 → 设备可能正忙于算子读写，视为在线
             isAlive = true;
         }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            await lease.DisposeAsync();
+            throw;
+        }
         catch
         {
             isAlive = false;
         }
 
-        // ─── 状态变化检测（仅在状态改变时记录日志）──────────
-        var hadPreviousState = _lastKnownState.TryGetValue(key, out var wasAlive);
-
-        if (!hadPreviousState)
+        try
         {
-            // 首次检测到该连接
-            _lastKnownState[key] = isAlive;
-            return;
-        }
-
-        if (wasAlive == isAlive)
-            return; // 状态未变化，静默
-
-        // 状态发生变化
-        _lastKnownState[key] = isAlive;
-
-        if (isAlive)
-        {
-            _heartbeatLogger?.LogInformation("[Heartbeat] ✅ 设备恢复在线: {Key}", key);
-        }
-        else
-        {
-            _heartbeatLogger?.LogWarning("[Heartbeat] ⚠️ 设备掉线: {Key}，将在下次执行时自动重连", key);
-
-            // 主动断开，确保 IsConnected 状态复位，触发 GetOrCreateConnectionAsync 重连
-            try
+            // ─── 状态变化检测（仅在状态改变时记录日志）──────────
+            var hadPreviousState = _lastKnownState.TryGetValue(key, out var wasAlive);
+            if (!hadPreviousState || wasAlive != isAlive)
             {
-                await client.DisconnectAsync();
+                _lastKnownState[key] = isAlive;
+                if (hadPreviousState && isAlive)
+                {
+                    _heartbeatLogger?.LogInformation("[Heartbeat] ✅ 设备恢复在线: {Key}", key);
+                }
+                else if (!isAlive)
+                {
+                    _heartbeatLogger?.LogWarning("[Heartbeat] ⚠️ 设备掉线并从池中移除: {Key}", key);
+                }
             }
-            catch
+
+            if (!isAlive)
             {
-                // 断开可能失败（连接已丢失），忽略
+                await RemoveDisconnectedEntryAsync(key, lease.Entry);
             }
+        }
+        finally
+        {
+            await lease.DisposeAsync();
         }
     }
 
@@ -348,21 +463,278 @@ public abstract class PlcCommunicationOperatorBase : OperatorBase
     /// <summary>
     /// 获取或创建PLC连接
     /// </summary>
-    private sealed class RefCountedSemaphore
+    protected internal sealed class PooledPlcConnectionLease : IAsyncDisposable
     {
+        private PooledConnectionEntry? _entry;
+        private readonly bool _touchLastUsedOnRelease;
+
+        internal PooledPlcConnectionLease(
+            PooledConnectionEntry entry,
+            bool isNewConnection,
+            bool touchLastUsedOnRelease)
+        {
+            _entry = entry;
+            _touchLastUsedOnRelease = touchLastUsedOnRelease;
+            Client = entry.Client;
+            ConnectionKey = entry.ConnectionKey;
+            IsNewConnection = isNewConnection;
+        }
+
+        public IPlcClient Client { get; }
+
+        public string ConnectionKey { get; }
+
+        public bool IsNewConnection { get; }
+
+        internal PooledConnectionEntry Entry =>
+            _entry ?? throw new ObjectDisposedException(nameof(PooledPlcConnectionLease));
+
+        public async ValueTask DisposeAsync()
+        {
+            var entry = Interlocked.Exchange(ref _entry, null);
+            if (entry != null)
+            {
+                await ReleaseConnectionLeaseAsync(entry, _touchLastUsedOnRelease);
+            }
+        }
+    }
+
+    internal sealed class PooledConnectionEntry
+    {
+        private readonly object _sync = new();
+        private readonly TaskCompletionSource _disposalCompleted =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private DateTimeOffset _lastUsedUtc;
+        private int _leaseCount;
+        private bool _retired;
+        private bool _disposeStarted;
+
+        public PooledConnectionEntry(string connectionKey, IPlcClient client, DateTimeOffset nowUtc)
+        {
+            ConnectionKey = connectionKey;
+            Client = client;
+            _lastUsedUtc = nowUtc;
+        }
+
+        public string ConnectionKey { get; }
+
+        public IPlcClient Client { get; }
+
+        public Task DisposalCompleted => _disposalCompleted.Task;
+
+        public int LeaseCount
+        {
+            get
+            {
+                lock (_sync)
+                {
+                    return _leaseCount;
+                }
+            }
+        }
+
+        public DateTimeOffset LastUsedUtc
+        {
+            get
+            {
+                lock (_sync)
+                {
+                    return _lastUsedUtc;
+                }
+            }
+        }
+
+        public bool IsRetired
+        {
+            get
+            {
+                lock (_sync)
+                {
+                    return _retired;
+                }
+            }
+        }
+
+        public bool TryAcquireLease(
+            DateTimeOffset nowUtc,
+            bool isNewConnection,
+            bool touchLastUsed,
+            out PooledPlcConnectionLease? lease)
+        {
+            lock (_sync)
+            {
+                if (_retired)
+                {
+                    lease = null;
+                    return false;
+                }
+
+                _leaseCount++;
+                if (touchLastUsed)
+                {
+                    _lastUsedUtc = nowUtc;
+                }
+
+                lease = new PooledPlcConnectionLease(this, isNewConnection, touchLastUsed);
+                return true;
+            }
+        }
+
+        public bool IsIdle(DateTimeOffset nowUtc, TimeSpan maxIdleAge)
+        {
+            lock (_sync)
+            {
+                return !_retired && _leaseCount == 0 && nowUtc - _lastUsedUtc >= maxIdleAge;
+            }
+        }
+
+        public bool CanEvictForCapacity()
+        {
+            lock (_sync)
+            {
+                return !_retired && _leaseCount == 0;
+            }
+        }
+
+        public bool Retire()
+        {
+            var disposeNow = false;
+            lock (_sync)
+            {
+                if (!_retired)
+                {
+                    _retired = true;
+                }
+
+                if (_leaseCount == 0 && !_disposeStarted)
+                {
+                    _disposeStarted = true;
+                    disposeNow = true;
+                }
+            }
+
+            if (disposeNow)
+            {
+                _ = DisposeClientAsync();
+            }
+
+            return disposeNow;
+        }
+
+        public bool ReleaseLease(DateTimeOffset nowUtc, bool touchLastUsed)
+        {
+            var disposeNow = false;
+            lock (_sync)
+            {
+                if (_leaseCount <= 0)
+                {
+                    throw new InvalidOperationException("PLC connection lease count underflow.");
+                }
+
+                _leaseCount--;
+                if (touchLastUsed)
+                {
+                    _lastUsedUtc = nowUtc;
+                }
+                if (_retired && _leaseCount == 0 && !_disposeStarted)
+                {
+                    _disposeStarted = true;
+                    disposeNow = true;
+                }
+            }
+
+            if (disposeNow)
+            {
+                _ = DisposeClientAsync();
+            }
+
+            return disposeNow;
+        }
+
+        private async Task DisposeClientAsync()
+        {
+            try
+            {
+                try
+                {
+                    await Client.DisconnectAsync();
+                }
+                catch
+                {
+                    // A disconnected industrial endpoint can fail its final close handshake.
+                }
+
+                try
+                {
+                    Client.Dispose();
+                }
+                catch
+                {
+                    // Pool retirement is best-effort after the entry has become unreachable.
+                }
+            }
+            finally
+            {
+                _retiringConnections.TryRemove(this, out _);
+                _disposalCompleted.TrySetResult();
+            }
+        }
+    }
+
+    private sealed class RefCountedSemaphore : IDisposable
+    {
+        private readonly object _sync = new();
         private int _refCount;
+        private bool _retired;
 
         public SemaphoreSlim Semaphore { get; } = new(1, 1);
 
-        public void AddRef()
+        public int ReferenceCount
         {
-            Interlocked.Increment(ref _refCount);
+            get
+            {
+                lock (_sync)
+                {
+                    return _refCount;
+                }
+            }
         }
 
-        public int ReleaseRef()
+        public bool TryAddRef()
         {
-            return Interlocked.Decrement(ref _refCount);
+            lock (_sync)
+            {
+                if (_retired)
+                {
+                    return false;
+                }
+
+                _refCount++;
+                return true;
+            }
         }
+
+        public bool ReleaseRefAndRetireIfUnused()
+        {
+            lock (_sync)
+            {
+                if (_refCount <= 0)
+                {
+                    throw new InvalidOperationException("PLC keyed lock reference count underflow.");
+                }
+
+                _refCount--;
+                if (_refCount != 0)
+                {
+                    return false;
+                }
+
+                _retired = true;
+                return true;
+            }
+        }
+
+        public void Dispose() => Semaphore.Dispose();
     }
 
     private static RefCountedSemaphore AcquireRefCountedSemaphore(
@@ -372,14 +744,21 @@ public abstract class PlcCommunicationOperatorBase : OperatorBase
         while (true)
         {
             var entry = dictionary.GetOrAdd(key, static _ => new RefCountedSemaphore());
-            entry.AddRef();
+            if (!entry.TryAddRef())
+            {
+                dictionary.TryRemove(new KeyValuePair<string, RefCountedSemaphore>(key, entry));
+                continue;
+            }
 
             if (dictionary.TryGetValue(key, out var current) && ReferenceEquals(current, entry))
             {
                 return entry;
             }
 
-            _ = entry.ReleaseRef();
+            if (entry.ReleaseRefAndRetireIfUnused())
+            {
+                entry.Dispose();
+            }
         }
     }
 
@@ -388,31 +767,64 @@ public abstract class PlcCommunicationOperatorBase : OperatorBase
         string key,
         RefCountedSemaphore entry)
     {
-        if (entry.ReleaseRef() != 0)
+        if (!entry.ReleaseRefAndRetireIfUnused())
         {
             return;
         }
 
-        _ = dictionary.TryRemove(new KeyValuePair<string, RefCountedSemaphore>(key, entry));
+        dictionary.TryRemove(new KeyValuePair<string, RefCountedSemaphore>(key, entry));
+        entry.Dispose();
     }
 
-    protected async Task<(IPlcClient client, bool isNewConnection)> GetOrCreateConnectionAsync(
+    protected async Task<PooledPlcConnectionLease> AcquireConnectionLeaseAsync(
         string connectionKey,
-        Func<IPlcClient> factory)
+        Func<IPlcClient> factory,
+        CancellationToken cancellationToken = default)
     {
+        ArgumentException.ThrowIfNullOrWhiteSpace(connectionKey);
+        ArgumentNullException.ThrowIfNull(factory);
+
         var keyLockEntry = AcquireRefCountedSemaphore(_connectionKeyLocks, connectionKey);
         var keyLockAcquired = false;
-        await keyLockEntry.Semaphore.WaitAsync();
-        keyLockAcquired = true;
+        var reservationHeld = false;
+        var reservationGeneration = 0L;
+        IPlcClient? newClient = null;
+
         try
         {
-            await _poolLock.WaitAsync();
+            await keyLockEntry.Semaphore.WaitAsync(cancellationToken);
+            keyLockAcquired = true;
+
+            var immediateDisposals = new List<Task>();
+            PooledPlcConnectionLease? existingLease = null;
+            await _poolLock.WaitAsync(cancellationToken);
             try
             {
-                if (_connectionPool.TryGetValue(connectionKey, out var existingClient) && existingClient.IsConnected)
+                var nowUtc = _poolTimeProvider.GetUtcNow();
+                MaintainPoolUnderLock(nowUtc, immediateDisposals);
+
+                if (_connectionPool.TryGetValue(connectionKey, out var existingEntry) &&
+                    existingEntry.Client.IsConnected &&
+                    existingEntry.TryAcquireLease(
+                        nowUtc,
+                        isNewConnection: false,
+                        touchLastUsed: true,
+                        out existingLease))
                 {
                     Logger.LogDebug("[{OperatorType}] 复用现有连接: {Key}", OperatorType, connectionKey);
-                    return (existingClient, false);
+                }
+                else
+                {
+                    EnsureCapacityForReservationUnderLock(immediateDisposals);
+                    if (_connectionPool.Count + _pendingConnectionCount >= _maxPooledConnections)
+                    {
+                        throw new InvalidOperationException(
+                            $"PLC_CONNECTION_POOL_CAPACITY_REACHED: capacity={_maxPooledConnections}.");
+                    }
+
+                    _pendingConnectionCount++;
+                    reservationHeld = true;
+                    reservationGeneration = _poolGeneration;
                 }
             }
             finally
@@ -420,59 +832,100 @@ public abstract class PlcCommunicationOperatorBase : OperatorBase
                 _poolLock.Release();
             }
 
-            // 创建新连接
+            if (immediateDisposals.Count > 0)
+            {
+                await Task.WhenAll(immediateDisposals);
+            }
+
+            if (existingLease != null)
+            {
+                return existingLease;
+            }
+
             Logger.LogInformation("[{OperatorType}] 创建新连接: {Key}", OperatorType, connectionKey);
-            var newClient = factory();
+            newClient = factory();
             bool connected;
             try
             {
-                connected = await newClient.ConnectAsync();
+                connected = await newClient.ConnectAsync(cancellationToken);
             }
             catch
             {
-                newClient.Dispose();
+                await DisposeUnpooledClientAsync(newClient);
+                newClient = null;
                 throw;
             }
 
             if (!connected)
             {
-                newClient.Dispose();
+                await DisposeUnpooledClientAsync(newClient);
+                newClient = null;
                 throw new InvalidOperationException($"无法连接到PLC: {connectionKey}");
             }
 
-            IPlcClient? oldClient = null;
-            await _poolLock.WaitAsync();
+            PooledPlcConnectionLease? createdLease = null;
+            var generationChanged = false;
+            await _poolLock.WaitAsync(cancellationToken);
             try
             {
-                // 并发场景下若其他线程已恢复可用连接，则直接复用并回收新客户端
-                if (_connectionPool.TryGetValue(connectionKey, out var latestClient) && latestClient.IsConnected)
+                _pendingConnectionCount--;
+                reservationHeld = false;
+                generationChanged = reservationGeneration != _poolGeneration;
+                if (!generationChanged)
                 {
-                    newClient.Dispose();
-                    Logger.LogDebug("[{OperatorType}] 复用连接（并发延迟）: {Key}", OperatorType, connectionKey);
-                    return (latestClient, false);
+                    var entry = new PooledConnectionEntry(
+                        connectionKey,
+                        newClient,
+                        _poolTimeProvider.GetUtcNow());
+                    if (!_connectionPool.TryAdd(connectionKey, entry) ||
+                        !entry.TryAcquireLease(
+                            _poolTimeProvider.GetUtcNow(),
+                            isNewConnection: true,
+                            touchLastUsed: true,
+                            out createdLease))
+                    {
+                        throw new InvalidOperationException(
+                            $"PLC connection '{connectionKey}' was created through an uncoordinated path.");
+                    }
+
+                    _lastKnownState[connectionKey] = true;
+                    newClient = null;
                 }
-
-                if (_connectionPool.TryGetValue(connectionKey, out oldClient))
-                {
-                    _connectionPool.Remove(connectionKey);
-                }
-
-                _connectionPool[connectionKey] = newClient;
-
-                // 新连接上线，初始化心跳状态
-                _lastKnownState[connectionKey] = true;
             }
             finally
             {
                 _poolLock.Release();
             }
 
-            oldClient?.Dispose();
+            if (generationChanged)
+            {
+                await DisposeUnpooledClientAsync(newClient!);
+                newClient = null;
+                throw new InvalidOperationException("PLC_CONNECTION_POOL_RESET_DURING_CONNECT.");
+            }
 
-            return (newClient, true);
+            return createdLease!;
         }
         finally
         {
+            if (newClient != null)
+            {
+                await DisposeUnpooledClientAsync(newClient);
+            }
+
+            if (reservationHeld)
+            {
+                await _poolLock.WaitAsync(CancellationToken.None);
+                try
+                {
+                    _pendingConnectionCount--;
+                }
+                finally
+                {
+                    _poolLock.Release();
+                }
+            }
+
             if (keyLockAcquired)
             {
                 keyLockEntry.Semaphore.Release();
@@ -480,6 +933,220 @@ public abstract class PlcCommunicationOperatorBase : OperatorBase
 
             ReleaseRefCountedSemaphore(_connectionKeyLocks, connectionKey, keyLockEntry);
         }
+    }
+
+    internal static async Task RunConnectionPoolMaintenanceAsync()
+    {
+        var immediateDisposals = new List<Task>();
+        await _poolLock.WaitAsync();
+        try
+        {
+            MaintainPoolUnderLock(_poolTimeProvider.GetUtcNow(), immediateDisposals);
+        }
+        finally
+        {
+            _poolLock.Release();
+        }
+
+        if (immediateDisposals.Count > 0)
+        {
+            await Task.WhenAll(immediateDisposals);
+        }
+    }
+
+    private static async Task<PooledPlcConnectionLease[]> AcquireHeartbeatLeasesAsync(CancellationToken ct)
+    {
+        if (!await _poolLock.WaitAsync(200, ct))
+        {
+            return [];
+        }
+
+        var immediateDisposals = new List<Task>();
+        var leases = new List<PooledPlcConnectionLease>();
+        try
+        {
+            var nowUtc = _poolTimeProvider.GetUtcNow();
+            MaintainPoolUnderLock(nowUtc, immediateDisposals);
+            foreach (var entry in _connectionPool.Values)
+            {
+                if (entry.TryAcquireLease(
+                        nowUtc,
+                        isNewConnection: false,
+                        touchLastUsed: false,
+                        out var lease))
+                {
+                    leases.Add(lease!);
+                }
+            }
+        }
+        finally
+        {
+            _poolLock.Release();
+        }
+
+        if (immediateDisposals.Count > 0)
+        {
+            await Task.WhenAll(immediateDisposals);
+        }
+
+        return leases.ToArray();
+    }
+
+    internal static async Task RunHeartbeatProbeOnceForTestingAsync(CancellationToken cancellationToken)
+    {
+        var snapshot = await AcquireHeartbeatLeasesAsync(cancellationToken);
+        if (snapshot.Length > 0)
+        {
+            await PingSnapshotAsync(snapshot, cancellationToken);
+        }
+    }
+
+    private static void MaintainPoolUnderLock(DateTimeOffset nowUtc, List<Task> immediateDisposals)
+    {
+        foreach (var (key, entry) in _connectionPool.ToArray())
+        {
+            if (!entry.Client.IsConnected)
+            {
+                RemoveEntryUnderLock(
+                    key,
+                    entry,
+                    ConnectionRetirementReason.Disconnected,
+                    immediateDisposals);
+            }
+            else if (entry.IsIdle(nowUtc, _maxIdleConnectionAge))
+            {
+                RemoveEntryUnderLock(
+                    key,
+                    entry,
+                    ConnectionRetirementReason.Idle,
+                    immediateDisposals);
+            }
+        }
+    }
+
+    private static void EnsureCapacityForReservationUnderLock(List<Task> immediateDisposals)
+    {
+        while (_connectionPool.Count + _pendingConnectionCount >= _maxPooledConnections)
+        {
+            var candidate = _connectionPool
+                .Where(pair => pair.Value.CanEvictForCapacity())
+                .OrderBy(pair => pair.Value.LastUsedUtc)
+                .FirstOrDefault();
+            if (candidate.Value == null)
+            {
+                return;
+            }
+
+            RemoveEntryUnderLock(
+                candidate.Key,
+                candidate.Value,
+                ConnectionRetirementReason.Capacity,
+                immediateDisposals);
+        }
+    }
+
+    private static bool RemoveEntryUnderLock(
+        string connectionKey,
+        PooledConnectionEntry entry,
+        ConnectionRetirementReason reason,
+        List<Task> immediateDisposals)
+    {
+        if (!_connectionPool.TryGetValue(connectionKey, out var current) ||
+            !ReferenceEquals(current, entry) ||
+            !_connectionPool.Remove(connectionKey))
+        {
+            return false;
+        }
+
+        _lastKnownState.TryRemove(connectionKey, out _);
+        _retiringConnections.TryAdd(entry, 0);
+        if (entry.Retire())
+        {
+            immediateDisposals.Add(entry.DisposalCompleted);
+        }
+
+        switch (reason)
+        {
+            case ConnectionRetirementReason.Idle:
+                Interlocked.Increment(ref _idleEvictionCount);
+                break;
+            case ConnectionRetirementReason.Capacity:
+                Interlocked.Increment(ref _capacityEvictionCount);
+                break;
+            case ConnectionRetirementReason.Disconnected:
+                Interlocked.Increment(ref _disconnectedRemovalCount);
+                break;
+        }
+
+        return true;
+    }
+
+    private static async Task RemoveDisconnectedEntryAsync(
+        string connectionKey,
+        PooledConnectionEntry entry)
+    {
+        var immediateDisposals = new List<Task>();
+        await _poolLock.WaitAsync();
+        try
+        {
+            RemoveEntryUnderLock(
+                connectionKey,
+                entry,
+                ConnectionRetirementReason.Disconnected,
+                immediateDisposals);
+        }
+        finally
+        {
+            _poolLock.Release();
+        }
+
+        if (immediateDisposals.Count > 0)
+        {
+            await Task.WhenAll(immediateDisposals);
+        }
+    }
+
+    private static async ValueTask ReleaseConnectionLeaseAsync(
+        PooledConnectionEntry entry,
+        bool touchLastUsed)
+    {
+        var disposeStarted = entry.ReleaseLease(_poolTimeProvider.GetUtcNow(), touchLastUsed);
+        if (disposeStarted)
+        {
+            await entry.DisposalCompleted;
+            return;
+        }
+
+        if (!entry.IsRetired && !entry.Client.IsConnected)
+        {
+            await RemoveDisconnectedEntryAsync(entry.ConnectionKey, entry);
+        }
+    }
+
+    private static async Task DisposeUnpooledClientAsync(IPlcClient client)
+    {
+        try
+        {
+            await client.DisconnectAsync();
+        }
+        catch
+        {
+        }
+
+        try
+        {
+            client.Dispose();
+        }
+        catch
+        {
+        }
+    }
+
+    private enum ConnectionRetirementReason
+    {
+        Idle,
+        Capacity,
+        Disconnected
     }
 
     protected Task<T> ExecuteWithConnectionOperationLockAsync<T>(

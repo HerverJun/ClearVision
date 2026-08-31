@@ -33,6 +33,7 @@ async function setCurrentProject(page) {
       id: 'e2e-project',
       name: 'E2E Project',
       description: '',
+      persistenceRevision: 0,
       flow: null,
     });
     inspectionModule.default.setProject('e2e-project');

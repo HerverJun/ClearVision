@@ -10,10 +10,13 @@ using OpenCvSharp;
 namespace ClearVision.Product.Tests.Operators;
 
 [TestClassification(TestDomain.Core, TestPurpose.Regression, TestLane.Pr, TestEvidenceType.Contract, TestOracleType.Contract, TestResourceRequirement.None, TestExpectedDuration.Fast, TestFlakyPolicy.Blocking, "product")]
-public class FrameChangeTriggerOperatorTests
+public class FrameChangeTriggerOperatorTests : IDisposable
 {
+    private readonly IDisposable _authorityScope = TestExecutionAuthorityScope.Enter();
     private readonly FrameChangeTriggerOperator _operator =
         new(Substitute.For<ILogger<FrameChangeTriggerOperator>>());
+
+    public void Dispose() => _authorityScope.Dispose();
 
     [Fact]
     public void OperatorType_ShouldBeFrameChangeTrigger()

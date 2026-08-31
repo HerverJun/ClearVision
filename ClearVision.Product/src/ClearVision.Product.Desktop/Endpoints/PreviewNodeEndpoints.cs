@@ -194,6 +194,20 @@ public static class PreviewNodeEndpoints
                     }
                 }
 
+                var authorityBinding = await BindPreviewAuthorityAsync(
+                    request,
+                    context,
+                    flow,
+                    projectRepository,
+                    context.RequestAborted);
+                if (authorityBinding.Failure != null)
+                {
+                    return authorityBinding.Failure;
+                }
+
+                var previewAuthority = authorityBinding.Authority!;
+                var projectRevision = authorityBinding.ProjectRevision;
+
                 var targetOperator = flow.Operators.FirstOrDefault(o => o.Id == request.TargetNodeId);
                 byte[]? capturedFrameImageData = null;
                 if (request.InputImageSourceNodeId.HasValue)
@@ -234,6 +248,8 @@ public static class PreviewNodeEndpoints
                         artifactOwner,
                         useArtifactReferences,
                         studioOptions.Value,
+                        previewAuthority,
+                        projectRevision,
                         imageSavePreviewCancellation.Token,
                         logger,
                         ReleaseProjectAccessAsync);
@@ -254,6 +270,8 @@ public static class PreviewNodeEndpoints
                         projectRepository,
                         projectVariableSessions,
                         studioOptions.Value,
+                        previewAuthority,
+                        projectRevision,
                         fileOutputPreviewCancellation.Token,
                         logger,
                         ReleaseProjectAccessAsync);
@@ -265,11 +283,14 @@ public static class PreviewNodeEndpoints
                 }
 
                 // 构建调试选项
-                var flowAdmission = await executionAdmissionService.ValidateFlowAsync(
+                var previewSnapshot = CreatePreviewSnapshot(
                     request.ProjectId,
                     flow,
-                    ExecutionAdmissionSurface.NodePreview,
-                    context.RequestAborted);
+                    projectRevision,
+                    previewAuthority);
+                var flowAdmission = executionAdmissionService.ValidateSnapshot(
+                    previewSnapshot,
+                    ExecutionAdmissionSurface.NodePreview);
                 if (!flowAdmission.IsAllowed)
                 {
                     return ToAdmissionFailure(flowAdmission);
@@ -321,7 +342,7 @@ public static class PreviewNodeEndpoints
 
                 // 执行调试流程（自动执行上游子图到目标节点）
                 var result = await flowService.ExecuteDebugWithSnapshotAsync(
-                    CreatePreviewSnapshot(request.ProjectId, flow),
+                    previewSnapshot,
                     debugOptions,
                     inputData,
                     projectVariables,
@@ -628,6 +649,8 @@ public static class PreviewNodeEndpoints
         PreviewArtifactOwnerScope artifactOwner,
         bool useArtifactReferences,
         StudioOptions studioOptions,
+        ExecutionRequestAuthority previewAuthority,
+        long projectRevision,
         CancellationToken cancellationToken,
         ILogger logger,
         Func<Task> releaseProjectAccessAsync)
@@ -668,11 +691,14 @@ public static class PreviewNodeEndpoints
         }
 
         var dryRunFlow = BuildImageSaveDryRunFlow(flow, plan.SourceOperator.Id);
-        var flowAdmission = await executionAdmissionService.ValidateFlowAsync(
+        var dryRunSnapshot = CreatePreviewSnapshot(
             request.ProjectId,
             dryRunFlow,
-            ExecutionAdmissionSurface.NodePreview,
-            cancellationToken);
+            projectRevision,
+            previewAuthority);
+        var flowAdmission = executionAdmissionService.ValidateSnapshot(
+            dryRunSnapshot,
+            ExecutionAdmissionSurface.NodePreview);
         if (!flowAdmission.IsAllowed)
         {
             await releaseProjectAccessAsync();
@@ -719,7 +745,7 @@ public static class PreviewNodeEndpoints
         };
 
         var result = await flowService.ExecuteDebugWithSnapshotAsync(
-            CreatePreviewSnapshot(request.ProjectId, dryRunFlow),
+            dryRunSnapshot,
             debugOptions,
             inputData,
             projectVariables,
@@ -784,16 +810,21 @@ public static class PreviewNodeEndpoints
         IProjectRepository projectRepository,
         ProjectVariableSessionRegistry projectVariableSessions,
         StudioOptions studioOptions,
+        ExecutionRequestAuthority previewAuthority,
+        long projectRevision,
         CancellationToken cancellationToken,
         ILogger logger,
         Func<Task> releaseProjectAccessAsync)
     {
         var dryRunFlow = BuildUpstreamDryRunFlow(flow, targetOperator.Id, $"{flow.Name}-{targetOperator.Type}Preview");
-        var flowAdmission = await executionAdmissionService.ValidateFlowAsync(
+        var dryRunSnapshot = CreatePreviewSnapshot(
             request.ProjectId,
             dryRunFlow,
-            ExecutionAdmissionSurface.NodePreview,
-            cancellationToken);
+            projectRevision,
+            previewAuthority);
+        var flowAdmission = executionAdmissionService.ValidateSnapshot(
+            dryRunSnapshot,
+            ExecutionAdmissionSurface.NodePreview);
         if (!flowAdmission.IsAllowed)
         {
             await releaseProjectAccessAsync();
@@ -856,7 +887,7 @@ public static class PreviewNodeEndpoints
             };
 
             result = await flowService.ExecuteDebugWithSnapshotAsync(
-                CreatePreviewSnapshot(request.ProjectId, dryRunFlow),
+                dryRunSnapshot,
                 debugOptions,
                 inputData,
                 projectVariables,
@@ -2891,15 +2922,144 @@ public static class PreviewNodeEndpoints
                 : errorMessage);
     }
 
-    private static ExecutionSnapshot CreatePreviewSnapshot(Guid projectId, OperatorFlow flow) =>
-        new(
-            projectId == Guid.Empty
-                ? flow.Id == Guid.Empty ? Guid.NewGuid() : flow.Id
-                : projectId,
+    private static async Task<BoundPreviewAuthority> BindPreviewAuthorityAsync(
+        PreviewNodeRequest request,
+        HttpContext context,
+        OperatorFlow requestedFlow,
+        IProjectRepository projectRepository,
+        CancellationToken cancellationToken)
+    {
+        var session = context.Items["CurrentUser"] as ClearVision.Product.Desktop.Middleware.UserSession;
+        if (session == null || string.IsNullOrWhiteSpace(session.UserId))
+        {
+            return BoundPreviewAuthority.Rejected(ExecutionAdmissionResult.Reject(
+                "ADMISSION_PRINCIPAL_REQUIRED",
+                "Node preview requires an authenticated user session."));
+        }
+
+        cancellationToken.ThrowIfCancellationRequested();
+        var project = await projectRepository.GetByIdFreshAsync(request.ProjectId);
+        cancellationToken.ThrowIfCancellationRequested();
+        if (project == null)
+        {
+            return BoundPreviewAuthority.Rejected(ExecutionAdmissionResult.Reject(
+                "ADMISSION_PROJECT_NOT_ACTIVE",
+                "Node preview requires an active project."));
+        }
+
+        if (request.ExpectedProjectRevision is null ||
+            request.ExpectedProjectRevision.Value != project.PersistenceRevision)
+        {
+            return BoundPreviewAuthority.Rejected(ExecutionAdmissionResult.Reject(
+                "ADMISSION_DRAFT_REVISION_REQUIRED",
+                "Node preview requires the current expected project revision."));
+        }
+
+        if (!Guid.TryParse(request.ConfirmationId, out var confirmationId) || confirmationId == Guid.Empty ||
+            !Guid.TryParse(request.AuditId, out var auditId) || auditId == Guid.Empty ||
+            confirmationId == auditId)
+        {
+            return BoundPreviewAuthority.Rejected(ExecutionAdmissionResult.Reject(
+                "ADMISSION_DRAFT_CONFIRMATION_REQUIRED",
+                "Node preview requires distinct confirmation and audit UUIDs."));
+        }
+
+        if (!TryParseCapabilities(request.CapabilityManifest, out var declaredCapabilities))
+        {
+            return BoundPreviewAuthority.Rejected(ExecutionAdmissionResult.Reject(
+                "ADMISSION_DRAFT_CAPABILITY_CONFIRMATION_REQUIRED",
+                "Node preview requires an explicit, valid capability manifest."));
+        }
+
+        var requiredCapabilities = ExecutionCapabilityManifest.Derive(requestedFlow).Capabilities;
+        if (declaredCapabilities != requiredCapabilities)
+        {
+            return BoundPreviewAuthority.Rejected(ExecutionAdmissionResult.Reject(
+                "ADMISSION_CAPABILITY_MANIFEST_MISMATCH",
+                "The declared capability manifest does not match the requested preview flow."));
+        }
+
+        var flowHash = ExecutionFlowIdentity.ComputeFlowHash(requestedFlow);
+        var authority = new ExecutionRequestAuthority(
+            new ExecutionPrincipal(
+                session.UserId,
+                session.Username,
+                session.Role,
+                IsAuthenticated: true),
+            project.PersistenceRevision,
+            new ExecutionCapabilityManifest(declaredCapabilities, isExplicit: true),
+            confirmationId.ToString("D"),
+            auditId.ToString("D"),
+            new Dictionary<string, string>
+            {
+                ["ProjectRevision"] = project.PersistenceRevision.ToString(CultureInfo.InvariantCulture),
+                ["FlowHash"] = flowHash
+            });
+        return BoundPreviewAuthority.Allowed(authority, project.PersistenceRevision);
+    }
+
+    private static bool TryParseCapabilities(
+        IReadOnlyList<string>? values,
+        out ExecutionSideEffect capabilities)
+    {
+        capabilities = ExecutionSideEffect.None;
+        if (values == null)
+        {
+            return false;
+        }
+
+        foreach (var value in values)
+        {
+            if (string.IsNullOrWhiteSpace(value) ||
+                !Enum.TryParse<ExecutionSideEffect>(value.Trim(), ignoreCase: true, out var parsed) ||
+                parsed == ExecutionSideEffect.None ||
+                !Enum.IsDefined(parsed))
+            {
+                return false;
+            }
+
+            capabilities |= parsed;
+        }
+
+        return true;
+    }
+
+    private static ExecutionSnapshot CreatePreviewSnapshot(
+        Guid projectId,
+        OperatorFlow flow,
+        long projectRevision,
+        ExecutionRequestAuthority authority)
+    {
+        var flowHash = ExecutionFlowIdentity.ComputeFlowHash(flow);
+        var resourceBindings = authority.ResourceBindings
+            .ToDictionary(pair => pair.Key, pair => pair.Value, StringComparer.Ordinal);
+        resourceBindings["ProjectRevision"] = projectRevision.ToString(CultureInfo.InvariantCulture);
+        resourceBindings["FlowHash"] = flowHash;
+        return new ExecutionSnapshot(
+            projectId,
             flow,
-            persistenceRevision: 0,
+            projectRevision,
             ExecutionSnapshotSource.Draft,
-            ExecutionRunMode.Preview);
+            ExecutionRunMode.Preview,
+            resourceBindings,
+            principal: authority.Principal,
+            capabilityManifest: ExecutionCapabilityManifest.Derive(flow, isExplicit: true),
+            expectedProjectRevision: projectRevision,
+            confirmationId: authority.ConfirmationId,
+            auditId: authority.AuditId);
+    }
+
+    private sealed record BoundPreviewAuthority(
+        ExecutionRequestAuthority? Authority,
+        long ProjectRevision,
+        IResult? Failure)
+    {
+        public static BoundPreviewAuthority Allowed(ExecutionRequestAuthority authority, long revision) =>
+            new(authority, revision, null);
+
+        public static BoundPreviewAuthority Rejected(ExecutionAdmissionResult admission) =>
+            new(null, 0, ToAdmissionFailure(admission));
+    }
 
     private static double ComputeBinaryRatio(byte[]? outputImageBytes)
     {
@@ -2982,6 +3142,16 @@ public class PreviewNodeRequest
     /// 客户端本地 flow revision；不是后端执行版本，服务端仅校验并回显。
     /// </summary>
     public long? FlowRevision { get; set; }
+
+    /// <summary>Authoritative project revision bound to this Draft preview.</summary>
+    public long? ExpectedProjectRevision { get; set; }
+
+    /// <summary>Explicit capabilities derived from the requested immutable flow.</summary>
+    public List<string>? CapabilityManifest { get; set; }
+
+    public string? ConfirmationId { get; set; }
+
+    public string? AuditId { get; set; }
 
     /// <summary>
     /// 流程数据（包含所有算子和连接）

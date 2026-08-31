@@ -41,7 +41,17 @@ public static class VisionRuntimeServiceCollectionExtensions
         services.AddScoped<GovernedFlowExecutionService>();
         services.AddScoped<IFlowExecutionService>(provider => provider.GetRequiredService<GovernedFlowExecutionService>());
         services.AddScoped<IFlowDefinitionValidator>(provider => provider.GetRequiredService<GovernedFlowExecutionService>());
+        services.AddScoped<IExecutionResourceAuthority>(provider =>
+            new ServerExecutionResourceAuthority(provider.GetService<IConfigurationService>()));
+        services.TryAddSingleton<IExecutionResourceProfileResolver>(provider =>
+            new ServerExecutionResourceProfileResolver(provider.GetService<IConfigurationService>()));
         services.AddScoped<IExecutionAdmissionService, ExecutionAdmissionService>();
+        services.TryAddSingleton<IOperatorDispatchJournal>(_ =>
+            new FileOperatorDispatchJournal(FileOperatorDispatchJournal.GetDefaultPath()));
+        services.AddOptions<HttpResourceBrokerOptions>();
+        services.TryAddSingleton<IHttpResourceDnsResolver, SystemHttpResourceDnsResolver>();
+        services.TryAddSingleton<IHttpResourceTransport, SecureHttpResourceTransport>();
+        services.TryAddSingleton<IHttpResourceBroker, ServerHttpResourceBroker>();
         services.AddSingleton<IOperatorFactory, OperatorFactory>();
         services.AddSingleton<WorkflowLegacyScanner>();
         services.AddSingleton<WorkflowLegacyRepairService>();
@@ -220,6 +230,12 @@ public static class VisionRuntimeServiceCollectionExtensions
         this IServiceCollection services,
         IConfiguration? configuration = null)
     {
+        if (configuration != null)
+        {
+            services.Configure<HttpResourceBrokerOptions>(
+                configuration.GetSection(HttpResourceBrokerOptions.ConfigurationSection));
+        }
+
         var loggerFactory = SerilogConfiguration.ConfigureSerilog();
         services.AddSingleton<Microsoft.Extensions.Logging.ILoggerFactory>(loggerFactory);
 
@@ -314,7 +330,9 @@ public static class VisionRuntimeServiceCollectionExtensions
         services.AddSingleton<IConfigurationService, JsonConfigurationService>();
         services.AddScoped<IUserRepository, UserRepository>();
         services.AddSingleton<IPasswordHasher, PasswordHasher>();
-        services.AddScoped<IAuthService, AuthService>();
+        services.AddScoped<AuthService>();
+        services.AddScoped<IAuthService>(sp => sp.GetRequiredService<AuthService>());
+        services.AddScoped<IAuthSessionRevocationService>(sp => sp.GetRequiredService<AuthService>());
         services.AddScoped<AuthenticatedContextProjectionService>();
         services.AddScoped<UserManagementService>();
 

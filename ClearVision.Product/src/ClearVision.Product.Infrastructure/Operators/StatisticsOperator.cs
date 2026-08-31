@@ -7,6 +7,7 @@ using ClearVision.Product.Core.Attributes;
 using ClearVision.Product.Core.Entities;
 using ClearVision.Product.Core.Enums;
 using ClearVision.Product.Core.Operators;
+using ClearVision.Product.Core.Services;
 using Microsoft.Extensions.Logging;
 
 namespace ClearVision.Product.Infrastructure.Operators;
@@ -32,7 +33,7 @@ namespace ClearVision.Product.Infrastructure.Operators;
 [OperatorParam("Reset", "Reset History", "bool", DefaultValue = false)]
 public class StatisticsOperator : OperatorBase
 {
-    private static readonly ConcurrentDictionary<Guid, RollingHistoryState> HistoryByOperator = new();
+    private static readonly ConcurrentDictionary<ExecutionStateKey, RollingHistoryState> HistoryByScope = new();
     private static readonly object CleanupSync = new();
     private static DateTime _lastCleanupUtc = DateTime.MinValue;
     private static readonly TimeSpan CleanupInterval = TimeSpan.FromMinutes(5);
@@ -60,7 +61,8 @@ public class StatisticsOperator : OperatorBase
         var reset = GetBoolParam(@operator, "Reset", false);
         var nowUtc = DateTime.UtcNow;
 
-        var state = HistoryByOperator.GetOrAdd(@operator.Id, _ => new RollingHistoryState());
+        var stateKey = ExecutionStateKey.ForOperator(@operator.Id);
+        var state = HistoryByScope.GetOrAdd(stateKey, _ => new RollingHistoryState());
 
         RollingStatisticsSnapshot snapshot;
         lock (state.SyncRoot)
@@ -161,7 +163,7 @@ public class StatisticsOperator : OperatorBase
                 return;
             }
 
-            foreach (var entry in HistoryByOperator)
+            foreach (var entry in HistoryByScope)
             {
                 var shouldRemove = false;
                 var state = entry.Value;
@@ -172,7 +174,7 @@ public class StatisticsOperator : OperatorBase
 
                 if (shouldRemove)
                 {
-                    HistoryByOperator.TryRemove(entry.Key, out _);
+                    HistoryByScope.TryRemove(entry.Key, out _);
                 }
             }
 

@@ -28,7 +28,7 @@ public enum ExecutionAdmissionSurface
     /// <summary>Station 现场正式运行（含内联流程），允许流程声明的真实 I/O。</summary>
     StationRuntimeExecution = 2,
 
-    /// <summary>流程编辑器节点预览：禁止真实外部 I/O（写盘算子走 safe dry-run；File 图源允许读图）。</summary>
+    /// <summary>流程编辑器节点预览：仅允许有界输入与隔离状态，禁止文件、网络、数据库和设备 I/O。</summary>
     NodePreview = 3,
 
     /// <summary>单算子预览/调参：禁止真实外部 I/O。</summary>
@@ -37,7 +37,7 @@ public enum ExecutionAdmissionSurface
     /// <summary>旧 WebMessage 执行命令：恒定禁用。</summary>
     LegacyWebMessageExecution = 5,
 
-    /// <summary>AutoTune 线序预览与指标分析：禁止真实外部 I/O（File 图源允许读图，与节点预览一致）。</summary>
+    /// <summary>AutoTune 线序预览与指标分析：仅允许有界输入与隔离状态，禁止文件、网络、数据库和设备 I/O。</summary>
     AutoTunePreview = 6,
 
     ShadowCandidate = 7,
@@ -122,15 +122,18 @@ public sealed class ExecutionAdmissionService : IExecutionAdmissionService
     private readonly IProjectRepository _projectRepository;
     private readonly IInspectionRuntimeCoordinator? _runtimeCoordinator;
     private readonly IFlowDefinitionValidator? _flowDefinitionValidator;
+    private readonly IExecutionResourceAuthority? _resourceAuthority;
 
     public ExecutionAdmissionService(
         IProjectRepository projectRepository,
         IInspectionRuntimeCoordinator? runtimeCoordinator = null,
-        IFlowDefinitionValidator? flowDefinitionValidator = null)
+        IFlowDefinitionValidator? flowDefinitionValidator = null,
+        IExecutionResourceAuthority? resourceAuthority = null)
     {
         _projectRepository = projectRepository;
         _runtimeCoordinator = runtimeCoordinator;
         _flowDefinitionValidator = flowDefinitionValidator;
+        _resourceAuthority = resourceAuthority;
     }
 
     /// <summary>
@@ -163,7 +166,7 @@ public sealed class ExecutionAdmissionService : IExecutionAdmissionService
         var project = await _projectRepository.GetByIdFreshAsync(projectId);
         cancellationToken.ThrowIfCancellationRequested();
 
-        return project == null
+        return project is not { IsDeleted: false }
             ? ExecutionAdmissionResult.Reject(
                 "ADMISSION_PROJECT_NOT_ACTIVE",
                 $"Project '{projectId}' does not exist or has been deleted.")
@@ -348,6 +351,20 @@ public sealed class ExecutionAdmissionService : IExecutionAdmissionService
         ExecutionAdmissionSurface surface)
     {
         ArgumentNullException.ThrowIfNull(snapshot);
+        var authority = ExecutionAuthorityMatrix.Validate(snapshot);
+        if (!authority.Allowed)
+        {
+            return ExecutionAdmissionResult.Reject(authority.Code, authority.Message);
+        }
+
+        var resourceAuthority = _resourceAuthority?.Validate(snapshot);
+        if (resourceAuthority is { Allowed: false })
+        {
+            return ExecutionAdmissionResult.Reject(
+                resourceAuthority.Code,
+                resourceAuthority.Message);
+        }
+
         var runtimeState = _runtimeCoordinator?.GetState(snapshot.ProjectId);
         if (IsOfficialExecutionSurface(surface) &&
             runtimeState?.Status is RuntimeStatus.Starting or RuntimeStatus.Running or RuntimeStatus.Stopping)
@@ -449,13 +466,6 @@ public sealed class ExecutionAdmissionService : IExecutionAdmissionService
             _ => ExecutionRunMode.Preview
         });
         var allowedCapabilities = policy.AllowedCapabilities;
-        if (surface == ExecutionAdmissionSurface.OperatorPreview)
-        {
-            // Single-operator preview has no bounded upstream sample context;
-            // retain its stricter no-file-read contract.
-            allowedCapabilities &= ~ExecutionSideEffect.FileRead;
-        }
-
         var blockedCapabilities = ExecutionSideEffectCatalog.GetCapabilities(@operator) & ~allowedCapabilities;
         return blockedCapabilities == ExecutionSideEffect.None
             ? null
@@ -494,7 +504,7 @@ public sealed class ExecutionAdmissionService : IExecutionAdmissionService
             _ => "预览"
         };
 
-        return $"{surfaceName}已安全拦截副作用算子“{first.OperatorName}”（{first.OperatorType}）：{first.Reason}预览不会访问外部设备、网络服务或执行文件系统写入，正式运行流程时才会执行。";
+        return $"{surfaceName}已安全拦截副作用算子“{first.OperatorName}”（{first.OperatorType}）：{first.Reason}预览不会访问外部设备、网络服务、数据库或文件系统，正式运行流程时才会执行。";
     }
 
 }

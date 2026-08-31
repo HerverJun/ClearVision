@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
+using ClearVision.Product.Application.Security;
 using ClearVision.Product.Application.Services;
 using ClearVision.Product.Core.Cameras;
 using ClearVision.Product.Core.Entities;
@@ -22,6 +23,9 @@ namespace ClearVision.Product.Desktop.Tests;
 
 public class ContinuousPreviewEndpointTests
 {
+    private static readonly string EngineerOwnerHash =
+        AuthenticatedOwnerResolver.ResolveOwnerHash("engineer");
+
     private static readonly byte[] ValidPngBytes = Convert.FromBase64String(
         "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==");
 
@@ -41,10 +45,20 @@ public class ContinuousPreviewEndpointTests
         });
 
         var streamCoordinator = Substitute.For<ICameraFrameStreamCoordinator>();
-        streamCoordinator.StartPreviewSessionAsync("binding-1", Arg.Any<CancellationToken>())
-            .Returns(new CameraPreviewSession("session-1", "binding-1", CameraTriggerMode.Continuous, 12));
-        streamCoordinator.WaitForPreviewFrameAsync("session-1", Arg.Any<CancellationToken>())
+        var expiresAtUtc = new DateTimeOffset(2026, 8, 31, 3, 0, 30, TimeSpan.Zero);
+        streamCoordinator.StartPreviewSessionAsync("binding-1", EngineerOwnerHash, Arg.Any<CancellationToken>())
+            .Returns(new CameraPreviewSession(
+                "session-1",
+                "binding-1",
+                CameraTriggerMode.Continuous,
+                12,
+                expiresAtUtc,
+                10_000));
+        streamCoordinator.WaitForPreviewFrameAsync("session-1", EngineerOwnerHash, Arg.Any<CancellationToken>())
             .Returns(new CameraStreamFrame("binding-1", ValidPngBytes, "image/png", 1, 1, 7, DateTime.UtcNow));
+        streamCoordinator.HeartbeatPreviewSessionAsync("session-1", EngineerOwnerHash, Arg.Any<CancellationToken>())
+            .Returns(new CameraPreviewHeartbeat("session-1", expiresAtUtc.AddSeconds(10)));
+        streamCoordinator.StopPreviewSessionAsync("session-1", EngineerOwnerHash).Returns(true);
 
         await using var host = await PreviewTestHost.CreateAsync(cameraManager, streamCoordinator);
 
@@ -52,6 +66,8 @@ public class ContinuousPreviewEndpointTests
         startResponse.StatusCode.Should().Be(HttpStatusCode.OK);
         var startPayload = await startResponse.Content.ReadFromJsonAsync<Dictionary<string, object>>();
         startPayload.Should().NotBeNull();
+        startPayload!.Should().ContainKey("heartbeatIntervalMs");
+        startPayload.Should().ContainKey("expiresAtUtc");
 
         var frameResponse = await host.Client.GetAsync("/api/cameras/continuous-preview/frame/session-1");
         frameResponse.StatusCode.Should().Be(HttpStatusCode.OK);
@@ -62,9 +78,26 @@ public class ContinuousPreviewEndpointTests
         frameResponse.Headers.GetValues("X-Frame-Sequence").Single().Should().Be("7");
         (await frameResponse.Content.ReadAsByteArrayAsync()).Should().Equal(ValidPngBytes);
 
+        var heartbeatResponse = await host.Client.PostAsJsonAsync(
+            "/api/cameras/continuous-preview/heartbeat",
+            new { sessionId = "session-1" });
+        heartbeatResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+
         var stopResponse = await host.Client.PostAsJsonAsync("/api/cameras/continuous-preview/stop", new { sessionId = "session-1" });
         stopResponse.StatusCode.Should().Be(HttpStatusCode.OK);
-        await streamCoordinator.Received(1).StopPreviewSessionAsync("session-1");
+        await streamCoordinator.Received(1).StartPreviewSessionAsync(
+            "binding-1",
+            EngineerOwnerHash,
+            Arg.Any<CancellationToken>());
+        await streamCoordinator.Received(1).WaitForPreviewFrameAsync(
+            "session-1",
+            EngineerOwnerHash,
+            Arg.Any<CancellationToken>());
+        await streamCoordinator.Received(1).HeartbeatPreviewSessionAsync(
+            "session-1",
+            EngineerOwnerHash,
+            Arg.Any<CancellationToken>());
+        await streamCoordinator.Received(1).StopPreviewSessionAsync("session-1", EngineerOwnerHash);
     }
 
     [Fact]
@@ -77,14 +110,59 @@ public class ContinuousPreviewEndpointTests
 
         var startResponse = await host.Client.PostAsJsonAsync("/api/cameras/continuous-preview/start", new { cameraBindingId = "binding-1" });
         var frameResponse = await host.Client.GetAsync("/api/cameras/continuous-preview/frame/session-1");
+        var heartbeatResponse = await host.Client.PostAsJsonAsync(
+            "/api/cameras/continuous-preview/heartbeat",
+            new { sessionId = "session-1" });
         var stopResponse = await host.Client.PostAsJsonAsync("/api/cameras/continuous-preview/stop", new { sessionId = "session-1" });
 
         startResponse.StatusCode.Should().Be(HttpStatusCode.Forbidden);
         frameResponse.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        heartbeatResponse.StatusCode.Should().Be(HttpStatusCode.Forbidden);
         stopResponse.StatusCode.Should().Be(HttpStatusCode.Forbidden);
-        await streamCoordinator.DidNotReceive().StartPreviewSessionAsync(Arg.Any<string>(), Arg.Any<CancellationToken>());
-        await streamCoordinator.DidNotReceive().WaitForPreviewFrameAsync(Arg.Any<string>(), Arg.Any<CancellationToken>());
-        await streamCoordinator.DidNotReceive().StopPreviewSessionAsync(Arg.Any<string>());
+        await streamCoordinator.DidNotReceive().StartPreviewSessionAsync(
+            Arg.Any<string>(),
+            Arg.Any<string>(),
+            Arg.Any<CancellationToken>());
+        await streamCoordinator.DidNotReceive().WaitForPreviewFrameAsync(
+            Arg.Any<string>(),
+            Arg.Any<string>(),
+            Arg.Any<CancellationToken>());
+        await streamCoordinator.DidNotReceive().HeartbeatPreviewSessionAsync(
+            Arg.Any<string>(),
+            Arg.Any<string>(),
+            Arg.Any<CancellationToken>());
+        await streamCoordinator.DidNotReceive().StopPreviewSessionAsync(
+            Arg.Any<string>(),
+            Arg.Any<string>());
+    }
+
+    [Fact]
+    public async Task ContinuousPreviewEndpoints_WithoutAuthenticatedUserId_ShouldRejectBeforeCoordinator()
+    {
+        var cameraManager = Substitute.For<ICameraManager>();
+        var streamCoordinator = Substitute.For<ICameraFrameStreamCoordinator>();
+
+        await using var host = await PreviewTestHost.CreateAsync(
+            cameraManager,
+            streamCoordinator,
+            userId: string.Empty);
+
+        var startResponse = await host.Client.PostAsJsonAsync(
+            "/api/cameras/continuous-preview/start",
+            new { cameraBindingId = "binding-1" });
+        var frameResponse = await host.Client.GetAsync("/api/cameras/continuous-preview/frame/session-1");
+        var heartbeatResponse = await host.Client.PostAsJsonAsync(
+            "/api/cameras/continuous-preview/heartbeat",
+            new { sessionId = "session-1" });
+        var stopResponse = await host.Client.PostAsJsonAsync(
+            "/api/cameras/continuous-preview/stop",
+            new { sessionId = "session-1" });
+
+        startResponse.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+        frameResponse.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+        heartbeatResponse.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+        stopResponse.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+        streamCoordinator.ReceivedCalls().Should().BeEmpty();
     }
 
     private sealed class PreviewTestHost : IAsyncDisposable
@@ -102,7 +180,8 @@ public class ContinuousPreviewEndpointTests
         public static async Task<PreviewTestHost> CreateAsync(
             ICameraManager cameraManager,
             ICameraFrameStreamCoordinator streamCoordinator,
-            string role = "Engineer")
+            string role = "Engineer",
+            string? userId = null)
         {
             var builder = WebApplication.CreateBuilder(new WebApplicationOptions
             {
@@ -135,7 +214,7 @@ public class ContinuousPreviewEndpointTests
             {
                 context.Items["CurrentUser"] = new UserSession
                 {
-                    UserId = role.ToLowerInvariant(),
+                    UserId = userId ?? role.ToLowerInvariant(),
                     Username = role.ToLowerInvariant(),
                     Role = role
                 };

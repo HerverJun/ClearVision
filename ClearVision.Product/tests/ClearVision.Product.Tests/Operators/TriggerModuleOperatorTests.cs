@@ -10,8 +10,12 @@ namespace ClearVision.Product.Tests.Operators;
 
 [TestClassification(TestDomain.Core, TestPurpose.Regression, TestLane.Pr, TestEvidenceType.Contract, TestOracleType.Contract, TestResourceRequirement.None, TestExpectedDuration.Fast, TestFlakyPolicy.Blocking, "product")]
 [Trait("Category", "Sprint5_Phase2")]
-public class TriggerModuleOperatorTests
+public class TriggerModuleOperatorTests : IDisposable
 {
+    private readonly IDisposable _authorityScope = TestExecutionAuthorityScope.Enter();
+
+    public void Dispose() => _authorityScope.Dispose();
+
     [Fact]
     public void OperatorType_ShouldBeTriggerModule()
     {

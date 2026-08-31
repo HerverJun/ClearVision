@@ -29,9 +29,12 @@ namespace ClearVision.Product.Infrastructure.Operators;
 [OutputPort("AllSampleMeanReprojectionError", "All Sample Mean Reprojection Error", PortDataType.Float)]
 [OutputPort("AllSampleMaxReprojectionError", "All Sample Max Reprojection Error", PortDataType.Float)]
 [OutputPort("ReprojectionErrorScope", "Reprojection Error Scope", PortDataType.String)]
+[OutputPort("CalibrationAssetId", "Calibration Asset Id", PortDataType.String)]
+[OutputPort("CalibrationAssetCandidate", "Calibration Asset Candidate", PortDataType.Boolean)]
+[OutputPort("CalibrationContentHash", "Calibration Content Hash", PortDataType.String)]
 [OperatorParam("CalibrationMode", "Calibration Mode", "enum", DefaultValue = "Affine", Options = new[] { "Affine|Affine", "Perspective|Perspective" })]
 [OperatorParam("PointPairs", "Point Pairs", "string", DefaultValue = "")]
-[OperatorParam("SavePath", "Save Path", "file", DefaultValue = "")]
+[OperatorParam("CalibrationAssetId", "Calibration Asset Id", "string", DefaultValue = "")]
 [OperatorParam("RansacReprojectionThreshold", "RANSAC Reprojection Threshold", "double", DefaultValue = 3.0, Min = 0.000001, Max = 100000.0)]
 [OperatorParam("RansacMaxIterations", "RANSAC Max Iterations", "int", DefaultValue = 3000, Min = 1, Max = 100000)]
 [OperatorParam("RansacConfidence", "RANSAC Confidence", "double", DefaultValue = 0.995, Min = 0.001, Max = 0.999999)]
@@ -175,11 +178,6 @@ public class NPointCalibrationOperator : OperatorBase
         var bundle = result.Bundle;
         var errorStats = result.ErrorStats;
         var calibrationJson = CalibrationBundleV2Json.Serialize(bundle);
-        var savePath = GetStringParam(@operator, "SavePath", string.Empty);
-        if (!string.IsNullOrWhiteSpace(savePath))
-        {
-            TrySaveCalibration(savePath, calibrationJson);
-        }
 
         var resultData = new Dictionary<string, object>
         {
@@ -206,6 +204,10 @@ public class NPointCalibrationOperator : OperatorBase
             ["ReprojectionErrorUnit"] = options.CalibrationUnit,
             ["CalibrationUnit"] = options.CalibrationUnit
         };
+        CalibrationAssetCandidateOutput.AddTo(
+            resultData,
+            GetStringParam(@operator, "CalibrationAssetId", string.Empty),
+            calibrationJson);
 
 
         if (TryGetInputImage(inputs, out var imageWrapper) && imageWrapper != null)
@@ -268,24 +270,6 @@ public class NPointCalibrationOperator : OperatorBase
         return string.IsNullOrWhiteSpace(rawUnit)
             ? "mm"
             : rawUnit.Trim();
-    }
-
-    private void TrySaveCalibration(string savePath, string calibrationJson)
-    {
-        try
-        {
-            var directory = Path.GetDirectoryName(savePath);
-            if (!string.IsNullOrWhiteSpace(directory))
-            {
-                Directory.CreateDirectory(directory);
-            }
-
-            File.WriteAllText(savePath, calibrationJson);
-        }
-        catch (Exception ex)
-        {
-            Logger.LogWarning(ex, "Failed to save calibration data to {Path}.", savePath);
-        }
     }
 
     private static object? ResolvePointPairsRaw(Operator @operator, Dictionary<string, object>? inputs)

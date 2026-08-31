@@ -37,6 +37,13 @@ public interface IInspectionService
         OperatorFlow? flow,
         CancellationToken cancellationToken = default);
 
+    Task<InspectionResult> ExecuteSingleAsync(
+        Guid projectId,
+        byte[] imageData,
+        OperatorFlow? flow,
+        ExecutionRequestAuthority authority,
+        CancellationToken cancellationToken = default);
+
     /// <summary>
     /// 执行单次检测（使用相机采集）
     /// </summary>
@@ -54,6 +61,13 @@ public interface IInspectionService
         OperatorFlow? flow,
         CancellationToken cancellationToken = default);
 
+    Task<InspectionResult> ExecuteSingleAsync(
+        Guid projectId,
+        string cameraBindingId,
+        OperatorFlow? flow,
+        ExecutionRequestAuthority authority,
+        CancellationToken cancellationToken = default);
+
     /// <summary>
     /// 开始实时检测（相机驱动模式 - 兼容旧模式）
     /// </summary>
@@ -63,6 +77,13 @@ public interface IInspectionService
     Task StartRealtimeInspectionAsync(
         Guid projectId,
         string? cameraId,
+        CancellationToken cancellationToken,
+        Action<InspectionResult>? onResultReady = null);
+
+    Task StartRealtimeInspectionAsync(
+        Guid projectId,
+        string? cameraBindingId,
+        ExecutionRequestAuthority authority,
         CancellationToken cancellationToken,
         Action<InspectionResult>? onResultReady = null);
 
@@ -79,6 +100,14 @@ public interface IInspectionService
         Guid projectId,
         OperatorFlow flow,
         string? cameraId,
+        CancellationToken cancellationToken,
+        Action<InspectionResult>? onResultReady = null);
+
+    Task StartRealtimeInspectionFlowAsync(
+        Guid projectId,
+        OperatorFlow flow,
+        string? cameraBindingId,
+        ExecutionRequestAuthority authority,
         CancellationToken cancellationToken,
         Action<InspectionResult>? onResultReady = null);
 

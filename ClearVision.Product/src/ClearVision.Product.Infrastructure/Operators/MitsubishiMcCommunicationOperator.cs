@@ -18,9 +18,9 @@ namespace ClearVision.Product.Infrastructure.Operators;
     Version = "1.0.1",
     Keywords = new[] { "PLC", "Mitsubishi", "MC", "Read", "Write" }
 )]
-[OperatorParameterRule("IpAddress", RequiredWhenAll = new[] { "UseGlobalFallback==false" }, ResourceKind = OperatorResourceKind.PlcEndpoint, ReasonCode = "MITSUBISHI_OPERATOR_IP_REQUIRED_WITHOUT_GLOBAL_FALLBACK")]
-[OperatorParameterRule("Port", RequiredWhenAll = new[] { "UseGlobalFallback==false" }, ReasonCode = "MITSUBISHI_OPERATOR_PORT_REQUIRED_WITHOUT_GLOBAL_FALLBACK")]
+[OperatorParameterRule("ProfileId", RequiredPolicy = OperatorParameterRequiredPolicy.Required, ResourceKind = OperatorResourceKind.PlcProfile, ReasonCode = "MITSUBISHI_PLC_PROFILE_REQUIRED")]
 [OperatorParameterRule("Address", RequiredPolicy = OperatorParameterRequiredPolicy.Required, ResourceKind = OperatorResourceKind.PlcAddress, ReasonCode = "MITSUBISHI_PLC_ADDRESS_REQUIRED")]
+[OperatorParameterRule("Operation", RequiredPolicy = OperatorParameterRequiredPolicy.Required, ReasonCode = "MITSUBISHI_PLC_OPERATION_REQUIRED")]
 [OperatorParameterRule("Length", EnabledWhenAll = new[] { "Operation==Read" }, HiddenWhenAll = new[] { "Operation!=Read" }, IgnoredWhenAll = new[] { "Operation!=Read" }, ReasonCode = "MITSUBISHI_READ_LENGTH_ONLY_FOR_READ")]
 [OperatorParameterRule("WriteValue", RequiredPolicy = OperatorParameterRequiredPolicy.Optional, EnabledWhenAll = new[] { "Operation==Write" }, HiddenWhenAll = new[] { "Operation!=Write" }, IgnoredWhenAll = new[] { "Operation!=Write" }, ReasonCode = "MITSUBISHI_WRITE_VALUE_ONLY_FOR_WRITE")]
 [OperatorParameterRule("PollingMode", EnabledWhenAll = new[] { "Operation==Read" }, HiddenWhenAll = new[] { "Operation!=Read" }, IgnoredWhenAll = new[] { "Operation!=Read" }, ReasonCode = "MITSUBISHI_POLLING_ONLY_FOR_READ")]
@@ -31,21 +31,9 @@ namespace ClearVision.Product.Infrastructure.Operators;
 [InputPort("Data", "Data", PortDataType.Any, IsRequired = false)]
 [OutputPort("Response", "Response", PortDataType.String)]
 [OutputPort("Status", "Status", PortDataType.Boolean)]
-[OperatorParam("IpAddress", "IP Address", "string", DefaultValue = "192.168.3.39")]
-[OperatorParam("Port", "Port", "int", DefaultValue = 5002, Min = 1, Max = 65535)]
-[OperatorParam("UseGlobalFallback", "Use Global Fallback", "bool", DefaultValue = false)]
+[OperatorParam("ProfileId", "PLC Profile", "string", DefaultValue = "")]
 [OperatorParam("Address", "PLC Address", "string", DefaultValue = "D100")]
 [OperatorParam("Length", "Read Length", "int", DefaultValue = 1, Min = 1, Max = 999)]
-[OperatorParam("DataType", "Data Type", "enum", DefaultValue = "Word", Options = new[]
-{
-    "Bit|Bit(Bool)",
-    "Word|Word(UInt16)",
-    "Int16|Int16",
-    "DWord|DWord(UInt32)",
-    "Int32|Int32",
-    "Float|Float",
-    "Double|Double"
-})]
 [OperatorParam("Operation", "Operation", "enum", DefaultValue = "Read", Options = new[] { "Read|Read", "Write|Write" })]
 [OperatorParam("WriteValue", "Write Value", "string", DefaultValue = "")]
 [OperatorParam("PollingMode", "Polling Mode", "enum", Description = "Whether to poll while reading.", DefaultValue = "None", Options = new[] { "None|None", "WaitForValue|Wait For Value" })]
@@ -60,16 +48,31 @@ public sealed class MitsubishiMcCommunicationOperator : PlcCommunicationOperator
     public override OperatorType OperatorType => OperatorType.MitsubishiMcCommunication;
 
     public MitsubishiMcCommunicationOperator(ILogger<MitsubishiMcCommunicationOperator> logger)
-        : this(logger, CreateClient)
+        : this(logger, DenyAllExecutionResourceProfileResolver.Instance, CreateClient)
+    {
+    }
+
+    public MitsubishiMcCommunicationOperator(
+        ILogger<MitsubishiMcCommunicationOperator> logger,
+        IExecutionResourceProfileResolver executionResourceProfileResolver)
+        : this(logger, executionResourceProfileResolver, CreateClient)
     {
     }
 
     internal MitsubishiMcCommunicationOperator(
         ILogger<MitsubishiMcCommunicationOperator> logger,
         Func<string, int, IPlcClient> clientFactory)
-        : base(logger)
+        : this(logger, DenyAllExecutionResourceProfileResolver.Instance, clientFactory)
     {
-        _clientFactory = clientFactory;
+    }
+
+    internal MitsubishiMcCommunicationOperator(
+        ILogger<MitsubishiMcCommunicationOperator> logger,
+        IExecutionResourceProfileResolver executionResourceProfileResolver,
+        Func<string, int, IPlcClient> clientFactory)
+        : base(logger, executionResourceProfileResolver)
+    {
+        _clientFactory = clientFactory ?? throw new ArgumentNullException(nameof(clientFactory));
     }
 
     protected override async Task<OperatorExecutionOutput> ExecuteCoreAsync(
@@ -77,12 +80,21 @@ public sealed class MitsubishiMcCommunicationOperator : PlcCommunicationOperator
         Dictionary<string, object>? inputs,
         CancellationToken cancellationToken)
     {
-        var operatorIpAddress = GetStringParam(@operator, "IpAddress", string.Empty);
-        var operatorPort = GetIntParam(@operator, "Port", 0);
-        var useGlobalFallback = GetBoolParam(@operator, "UseGlobalFallback", false);
-        var address = GetStringParam(@operator, "Address", "D100");
+        var forbiddenRawTarget = FindForbiddenRawTargetParameter(
+            @operator,
+            "IpAddress",
+            "Port",
+            "UseGlobalFallback",
+            "DataType");
+        if (forbiddenRawTarget != null)
+        {
+            return CreateFailureOutput(
+                $"PLC_RAW_TARGET_FORBIDDEN: {forbiddenRawTarget} cannot grant execution authority; use ProfileId and an allow-listed Address/Operation binding.");
+        }
+
+        var profileId = GetStringParam(@operator, "ProfileId", string.Empty);
+        var requestedAddress = GetStringParam(@operator, "Address", "D100");
         var length = GetIntParam(@operator, "Length", 1, 1, 999);
-        var dataType = GetStringParam(@operator, "DataType", "Word");
         var operation = GetStringParam(@operator, "Operation", "Read");
         var pollingMode = GetStringParam(@operator, "PollingMode", "None");
         var pollingCondition = GetStringParam(@operator, "PollingCondition", "Equal");
@@ -91,7 +103,7 @@ public sealed class MitsubishiMcCommunicationOperator : PlcCommunicationOperator
         var pollingInterval = GetIntParam(@operator, "PollingInterval", 50, 10, 5000);
         var writeValue = ResolveWriteValue(@operator, inputs);
 
-        if (OperatorParameterValueSemantics.IsMissing(address))
+        if (OperatorParameterValueSemantics.IsMissing(requestedAddress))
         {
             return CreateFailureOutput("Address cannot be empty.");
         }
@@ -122,23 +134,36 @@ public sealed class MitsubishiMcCommunicationOperator : PlcCommunicationOperator
             return CreateFailureOutput("WriteValue cannot be empty.");
         }
 
-        var logIp = string.IsNullOrWhiteSpace(operatorIpAddress) ? "(unset)" : operatorIpAddress;
-        var logPort = operatorPort;
+        var logIp = "(unresolved)";
+        var logPort = 0;
 
         try
         {
-            var (ipAddress, port, _, connectionSource) = ResolveConnectionSettings(
-                operatorIpAddress,
-                operatorPort,
-                "MC",
-                useGlobalFallback);
+            var resolution = ResolveExecutionResource(
+                profileId,
+                ExecutionPlcProtocols.MitsubishiMc,
+                requestedAddress,
+                operation,
+                operation.Equals("Read", StringComparison.OrdinalIgnoreCase) ? length : 1);
+            if (!resolution.Resolved || resolution.Resource == null)
+            {
+                return CreateFailureOutput($"{resolution.Code}: {resolution.Message}");
+            }
+
+            var resource = resolution.Resource;
+            var ipAddress = resource.Host;
+            var port = resource.Port;
+            var address = resource.Address;
+            var dataType = resource.DataType;
             logIp = ipAddress;
             logPort = port;
 
             var connectionKey = $"MC:{ipAddress}:{port}";
-            var (client, _) = await GetOrCreateConnectionAsync(
+            await using var connectionLease = await AcquireConnectionLeaseAsync(
                 connectionKey,
-                () => _clientFactory(ipAddress, port));
+                () => _clientFactory(ipAddress, port),
+                cancellationToken);
+            var client = connectionLease.Client;
 
             if (operation.Equals("Read", StringComparison.OrdinalIgnoreCase))
             {
@@ -157,7 +182,7 @@ public sealed class MitsubishiMcCommunicationOperator : PlcCommunicationOperator
                             pollingInterval,
                             cancellationToken),
                         cancellationToken);
-                    AttachConnectionAuditInfo(pollingReadOutput, connectionSource);
+                    AttachConnectionAuditInfo(pollingReadOutput, "ServerProfile");
                     return pollingReadOutput;
                 }
 
@@ -165,7 +190,7 @@ public sealed class MitsubishiMcCommunicationOperator : PlcCommunicationOperator
                     connectionKey,
                     () => ExecuteReadAsync(client, address, dataType, (ushort)length, cancellationToken),
                     cancellationToken);
-                AttachConnectionAuditInfo(readOutput, connectionSource);
+                AttachConnectionAuditInfo(readOutput, "ServerProfile");
                 return readOutput;
             }
 
@@ -173,7 +198,7 @@ public sealed class MitsubishiMcCommunicationOperator : PlcCommunicationOperator
                 connectionKey,
                 () => ExecuteWriteAsync(client, address, dataType, writeValue, cancellationToken),
                 cancellationToken);
-            AttachConnectionAuditInfo(writeOutput, connectionSource);
+            AttachConnectionAuditInfo(writeOutput, "ServerProfile");
             return writeOutput;
         }
         catch (Exception ex)
@@ -224,22 +249,23 @@ public sealed class MitsubishiMcCommunicationOperator : PlcCommunicationOperator
 
     public override ValidationResult ValidateParameters(Operator @operator)
     {
-        var operatorIpAddress = GetStringParam(@operator, "IpAddress", string.Empty);
-        var operatorPort = GetIntParam(@operator, "Port", 0);
-        var useGlobalFallback = GetBoolParam(@operator, "UseGlobalFallback", false);
+        var forbiddenRawTarget = FindForbiddenRawTargetParameter(
+            @operator,
+            "IpAddress",
+            "Port",
+            "UseGlobalFallback",
+            "DataType");
+        if (forbiddenRawTarget != null)
+        {
+            return ValidationResult.Invalid(
+                $"PLC_RAW_TARGET_FORBIDDEN: {forbiddenRawTarget} cannot grant execution authority; use ProfileId and an allow-listed Address/Operation binding.");
+        }
+
+        var profileId = GetStringParam(@operator, "ProfileId", string.Empty);
         var address = GetStringParam(@operator, "Address", string.Empty);
         var length = GetIntParam(@operator, "Length", 1);
         var pollingMode = GetStringParam(@operator, "PollingMode", "None");
         var pollingCondition = GetStringParam(@operator, "PollingCondition", "Equal");
-
-        try
-        {
-            ResolveConnectionSettings(operatorIpAddress, operatorPort, "MC", useGlobalFallback);
-        }
-        catch (Exception ex)
-        {
-            return ValidationResult.Invalid(ex.Message);
-        }
 
         if (OperatorParameterValueSemantics.IsMissing(address))
         {
@@ -272,6 +298,17 @@ public sealed class MitsubishiMcCommunicationOperator : PlcCommunicationOperator
                 return ValidationResult.Invalid(
                     $"PLC_POLLING_CONDITION_INVALID: PollingCondition must be one of: {string.Join(", ", PlcOperatorParameterContract.SupportedPollingConditions)}.");
             }
+        }
+
+        var resolution = ResolveExecutionResource(
+            profileId,
+            ExecutionPlcProtocols.MitsubishiMc,
+            address,
+            operation,
+            operation.Equals("Read", StringComparison.OrdinalIgnoreCase) ? length : 1);
+        if (!resolution.Resolved || resolution.Resource == null)
+        {
+            return ValidationResult.Invalid($"{resolution.Code}: {resolution.Message}");
         }
 
         return ValidationResult.Valid();

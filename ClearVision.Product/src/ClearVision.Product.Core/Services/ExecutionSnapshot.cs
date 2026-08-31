@@ -66,6 +66,24 @@ public sealed record ExecutionSideEffectViolation(
 /// </summary>
 public static class ExecutionSideEffectCatalog
 {
+    private static readonly HashSet<OperatorType> FileReadOperators =
+    [
+        OperatorType.DeepLearning,
+        OperatorType.SemanticSegmentation,
+        OperatorType.AnomalyDetection,
+        OperatorType.ShapeMatching,
+        OperatorType.AkazeFeatureMatch,
+        OperatorType.OrbFeatureMatch,
+        OperatorType.GradientShapeMatch,
+        OperatorType.PyramidShapeMatch,
+        OperatorType.PlanarMatching,
+        OperatorType.LocalDeformableMatching,
+        OperatorType.CalibrationLoader,
+        OperatorType.CameraCalibration,
+        OperatorType.FisheyeCalibration,
+        OperatorType.StereoCalibration
+    ];
+
     private static readonly HashSet<OperatorType> NetworkWriteOperators =
     [
         OperatorType.HttpRequest,
@@ -95,6 +113,11 @@ public static class ExecutionSideEffectCatalog
     public static ExecutionSideEffect GetCapabilities(Operator @operator)
     {
         var capabilities = ExecutionSideEffect.None;
+        if (FileReadOperators.Contains(@operator.Type) || RequiresOptionalFileRead(@operator))
+        {
+            capabilities |= ExecutionSideEffect.FileRead;
+        }
+
         if (NetworkWriteOperators.Contains(@operator.Type))
         {
             capabilities |= ExecutionSideEffect.NetworkWrite;
@@ -106,7 +129,8 @@ public static class ExecutionSideEffectCatalog
         }
 
         if (@operator.Type == OperatorType.ImageSave || @operator.Type == OperatorType.TextSave ||
-            (@operator.Type == OperatorType.ResultOutput && ReadBool(@operator, "SaveToFile")))
+            (@operator.Type == OperatorType.ResultOutput && ReadBool(@operator, "SaveToFile")) ||
+            (@operator.Type == OperatorType.AnomalyDetection && HasValue(@operator, "SaveFeatureBankPath")))
         {
             capabilities |= ExecutionSideEffect.FileWrite;
         }
@@ -131,6 +155,28 @@ public static class ExecutionSideEffectCatalog
 
         return capabilities;
     }
+
+    private static bool RequiresOptionalFileRead(Operator @operator)
+    {
+        if (@operator.Type == OperatorType.EdgeDetection)
+        {
+            return string.Equals(
+                       NormalizeOption(ReadString(@operator, "Method")),
+                       "OnnxEdge",
+                       StringComparison.OrdinalIgnoreCase) ||
+                   HasValue(@operator, "EdgeModelPath", "EdgeModelId", "ModelCatalogPath");
+        }
+
+        if (@operator.Type == OperatorType.OcrRecognition)
+        {
+            return HasValue(@operator, "ModelPath");
+        }
+
+        return false;
+    }
+
+    private static bool HasValue(Operator @operator, params string[] names) =>
+        names.Any(name => !string.IsNullOrWhiteSpace(ReadString(@operator, name)));
 
     /// <summary>
     /// Returns the declaration field that caused a capability when one exists.
@@ -202,14 +248,14 @@ public sealed class ExecutionSideEffectPolicy
             new ExecutionSideEffectPolicy(runMode, ExecutionSideEffect.DeviceRead | ExecutionSideEffect.FileRead |
                 ExecutionSideEffect.FileWrite | ExecutionSideEffect.NetworkWrite | ExecutionSideEffect.DeviceWrite |
                 ExecutionSideEffect.StateWrite),
-        // Preview/debug may mutate variables only inside an isolated preview
-        // session. GovernedFlowExecution verifies that context before invoking
-        // the engine. External writes and device operations remain forbidden.
+        // Preview/debug consume only bounded request input and may mutate
+        // variables inside an isolated preview session. They never acquire a
+        // filesystem, network, database, or device resource from node params.
         ExecutionRunMode.Preview or ExecutionRunMode.Debug =>
-            new ExecutionSideEffectPolicy(runMode, ExecutionSideEffect.FileRead | ExecutionSideEffect.StateWrite),
+            new ExecutionSideEffectPolicy(runMode, ExecutionSideEffect.StateWrite),
         // Shadow intentionally receives no shared state write capability.
         ExecutionRunMode.ShadowCandidate =>
-            new ExecutionSideEffectPolicy(runMode, ExecutionSideEffect.FileRead),
+            new ExecutionSideEffectPolicy(runMode, ExecutionSideEffect.None),
         _ => new ExecutionSideEffectPolicy(runMode, ExecutionSideEffect.None)
     };
 
@@ -220,8 +266,7 @@ public sealed class ExecutionSideEffectPolicy
             return Array.Empty<ExecutionSideEffectViolation>();
         }
 
-        return flow.Operators
-            .Where(@operator => @operator.IsEnabled)
+        return NestedExecutionFlowCatalog.EnumerateEnabledOperators(flow)
             .Select(@operator =>
             {
                 var required = ExecutionSideEffectCatalog.GetCapabilities(@operator);
@@ -286,7 +331,15 @@ public sealed class ExecutionSnapshot
         ShadowExecutionRole shadowRole = ShadowExecutionRole.None,
         Guid? snapshotId = null,
         ProjectGlobalVariableSchema? globalVariables = null,
-        OperatorFlow? executionIdentityFlow = null)
+        OperatorFlow? executionIdentityFlow = null,
+        ExecutionPrincipal? principal = null,
+        ExecutionCapabilityManifest? capabilityManifest = null,
+        long? expectedProjectRevision = null,
+        string? confirmationId = null,
+        string? auditId = null,
+        Guid? sessionId = null,
+        Guid? runId = null,
+        ExecutionSideEffect externalCapabilities = ExecutionSideEffect.None)
     {
         if (projectId == Guid.Empty)
         {
@@ -324,6 +377,28 @@ public sealed class ExecutionSnapshot
             (resourceBindings ?? new Dictionary<string, string>())
                 .Where(pair => !string.IsNullOrWhiteSpace(pair.Key))
                 .ToDictionary(pair => pair.Key.Trim(), pair => pair.Value?.Trim() ?? string.Empty, StringComparer.Ordinal));
+        Principal = principal ?? ExecutionPrincipal.System();
+        CapabilityManifest = capabilityManifest ?? new ExecutionCapabilityManifest(
+            ExecutionCapabilityManifest.Derive(_flow).Capabilities | externalCapabilities,
+            isExplicit: false);
+        ExpectedProjectRevision = expectedProjectRevision;
+        ConfirmationId = NormalizeOptional(confirmationId);
+        AuditId = NormalizeOptional(auditId);
+        if ((externalCapabilities & ~ExecutionSideEffect.DeviceRead) != ExecutionSideEffect.None)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(externalCapabilities),
+                "Only server-bound external DeviceRead authority is supported.");
+        }
+
+        ExternalCapabilities = externalCapabilities;
+        SessionId = sessionId is { } requestedSessionId && requestedSessionId != Guid.Empty
+            ? requestedSessionId
+            : SnapshotId;
+        RunId = runId is { } requestedRunId && requestedRunId != Guid.Empty
+            ? requestedRunId
+            : Guid.NewGuid();
+        FlowId = _flow.Id == Guid.Empty ? SnapshotId : _flow.Id;
     }
 
     public Guid SnapshotId { get; }
@@ -336,6 +411,15 @@ public sealed class ExecutionSnapshot
     public ShadowExecutionRole ShadowRole { get; }
     public string? RuntimePackageId { get; }
     public IReadOnlyDictionary<string, string> ResourceBindings { get; }
+    public ExecutionPrincipal Principal { get; }
+    public ExecutionCapabilityManifest CapabilityManifest { get; }
+    public long? ExpectedProjectRevision { get; }
+    public string? ConfirmationId { get; }
+    public string? AuditId { get; }
+    public ExecutionSideEffect ExternalCapabilities { get; }
+    public Guid SessionId { get; }
+    public Guid FlowId { get; }
+    public Guid RunId { get; }
     public ExecutionSideEffectPolicy SideEffectPolicy => ExecutionSideEffectPolicy.For(RunMode);
 
     public OperatorFlow CreateExecutionFlow() => ExecutionFlowIdentity.CloneFlow(_flow);

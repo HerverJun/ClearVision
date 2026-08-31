@@ -23,16 +23,27 @@ public sealed class StationHardwareSettingsService
     private readonly IConfigurationService _configurationService;
     private readonly ICameraManager _cameraManager;
     private readonly ILogger<StationHardwareSettingsService> _logger;
+    private readonly Func<string, ILogger, CancellationToken, Task<bool>> _plcConnectionProbe;
     private readonly SemaphoreSlim _cameraOperationGate = new(1, 1);
 
     public StationHardwareSettingsService(
         IConfigurationService configurationService,
         ICameraManager cameraManager,
         ILogger<StationHardwareSettingsService> logger)
+        : this(configurationService, cameraManager, logger, ProbePlcConnectionAsync)
+    {
+    }
+
+    internal StationHardwareSettingsService(
+        IConfigurationService configurationService,
+        ICameraManager cameraManager,
+        ILogger<StationHardwareSettingsService> logger,
+        Func<string, ILogger, CancellationToken, Task<bool>> plcConnectionProbe)
     {
         _configurationService = configurationService;
         _cameraManager = cameraManager;
         _logger = logger;
+        _plcConnectionProbe = plcConnectionProbe ?? throw new ArgumentNullException(nameof(plcConnectionProbe));
     }
 
     public async Task<StationHardwareSettingsSnapshot> LoadAsync()
@@ -139,21 +150,30 @@ public sealed class StationHardwareSettingsService
         return _cameraManager.EnumerateCamerasAsync();
     }
 
-    public async Task<StationHardwareTestResult> TestCameraAsync(CameraBindingConfig binding)
+    public async Task<StationHardwareTestResult> TestCameraAsync(
+        CameraBindingConfig binding,
+        CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(binding);
         binding.Normalize();
 
-        if (string.IsNullOrWhiteSpace(binding.SerialNumber))
-        {
-            return StationHardwareTestResult.Fail("相机序列号不能为空。");
-        }
-
         try
         {
-            var camera = await _cameraManager.GetOrCreateCameraAsync(binding.SerialNumber);
-            await camera.SetExposureTimeAsync(binding.ExposureTimeUs);
-            await camera.SetGainAsync(binding.GainDb);
+            var authoritativeBinding = _cameraManager.RequireEnabledBinding(binding.Id);
+            if (!string.Equals(
+                    authoritativeBinding.SerialNumber,
+                    binding.SerialNumber,
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                return StationHardwareTestResult.Fail("相机绑定与当前服务端配置不一致。");
+            }
+
+            await using var cameraLease = await _cameraManager.AcquireByBindingLeaseAsync(
+                authoritativeBinding.Id,
+                cancellationToken);
+            var camera = cameraLease.Camera;
+            await camera.SetExposureTimeAsync(authoritativeBinding.ExposureTimeUs);
+            await camera.SetGainAsync(authoritativeBinding.GainDb);
 
             return camera.IsConnected
                 ? StationHardwareTestResult.Ok($"相机已连接：{camera.Name}")
@@ -165,13 +185,27 @@ public sealed class StationHardwareSettingsService
         }
     }
 
-    public async Task<StationHardwareTestResult> TestPlcConnectionAsync(CommunicationConfig communication, CancellationToken cancellationToken)
+    public async Task<StationHardwareTestResult> TestPlcConnectionAsync(
+        string profileId,
+        CancellationToken cancellationToken)
     {
-        ArgumentNullException.ThrowIfNull(communication);
-        communication.Normalize();
+        var requestedProfileId = (profileId ?? string.Empty).Trim();
+        var protocol = CommunicationConfig.NormalizeProtocolKey(requestedProfileId);
+        if (string.IsNullOrWhiteSpace(requestedProfileId) ||
+            !requestedProfileId.Equals(protocol, StringComparison.OrdinalIgnoreCase))
+        {
+            return StationHardwareTestResult.Fail("PLC ProfileId 不存在或不受支持。");
+        }
 
-        var protocol = CommunicationConfig.NormalizeProtocolKey(communication.ActiveProtocol);
-        var profile = communication.GetProfile(protocol);
+        var read = await _configurationService.ReadAsync(cancellationToken);
+        if (!read.IsHealthy || read.Config == null)
+        {
+            return StationHardwareTestResult.Fail("无法读取已保存的 PLC Profile。");
+        }
+
+        var config = read.Config;
+        config.Normalize();
+        var profile = config.Communication.GetProfile(protocol);
         if (string.IsNullOrWhiteSpace(profile.IpAddress))
         {
             return StationHardwareTestResult.Fail("PLC IP 地址不能为空。");
@@ -189,21 +223,7 @@ public sealed class StationHardwareSettingsService
 
         try
         {
-            using var client = PlcClientFactory.CreateFromConnectionString(connectionString, _logger);
-            var connected = await client.ConnectAsync(cancellationToken);
-            var pingOk = connected && await client.PingAsync(cancellationToken);
-
-            if (connected)
-            {
-                try
-                {
-                    await client.DisconnectAsync();
-                }
-                catch
-                {
-                    // Test already finished; ignore disconnect cleanup failures.
-                }
-            }
+            var pingOk = await _plcConnectionProbe(connectionString, _logger, cancellationToken);
 
             return pingOk
                 ? StationHardwareTestResult.Ok("PLC 连接成功。")
@@ -217,6 +237,29 @@ public sealed class StationHardwareSettingsService
         {
             return StationHardwareTestResult.Fail($"PLC 测试失败：{ex.Message}");
         }
+    }
+
+    private static async Task<bool> ProbePlcConnectionAsync(
+        string connectionString,
+        ILogger logger,
+        CancellationToken cancellationToken)
+    {
+        using var client = PlcClientFactory.CreateFromConnectionString(connectionString, logger);
+        var connected = await client.ConnectAsync(cancellationToken);
+        var pingOk = connected && await client.PingAsync(cancellationToken);
+        if (connected)
+        {
+            try
+            {
+                await client.DisconnectAsync();
+            }
+            catch
+            {
+                // Test already finished; ignore disconnect cleanup failures.
+            }
+        }
+
+        return pingOk;
     }
 
     private static bool TryBuildConnectionString(

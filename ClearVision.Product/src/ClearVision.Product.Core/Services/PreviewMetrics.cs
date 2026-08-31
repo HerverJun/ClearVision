@@ -265,52 +265,6 @@ public class AutoTuneGoal
 }
 
 /// <summary>
-/// 自动调参结果
-/// </summary>
-public class AutoTuneResult
-{
-    /// <summary>
-    /// 是否成功
-    /// </summary>
-    public bool Success { get; set; }
-
-    /// <summary>
-    /// 最终参数
-    /// </summary>
-    public Dictionary<string, object> FinalParameters { get; set; } = new();
-
-    /// <summary>
-    /// 最终评分
-    /// </summary>
-    public double FinalScore { get; set; }
-
-    /// <summary>
-    /// 迭代历史
-    /// </summary>
-    public List<AutoTuneIteration> Iterations { get; set; } = new();
-
-    /// <summary>
-    /// 执行的总迭代次数
-    /// </summary>
-    public int TotalIterations { get; set; }
-
-    /// <summary>
-    /// 总执行时间（毫秒）
-    /// </summary>
-    public long TotalExecutionTimeMs { get; set; }
-
-    /// <summary>
-    /// 是否达到目标
-    /// </summary>
-    public bool IsGoalAchieved { get; set; }
-
-    /// <summary>
-    /// 错误信息（如果失败）
-    /// </summary>
-    public string? ErrorMessage { get; set; }
-}
-
-/// <summary>
 /// 自动调参迭代记录
 /// </summary>
 public class AutoTuneIteration

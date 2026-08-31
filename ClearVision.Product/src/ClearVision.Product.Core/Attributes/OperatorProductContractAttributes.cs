@@ -23,7 +23,8 @@ public enum OperatorResourceKind
     PlcEndpoint,
     PlcAddress,
     TcpProfile,
-    NetworkEndpoint
+    NetworkEndpoint,
+    PlcProfile
 }
 
 /// <summary>

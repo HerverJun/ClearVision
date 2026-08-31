@@ -471,41 +471,14 @@ export function installPlcTab(SettingsView) {
         ,
         async testPlcConnection() {
             if (!this.requireCapability(Capabilities.PLC_CONNECTION_TEST)) return;
-            try {
-                this.validateActivePlcConnectionForm();
-            } catch (error) {
-                showToast(error.message, 'warning');
-                return;
-            }
-
-            this.syncActivePlcProfileDraft(this.getActivePlcProtocol());
-
             const protocol = this.getActivePlcProtocol();
-            const profile = this.getActivePlcProfile();
             const testButton = this.container?.querySelector('#btn-plc-test');
-            const payload = {
-                protocol,
-                ipAddress: profile?.ipAddress || '',
-                port: Number.parseInt(`${profile?.port ?? 0}`, 10) || 0,
-                cpuType: protocol === 'S7' ? (profile?.cpuType || 'S7-1200') : null,
-                rack: protocol === 'S7' ? Number.parseInt(`${profile?.rack ?? 0}`, 10) : null,
-                slot: protocol === 'S7' ? Number.parseInt(`${profile?.slot ?? 1}`, 10) : null
-            };
-
-            if (!payload.ipAddress) {
-                showToast('请先填写 PLC IP 地址', 'warning');
-                return;
-            }
-
-            if (!Number.isFinite(payload.port) || payload.port <= 0 || payload.port > 65535) {
-                showToast('端口必须是 1-65535 之间的整数', 'warning');
-                return;
-            }
+            const payload = { profileId: protocol };
 
             if (testButton) {
                 this.setPlcTestButtonLoading(testButton, true);
             }
-            this.updatePlcConnectionBadge('testing', '正在使用当前表单参数测试连接');
+            this.updatePlcConnectionBadge('testing', '正在使用已保存的 PLC Profile 测试连接');
 
             try {
                 const result = await settingsApi.testPlcConnection(payload);

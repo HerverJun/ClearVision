@@ -208,6 +208,40 @@ public class InspectionWorker : IHostedService, IInspectionWorker, IAsyncDisposa
             return false;
         }
 
+        // Repeat the immutable authority check at the worker boundary before
+        // registering a background task. InspectionService performs the
+        // repository-aware admission first; this local guard prevents a future
+        // internal caller from reaching state, event, or device work with an
+        // invalid snapshot.
+        try
+        {
+            await using var validationScope = _scopeFactory.CreateAsyncScope();
+            var flowExecution = validationScope.ServiceProvider.GetRequiredService<IFlowExecutionService>();
+            if (!await TryValidateSnapshotAsync(flowExecution, snapshot, "primary", CancellationToken.None) ||
+                (shadowCandidateSnapshot != null &&
+                 !await TryValidateSnapshotAsync(flowExecution, shadowCandidateSnapshot, "shadow-candidate", CancellationToken.None)))
+            {
+                return false;
+            }
+
+            var requestedCameraBindingId = ImageAcquisitionFlowAnalyzer.ShouldBypassExternalCameraInput(
+                snapshot.CreateExecutionFlow())
+                ? null
+                : cameraId;
+            if (!TryResolveAuthoritativeExternalCameraBinding(snapshot, requestedCameraBindingId, out cameraId))
+            {
+                return false;
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(
+                ex,
+                "[InspectionWorker] Snapshot validation failed before run registration. ProjectId={ProjectId}",
+                projectId);
+            return false;
+        }
+
         if (_isShuttingDown)
         {
             _logger.LogWarning("[InspectionWorker] 拒绝新任务，正在关机中: {ProjectId}", projectId);
@@ -338,9 +372,6 @@ public class InspectionWorker : IHostedService, IInspectionWorker, IAsyncDisposa
         // 第一层保护：Worker 级
         try
         {
-            // 更新状态为 Running
-            _coordinator.UpdateSessionStatus(projectId, sessionId, RuntimeStatus.Running);
-
             await RunWithScopeAsync(snapshot, shadowCandidateSnapshot, sessionId, cameraId, ct);
             await EnsureStoppedStateAsync(projectId, sessionId);
         }
@@ -389,13 +420,34 @@ public class InspectionWorker : IHostedService, IInspectionWorker, IAsyncDisposa
         {
             await using var scope = _scopeFactory.CreateAsyncScope();
 
-            // 解析 Scoped 服务
+            // Revalidate at the actual dispatch scope before resolving resource
+            // consumers or changing run-visible state. This closes the gap
+            // between task registration and background execution.
             var flowExecution = scope.ServiceProvider.GetRequiredService<IFlowExecutionService>();
+            if (!await TryValidateSnapshotAsync(flowExecution, snapshot, "primary", ct) ||
+                (shadowCandidateSnapshot != null &&
+                 !await TryValidateSnapshotAsync(flowExecution, shadowCandidateSnapshot, "shadow-candidate", ct)))
+            {
+                throw new InvalidOperationException(
+                    "ADMISSION_EXECUTION_SNAPSHOT_INVALID: Realtime execution snapshot was rejected before dispatch.");
+            }
+
+            var requestedCameraBindingId = ImageAcquisitionFlowAnalyzer.ShouldBypassExternalCameraInput(flow)
+                ? null
+                : cameraId;
+            if (!TryResolveAuthoritativeExternalCameraBinding(snapshot, requestedCameraBindingId, out cameraId))
+            {
+                throw new InvalidOperationException(
+                    "ADMISSION_EXTERNAL_CAMERA_BINDING_MISMATCH: Realtime camera does not match the immutable execution snapshot.");
+            }
+
+            // Resolve resource consumers only after authority validation.
             var imageAcquisition = scope.ServiceProvider.GetRequiredService<IImageAcquisitionService>();
             var resultChannelWriter = scope.ServiceProvider.GetRequiredService<IInspectionResultChannelWriter>();
             var logger = scope.ServiceProvider.GetRequiredService<ILogger<InspectionWorker>>();
             var streamCoordinator = scope.ServiceProvider.GetService<ICameraFrameStreamCoordinator>();
             var configurationService = scope.ServiceProvider.GetService<IConfigurationService>();
+            var projectSaveCoordinator = scope.ServiceProvider.GetService<ProjectSaveCoordinator>();
             var projectVariableSessions = scope.ServiceProvider.GetService<ProjectVariableSessionRegistry>();
             var globalVariables = snapshot.CreateGlobalVariables();
             IProjectVariableSession? projectVariableSession;
@@ -420,6 +472,7 @@ public class InspectionWorker : IHostedService, IInspectionWorker, IAsyncDisposa
 
             using (logger.BeginInspectionScope(correlationId, projectId, sessionId))
             {
+                _coordinator.UpdateSessionStatus(projectId, sessionId, RuntimeStatus.Running);
                 logger.LogInformation("[InspectionWorker] 开始检测循环");
 
                 // 发布状态变更事件：Running
@@ -445,6 +498,7 @@ public class InspectionWorker : IHostedService, IInspectionWorker, IAsyncDisposa
                     imageAcquisition,
                     resultChannelWriter,
                     configurationService,
+                    projectSaveCoordinator,
                     projectVariableSessions,
                     projectVariableSession,
                     projectVariableBindingIndex,
@@ -475,6 +529,64 @@ public class InspectionWorker : IHostedService, IInspectionWorker, IAsyncDisposa
         }
     }
 
+    private async Task<bool> TryValidateSnapshotAsync(
+        IFlowExecutionService flowExecution,
+        ExecutionSnapshot snapshot,
+        string role,
+        CancellationToken cancellationToken)
+    {
+        var validation = await flowExecution.ValidateSnapshotAsync(snapshot, cancellationToken);
+        if (validation.IsValid)
+        {
+            return true;
+        }
+
+        _logger.LogWarning(
+            "[InspectionWorker] Rejected {SnapshotRole} execution snapshot before side effects. " +
+            "ProjectId={ProjectId}, SnapshotId={SnapshotId}, Errors={Errors}",
+            role,
+            snapshot.ProjectId,
+            snapshot.SnapshotId,
+            validation.Errors.Count == 0 ? "unspecified" : string.Join("; ", validation.Errors));
+        return false;
+    }
+
+    private bool TryResolveAuthoritativeExternalCameraBinding(
+        ExecutionSnapshot snapshot,
+        string? requestedCameraBindingId,
+        out string? authoritativeCameraBindingId)
+    {
+        authoritativeCameraBindingId = null;
+        if (snapshot.ExternalCapabilities.HasFlag(ExecutionSideEffect.DeviceRead))
+        {
+            if (!snapshot.ResourceBindings.TryGetValue("CameraBindingId", out var boundCameraBindingId) ||
+                string.IsNullOrWhiteSpace(boundCameraBindingId))
+            {
+                _logger.LogWarning(
+                    "[InspectionWorker] External camera authority is missing its immutable binding. SnapshotId={SnapshotId}",
+                    snapshot.SnapshotId);
+                return false;
+            }
+
+            authoritativeCameraBindingId = boundCameraBindingId.Trim();
+        }
+
+        if (!string.IsNullOrWhiteSpace(requestedCameraBindingId) &&
+            !string.Equals(
+                requestedCameraBindingId.Trim(),
+                authoritativeCameraBindingId,
+                StringComparison.OrdinalIgnoreCase))
+        {
+            _logger.LogWarning(
+                "[InspectionWorker] Rejected camera binding mismatch. SnapshotId={SnapshotId}",
+                snapshot.SnapshotId);
+            authoritativeCameraBindingId = null;
+            return false;
+        }
+
+        return true;
+    }
+
     /// <summary>
     /// 实时检测循环
     /// </summary>
@@ -491,6 +603,7 @@ public class InspectionWorker : IHostedService, IInspectionWorker, IAsyncDisposa
         IImageAcquisitionService imageAcquisition,
         IInspectionResultChannelWriter resultChannelWriter,
         IConfigurationService? configurationService,
+        ProjectSaveCoordinator? projectSaveCoordinator,
         ProjectVariableSessionRegistry? projectVariableSessions,
         IProjectVariableSession? projectVariableSession,
         ProjectVariableBindingIndex? projectVariableBindingIndex,
@@ -503,9 +616,8 @@ public class InspectionWorker : IHostedService, IInspectionWorker, IAsyncDisposa
             if (streamCoordinator == null ||
                 !TryResolveContinuousInspectionConfig(flow, cameraId, out var continuousCameraId, out var continuousConfig))
             {
-                _logger.LogWarning(
-                    "[InspectionWorker] Continuous inspection requested but camera/config could not be resolved. Mode={Mode}",
-                    continuousInspectionMode);
+                throw new InvalidOperationException(
+                    "ADMISSION_EXTERNAL_CAMERA_BINDING_INVALID: Continuous inspection requires the authoritative snapshot camera binding and configuration.");
             }
             else
             {
@@ -528,7 +640,8 @@ public class InspectionWorker : IHostedService, IInspectionWorker, IAsyncDisposa
                     _imageCacheRepository,
                     projectVariableSession,
                     projectVariableBindingIndex,
-                    CreateProjectVariableCommitHandler(projectId, projectVariableSessions));
+                    CreateProjectVariableCommitHandler(projectId, projectVariableSessions),
+                    projectSaveCoordinator);
                 return;
             }
         }
@@ -557,12 +670,13 @@ public class InspectionWorker : IHostedService, IInspectionWorker, IAsyncDisposa
                         blockingSoftwareTriggerExecution,
                         flowExecution,
                         imageAcquisition,
-                    resultChannelWriter,
-                    configurationService,
-                    projectVariableSessions,
-                    projectVariableSession,
-                    projectVariableBindingIndex,
-                    ct);
+                        resultChannelWriter,
+                        configurationService,
+                        projectSaveCoordinator,
+                        projectVariableSessions,
+                        projectVariableSession,
+                        projectVariableBindingIndex,
+                        ct);
                     return;
                 }
 
@@ -586,6 +700,7 @@ public class InspectionWorker : IHostedService, IInspectionWorker, IAsyncDisposa
                         streamCoordinator,
                         flowExecution,
                         imageAcquisition,
+                        projectSaveCoordinator,
                         projectVariableSessions,
                         projectVariableSession,
                         projectVariableBindingIndex,
@@ -986,6 +1101,7 @@ public class InspectionWorker : IHostedService, IInspectionWorker, IAsyncDisposa
         ICameraFrameStreamCoordinator? streamCoordinator,
         IFlowExecutionService flowExecution,
         IImageAcquisitionService imageAcquisition,
+        ProjectSaveCoordinator? projectSaveCoordinator,
         ProjectVariableSessionRegistry? projectVariableSessions,
         IProjectVariableSession? projectVariableSession,
         ProjectVariableBindingIndex? projectVariableBindingIndex,
@@ -1000,51 +1116,83 @@ public class InspectionWorker : IHostedService, IInspectionWorker, IAsyncDisposa
         {
             // 准备输入数据
             var inputData = new Dictionary<string, object>();
+            var access = projectSaveCoordinator == null
+                ? null
+                : await projectSaveCoordinator.AcquireProjectAccessAsync(projectId, ct);
+            await using (access)
+            {
+                if (!await TryValidateSnapshotAsync(flowExecution, executionSnapshot, "cycle", ct))
+                {
+                    throw new InvalidOperationException(
+                        "ADMISSION_EXECUTION_SNAPSHOT_INVALID: Execution snapshot changed before camera acquisition.");
+                }
 
-            // 如果指定了相机，预加载图像
-            var shouldUseExternalCameraInput = !ImageAcquisitionFlowAnalyzer.ShouldBypassExternalCameraInput(flow);
-            if (shouldUseExternalCameraInput &&
-                continuousInspectionMode is ContinuousInspectionMode.Primary or ContinuousInspectionMode.Shadow &&
-                streamCoordinator != null &&
-                TryResolveCycleCameraId(flow, cameraId, out var envelopeCameraId))
-            {
-                try
+                var requestedCameraBindingId = ImageAcquisitionFlowAnalyzer.ShouldBypassExternalCameraInput(flow)
+                    ? null
+                    : cameraId;
+                if (!TryResolveAuthoritativeExternalCameraBinding(
+                        executionSnapshot,
+                        requestedCameraBindingId,
+                        out cameraId))
                 {
-                    var envelope = await streamCoordinator.AcquireFrameEnvelopeAsync(envelopeCameraId, ct);
-                    inputData["ProvidedFrameEnvelope"] = envelope;
+                    throw new InvalidOperationException(
+                        "ADMISSION_EXTERNAL_CAMERA_BINDING_MISMATCH: Cycle camera does not match the immutable execution snapshot.");
                 }
-                catch (Exception ex)
+
+                // 如果指定了相机，预加载图像
+                var shouldUseExternalCameraInput = !ImageAcquisitionFlowAnalyzer.ShouldBypassExternalCameraInput(flow);
+                if (shouldUseExternalCameraInput &&
+                    continuousInspectionMode is ContinuousInspectionMode.Primary or ContinuousInspectionMode.Shadow &&
+                    streamCoordinator != null &&
+                    TryResolveCycleCameraId(flow, cameraId, out var envelopeCameraId))
                 {
-                    _logger.LogWarning(ex, "[InspectionWorker] Failed to acquire continuous frame envelope.");
-                }
-            }
-            else if (shouldUseExternalCameraInput && !string.IsNullOrEmpty(cameraId))
-            {
-                ClearVision.Product.Application.DTOs.ImageDto? imageDto = null;
-                try
-                {
-                    imageDto = await imageAcquisition.AcquireFromCameraAsync(cameraId, ct);
-                    if (!string.IsNullOrEmpty(imageDto.DataBase64))
+                    try
                     {
-                        var imageData = Convert.FromBase64String(imageDto.DataBase64);
-                        inputData["Image"] = imageData;
+                        var envelope = await streamCoordinator.AcquireFrameEnvelopeAsync(envelopeCameraId, ct);
+                        inputData["ProvidedFrameEnvelope"] = envelope;
+                    }
+                    catch (Exception ex)
+                    {
+                        throw new InvalidOperationException(
+                            "CAMERA_ACQUISITION_FAILED: Continuous frame acquisition failed before flow dispatch.",
+                            ex);
                     }
                 }
-                catch (Exception ex)
+                else if (shouldUseExternalCameraInput && !string.IsNullOrEmpty(cameraId))
                 {
-                    _logger.LogWarning(ex, "[InspectionWorker] 预加载相机图像失败");
-                }
-                finally
-                {
-                    if (imageDto?.Id is { } imageId && imageId != Guid.Empty)
+                    ClearVision.Product.Application.DTOs.ImageDto? imageDto = null;
+                    try
                     {
-                        try
+                        imageDto = await imageAcquisition.AcquireFromCameraAsync(cameraId, ct);
+                        if (!string.IsNullOrEmpty(imageDto.DataBase64))
                         {
-                            await imageAcquisition.ReleaseImageAsync(imageId);
+                            var imageData = Convert.FromBase64String(imageDto.DataBase64);
+                            inputData["Image"] = imageData;
                         }
-                        catch (Exception ex)
+                        else
                         {
-                            _logger.LogDebug(ex, "[InspectionWorker] Failed to release preloaded camera image cache. ImageId={ImageId}", imageId);
+                            throw new InvalidOperationException(
+                                "CAMERA_ACQUISITION_FAILED: Camera returned no image before flow dispatch.");
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        throw new InvalidOperationException(
+                            "CAMERA_ACQUISITION_FAILED: Camera preload failed before flow dispatch.",
+                            ex);
+                    }
+                    finally
+                    {
+                        if (imageDto?.Id is { } imageId && imageId != Guid.Empty)
+                        {
+                            try
+                            {
+                                await imageAcquisition.ReleaseImageAsync(imageId);
+                            }
+                            catch (Exception ex)
+                            {
+                                _logger.LogDebug(ex, "[InspectionWorker] Failed to release preloaded camera image cache. ImageId={ImageId}", imageId);
+                            }
                         }
                     }
                 }

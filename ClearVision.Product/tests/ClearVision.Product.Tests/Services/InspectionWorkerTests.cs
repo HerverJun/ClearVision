@@ -29,6 +29,62 @@ namespace ClearVision.Product.Tests.Services;
 public class InspectionWorkerTests
 {
     [Fact]
+    public async Task TryStartRunAsync_WhenSnapshotValidationFails_ShouldRejectBeforeStateEventOrDeviceWork()
+    {
+        var flowExecution = Substitute.For<IFlowExecutionService>();
+        var imageAcquisition = Substitute.For<IImageAcquisitionService>();
+        var resultChannelWriter = Substitute.For<IInspectionResultChannelWriter>();
+        using var serviceProvider = BuildScopedServices(
+            flowExecution,
+            imageAcquisition,
+            resultChannelWriter,
+            Substitute.For<IInspectionResultRepository>(),
+            Substitute.For<IProjectRepository>());
+        flowExecution.ValidateSnapshotAsync(
+                Arg.Any<ExecutionSnapshot>(),
+                Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(new FlowValidationResult
+        {
+            IsValid = false,
+            Errors = ["ADMISSION_TEST_REJECTED"]
+        }));
+        var store = new InMemoryEventStore(NullLogger<InMemoryEventStore>.Instance);
+        var bus = new InMemoryInspectionEventBus(NullLogger<InMemoryInspectionEventBus>.Instance, store);
+        var coordinator = Substitute.For<IInspectionRuntimeCoordinator>();
+        var lifetime = Substitute.For<IHostApplicationLifetime>();
+        lifetime.ApplicationStopping.Returns(CancellationToken.None);
+        var worker = new InspectionWorker(
+            serviceProvider.GetRequiredService<IServiceScopeFactory>(),
+            coordinator,
+            bus,
+            NullLogger<InspectionWorker>.Instance,
+            lifetime,
+            new InspectionMetrics(),
+            new AnalysisDataBuilder());
+        var observedStateEvents = 0;
+        using var subscription = bus.Subscribe<InspectionStateChangedEvent>((_, _) =>
+        {
+            Interlocked.Increment(ref observedStateEvents);
+            return Task.CompletedTask;
+        });
+
+        var started = await worker.TryStartRunAsync(
+            Guid.NewGuid(),
+            CreateExecutionSnapshot(Guid.NewGuid(), new OperatorFlow("Rejected")),
+            "untrusted-camera");
+
+        started.Should().BeFalse();
+        observedStateEvents.Should().Be(0);
+        coordinator.DidNotReceiveWithAnyArgs().UpdateSessionStatus(default, default, default);
+        await imageAcquisition.DidNotReceiveWithAnyArgs().AcquireFromCameraAsync(default!, default);
+        await flowExecution.DidNotReceiveWithAnyArgs().ExecuteWithSnapshotAsync(
+            default!,
+            default,
+            default,
+            default);
+    }
+
+    [Fact]
     public async Task StopAsync_CancelsRunningTask_AndPublishesStoppedState()
     {
         var flowExecution = Substitute.For<IFlowExecutionService>();
@@ -898,6 +954,7 @@ public class InspectionWorkerTests
         sourceFlow.AddOperator(new Operator("late-mutation", OperatorType.TextSave, 0, 0));
         var observedOperatorCounts = new List<int>();
         var flowExecution = Substitute.For<IFlowExecutionService>();
+        ConfigureValidSnapshotAuthority(flowExecution);
         flowExecution.ExecuteWithSnapshotAsync(
                 Arg.Any<ExecutionSnapshot>(),
                 Arg.Any<Dictionary<string, object>?>(),
@@ -935,7 +992,10 @@ public class InspectionWorkerTests
         var projectId = Guid.NewGuid();
         var primaryFlow = CreateDecisionFlow("shadow-primary", "JudgmentResult");
         var candidateFlow = CreateDecisionFlow("shadow-candidate", "JudgmentResult");
-        var primarySnapshot = CreateExecutionSnapshot(projectId, primaryFlow);
+        var primarySnapshot = CreateExecutionSnapshot(
+            projectId,
+            primaryFlow,
+            externalCameraBindingId: "cam-shadow");
         var candidateSnapshot = new ExecutionSnapshot(
             projectId,
             candidateFlow,
@@ -946,6 +1006,7 @@ public class InspectionWorkerTests
         candidateSnapshot.FlowHash.Should().NotBe(primarySnapshot.FlowHash);
 
         var flowExecution = Substitute.For<IFlowExecutionService>();
+        ConfigureValidSnapshotAuthority(flowExecution);
         flowExecution.ExecuteWithSnapshotAsync(
                 Arg.Any<ExecutionSnapshot>(),
                 Arg.Any<Dictionary<string, object>?>(),
@@ -991,8 +1052,12 @@ public class InspectionWorkerTests
     public async Task ExecuteCycleAsync_ShadowWithoutCandidate_ShouldRunBaselineOnceAndPublishNoFakeComparison()
     {
         var flow = CreateDecisionFlow("shadow-disabled", "JudgmentResult");
-        var snapshot = CreateExecutionSnapshot(Guid.NewGuid(), flow);
+        var snapshot = CreateExecutionSnapshot(
+            Guid.NewGuid(),
+            flow,
+            externalCameraBindingId: "cam-shadow");
         var flowExecution = Substitute.For<IFlowExecutionService>();
+        ConfigureValidSnapshotAuthority(flowExecution);
         flowExecution.ExecuteWithSnapshotAsync(
                 Arg.Any<ExecutionSnapshot>(),
                 Arg.Any<Dictionary<string, object>?>(),
@@ -1049,6 +1114,14 @@ public class InspectionWorkerTests
             persistence);
     }
 
+    private static void ConfigureValidSnapshotAuthority(IFlowExecutionService flowExecution)
+    {
+        flowExecution.ValidateSnapshotAsync(
+                Arg.Any<ExecutionSnapshot>(),
+                Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(new FlowValidationResult { IsValid = true }));
+    }
+
     private static async Task<FlowExecutionResult> WaitForCancellationAsync(CancellationToken cancellationToken)
     {
         await Task.Delay(Timeout.Infinite, cancellationToken);
@@ -1072,6 +1145,14 @@ public class InspectionWorkerTests
         IConfigurationService? configurationService = null,
         ProjectVariableSessionRegistry? projectVariableSessionRegistry = null)
     {
+        flowExecution.ValidateSnapshot(Arg.Any<ExecutionSnapshot>()).Returns(new FlowValidationResult
+        {
+            IsValid = true
+        });
+        flowExecution.ValidateSnapshotAsync(
+                Arg.Any<ExecutionSnapshot>(),
+                Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(new FlowValidationResult { IsValid = true }));
         var services = new ServiceCollection();
         services.AddLogging();
         services.AddScoped(_ => flowExecution);
@@ -1150,12 +1231,18 @@ public class InspectionWorkerTests
             "ExecuteCycleAsync",
             BindingFlags.NonPublic | BindingFlags.Instance);
         method.Should().NotBeNull();
+        var snapshot = executionSnapshot ?? CreateExecutionSnapshot(
+            Guid.NewGuid(),
+            flow,
+            externalCameraBindingId: ImageAcquisitionFlowAnalyzer.ShouldBypassExternalCameraInput(flow)
+                ? null
+                : cameraId);
 
         var task = (Task<InspectionResult>)method!.Invoke(
             worker,
             new object?[]
             {
-                executionSnapshot ?? CreateExecutionSnapshot(Guid.NewGuid(), flow),
+                snapshot,
                 shadowCandidateSnapshot,
                 Guid.NewGuid(),
                 cameraId,
@@ -1163,6 +1250,7 @@ public class InspectionWorkerTests
                 streamCoordinator,
                 flowExecution,
                 imageAcquisition,
+                null,
                 null,
                 null,
                 null,
@@ -1187,12 +1275,18 @@ public class InspectionWorkerTests
             "RunRealtimeLoopAsync",
             BindingFlags.NonPublic | BindingFlags.Instance);
         method.Should().NotBeNull();
+        var snapshot = CreateExecutionSnapshot(
+            Guid.NewGuid(),
+            flow,
+            externalCameraBindingId: ImageAcquisitionFlowAnalyzer.ShouldBypassExternalCameraInput(flow)
+                ? null
+                : cameraId);
 
         return (Task)method!.Invoke(
             worker,
             new object?[]
             {
-                CreateExecutionSnapshot(Guid.NewGuid(), flow),
+                snapshot,
                 null,
                 Guid.NewGuid(),
                 cameraId,
@@ -1207,6 +1301,7 @@ public class InspectionWorkerTests
                 null,
                 null,
                 null,
+                null,
                 cancellationToken
             })!;
     }
@@ -1214,14 +1309,25 @@ public class InspectionWorkerTests
     private static ExecutionSnapshot CreateExecutionSnapshot(
         Guid projectId,
         OperatorFlow flow,
-        ProjectGlobalVariableSchema? globalVariables = null) =>
+        ProjectGlobalVariableSchema? globalVariables = null,
+        string? externalCameraBindingId = null) =>
         new(
             projectId,
             flow,
             persistenceRevision: 7,
             ExecutionSnapshotSource.PersistedProject,
             ExecutionRunMode.FormalPrimary,
-            globalVariables: globalVariables);
+            resourceBindings: ExecutionResourceBindingManifest.Build(
+                flow,
+                "StoredProject",
+                new Dictionary<string, string> { ["ProjectRevision"] = "7" },
+                string.IsNullOrWhiteSpace(externalCameraBindingId)
+                    ? null
+                    : new ExecutionExternalResourceManifest(externalCameraBindingId)),
+            globalVariables: globalVariables,
+            externalCapabilities: string.IsNullOrWhiteSpace(externalCameraBindingId)
+                ? ExecutionSideEffect.None
+                : ExecutionSideEffect.DeviceRead);
 
     private static async Task WaitUntilAsync(Func<bool> condition, TimeSpan timeout)
     {

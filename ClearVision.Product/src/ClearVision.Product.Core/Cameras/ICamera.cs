@@ -61,6 +61,7 @@ public interface ICameraManager
 {
     Task<IEnumerable<CameraInfo>> EnumerateCamerasAsync();
     Task<ICamera> GetOrCreateCameraAsync(string cameraId);
+    Task<ICameraLease> AcquireCameraLeaseAsync(string cameraId, CancellationToken cancellationToken = default);
     Task<ICamera> OpenCameraAsync(string cameraId);
     Task CloseCameraAsync(string cameraId);
     ICamera? GetCamera(string cameraId);
@@ -72,4 +73,14 @@ public interface ICameraManager
     void UpdateBindings(List<CameraBindingConfig> bindings, string activeCameraId);
     Task ApplyBindingsAsync(List<CameraBindingConfig> bindings, string activeCameraId);
     Task<ICamera> GetOrCreateByBindingAsync(string bindingId);
+    Task<ICameraLease> AcquireByBindingLeaseAsync(string bindingId, CancellationToken cancellationToken = default);
+}
+
+/// <summary>
+/// Pins a managed camera instance until the lease is released. Closing or replacing the camera
+/// retires it immediately from manager lookup, but physical disposal waits for all leases.
+/// </summary>
+public interface ICameraLease : IDisposable, IAsyncDisposable
+{
+    ICamera Camera { get; }
 }

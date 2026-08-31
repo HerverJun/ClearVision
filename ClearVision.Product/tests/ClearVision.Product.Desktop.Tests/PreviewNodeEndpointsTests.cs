@@ -22,6 +22,7 @@ using ClearVision.Product.Infrastructure.Services;
 using FluentAssertions;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -270,7 +271,7 @@ public class PreviewNodeEndpointsTests
     }
 
     [Fact]
-    public async Task PreviewNode_WithChineseFileImageAcquisitionFlowData_ReturnsOutputImageArtifact()
+    public async Task PreviewNode_WithChineseFileImageAcquisitionFlowData_ShouldRejectBeforeFileDispatch()
     {
         var directory = Path.Combine(Path.GetTempPath(), $"ClearVision-预览链路-{Guid.NewGuid():N}");
         var filePath = Path.Combine(directory, "中文文件名-样张.png");
@@ -312,13 +313,15 @@ public class PreviewNodeEndpointsTests
                     ["MaxValue"] = 255.0
                 });
 
+            var acquisitionExecutor = new CountingOperatorExecutor(
+                new ImageAcquisitionOperator(
+                    NullLogger<ImageAcquisitionOperator>.Instance,
+                    Substitute.For<ICameraManager>()));
             await using var host = await PreviewNodeTestHost.CreateWithRealFlowExecutionAsync(
                 project,
                 new ProjectVariableSessionRegistry(),
                 [
-                    new ImageAcquisitionOperator(
-                        NullLogger<ImageAcquisitionOperator>.Instance,
-                        Substitute.For<ICameraManager>()),
+                    acquisitionExecutor,
                     new ThresholdOperator(NullLogger<ThresholdOperator>.Instance)
                 ]);
 
@@ -337,26 +340,9 @@ public class PreviewNodeEndpointsTests
             });
 
             var payload = await response.Content.ReadAsStringAsync();
-            response.StatusCode.Should().Be(System.Net.HttpStatusCode.OK, payload);
-            using var document = JsonDocument.Parse(payload);
-            document.RootElement.GetProperty("success").GetBoolean().Should().BeTrue(payload);
-            document.RootElement.GetProperty("outputImageBase64").ValueKind.Should().Be(JsonValueKind.Null);
-            document.RootElement.GetProperty("outputData").GetProperty("Width").GetInt32().Should().Be(16);
-            document.RootElement.GetProperty("outputData").GetProperty("Height").GetInt32().Should().Be(12);
-
-            var outputArtifact = document.RootElement
-                .GetProperty("artifacts")
-                .EnumerateArray()
-                .Single(artifact => artifact.GetProperty("role").GetString() == "outputImage");
-            outputArtifact.GetProperty("contentType").GetString().Should().Be("image/png");
-            outputArtifact.GetProperty("length").GetInt64().Should().BeGreaterThan(0);
-
-            var artifactId = outputArtifact.GetProperty("artifactId").GetString()!;
-            using var artifactResponse = await host.Client.GetAsync($"/api/preview-artifacts/{artifactId}");
-            artifactResponse.StatusCode.Should().Be(System.Net.HttpStatusCode.OK);
-            artifactResponse.Content.Headers.ContentType!.MediaType.Should().Be("image/png");
-            (await artifactResponse.Content.ReadAsByteArrayAsync()).Should().StartWith(
-                new byte[] { 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A });
+            response.StatusCode.Should().Be(System.Net.HttpStatusCode.BadRequest, payload);
+            payload.Should().Contain("ADMISSION_DRAFT_PREVIEW_SIDE_EFFECT_BLOCKED");
+            acquisitionExecutor.ExecuteCount.Should().Be(0);
         }
         finally
         {
@@ -593,7 +579,7 @@ public class PreviewNodeEndpointsTests
 
         var payload = await response.Content.ReadAsStringAsync();
         response.StatusCode.Should().Be(System.Net.HttpStatusCode.BadRequest, payload);
-        payload.Should().Contain("ADMISSION_NODE_PREVIEW_SIDE_EFFECT_BLOCKED");
+        payload.Should().Contain("ADMISSION_DRAFT_PREVIEW_SIDE_EFFECT_BLOCKED");
     }
 
     [Theory]
@@ -735,8 +721,8 @@ public class PreviewNodeEndpointsTests
 
         var payload = await response.Content.ReadAsStringAsync();
         response.StatusCode.Should().Be(System.Net.HttpStatusCode.BadRequest, payload);
-        payload.Should().Contain("ADMISSION_NODE_PREVIEW_SIDE_EFFECT_BLOCKED");
-        payload.Should().Contain("Camera B");
+        payload.Should().Contain("ADMISSION_DRAFT_PREVIEW_SIDE_EFFECT_BLOCKED");
+        payload.Should().Contain("device side effects");
     }
 
     [Fact]
@@ -1222,20 +1208,22 @@ public class PreviewNodeEndpointsTests
     }
 
     [Fact]
-    public async Task PreviewNode_WithExplicitMissingFilePathAndRuntimeImage_ShouldKeepFilePathFailure()
+    public async Task PreviewNode_WithExplicitMissingFilePathAndRuntimeImage_ShouldRejectBeforeFileDispatch()
     {
         var project = new Project("preview-explicit-missing-file");
         var acquisitionId = Guid.NewGuid();
         var acquisitionOutputPort = CreatePort("Image", PortDataType.Image, PortDirection.Output);
         var missingPath = Path.Combine(Path.GetTempPath(), $"missing-preview-{Guid.NewGuid():N}.png");
 
+        var acquisitionExecutor = new CountingOperatorExecutor(
+            new ImageAcquisitionOperator(
+                NullLogger<ImageAcquisitionOperator>.Instance,
+                Substitute.For<ICameraManager>()));
         await using var host = await PreviewNodeTestHost.CreateWithRealFlowExecutionAsync(
             project,
             new ProjectVariableSessionRegistry(),
             [
-                new ImageAcquisitionOperator(
-                    NullLogger<ImageAcquisitionOperator>.Instance,
-                    Substitute.For<ICameraManager>())
+                acquisitionExecutor
             ]);
 
         using var response = await host.Client.PostAsJsonAsync("/api/flows/preview-node", new PreviewNodeRequest
@@ -1257,11 +1245,9 @@ public class PreviewNodeEndpointsTests
         });
 
         var payload = await response.Content.ReadAsStringAsync();
-        response.StatusCode.Should().Be(System.Net.HttpStatusCode.OK, payload);
-        using var document = JsonDocument.Parse(payload);
-        document.RootElement.GetProperty("success").GetBoolean().Should().BeFalse(payload);
-        document.RootElement.GetProperty("errorMessage").GetString().Should().Contain(missingPath);
-        payload.Should().NotContain("provided-image");
+        response.StatusCode.Should().Be(System.Net.HttpStatusCode.BadRequest, payload);
+        payload.Should().Contain("ADMISSION_DRAFT_PREVIEW_SIDE_EFFECT_BLOCKED");
+        acquisitionExecutor.ExecuteCount.Should().Be(0);
     }
 
     [Fact]
@@ -1485,6 +1471,80 @@ public class PreviewNodeEndpointsTests
         var payload = await response.Content.ReadAsStringAsync();
         payload.Should().Contain("ADMISSION_PROJECT_REQUIRED");
         payload.Should().Contain("active projectId is required");
+    }
+
+    [Fact]
+    public async Task PreviewNode_MissingDraftAuthority_ShouldFailClosedWhenTestEnrichmentIsDisabled()
+    {
+        var targetNodeId = Guid.NewGuid();
+        await using var host = await PreviewNodeTestHost.CreateAsync(
+            _ => { },
+            enrichDraftAuthority: false);
+
+        using var response = await host.Client.PostAsJsonAsync("/api/flows/preview-node", new PreviewNodeRequest
+        {
+            ProjectId = Guid.NewGuid(),
+            TargetNodeId = targetNodeId,
+            FlowData = CreateUpdateFlowRequest(
+                CreateOperatorDto(targetNodeId, "Threshold", OperatorType.Thresholding))
+        });
+
+        response.StatusCode.Should().Be(System.Net.HttpStatusCode.BadRequest);
+        (await response.Content.ReadAsStringAsync()).Should().Contain("ADMISSION_DRAFT_REVISION_REQUIRED");
+    }
+
+    [Fact]
+    public async Task PreviewNode_StaleDraftRevision_ShouldFailClosedWhenTestEnrichmentIsDisabled()
+    {
+        var project = new Project("stale-preview-authority");
+        var targetNodeId = Guid.NewGuid();
+        await using var host = await PreviewNodeTestHost.CreateAsync(
+            _ => { },
+            configureProjectRepository: repository =>
+                repository.GetByIdFreshAsync(project.Id).Returns(project),
+            enrichDraftAuthority: false);
+
+        using var response = await host.Client.PostAsJsonAsync("/api/flows/preview-node", new PreviewNodeRequest
+        {
+            ProjectId = project.Id,
+            TargetNodeId = targetNodeId,
+            ExpectedProjectRevision = project.PersistenceRevision + 1,
+            CapabilityManifest = new List<string>(),
+            ConfirmationId = Guid.NewGuid().ToString("D"),
+            AuditId = Guid.NewGuid().ToString("D"),
+            FlowData = CreateUpdateFlowRequest(
+                CreateOperatorDto(targetNodeId, "Threshold", OperatorType.Thresholding))
+        });
+
+        response.StatusCode.Should().Be(System.Net.HttpStatusCode.BadRequest);
+        (await response.Content.ReadAsStringAsync()).Should().Contain("ADMISSION_DRAFT_REVISION_REQUIRED");
+    }
+
+    [Fact]
+    public async Task PreviewNode_ForgedCapabilityManifest_ShouldFailClosedWhenTestEnrichmentIsDisabled()
+    {
+        var project = new Project("forged-preview-authority");
+        var targetNodeId = Guid.NewGuid();
+        await using var host = await PreviewNodeTestHost.CreateAsync(
+            _ => { },
+            configureProjectRepository: repository =>
+                repository.GetByIdFreshAsync(project.Id).Returns(project),
+            enrichDraftAuthority: false);
+
+        using var response = await host.Client.PostAsJsonAsync("/api/flows/preview-node", new PreviewNodeRequest
+        {
+            ProjectId = project.Id,
+            TargetNodeId = targetNodeId,
+            ExpectedProjectRevision = project.PersistenceRevision,
+            CapabilityManifest = [ExecutionSideEffect.NetworkWrite.ToString()],
+            ConfirmationId = Guid.NewGuid().ToString("D"),
+            AuditId = Guid.NewGuid().ToString("D"),
+            FlowData = CreateUpdateFlowRequest(
+                CreateOperatorDto(targetNodeId, "Threshold", OperatorType.Thresholding))
+        });
+
+        response.StatusCode.Should().Be(System.Net.HttpStatusCode.BadRequest);
+        (await response.Content.ReadAsStringAsync()).Should().Contain("ADMISSION_CAPABILITY_MANIFEST_MISMATCH");
     }
 
     [Fact]
@@ -2061,7 +2121,7 @@ public class PreviewNodeEndpointsTests
 
         response.StatusCode.Should().Be(System.Net.HttpStatusCode.BadRequest);
         var payload = await response.Content.ReadAsStringAsync();
-        payload.Should().Contain("ADMISSION_NODE_PREVIEW_SIDE_EFFECT_BLOCKED");
+        payload.Should().Contain("ADMISSION_DRAFT_PREVIEW_SIDE_EFFECT_BLOCKED");
         await flowExecution!.DidNotReceiveWithAnyArgs().ExecuteDebugWithSnapshotAsync(
             Arg.Any<ExecutionSnapshot>(),
             Arg.Any<DebugOptions>(),
@@ -2994,8 +3054,8 @@ public class PreviewNodeEndpointsTests
 
         var payload = await response.Content.ReadAsStringAsync();
         response.StatusCode.Should().Be(System.Net.HttpStatusCode.BadRequest, payload);
-        payload.Should().Contain("ADMISSION_NODE_PREVIEW_SIDE_EFFECT_BLOCKED");
-        payload.Should().Contain("外部设备、网络服务或执行文件系统写入");
+        payload.Should().Contain("ADMISSION_DRAFT_PREVIEW_SIDE_EFFECT_BLOCKED");
+        payload.Should().Contain("file, network, database, or device side effects");
         await flowExecution!.DidNotReceiveWithAnyArgs().ExecuteDebugWithSnapshotAsync(
             Arg.Any<ExecutionSnapshot>(),
             Arg.Any<DebugOptions>(),
@@ -3533,18 +3593,12 @@ public class PreviewNodeEndpointsTests
     public async Task PreviewNode_ShouldRepairIncompatiblePreferredPortIdsWithinTargetSubgraph()
     {
         var projectId = Guid.NewGuid();
-        var acquisitionId = Guid.NewGuid();
-        var deepLearningId = Guid.NewGuid();
+        var sourceId = Guid.NewGuid();
         var targetNodeId = Guid.NewGuid();
-        var acquisitionImageOutput = CreatePort("Image", PortDataType.Image, PortDirection.Output);
-        var deepLearningImageInput = CreatePort("Image", PortDataType.Image, PortDirection.Input, isRequired: true);
-        var deepLearningImageOutput = CreatePort("Image", PortDataType.Image, PortDirection.Output);
-        var deepLearningObjectCountOutput = CreatePort("ObjectCount", PortDataType.Integer, PortDirection.Output);
-        var deepLearningObjectsOutput = CreatePort("Objects", PortDataType.DetectionList, PortDirection.Output);
-        var roiDetectionsInput = CreatePort("Detections", PortDataType.DetectionList, PortDirection.Input, isRequired: true);
-        var roiImageInput = CreatePort("Image", PortDataType.Image, PortDirection.Input);
-        var roiImageOutput = CreatePort("Image", PortDataType.Image, PortDirection.Output);
-        var roiDetectionsOutput = CreatePort("Detections", PortDataType.DetectionList, PortDirection.Output);
+        var sourceImageOutput = CreatePort("Image", PortDataType.Image, PortDirection.Output);
+        var sourceCountOutput = CreatePort("Count", PortDataType.Integer, PortDirection.Output);
+        var targetImageInput = CreatePort("Image", PortDataType.Image, PortDirection.Input, isRequired: true);
+        var targetImageOutput = CreatePort("Image", PortDataType.Image, PortDirection.Output);
         OperatorFlow? capturedFlow = null;
 
         await using var host = await PreviewNodeTestHost.CreateAsync(flowExecution =>
@@ -3581,39 +3635,30 @@ public class PreviewNodeEndpointsTests
             TargetNodeId = targetNodeId,
             FlowData = CreateUpdateFlowRequest(
                 CreateOperatorDto(
-                    acquisitionId,
-                    "Acquire",
-                    OperatorType.ImageAcquisition,
-                    outputPorts: [acquisitionImageOutput],
-                    parameters: new Dictionary<string, object> { ["SourceType"] = "ProvidedFrame" }),
-                CreateOperatorDto(
-                    deepLearningId,
-                    "DeepLearning",
-                    OperatorType.DeepLearning,
-                    inputPorts: [deepLearningImageInput],
-                    outputPorts: [deepLearningImageOutput, deepLearningObjectCountOutput, deepLearningObjectsOutput]),
+                    sourceId,
+                    "Source",
+                    OperatorType.ImageResize,
+                    outputPorts: [sourceImageOutput, sourceCountOutput]),
                 CreateOperatorDto(
                     targetNodeId,
-                    "BoxFilter",
-                    OperatorType.BoxFilter,
-                    inputPorts: [roiDetectionsInput, roiImageInput],
-                    outputPorts: [roiDetectionsOutput, roiImageOutput]),
-                CreateConnection(acquisitionId, acquisitionImageOutput.Id, deepLearningId, deepLearningImageInput.Id),
-                CreateConnection(acquisitionId, acquisitionImageOutput.Id, targetNodeId, roiImageInput.Id),
-                CreateConnection(deepLearningId, deepLearningObjectCountOutput.Id, targetNodeId, roiDetectionsInput.Id))
+                    "Target",
+                    OperatorType.ImageResize,
+                    inputPorts: [targetImageInput],
+                    outputPorts: [targetImageOutput]),
+                CreateConnection(sourceId, sourceCountOutput.Id, targetNodeId, targetImageInput.Id))
         });
 
         response.StatusCode.Should().Be(System.Net.HttpStatusCode.OK);
         capturedFlow.Should().NotBeNull();
 
-        var deepLearning = capturedFlow!.Operators.Single(op => op.Id == deepLearningId);
+        var source = capturedFlow!.Operators.Single(op => op.Id == sourceId);
         var repairedConnection = capturedFlow.Connections.Single(conn =>
-            conn.SourceOperatorId == deepLearningId &&
+            conn.SourceOperatorId == sourceId &&
             conn.TargetOperatorId == targetNodeId);
-        var repairedSourcePort = deepLearning.OutputPorts.Single(port => port.Id == repairedConnection.SourcePortId);
+        var repairedSourcePort = source.OutputPorts.Single(port => port.Id == repairedConnection.SourcePortId);
 
-        repairedSourcePort.Name.Should().Be("Objects");
-        repairedSourcePort.DataType.Should().Be(PortDataType.DetectionList);
+        repairedSourcePort.Name.Should().Be("Image");
+        repairedSourcePort.DataType.Should().Be(PortDataType.Image);
     }
 
     [Fact]
@@ -4180,7 +4225,8 @@ public class PreviewNodeEndpointsTests
         public static async Task<PreviewNodeTestHost> CreateAsync(
             Action<IFlowExecutionService> configureFlowExecution,
             Action<IProjectRepository>? configureProjectRepository = null,
-            Action<IProjectFlowStorage>? configureFlowStorage = null)
+            Action<IProjectFlowStorage>? configureFlowStorage = null,
+            bool enrichDraftAuthority = true)
         {
             var builder = WebApplication.CreateBuilder(new WebApplicationOptions
             {
@@ -4207,7 +4253,7 @@ public class PreviewNodeEndpointsTests
             builder.Services.AddPreviewArtifactServices();
 
             var app = builder.Build();
-            UseTestUserIdentity(app);
+            UseTestUserIdentity(app, projectRepository, flowStorage, enrichDraftAuthority);
             app.MapPreviewNodeEndpoints();
             app.MapPreviewArtifactEndpoints();
             await app.StartAsync();
@@ -4221,7 +4267,8 @@ public class PreviewNodeEndpointsTests
             IEnumerable<IOperatorExecutor> executors,
             ProjectVariableExecutionContextAccessor? accessor = null,
             IProjectRepository? projectRepository = null,
-            IProjectFlowStorage? flowStorage = null)
+            IProjectFlowStorage? flowStorage = null,
+            bool enrichDraftAuthority = true)
         {
             var builder = WebApplication.CreateBuilder(new WebApplicationOptions
             {
@@ -4251,7 +4298,7 @@ public class PreviewNodeEndpointsTests
             builder.Services.AddPreviewArtifactServices();
 
             var app = builder.Build();
-            UseTestUserIdentity(app);
+            UseTestUserIdentity(app, projectRepository, flowStorage, enrichDraftAuthority);
             app.MapPreviewNodeEndpoints();
             app.MapPreviewArtifactEndpoints();
             await app.StartAsync();
@@ -4259,7 +4306,11 @@ public class PreviewNodeEndpointsTests
             return new PreviewNodeTestHost(app, app.GetTestClient());
         }
 
-        private static void UseTestUserIdentity(WebApplication app)
+        private static void UseTestUserIdentity(
+            WebApplication app,
+            IProjectRepository projectRepository,
+            IProjectFlowStorage flowStorage,
+            bool enrichDraftAuthority)
         {
             app.Use(async (context, next) =>
             {
@@ -4273,9 +4324,167 @@ public class PreviewNodeEndpointsTests
                 [
                     new Claim(ClaimTypes.NameIdentifier, userId)
                 ], "PreviewNodeTest"));
+                context.Items["CurrentUser"] = new ClearVision.Product.Desktop.Middleware.UserSession
+                {
+                    UserId = userId,
+                    Username = "Preview Test Engineer",
+                    Role = "Engineer"
+                };
+
+                if (enrichDraftAuthority &&
+                    HttpMethods.IsPost(context.Request.Method) &&
+                    context.Request.Path == "/api/flows/preview-node")
+                {
+                    var enrichedBody = await CreateEnrichedRequestBodyAsync(
+                        context,
+                        projectRepository,
+                        flowStorage);
+                    if (enrichedBody != null)
+                    {
+                        await using (enrichedBody)
+                        {
+                            context.Request.Body = enrichedBody;
+                            context.Request.ContentLength = enrichedBody.Length;
+                            await next();
+                        }
+
+                        return;
+                    }
+                }
+
                 await next();
             });
         }
+
+        private static async Task<MemoryStream?> CreateEnrichedRequestBodyAsync(
+            HttpContext context,
+            IProjectRepository projectRepository,
+            IProjectFlowStorage flowStorage)
+        {
+            context.Request.EnableBuffering();
+            using var reader = new StreamReader(
+                context.Request.Body,
+                Encoding.UTF8,
+                detectEncodingFromByteOrderMarks: false,
+                leaveOpen: true);
+            var payload = await reader.ReadToEndAsync(context.RequestAborted);
+            context.Request.Body.Position = 0;
+            if (string.IsNullOrWhiteSpace(payload))
+            {
+                return null;
+            }
+
+            PreviewNodeRequest? request;
+            try
+            {
+                request = JsonSerializer.Deserialize<PreviewNodeRequest>(payload, RequestJsonOptions);
+            }
+            catch (JsonException)
+            {
+                return null;
+            }
+
+            if (request == null)
+            {
+                return null;
+            }
+
+            var project = await projectRepository.GetByIdFreshAsync(request.ProjectId);
+            if (project == null)
+            {
+                return null;
+            }
+
+            request.ExpectedProjectRevision = project.PersistenceRevision;
+            request.ConfirmationId = Guid.NewGuid().ToString("D");
+            request.AuditId = Guid.NewGuid().ToString("D");
+            OperatorFlow? requestedFlow;
+            try
+            {
+                requestedFlow = await ResolveRequestedFlowAsync(request, projectRepository, flowStorage);
+            }
+            catch
+            {
+                requestedFlow = null;
+            }
+            request.CapabilityManifest = requestedFlow == null
+                ? new List<string>()
+                : ExpandCapabilities(ExecutionCapabilityManifest.Derive(requestedFlow).Capabilities);
+
+            return new MemoryStream(JsonSerializer.SerializeToUtf8Bytes(request, RequestJsonOptions));
+        }
+
+        private static async Task<OperatorFlow?> ResolveRequestedFlowAsync(
+            PreviewNodeRequest request,
+            IProjectRepository projectRepository,
+            IProjectFlowStorage flowStorage)
+        {
+            OperatorFlow? flow;
+            if (request.FlowData is { Operators.Count: > 0 } inlineFlow)
+            {
+                flow = FlowEntityMapper.ToPreviewEntity(inlineFlow, request.TargetNodeId, "PreviewFlow");
+            }
+            else
+            {
+                var project = await projectRepository.GetWithFlowAsync(request.ProjectId);
+                if (project == null)
+                {
+                    return null;
+                }
+
+                flow = null;
+                try
+                {
+                    var storedJson = await flowStorage.LoadFlowJsonAsync(request.ProjectId);
+                    var storedDto = string.IsNullOrWhiteSpace(storedJson)
+                        ? null
+                        : JsonSerializer.Deserialize<OperatorFlowDto>(storedJson, StoredFlowJsonOptions);
+                    if (storedDto?.Operators?.Count > 0)
+                    {
+                        flow = storedDto.ToEntity();
+                    }
+                }
+                catch
+                {
+                }
+
+                if (flow == null && project.Flow?.Operators?.Count > 0)
+                {
+                    flow = ExecutionFlowIdentity.CloneFlow(project.Flow);
+                }
+            }
+
+            if (flow != null && request.Parameters is { Count: > 0 })
+            {
+                var target = flow.Operators.FirstOrDefault(item => item.Id == request.TargetNodeId);
+                if (target != null)
+                {
+                    foreach (var (name, value) in request.Parameters)
+                    {
+                        target.Parameters.FirstOrDefault(parameter => parameter.Name == name)?.SetValue(value);
+                    }
+                }
+            }
+
+            return flow;
+        }
+
+        private static List<string> ExpandCapabilities(ExecutionSideEffect capabilities) =>
+            Enum.GetValues<ExecutionSideEffect>()
+                .Where(value => value != ExecutionSideEffect.None && capabilities.HasFlag(value))
+                .Select(value => value.ToString())
+                .ToList();
+
+        private static readonly JsonSerializerOptions RequestJsonOptions = new(JsonSerializerDefaults.Web)
+        {
+            PropertyNameCaseInsensitive = true
+        };
+
+        private static readonly JsonSerializerOptions StoredFlowJsonOptions = new()
+        {
+            PropertyNameCaseInsensitive = true,
+            Converters = { new System.Text.Json.Serialization.JsonStringEnumConverter() }
+        };
 
         public async ValueTask DisposeAsync()
         {

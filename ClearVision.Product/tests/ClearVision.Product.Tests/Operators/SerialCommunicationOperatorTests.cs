@@ -1,5 +1,6 @@
 using ClearVision.Product.Core.Entities;
 using ClearVision.Product.Core.Enums;
+using ClearVision.Product.Core.Services;
 using ClearVision.Product.Infrastructure.Operators;
 using FluentAssertions;
 using Microsoft.Extensions.Logging;
@@ -25,26 +26,38 @@ public class SerialCommunicationOperatorTests
     }
 
     [Fact]
-    public void ValidateParameters_WithInvalidBaudRate_ShouldReturnInvalid()
+    public void ValidateParameters_WithForgedRawBaudRate_ShouldUseServerProfile()
     {
-        var op = new Operator("test", OperatorType.SerialCommunication, 0, 0);
-        op.AddParameter(TestHelpers.CreateParameter("PortName", "COM1", "string"));
-        op.AddParameter(TestHelpers.CreateParameter("BaudRate", "invalid", "string"));
+        var sut = CreateWithConnection(new FakeSerialPortConnection([]));
+        var op = CreateOperator(("BaudRate", "invalid"));
 
-        _operator.ValidateParameters(op).IsValid.Should().BeFalse();
+        sut.ValidateParameters(op).IsValid.Should().BeTrue();
     }
 
     [Fact]
-    public async Task ExecuteAsync_WithDataBitsOutOfRange_ShouldFailBeforeOpeningPort()
+    public async Task ExecuteAsync_WithRejectedProfile_ShouldFailBeforeCreatingOrOpeningPort()
     {
-        var op = new Operator("test", OperatorType.SerialCommunication, 0, 0);
-        op.AddParameter(TestHelpers.CreateParameter("PortName", "COM_DO_NOT_OPEN", "string"));
-        op.AddParameter(TestHelpers.CreateParameter("DataBits", 4, "int"));
+        var resolver = Substitute.For<IExecutionResourceProfileResolver>();
+        resolver.ResolveSerial(Arg.Any<string>()).Returns(
+            ExecutionResourceProfileResolution<ResolvedSerialExecutionResource>.Reject(
+                "RESOURCE_SERIAL_PROFILE_NOT_FOUND",
+                "The requested server serial profile does not exist."));
+        var connectionFactoryCalls = 0;
+        var sut = new SerialCommunicationOperator(
+            Substitute.For<ILogger<SerialCommunicationOperator>>(),
+            resolver,
+            _ =>
+            {
+                connectionFactoryCalls++;
+                return new FakeSerialPortConnection([]);
+            });
+        var op = CreateOperator(("PortName", "COM_CLIENT_FORGED"), ("DataBits", 4));
 
-        var result = await _operator.ExecuteAsync(op);
+        var result = await sut.ExecuteAsync(op);
 
         result.IsSuccess.Should().BeFalse();
-        result.ErrorMessage.Should().Be("数据位必须在 5-8 之间");
+        result.ErrorMessage.Should().Contain("RESOURCE_SERIAL_PROFILE_NOT_FOUND");
+        connectionFactoryCalls.Should().Be(0);
     }
 
     [Fact]
@@ -82,6 +95,44 @@ public class SerialCommunicationOperatorTests
         fakeConnection.WrittenBytes.Should().Equal(0x0A, 0xFF);
         result.OutputData!["Response"].Should().Be("01 A0");
         result.OutputData["BytesReceived"].Should().Be(2);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_WithForgedRawTarget_ShouldDispatchExactServerResolvedSettings()
+    {
+        var fakeConnection = new FakeSerialPortConnection([]);
+        SerialCommunicationOperator.SerialPortConnectionSettings? dispatchedSettings = null;
+        var resolver = CreateSerialResolver(
+            portName: "COM_SERVER_37",
+            baudRate: 115200,
+            dataBits: 7,
+            stopBits: "Two",
+            parity: "Even");
+        var sut = new SerialCommunicationOperator(
+            Substitute.For<ILogger<SerialCommunicationOperator>>(),
+            resolver,
+            settings =>
+            {
+                dispatchedSettings = settings;
+                return fakeConnection;
+            });
+        var op = CreateOperator(
+            ("PortName", "COM_CLIENT_FORGED"),
+            ("BaudRate", "9600"),
+            ("DataBits", 5),
+            ("StopBits", "One"),
+            ("Parity", "None"),
+            ("ResponseWaitMs", 0));
+
+        var result = await sut.ExecuteAsync(op);
+
+        result.IsSuccess.Should().BeTrue(result.ErrorMessage);
+        dispatchedSettings.Should().NotBeNull();
+        dispatchedSettings!.Value.PortName.Should().Be("COM_SERVER_37");
+        dispatchedSettings.Value.BaudRate.Should().Be(115200);
+        dispatchedSettings.Value.DataBits.Should().Be(7);
+        dispatchedSettings.Value.StopBits.ToString().Should().Be("Two");
+        dispatchedSettings.Value.Parity.ToString().Should().Be("Even");
     }
 
     [Fact]
@@ -166,9 +217,10 @@ public class SerialCommunicationOperatorTests
     [InlineData("Two")]
     public void ValidateParameters_WithSupportedStopBits_ShouldBeValid(string stopBits)
     {
+        var sut = CreateWithConnection(new FakeSerialPortConnection([]), stopBits: stopBits);
         var op = CreateOperator(("StopBits", stopBits));
 
-        _operator.ValidateParameters(op).IsValid.Should().BeTrue();
+        sut.ValidateParameters(op).IsValid.Should().BeTrue();
     }
 
     [Theory]
@@ -177,9 +229,10 @@ public class SerialCommunicationOperatorTests
     [InlineData("Even")]
     public void ValidateParameters_WithSupportedParity_ShouldBeValid(string parity)
     {
+        var sut = CreateWithConnection(new FakeSerialPortConnection([]), parity: parity);
         var op = CreateOperator(("Parity", parity));
 
-        _operator.ValidateParameters(op).IsValid.Should().BeTrue();
+        sut.ValidateParameters(op).IsValid.Should().BeTrue();
     }
 
     [Theory]
@@ -188,9 +241,10 @@ public class SerialCommunicationOperatorTests
     [InlineData("HEX")]
     public void ValidateParameters_WithSupportedEncoding_ShouldBeValid(string encoding)
     {
+        var sut = CreateWithConnection(new FakeSerialPortConnection([]));
         var op = CreateOperator(("Encoding", encoding));
 
-        _operator.ValidateParameters(op).IsValid.Should().BeTrue();
+        sut.ValidateParameters(op).IsValid.Should().BeTrue();
     }
 
     [Theory]
@@ -202,7 +256,7 @@ public class SerialCommunicationOperatorTests
     public async Task InvalidStopBits_ShouldFailValidationAndExecuteWithoutOpeningPort(string stopBits)
     {
         var fakeConnection = new FakeSerialPortConnection([]);
-        var sut = CreateWithConnection(fakeConnection);
+        var sut = CreateWithConnection(fakeConnection, stopBits: stopBits);
         var op = CreateOperator(("StopBits", stopBits), ("SendData", "PING"));
 
         var validation = sut.ValidateParameters(op);
@@ -226,7 +280,7 @@ public class SerialCommunicationOperatorTests
     public async Task InvalidParity_ShouldFailValidationAndExecuteWithoutOpeningPort(string parity)
     {
         var fakeConnection = new FakeSerialPortConnection([]);
-        var sut = CreateWithConnection(fakeConnection);
+        var sut = CreateWithConnection(fakeConnection, parity: parity);
         var op = CreateOperator(("Parity", parity), ("SendData", "PING"));
 
         var validation = sut.ValidateParameters(op);
@@ -312,16 +366,44 @@ public class SerialCommunicationOperatorTests
         fakeConnection.WrittenBytes.Should().BeEmpty();
     }
 
-    private static SerialCommunicationOperator CreateWithConnection(FakeSerialPortConnection connection)
+    private static SerialCommunicationOperator CreateWithConnection(
+        FakeSerialPortConnection connection,
+        string portName = "COM_SERVER",
+        int baudRate = 115200,
+        int dataBits = 8,
+        string stopBits = "One",
+        string parity = "None")
     {
         return new SerialCommunicationOperator(
             Substitute.For<ILogger<SerialCommunicationOperator>>(),
+            CreateSerialResolver(portName, baudRate, dataBits, stopBits, parity),
             _ => connection);
+    }
+
+    private static IExecutionResourceProfileResolver CreateSerialResolver(
+        string portName,
+        int baudRate,
+        int dataBits,
+        string stopBits,
+        string parity)
+    {
+        var resolver = Substitute.For<IExecutionResourceProfileResolver>();
+        resolver.ResolveSerial("serial-main").Returns(
+            ExecutionResourceProfileResolution<ResolvedSerialExecutionResource>.Allow(
+                new ResolvedSerialExecutionResource(
+                    "serial-main",
+                    portName,
+                    baudRate,
+                    dataBits,
+                    stopBits,
+                    parity)));
+        return resolver;
     }
 
     private static Operator CreateOperator(params (string Name, object Value)[] parameters)
     {
         var op = new Operator("test", OperatorType.SerialCommunication, 0, 0);
+        op.AddParameter(TestHelpers.CreateParameter("ProfileId", "serial-main", "string"));
         op.AddParameter(TestHelpers.CreateParameter("PortName", "COM_TEST", "string"));
         op.AddParameter(TestHelpers.CreateParameter("TimeoutMs", 3000, "int"));
         foreach (var (name, value) in parameters)
