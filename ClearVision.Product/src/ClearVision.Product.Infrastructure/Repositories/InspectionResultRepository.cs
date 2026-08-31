@@ -13,7 +13,7 @@ namespace ClearVision.Product.Infrastructure.Repositories;
 /// <summary>
 /// 检测结果仓储实现
 /// </summary>
-public class InspectionResultRepository : RepositoryBase<InspectionResult>, IInspectionResultRepository
+public class InspectionResultRepository : RepositoryBase<InspectionResult>, IInspectionResultRepository, IInspectionResultAnalysisRepository
 {
     public InspectionResultRepository(Data.VisionDbContext context) : base(context)
     {
@@ -138,19 +138,48 @@ public class InspectionResultRepository : RepositoryBase<InspectionResult>, IIns
     {
         var query = BuildFilteredQuery(projectId, startTime, endTime, status, defectType);
 
+        // The database groups the finite outcome state-space, so a large project never
+        // materializes one row per inspection just to build dashboard counters.
         var records = await query
             .AsNoTracking()
-            .Select(r => new
+            .GroupBy(r => new
             {
                 r.Status,
                 r.ExecutionOutcome,
                 r.DecisionOutcome,
-                r.HasJudgmentSignal,
-                r.ProcessingTimeMs
+                r.HasJudgmentSignal
+            })
+            .Select(group => new
+            {
+                group.Key.Status,
+                group.Key.ExecutionOutcome,
+                group.Key.DecisionOutcome,
+                group.Key.HasJudgmentSignal,
+                Count = group.Count(),
+                AverageProcessingTimeMs = group.Average(item => (double)item.ProcessingTimeMs)
             })
             .ToListAsync();
-        var outcomeStatistics = InspectionOutcomeStatistics.Calculate(records.Select(record =>
-            record.ExecutionOutcome.HasValue && record.DecisionOutcome.HasValue
+
+        var totalCount = 0;
+        var executionSucceededCount = 0;
+        var okCount = 0;
+        var ngCount = 0;
+        var undeterminedCount = 0;
+        var notApplicableCount = 0;
+        var invalidCount = 0;
+        var failedCount = 0;
+        var cancelledCount = 0;
+        var timedOutCount = 0;
+        var skippedCount = 0;
+        var processingTimeTotal = 0d;
+
+        foreach (var record in records)
+        {
+            var count = record.Count;
+            totalCount += count;
+            processingTimeTotal += record.AverageProcessingTimeMs * count;
+
+            var outcome = record.ExecutionOutcome.HasValue && record.DecisionOutcome.HasValue
                 ? new InspectionOutcome(
                     record.ExecutionOutcome.Value,
                     record.DecisionOutcome.Value,
@@ -160,29 +189,69 @@ public class InspectionResultRepository : RepositoryBase<InspectionResult>, IIns
                     record.HasJudgmentSignal ??
                     (record.ExecutionOutcome.Value == ExecutionOutcome.Succeeded &&
                      record.DecisionOutcome.Value is DecisionOutcome.Ok or DecisionOutcome.Ng))
-                : LegacyInspectionStatusProjection.FromLegacy(record.Status)));
-        var avgTime = records.Count > 0 ? records.Average(record => record.ProcessingTimeMs) : 0;
+                : LegacyInspectionStatusProjection.FromLegacy(record.Status);
+
+            if (outcome.Execution == ExecutionOutcome.Succeeded)
+            {
+                executionSucceededCount += count;
+            }
+
+            switch (InspectionOutcomeClassifier.Classify(outcome))
+            {
+                case CanonicalInspectionOutcomeKind.Ok:
+                    okCount += count;
+                    break;
+                case CanonicalInspectionOutcomeKind.Ng:
+                    ngCount += count;
+                    break;
+                case CanonicalInspectionOutcomeKind.Undetermined:
+                    undeterminedCount += count;
+                    break;
+                case CanonicalInspectionOutcomeKind.NotApplicable:
+                    notApplicableCount += count;
+                    break;
+                case CanonicalInspectionOutcomeKind.Invalid:
+                    invalidCount += count;
+                    break;
+                case CanonicalInspectionOutcomeKind.Failed:
+                    failedCount += count;
+                    break;
+                case CanonicalInspectionOutcomeKind.Cancelled:
+                    cancelledCount += count;
+                    break;
+                case CanonicalInspectionOutcomeKind.TimedOut:
+                    timedOutCount += count;
+                    break;
+                case CanonicalInspectionOutcomeKind.Skipped:
+                    skippedCount += count;
+                    break;
+            }
+        }
+
+        var validDecisionCount = okCount + ngCount;
+        var executionFailureCount = failedCount + timedOutCount;
+        var averageProcessingTimeMs = totalCount == 0 ? 0 : processingTimeTotal / totalCount;
 
         return new InspectionStatistics
         {
-            TotalCount = outcomeStatistics.TotalAttemptCount,
-            OKCount = outcomeStatistics.OkCount,
-            NGCount = outcomeStatistics.NgCount,
-            ErrorCount = outcomeStatistics.ExecutionFailureCount + outcomeStatistics.InvalidCount,
-            OKRate = outcomeStatistics.YieldRate,
-            YieldRate = outcomeStatistics.YieldRate,
-            ExecutionSucceededCount = outcomeStatistics.ExecutionSucceededCount,
-            ValidDecisionCount = outcomeStatistics.ValidDecisionCount,
-            DecisionCoverageRate = outcomeStatistics.DecisionCoverageRate,
-            ExecutionFailureCount = outcomeStatistics.ExecutionFailureCount,
-            UndeterminedCount = outcomeStatistics.UndeterminedCount,
-            NotApplicableCount = outcomeStatistics.NotApplicableCount,
-            InvalidCount = outcomeStatistics.InvalidCount,
-            FailedCount = outcomeStatistics.FailedCount,
-            CancelledCount = outcomeStatistics.CancelledCount,
-            TimedOutCount = outcomeStatistics.TimedOutCount,
-            SkippedCount = outcomeStatistics.SkippedCount,
-            AverageProcessingTimeMs = avgTime
+            TotalCount = totalCount,
+            OKCount = okCount,
+            NGCount = ngCount,
+            ErrorCount = executionFailureCount + invalidCount,
+            OKRate = validDecisionCount > 0 ? okCount / (double)validDecisionCount : 0,
+            YieldRate = validDecisionCount > 0 ? okCount / (double)validDecisionCount : 0,
+            ExecutionSucceededCount = executionSucceededCount,
+            ValidDecisionCount = validDecisionCount,
+            DecisionCoverageRate = executionSucceededCount > 0 ? validDecisionCount / (double)executionSucceededCount : 0,
+            ExecutionFailureCount = executionFailureCount,
+            UndeterminedCount = undeterminedCount,
+            NotApplicableCount = notApplicableCount,
+            InvalidCount = invalidCount,
+            FailedCount = failedCount,
+            CancelledCount = cancelledCount,
+            TimedOutCount = timedOutCount,
+            SkippedCount = skippedCount,
+            AverageProcessingTimeMs = averageProcessingTimeMs
         };
     }
 
@@ -195,14 +264,90 @@ public class InspectionResultRepository : RepositoryBase<InspectionResult>, IIns
     {
         var query = BuildFilteredQuery(projectId, startTime, endTime, status, defectType);
 
-        // 使用 SelectMany 获取所有缺陷
         var defects = await query
+            .AsNoTracking()
             .SelectMany(r => r.Defects)
+            .GroupBy(defect => defect.Type)
+            .Select(group => new { DefectType = group.Key, Count = group.Count() })
             .ToListAsync();
 
-        return defects
-            .GroupBy(d => d.Type)
-            .ToDictionary(g => g.Key, g => g.Count());
+        return defects.ToDictionary(item => item.DefectType, item => item.Count);
+    }
+
+    public async Task<IReadOnlyList<InspectionAnalysisSample>> GetAnalysisSamplesAsync(
+        InspectionAnalysisQuery query,
+        int maxRows)
+    {
+        var boundedMaxRows = Math.Clamp(maxRows, 1, 100_000);
+        return await BuildFilteredQuery(
+                query.ProjectId,
+                query.StartTime,
+                query.EndTime,
+                query.Status,
+                query.DefectType)
+            .AsNoTracking()
+            .OrderBy(item => item.InspectionTime)
+            .ThenBy(item => item.Id)
+            .Select(item => new InspectionAnalysisSample(
+                item.InspectionTime,
+                item.Status,
+                item.ExecutionOutcome,
+                item.DecisionOutcome,
+                item.HasJudgmentSignal,
+                item.ProcessingTimeMs,
+                item.Defects.Count()))
+            .Take(boundedMaxRows + 1)
+            .ToListAsync();
+    }
+
+    public async Task<InspectionConfidenceSummary> GetConfidenceSummaryAsync(InspectionAnalysisQuery query)
+    {
+        var groups = await BuildFilteredQuery(
+                query.ProjectId,
+                query.StartTime,
+                query.EndTime,
+                query.Status,
+                query.DefectType)
+            .AsNoTracking()
+            .SelectMany(result => result.Defects)
+            .GroupBy(defect => defect.ConfidenceScore >= 0.9d
+                ? 0
+                : defect.ConfidenceScore >= 0.8d
+                    ? 1
+                    : defect.ConfidenceScore >= 0.7d
+                        ? 2
+                        : defect.ConfidenceScore >= 0.6d
+                            ? 3
+                            : defect.ConfidenceScore >= 0.5d
+                                ? 4
+                                : 5)
+            .Select(group => new
+            {
+                Bucket = group.Key,
+                Count = group.Count(),
+                TotalConfidence = group.Sum(defect => defect.ConfidenceScore)
+            })
+            .ToListAsync();
+
+        var counts = new int[6];
+        var totalDefects = 0;
+        var totalConfidence = 0d;
+        foreach (var group in groups)
+        {
+            counts[group.Bucket] = group.Count;
+            totalDefects += group.Count;
+            totalConfidence += group.TotalConfidence;
+        }
+
+        return new InspectionConfidenceSummary(
+            counts[0],
+            counts[1],
+            counts[2],
+            counts[3],
+            counts[4],
+            counts[5],
+            totalDefects,
+            totalDefects == 0 ? 0 : totalConfidence / totalDefects);
     }
 
     private IQueryable<InspectionResult> BuildFilteredQuery(

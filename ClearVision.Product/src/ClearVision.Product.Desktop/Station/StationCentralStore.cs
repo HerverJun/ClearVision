@@ -1,6 +1,10 @@
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
+using System.Data;
+using System.Data.Common;
+using System.Globalization;
+using ClearVision.Product.Core.Outcomes;
 using ClearVision.Product.Infrastructure.Data;
 using ClearVision.Product.Runtime.Abstractions;
 using Microsoft.EntityFrameworkCore;
@@ -403,36 +407,47 @@ public sealed class StationCentralStore
     {
         using var scope = _scopeFactory.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<VisionDbContext>();
+        var window = StationResultQueryBudget.Normalize(fromUtc, toUtc, DateTimeOffset.UtcNow);
         var normalizedPageIndex = Math.Max(0, pageIndex);
         var normalizedPageSize = Math.Clamp(pageSize, 1, 500);
-        var query = db.StationResultSummaries.AsNoTracking();
-
-        if (!string.IsNullOrWhiteSpace(stationId))
+        var filter = BuildResultFilter(
+            stationId,
+            window,
+            status,
+            diagnosticCode);
+        var connection = db.Database.GetDbConnection();
+        var closeConnection = connection.State != ConnectionState.Open;
+        if (closeConnection)
         {
-            query = query.Where(item => item.StationId == stationId);
+            connection.Open();
         }
 
-        var filtered = query
-            .AsEnumerable()
-            .Where(item => !fromUtc.HasValue || item.CompletedAtUtc >= fromUtc.Value)
-            .Where(item => !toUtc.HasValue || item.CompletedAtUtc <= toUtc.Value)
-            .Where(item => MatchesText(item.DiagnosticCode, diagnosticCode))
-            .Select(ToDto)
-            .Where(item => StationOutcomeStatisticsBuilder.MatchesStatus(item, status))
-            .OrderByDescending(item => item.CompletedAtUtc)
-            .ThenByDescending(item => item.SequenceId)
-            .ToList();
-
-        return new StationResultsPageViewModel
+        try
         {
-            Items = filtered
-                .Skip(normalizedPageIndex * normalizedPageSize)
-                .Take(normalizedPageSize)
-                .ToList(),
-            TotalCount = filtered.Count,
-            PageIndex = normalizedPageIndex,
-            PageSize = normalizedPageSize
-        };
+            var totalCount = ExecuteResultCount(connection, filter);
+            var items = ExecuteResultPage(
+                connection,
+                filter,
+                normalizedPageIndex,
+                normalizedPageSize)
+                .Select(ToDto)
+                .ToList();
+
+            return new StationResultsPageViewModel
+            {
+                Items = items,
+                TotalCount = totalCount,
+                PageIndex = normalizedPageIndex,
+                PageSize = normalizedPageSize
+            };
+        }
+        finally
+        {
+            if (closeConnection)
+            {
+                connection.Close();
+            }
+        }
     }
 
     public IReadOnlyList<StationHealthSnapshotDto> GetRecentHealth(string stationId, int take)
@@ -720,23 +735,30 @@ public sealed class StationCentralStore
     {
         using var scope = _scopeFactory.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<VisionDbContext>();
-        var query = db.StationResultSummaries.AsNoTracking();
-
-        if (!string.IsNullOrWhiteSpace(stationId))
+        var window = StationResultQueryBudget.Normalize(fromUtc, toUtc, DateTimeOffset.UtcNow);
+        var filter = BuildResultFilter(stationId, window, status, diagnosticCode);
+        var connection = db.Database.GetDbConnection();
+        var closeConnection = connection.State != ConnectionState.Open;
+        if (closeConnection)
         {
-            query = query.Where(item => item.StationId == stationId);
+            connection.Open();
         }
 
-        var results = query
-            .AsEnumerable()
-            .Where(item => !fromUtc.HasValue || item.CompletedAtUtc >= fromUtc.Value)
-            .Where(item => !toUtc.HasValue || item.CompletedAtUtc <= toUtc.Value)
-            .Where(item => MatchesText(item.DiagnosticCode, diagnosticCode))
-            .Select(ToDto)
-            .Where(item => StationOutcomeStatisticsBuilder.MatchesStatus(item, status))
-            .ToList();
-
-        return StationOutcomeStatisticsBuilder.Build(results, fromUtc, toUtc);
+        try
+        {
+            var overall = ExecuteOutcomeAggregates(connection, filter, includeStationId: false);
+            var byStation = ExecuteOutcomeAggregates(connection, filter, includeStationId: true);
+            var diagnostics = ExecuteDiagnosticAggregates(connection, filter);
+            var hourly = ExecuteHourlyAggregates(connection, filter);
+            return BuildStatistics(window, overall, byStation, diagnostics, hourly);
+        }
+        finally
+        {
+            if (closeConnection)
+            {
+                connection.Close();
+            }
+        }
     }
 
     private static StationNodeEntity GetOrCreateNode(VisionDbContext db, string stationId, DateTimeOffset now)
@@ -1253,12 +1275,469 @@ public sealed class StationCentralStore
                value.Contains("authorization", StringComparison.OrdinalIgnoreCase);
     }
 
-    private static bool MatchesText(string? value, string? requestedValue)
+    private static StationResultSqlFilter BuildResultFilter(
+        string? stationId,
+        StationResultWindow window,
+        string? status,
+        string? diagnosticCode)
     {
-        return string.IsNullOrWhiteSpace(requestedValue) ||
-               string.Equals(requestedValue, "all", StringComparison.OrdinalIgnoreCase) ||
-               string.Equals(value, requestedValue, StringComparison.OrdinalIgnoreCase);
+        var predicates = new List<string>
+        {
+            "julianday(\"CompletedAtUtc\") >= julianday($fromUtc)",
+            "julianday(\"CompletedAtUtc\") <= julianday($toUtc)"
+        };
+        var parameters = new List<StationResultSqlParameter>
+        {
+            new("$fromUtc", window.FromUtc.ToString("O", CultureInfo.InvariantCulture)),
+            new("$toUtc", window.ToUtc.ToString("O", CultureInfo.InvariantCulture))
+        };
+
+        if (!string.IsNullOrWhiteSpace(stationId))
+        {
+            predicates.Add("\"StationId\" = $stationId");
+            parameters.Add(new StationResultSqlParameter("$stationId", stationId.Trim()));
+        }
+
+        if (!string.IsNullOrWhiteSpace(diagnosticCode) &&
+            !string.Equals(diagnosticCode, "all", StringComparison.OrdinalIgnoreCase))
+        {
+            predicates.Add("UPPER(\"DiagnosticCode\") = $diagnosticCode");
+            parameters.Add(new StationResultSqlParameter("$diagnosticCode", diagnosticCode.Trim().ToUpperInvariant()));
+        }
+
+        var statusPredicate = BuildStatusPredicate(status);
+        if (!string.IsNullOrEmpty(statusPredicate))
+        {
+            predicates.Add(statusPredicate);
+        }
+
+        return new StationResultSqlFilter(
+            " WHERE " + string.Join(" AND ", predicates),
+            parameters);
     }
+
+    private static string? BuildStatusPredicate(string? status)
+    {
+        if (string.IsNullOrWhiteSpace(status) ||
+            string.Equals(status, "all", StringComparison.OrdinalIgnoreCase))
+        {
+            return null;
+        }
+
+        const string legacy = "(\"ExecutionOutcome\" IS NULL OR \"DecisionOutcome\" IS NULL)";
+        var token = new string(status.Where(char.IsLetterOrDigit).ToArray()).ToLowerInvariant();
+        return token switch
+        {
+            "ok" => "((\"ExecutionOutcome\" = 'Succeeded' AND \"DecisionOutcome\" = 'Ok') OR (" + legacy + " AND \"Outcome\" = 'Ok'))",
+            "ng" => "((\"ExecutionOutcome\" = 'Succeeded' AND \"DecisionOutcome\" = 'Ng') OR (" + legacy + " AND \"Outcome\" = 'Ng'))",
+            "undetermined" => "((\"ExecutionOutcome\" = 'Succeeded' AND \"DecisionOutcome\" = 'Undetermined') OR (" + legacy + " AND \"Outcome\" = 'Undetermined'))",
+            "notapplicable" => "(\"ExecutionOutcome\" = 'Succeeded' AND \"DecisionOutcome\" = 'NotApplicable')",
+            "invalid" => "(\"ExecutionOutcome\" = 'Succeeded' AND \"DecisionOutcome\" = 'Invalid')",
+            "failed" => "(\"ExecutionOutcome\" = 'Failed' OR (" + legacy + " AND \"Outcome\" = 'Error'))",
+            "cancelled" or "canceled" => "(\"ExecutionOutcome\" = 'Cancelled' OR (" + legacy + " AND \"Outcome\" = 'Canceled'))",
+            "timedout" => "(\"ExecutionOutcome\" = 'TimedOut')",
+            "skipped" => "(\"ExecutionOutcome\" = 'Skipped')",
+            "error" => "(\"ExecutionOutcome\" IN ('Failed', 'TimedOut') OR (" + legacy + " AND \"Outcome\" = 'Error'))",
+            _ => null
+        };
+    }
+
+    private static int ExecuteResultCount(DbConnection connection, StationResultSqlFilter filter)
+    {
+        using var command = CreateResultCommand(
+            connection,
+            "SELECT COUNT(*) FROM \"StationResultSummaries\"" + filter.WhereClause,
+            filter);
+        return Convert.ToInt32(command.ExecuteScalar(), CultureInfo.InvariantCulture);
+    }
+
+    private static IReadOnlyList<StationResultSummaryEntity> ExecuteResultPage(
+        DbConnection connection,
+        StationResultSqlFilter filter,
+        int pageIndex,
+        int pageSize)
+    {
+        using var command = CreateResultCommand(
+            connection,
+            "SELECT * FROM \"StationResultSummaries\"" + filter.WhereClause +
+            " ORDER BY julianday(\"CompletedAtUtc\") DESC, \"SequenceId\" DESC LIMIT $pageSize OFFSET $pageOffset",
+            filter,
+            new StationResultSqlParameter("$pageSize", pageSize),
+            new StationResultSqlParameter("$pageOffset", checked(pageIndex * pageSize)));
+        using var reader = command.ExecuteReader();
+        var results = new List<StationResultSummaryEntity>();
+        while (reader.Read())
+        {
+            results.Add(ReadResultEntity(reader));
+        }
+
+        return results;
+    }
+
+    private static IReadOnlyList<StationOutcomeAggregate> ExecuteOutcomeAggregates(
+        DbConnection connection,
+        StationResultSqlFilter filter,
+        bool includeStationId)
+    {
+        const string outcomeColumns = "\"Outcome\", \"InspectionStatus\", \"ExecutionOutcome\", \"DecisionOutcome\", \"HasJudgmentSignal\"";
+        var stationColumn = includeStationId ? "\"StationId\", " : string.Empty;
+        var groupBy = includeStationId ? "\"StationId\", " + outcomeColumns : outcomeColumns;
+        using var command = CreateResultCommand(
+            connection,
+            "SELECT " + stationColumn + outcomeColumns +
+            ", COUNT(*) AS \"Count\", COALESCE(SUM(\"ExecutionTimeMs\"), 0) AS \"ExecutionTimeTotal\" FROM \"StationResultSummaries\"" +
+            filter.WhereClause +
+            " GROUP BY " + groupBy,
+            filter);
+        using var reader = command.ExecuteReader();
+        var results = new List<StationOutcomeAggregate>();
+        while (reader.Read())
+        {
+            results.Add(new StationOutcomeAggregate(
+                includeStationId ? ReadRequiredString(reader, "StationId") : string.Empty,
+                ReadRequiredString(reader, "Outcome"),
+                ReadNullableString(reader, "InspectionStatus"),
+                ReadNullableString(reader, "ExecutionOutcome"),
+                ReadNullableString(reader, "DecisionOutcome"),
+                ReadNullableBoolean(reader, "HasJudgmentSignal"),
+                ReadInt32(reader, "Count"),
+                ReadDouble(reader, "ExecutionTimeTotal")));
+        }
+
+        return results;
+    }
+
+    private static IReadOnlyList<StationDiagnosticAggregate> ExecuteDiagnosticAggregates(
+        DbConnection connection,
+        StationResultSqlFilter filter)
+    {
+        const string diagnosticExpression = "CASE WHEN \"DiagnosticCode\" IS NULL OR TRIM(\"DiagnosticCode\") = '' THEN 'Unknown' ELSE \"DiagnosticCode\" END";
+        using var command = CreateResultCommand(
+            connection,
+            "SELECT " + diagnosticExpression + " AS \"DiagnosticCode\", COUNT(*) AS \"Count\" FROM \"StationResultSummaries\"" +
+            filter.WhereClause +
+            " GROUP BY " + diagnosticExpression + " ORDER BY \"Count\" DESC, \"DiagnosticCode\" ASC LIMIT 20",
+            filter);
+        using var reader = command.ExecuteReader();
+        var results = new List<StationDiagnosticAggregate>();
+        while (reader.Read())
+        {
+            results.Add(new StationDiagnosticAggregate(
+                ReadRequiredString(reader, "DiagnosticCode"),
+                ReadInt32(reader, "Count")));
+        }
+
+        return results;
+    }
+
+    private static IReadOnlyList<StationHourlyOutcomeAggregate> ExecuteHourlyAggregates(
+        DbConnection connection,
+        StationResultSqlFilter filter)
+    {
+        const string hourExpression = "strftime('%Y-%m-%dT%H:00:00+00:00', \"CompletedAtUtc\")";
+        const string outcomeColumns = "\"Outcome\", \"InspectionStatus\", \"ExecutionOutcome\", \"DecisionOutcome\", \"HasJudgmentSignal\"";
+        using var command = CreateResultCommand(
+            connection,
+            "SELECT " + hourExpression + " AS \"HourUtc\", " + outcomeColumns +
+            ", COUNT(*) AS \"Count\", 0 AS \"ExecutionTimeTotal\" FROM \"StationResultSummaries\"" +
+            filter.WhereClause +
+            " GROUP BY " + hourExpression + ", " + outcomeColumns +
+            " ORDER BY \"HourUtc\" ASC LIMIT " + (StationResultQueryBudget.MaximumHourlyTrendPoints * 16).ToString(CultureInfo.InvariantCulture),
+            filter);
+        using var reader = command.ExecuteReader();
+        var results = new List<StationHourlyOutcomeAggregate>();
+        while (reader.Read())
+        {
+            var hour = ReadDateTimeOffset(reader, "HourUtc");
+            results.Add(new StationHourlyOutcomeAggregate(
+                hour,
+                new StationOutcomeAggregate(
+                    string.Empty,
+                    ReadRequiredString(reader, "Outcome"),
+                    ReadNullableString(reader, "InspectionStatus"),
+                    ReadNullableString(reader, "ExecutionOutcome"),
+                    ReadNullableString(reader, "DecisionOutcome"),
+                    ReadNullableBoolean(reader, "HasJudgmentSignal"),
+                    ReadInt32(reader, "Count"),
+                    0)));
+        }
+
+        return results;
+    }
+
+    private static StationResultStatisticsViewModel BuildStatistics(
+        StationResultWindow window,
+        IReadOnlyList<StationOutcomeAggregate> overall,
+        IReadOnlyList<StationOutcomeAggregate> byStation,
+        IReadOnlyList<StationDiagnosticAggregate> diagnostics,
+        IReadOnlyList<StationHourlyOutcomeAggregate> hourly)
+    {
+        var overallStatistics = StationOutcomeStatisticsBuilder.Combine(overall.Select(ToOutcomeStatistics));
+        var overallCount = overall.Sum(item => item.Count);
+        return new StationResultStatisticsViewModel
+        {
+            FromUtc = window.FromUtc,
+            ToUtc = window.ToUtc,
+            OutcomeStatistics = overallStatistics,
+            AverageExecutionTimeMs = overallCount == 0
+                ? 0
+                : overall.Sum(item => item.ExecutionTimeTotal) / overallCount,
+            ByStation = byStation
+                .GroupBy(item => item.StationId, StringComparer.OrdinalIgnoreCase)
+                .Select(group => new StationOutcomeBreakdownViewModel
+                {
+                    StationId = group.Key,
+                    OutcomeStatistics = StationOutcomeStatisticsBuilder.Combine(group.Select(ToOutcomeStatistics)),
+                    AverageExecutionTimeMs = group.Sum(item => item.Count) == 0
+                        ? 0
+                        : group.Sum(item => item.ExecutionTimeTotal) / group.Sum(item => item.Count)
+                })
+                .OrderByDescending(item => item.TotalAttemptCount)
+                .ThenBy(item => item.StationId, StringComparer.OrdinalIgnoreCase)
+                .Take(500)
+                .ToList(),
+            ByDiagnosticCode = diagnostics
+                .Select(item => new StationDiagnosticBreakdownViewModel
+                {
+                    DiagnosticCode = item.DiagnosticCode,
+                    Count = item.Count
+                })
+                .ToList(),
+            HourlyTrend = hourly
+                .GroupBy(item => item.HourUtc)
+                .Select(group => new StationOutcomeTrendViewModel
+                {
+                    HourUtc = group.Key,
+                    OutcomeStatistics = StationOutcomeStatisticsBuilder.Combine(group.Select(item => ToOutcomeStatistics(item.Outcome)))
+                })
+                .OrderBy(item => item.HourUtc)
+                .Take(StationResultQueryBudget.MaximumHourlyTrendPoints)
+                .ToList()
+        };
+    }
+
+    private static InspectionOutcomeStatistics ToOutcomeStatistics(StationOutcomeAggregate aggregate)
+    {
+        var summary = new StationResultSummaryDto
+        {
+            Outcome = Enum.TryParse<RuntimeRunOutcome>(aggregate.Outcome, true, out var outcome)
+                ? outcome
+                : RuntimeRunOutcome.Error,
+            InspectionStatus = Enum.TryParse<ClearVision.Product.Core.Enums.InspectionStatus>(aggregate.InspectionStatus, true, out var status)
+                ? status
+                : null,
+            ExecutionOutcome = Enum.TryParse<ExecutionOutcome>(aggregate.ExecutionOutcome, true, out var executionOutcome)
+                ? executionOutcome
+                : null,
+            DecisionOutcome = Enum.TryParse<DecisionOutcome>(aggregate.DecisionOutcome, true, out var decisionOutcome)
+                ? decisionOutcome
+                : null,
+            HasJudgmentSignal = aggregate.HasJudgmentSignal
+        };
+        var canonical = StationCanonicalOutcomeProjection.Resolve(summary);
+        var count = aggregate.Count;
+        return InspectionOutcomeClassifier.Classify(canonical) switch
+        {
+            CanonicalInspectionOutcomeKind.Ok => new InspectionOutcomeStatistics
+            {
+                TotalAttemptCount = count,
+                ExecutionSucceededCount = count,
+                ValidDecisionCount = count,
+                OkCount = count
+            },
+            CanonicalInspectionOutcomeKind.Ng => new InspectionOutcomeStatistics
+            {
+                TotalAttemptCount = count,
+                ExecutionSucceededCount = count,
+                ValidDecisionCount = count,
+                NgCount = count
+            },
+            CanonicalInspectionOutcomeKind.Undetermined => new InspectionOutcomeStatistics
+            {
+                TotalAttemptCount = count,
+                ExecutionSucceededCount = count,
+                UndeterminedCount = count
+            },
+            CanonicalInspectionOutcomeKind.NotApplicable => new InspectionOutcomeStatistics
+            {
+                TotalAttemptCount = count,
+                ExecutionSucceededCount = count,
+                NotApplicableCount = count
+            },
+            CanonicalInspectionOutcomeKind.Invalid => new InspectionOutcomeStatistics
+            {
+                TotalAttemptCount = count,
+                ExecutionSucceededCount = count,
+                InvalidCount = count
+            },
+            CanonicalInspectionOutcomeKind.Failed => new InspectionOutcomeStatistics
+            {
+                TotalAttemptCount = count,
+                FailedCount = count
+            },
+            CanonicalInspectionOutcomeKind.Cancelled => new InspectionOutcomeStatistics
+            {
+                TotalAttemptCount = count,
+                CancelledCount = count
+            },
+            CanonicalInspectionOutcomeKind.TimedOut => new InspectionOutcomeStatistics
+            {
+                TotalAttemptCount = count,
+                TimedOutCount = count
+            },
+            CanonicalInspectionOutcomeKind.Skipped => new InspectionOutcomeStatistics
+            {
+                TotalAttemptCount = count,
+                SkippedCount = count
+            },
+            _ => new InspectionOutcomeStatistics { TotalAttemptCount = count }
+        };
+    }
+
+    private static DbCommand CreateResultCommand(
+        DbConnection connection,
+        string commandText,
+        StationResultSqlFilter filter,
+        params StationResultSqlParameter[] additionalParameters)
+    {
+        var command = connection.CreateCommand();
+        command.CommandText = commandText;
+        foreach (var parameter in filter.Parameters.Concat(additionalParameters))
+        {
+            var dbParameter = command.CreateParameter();
+            dbParameter.ParameterName = parameter.Name;
+            dbParameter.Value = parameter.Value ?? DBNull.Value;
+            command.Parameters.Add(dbParameter);
+        }
+
+        return command;
+    }
+
+    private static StationResultSummaryEntity ReadResultEntity(DbDataReader reader) =>
+        new()
+        {
+            Id = ReadInt32(reader, "Id"),
+            StationId = ReadRequiredString(reader, "StationId"),
+            SequenceId = ReadInt64(reader, "SequenceId"),
+            MessageId = ReadRequiredString(reader, "MessageId"),
+            RunId = ReadRequiredString(reader, "RunId"),
+            PackageId = ReadRequiredString(reader, "PackageId"),
+            PackageName = ReadRequiredString(reader, "PackageName"),
+            PackageVersion = ReadRequiredString(reader, "PackageVersion"),
+            FlowHash = ReadRequiredString(reader, "FlowHash"),
+            PackageFlowHash = ReadNullableString(reader, "PackageFlowHash"),
+            ExecutionFlowHash = ReadNullableString(reader, "ExecutionFlowHash"),
+            ExecutionSnapshotId = ReadNullableGuid(reader, "ExecutionSnapshotId"),
+            ProjectRevision = ReadNullableInt64(reader, "ProjectRevision"),
+            DecisionConfigurationHash = ReadNullableString(reader, "DecisionConfigurationHash"),
+            ExecutionRunMode = ReadNullableString(reader, "ExecutionRunMode"),
+            ImageId = ReadRequiredString(reader, "ImageId"),
+            Outcome = ReadRequiredString(reader, "Outcome"),
+            InspectionStatus = ReadNullableString(reader, "InspectionStatus"),
+            ExecutionOutcome = ReadNullableString(reader, "ExecutionOutcome"),
+            DecisionOutcome = ReadNullableString(reader, "DecisionOutcome"),
+            HasJudgmentSignal = ReadNullableBoolean(reader, "HasJudgmentSignal"),
+            DecisionSource = ReadNullableString(reader, "DecisionSource"),
+            ReasonCode = ReadNullableString(reader, "ReasonCode"),
+            ExecutionTimeMs = ReadInt64(reader, "ExecutionTimeMs"),
+            DiagnosticCode = ReadRequiredString(reader, "DiagnosticCode"),
+            DiagnosticMessage = ReadNullableString(reader, "DiagnosticMessage"),
+            PrimaryOutputsPreviewJson = ReadRequiredString(reader, "PrimaryOutputsPreviewJson"),
+            StartedAtUtc = ReadDateTimeOffset(reader, "StartedAtUtc"),
+            CompletedAtUtc = ReadDateTimeOffset(reader, "CompletedAtUtc"),
+            CreatedAtUtc = ReadDateTimeOffset(reader, "CreatedAtUtc"),
+            ReceivedAtUtc = ReadDateTimeOffset(reader, "ReceivedAtUtc")
+        };
+
+    private static string ReadRequiredString(DbDataReader reader, string column) =>
+        ReadNullableString(reader, column) ?? string.Empty;
+
+    private static string? ReadNullableString(DbDataReader reader, string column)
+    {
+        var ordinal = reader.GetOrdinal(column);
+        return reader.IsDBNull(ordinal) ? null : Convert.ToString(reader.GetValue(ordinal), CultureInfo.InvariantCulture);
+    }
+
+    private static int ReadInt32(DbDataReader reader, string column) =>
+        Convert.ToInt32(reader.GetValue(reader.GetOrdinal(column)), CultureInfo.InvariantCulture);
+
+    private static long ReadInt64(DbDataReader reader, string column) =>
+        Convert.ToInt64(reader.GetValue(reader.GetOrdinal(column)), CultureInfo.InvariantCulture);
+
+    private static long? ReadNullableInt64(DbDataReader reader, string column)
+    {
+        var ordinal = reader.GetOrdinal(column);
+        return reader.IsDBNull(ordinal)
+            ? null
+            : Convert.ToInt64(reader.GetValue(ordinal), CultureInfo.InvariantCulture);
+    }
+
+    private static double ReadDouble(DbDataReader reader, string column) =>
+        Convert.ToDouble(reader.GetValue(reader.GetOrdinal(column)), CultureInfo.InvariantCulture);
+
+    private static bool? ReadNullableBoolean(DbDataReader reader, string column)
+    {
+        var ordinal = reader.GetOrdinal(column);
+        return reader.IsDBNull(ordinal)
+            ? null
+            : Convert.ToBoolean(reader.GetValue(ordinal), CultureInfo.InvariantCulture);
+    }
+
+    private static Guid? ReadNullableGuid(DbDataReader reader, string column)
+    {
+        var ordinal = reader.GetOrdinal(column);
+        if (reader.IsDBNull(ordinal))
+        {
+            return null;
+        }
+
+        var value = reader.GetValue(ordinal);
+        return value is Guid guid
+            ? guid
+            : Guid.TryParse(Convert.ToString(value, CultureInfo.InvariantCulture), out var parsed)
+                ? parsed
+                : null;
+    }
+
+    private static DateTimeOffset ReadDateTimeOffset(DbDataReader reader, string column)
+    {
+        var value = reader.GetValue(reader.GetOrdinal(column));
+        return value switch
+        {
+            DateTimeOffset timestamp => timestamp,
+            DateTime timestamp => new DateTimeOffset(timestamp.Kind == DateTimeKind.Unspecified
+                ? DateTime.SpecifyKind(timestamp, DateTimeKind.Utc)
+                : timestamp),
+            _ when DateTimeOffset.TryParse(
+                Convert.ToString(value, CultureInfo.InvariantCulture),
+                CultureInfo.InvariantCulture,
+                DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal,
+                out var parsed) => parsed,
+            _ => throw new InvalidOperationException($"Station result column '{column}' is not a valid timestamp.")
+        };
+    }
+
+    private sealed record StationResultSqlFilter(
+        string WhereClause,
+        IReadOnlyList<StationResultSqlParameter> Parameters);
+
+    private sealed record StationResultSqlParameter(string Name, object? Value);
+
+    private sealed record StationOutcomeAggregate(
+        string StationId,
+        string Outcome,
+        string? InspectionStatus,
+        string? ExecutionOutcome,
+        string? DecisionOutcome,
+        bool? HasJudgmentSignal,
+        int Count,
+        double ExecutionTimeTotal);
+
+    private sealed record StationDiagnosticAggregate(string DiagnosticCode, int Count);
+
+    private sealed record StationHourlyOutcomeAggregate(
+        DateTimeOffset HourUtc,
+        StationOutcomeAggregate Outcome);
 
     private static string? Truncate(string? text, int maxLength)
     {

@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using System.Security.Cryptography;
+using System.Runtime.CompilerServices;
 using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
@@ -605,18 +606,48 @@ public sealed class RuntimePreviewGovernanceStore
     }
 }
 
+/// <summary>
+/// One lock and a tombstone set shared by all in-memory projections over one
+/// governance store.  Cleanup and writes must use the same serialized region
+/// so an already-pruned session cannot be revived by an in-flight writer.
+/// </summary>
+public sealed class RuntimePreviewRetentionCoordinator
+{
+    private static readonly ConditionalWeakTable<RuntimePreviewGovernanceStore, RuntimePreviewRetentionCoordinator> ByStore = new();
+    private readonly HashSet<string> _prunedSessionIds = new(StringComparer.OrdinalIgnoreCase);
+
+    public object Gate { get; } = new();
+
+    public static RuntimePreviewRetentionCoordinator For(RuntimePreviewGovernanceStore store) =>
+        ByStore.GetValue(store, static _ => new RuntimePreviewRetentionCoordinator());
+
+    public bool IsPruned(string? sessionId) =>
+        !string.IsNullOrWhiteSpace(sessionId) && _prunedSessionIds.Contains(sessionId.Trim());
+
+    public void MarkPruned(IEnumerable<string> sessionIds)
+    {
+        foreach (var sessionId in sessionIds.Where(id => !string.IsNullOrWhiteSpace(id)))
+        {
+            _prunedSessionIds.Add(sessionId.Trim());
+        }
+    }
+}
+
 public sealed class RuntimePreviewSessionStore
 {
     private readonly ConcurrentDictionary<string, RuntimePreviewSession> _sessions = new(StringComparer.OrdinalIgnoreCase);
     private readonly RuntimePreviewGovernanceStore? _governanceStore;
+    private readonly RuntimePreviewRetentionCoordinator _retentionCoordinator;
 
     public RuntimePreviewSessionStore()
     {
+        _retentionCoordinator = new RuntimePreviewRetentionCoordinator();
     }
 
     public RuntimePreviewSessionStore(RuntimePreviewGovernanceStore governanceStore)
     {
         _governanceStore = governanceStore;
+        _retentionCoordinator = RuntimePreviewRetentionCoordinator.For(governanceStore);
         foreach (var session in governanceStore.LoadSessions())
         {
             _sessions[session.SessionId] = session;
@@ -642,8 +673,11 @@ public sealed class RuntimePreviewSessionStore
             MetadataOnly = true,
             RealResourcesTouched = false
         };
-        _sessions[session.SessionId] = session;
-        _governanceStore?.SaveSession(session);
+        lock (_retentionCoordinator.Gate)
+        {
+            _sessions[session.SessionId] = session;
+            _governanceStore?.SaveSession(session);
+        }
         return session;
     }
 
@@ -661,12 +695,41 @@ public sealed class RuntimePreviewSessionStore
 
     public RuntimePreviewSession Update(string sessionId, Func<RuntimePreviewSession, RuntimePreviewSession> update)
     {
-        var updated = _sessions.AddOrUpdate(
-            sessionId,
-            _ => throw new InvalidOperationException($"RuntimePreview session '{sessionId}' was not found."),
-            (_, current) => update(current) with { UpdatedAtUtc = DateTimeOffset.UtcNow });
-        _governanceStore?.SaveSession(updated);
-        return updated;
+        lock (_retentionCoordinator.Gate)
+        {
+            ThrowIfPruned(sessionId);
+            var updated = _sessions.AddOrUpdate(
+                sessionId,
+                _ => throw new InvalidOperationException($"RuntimePreview session '{sessionId}' was not found."),
+                (_, current) => update(current) with { UpdatedAtUtc = DateTimeOffset.UtcNow });
+            _governanceStore?.SaveSession(updated);
+            return updated;
+        }
+    }
+
+    internal void ReloadFromGovernanceStore()
+    {
+        if (_governanceStore == null)
+        {
+            return;
+        }
+
+        lock (_retentionCoordinator.Gate)
+        {
+            _sessions.Clear();
+            foreach (var session in _governanceStore.LoadSessions())
+            {
+                _sessions[session.SessionId] = session;
+            }
+        }
+    }
+
+    private void ThrowIfPruned(string? sessionId)
+    {
+        if (_retentionCoordinator.IsPruned(sessionId))
+        {
+            throw new InvalidOperationException($"RuntimePreview session '{sessionId}' was removed by retention cleanup.");
+        }
     }
 }
 
@@ -674,14 +737,17 @@ public sealed class RuntimePreviewAuditTrail
 {
     private readonly ConcurrentDictionary<string, RuntimePreviewAuditEvent> _events = new(StringComparer.OrdinalIgnoreCase);
     private readonly RuntimePreviewGovernanceStore? _governanceStore;
+    private readonly RuntimePreviewRetentionCoordinator _retentionCoordinator;
 
     public RuntimePreviewAuditTrail()
     {
+        _retentionCoordinator = new RuntimePreviewRetentionCoordinator();
     }
 
     public RuntimePreviewAuditTrail(RuntimePreviewGovernanceStore governanceStore)
     {
         _governanceStore = governanceStore;
+        _retentionCoordinator = RuntimePreviewRetentionCoordinator.For(governanceStore);
         foreach (var auditEvent in governanceStore.LoadAuditEvents())
         {
             _events[auditEvent.EventId] = auditEvent;
@@ -690,20 +756,28 @@ public sealed class RuntimePreviewAuditTrail
 
     public RuntimePreviewAuditEvent Append(string sessionId, string eventType, object? payload)
     {
-        var safePayload = RuntimePreviewGovernanceRedactor.ToRedactedElement(payload);
-        var auditEvent = new RuntimePreviewAuditEvent
+        lock (_retentionCoordinator.Gate)
         {
-            EventId = $"rp_audit_{Guid.NewGuid():N}",
-            SessionId = sessionId,
-            EventType = eventType,
-            CreatedAtUtc = DateTimeOffset.UtcNow,
-            Payload = safePayload,
-            Redacted = true,
-            MetadataOnly = true
-        };
-        _events[auditEvent.EventId] = auditEvent;
-        _governanceStore?.SaveAuditEvent(auditEvent);
-        return auditEvent;
+            if (_retentionCoordinator.IsPruned(sessionId))
+            {
+                throw new InvalidOperationException($"RuntimePreview session '{sessionId}' was removed by retention cleanup.");
+            }
+
+            var safePayload = RuntimePreviewGovernanceRedactor.ToRedactedElement(payload);
+            var auditEvent = new RuntimePreviewAuditEvent
+            {
+                EventId = $"rp_audit_{Guid.NewGuid():N}",
+                SessionId = sessionId,
+                EventType = eventType,
+                CreatedAtUtc = DateTimeOffset.UtcNow,
+                Payload = safePayload,
+                Redacted = true,
+                MetadataOnly = true
+            };
+            _events[auditEvent.EventId] = auditEvent;
+            _governanceStore?.SaveAuditEvent(auditEvent);
+            return auditEvent;
+        }
     }
 
     public IReadOnlyList<RuntimePreviewAuditEvent> ListForSession(string sessionId)
@@ -720,6 +794,23 @@ public sealed class RuntimePreviewAuditTrail
             .OrderBy(item => item.CreatedAtUtc)
             .ToList();
     }
+
+    internal void ReloadFromGovernanceStore()
+    {
+        if (_governanceStore == null)
+        {
+            return;
+        }
+
+        lock (_retentionCoordinator.Gate)
+        {
+            _events.Clear();
+            foreach (var auditEvent in _governanceStore.LoadAuditEvents())
+            {
+                _events[auditEvent.EventId] = auditEvent;
+            }
+        }
+    }
 }
 
 public sealed class RuntimePreviewReportArchive
@@ -733,14 +824,17 @@ public sealed class RuntimePreviewReportArchive
     private readonly ConcurrentDictionary<string, RuntimePreviewPreReleaseReviewReport> _preReleaseReviewReports = new(StringComparer.OrdinalIgnoreCase);
     private readonly ConcurrentDictionary<string, RuntimePreviewReleaseReadinessDecisionMatrix> _releaseReviewDecisions = new(StringComparer.OrdinalIgnoreCase);
     private readonly RuntimePreviewGovernanceStore? _governanceStore;
+    private readonly RuntimePreviewRetentionCoordinator _retentionCoordinator;
 
     public RuntimePreviewReportArchive()
     {
+        _retentionCoordinator = new RuntimePreviewRetentionCoordinator();
     }
 
     public RuntimePreviewReportArchive(RuntimePreviewGovernanceStore governanceStore)
     {
         _governanceStore = governanceStore;
+        _retentionCoordinator = RuntimePreviewRetentionCoordinator.For(governanceStore);
         foreach (var report in governanceStore.LoadReports())
         {
             _reports[report.ReportId] = report;
@@ -788,9 +882,13 @@ public sealed class RuntimePreviewReportArchive
 
     public RuntimePreviewSessionReport Save(RuntimePreviewSessionReport report)
     {
-        _reports[report.ReportId] = report;
-        _governanceStore?.SaveReport(report);
-        return report;
+        lock (_retentionCoordinator.Gate)
+        {
+            ThrowIfPruned(report.SessionId);
+            _reports[report.ReportId] = report;
+            _governanceStore?.SaveReport(report);
+            return report;
+        }
     }
 
     public RuntimePreviewSessionReport? Get(string reportId)
@@ -815,9 +913,13 @@ public sealed class RuntimePreviewReportArchive
 
     public RuntimePreviewDeployReadinessReport SaveDeployReadinessReport(RuntimePreviewDeployReadinessReport report)
     {
-        _deployReadinessReports[report.ReportId] = report;
-        _governanceStore?.SaveDeployReadinessReport(report);
-        return report;
+        lock (_retentionCoordinator.Gate)
+        {
+            ThrowIfPruned(report.SessionId);
+            _deployReadinessReports[report.ReportId] = report;
+            _governanceStore?.SaveDeployReadinessReport(report);
+            return report;
+        }
     }
 
     public RuntimePreviewDeployReadinessReport? GetDeployReadinessReport(string reportId)
@@ -842,9 +944,13 @@ public sealed class RuntimePreviewReportArchive
 
     public RuntimePreviewPackageReadinessReport SavePackageReadinessReport(RuntimePreviewPackageReadinessReport report)
     {
-        _packageReadinessReports[report.ReportId] = report;
-        _governanceStore?.SavePackageReadinessReport(report);
-        return report;
+        lock (_retentionCoordinator.Gate)
+        {
+            ThrowIfPruned(report.SessionId);
+            _packageReadinessReports[report.ReportId] = report;
+            _governanceStore?.SavePackageReadinessReport(report);
+            return report;
+        }
     }
 
     public RuntimePreviewPackageReadinessReport? GetPackageReadinessReport(string reportId)
@@ -869,9 +975,13 @@ public sealed class RuntimePreviewReportArchive
 
     public RuntimePackageManifestDryRunReport SaveManifestDryRunReport(RuntimePackageManifestDryRunReport report)
     {
-        _manifestDryRunReports[report.ManifestId] = report;
-        _governanceStore?.SaveManifestDryRunReport(report);
-        return report;
+        lock (_retentionCoordinator.Gate)
+        {
+            ThrowIfPruned(report.SessionId);
+            _manifestDryRunReports[report.ManifestId] = report;
+            _governanceStore?.SaveManifestDryRunReport(report);
+            return report;
+        }
     }
 
     public RuntimePackageManifestDryRunReport? GetManifestDryRunReport(string manifestId)
@@ -905,9 +1015,13 @@ public sealed class RuntimePreviewReportArchive
 
     public RuntimePreviewStationCompatibilityReport SaveStationCompatibilityReport(RuntimePreviewStationCompatibilityReport report)
     {
-        _stationCompatibilityReports[report.ReportId] = report;
-        _governanceStore?.SaveStationCompatibilityReport(report);
-        return report;
+        lock (_retentionCoordinator.Gate)
+        {
+            ThrowIfPruned(report.SessionId);
+            _stationCompatibilityReports[report.ReportId] = report;
+            _governanceStore?.SaveStationCompatibilityReport(report);
+            return report;
+        }
     }
 
     public RuntimePreviewStationCompatibilityReport? GetStationCompatibilityReport(string reportId)
@@ -940,9 +1054,13 @@ public sealed class RuntimePreviewReportArchive
 
     public RuntimePreviewOperatorContractValidationReport SaveOperatorContractValidationReport(RuntimePreviewOperatorContractValidationReport report)
     {
-        _operatorContractValidationReports[report.ReportId] = report;
-        _governanceStore?.SaveOperatorContractValidationReport(report);
-        return report;
+        lock (_retentionCoordinator.Gate)
+        {
+            ThrowIfPruned(report.SessionId);
+            _operatorContractValidationReports[report.ReportId] = report;
+            _governanceStore?.SaveOperatorContractValidationReport(report);
+            return report;
+        }
     }
 
     public RuntimePreviewOperatorContractValidationReport? GetOperatorContractValidationReport(string reportId)
@@ -967,27 +1085,34 @@ public sealed class RuntimePreviewReportArchive
 
     public RuntimePreviewPreReleaseReviewReport SavePreReleaseReviewReport(RuntimePreviewPreReleaseReviewReport report)
     {
-        _preReleaseReviewReports[report.ReviewId] = report;
-        _governanceStore?.SavePreReleaseReviewReport(report);
-        if (!string.IsNullOrWhiteSpace(report.DecisionMatrix.ReviewId) ||
-            !string.IsNullOrWhiteSpace(report.DecisionMatrix.ReportId))
+        lock (_retentionCoordinator.Gate)
         {
-            SaveReleaseReviewDecision(report.DecisionMatrix);
-        }
+            ThrowIfPruned(report.SessionId);
+            _preReleaseReviewReports[report.ReviewId] = report;
+            _governanceStore?.SavePreReleaseReviewReport(report);
+            if (!string.IsNullOrWhiteSpace(report.DecisionMatrix.ReviewId) ||
+                !string.IsNullOrWhiteSpace(report.DecisionMatrix.ReportId))
+            {
+                SaveReleaseReviewDecision(report.DecisionMatrix);
+            }
 
-        return report;
+            return report;
+        }
     }
 
     public RuntimePreviewReleaseReadinessDecisionMatrix SaveReleaseReviewDecision(RuntimePreviewReleaseReadinessDecisionMatrix decision)
     {
-        var key = string.IsNullOrWhiteSpace(decision.ReportId) ? decision.ReviewId : decision.ReportId;
-        if (!string.IsNullOrWhiteSpace(key))
+        lock (_retentionCoordinator.Gate)
         {
-            _releaseReviewDecisions[key] = decision;
-        }
+            var key = string.IsNullOrWhiteSpace(decision.ReportId) ? decision.ReviewId : decision.ReportId;
+            if (!string.IsNullOrWhiteSpace(key))
+            {
+                _releaseReviewDecisions[key] = decision;
+            }
 
-        _governanceStore?.SaveReleaseReviewDecision(decision);
-        return decision;
+            _governanceStore?.SaveReleaseReviewDecision(decision);
+            return decision;
+        }
     }
 
     public RuntimePreviewReleaseReadinessDecisionMatrix? GetReleaseReviewDecision(string reportIdOrReviewId)
@@ -1046,6 +1171,47 @@ public sealed class RuntimePreviewReportArchive
         return _preReleaseReviewReports.Values
             .OrderByDescending(report => report.GeneratedAtUtc)
             .ToList();
+    }
+
+    internal void ReloadFromGovernanceStore()
+    {
+        if (_governanceStore == null)
+        {
+            return;
+        }
+
+        lock (_retentionCoordinator.Gate)
+        {
+            _reports.Clear();
+            _deployReadinessReports.Clear();
+            _packageReadinessReports.Clear();
+            _manifestDryRunReports.Clear();
+            _stationCompatibilityReports.Clear();
+            _operatorContractValidationReports.Clear();
+            _preReleaseReviewReports.Clear();
+            _releaseReviewDecisions.Clear();
+
+            foreach (var report in _governanceStore.LoadReports()) _reports[report.ReportId] = report;
+            foreach (var report in _governanceStore.LoadDeployReadinessReports()) _deployReadinessReports[report.ReportId] = report;
+            foreach (var report in _governanceStore.LoadPackageReadinessReports()) _packageReadinessReports[report.ReportId] = report;
+            foreach (var report in _governanceStore.LoadManifestDryRunReports()) _manifestDryRunReports[report.ManifestId] = report;
+            foreach (var report in _governanceStore.LoadStationCompatibilityReports()) _stationCompatibilityReports[report.ReportId] = report;
+            foreach (var report in _governanceStore.LoadOperatorContractValidationReports()) _operatorContractValidationReports[report.ReportId] = report;
+            foreach (var report in _governanceStore.LoadPreReleaseReviewReports()) _preReleaseReviewReports[report.ReviewId] = report;
+            foreach (var decision in _governanceStore.LoadReleaseReviewDecisions())
+            {
+                var key = string.IsNullOrWhiteSpace(decision.ReportId) ? decision.ReviewId : decision.ReportId;
+                if (!string.IsNullOrWhiteSpace(key)) _releaseReviewDecisions[key] = decision;
+            }
+        }
+    }
+
+    private void ThrowIfPruned(string? sessionId)
+    {
+        if (_retentionCoordinator.IsPruned(sessionId))
+        {
+            throw new InvalidOperationException($"RuntimePreview session '{sessionId}' was removed by retention cleanup.");
+        }
     }
 }
 
@@ -1659,21 +1825,54 @@ public sealed class RuntimePreviewSimulatedExecutionHarness
 public sealed class RuntimePreviewGovernanceMaintenanceService
 {
     private readonly RuntimePreviewGovernanceStore _store;
+    private readonly RuntimePreviewSessionStore _sessionStore;
     private readonly RuntimePreviewAuditTrail _auditTrail;
+    private readonly RuntimePreviewReportArchive _reportArchive;
+    private readonly RuntimePreviewRetentionCoordinator _retentionCoordinator;
 
     public RuntimePreviewGovernanceMaintenanceService(
         RuntimePreviewGovernanceStore store,
         RuntimePreviewAuditTrail auditTrail)
+        : this(
+            store,
+            new RuntimePreviewSessionStore(store),
+            auditTrail,
+            new RuntimePreviewReportArchive(store))
+    {
+    }
+
+    public RuntimePreviewGovernanceMaintenanceService(
+        RuntimePreviewGovernanceStore store,
+        RuntimePreviewSessionStore sessionStore,
+        RuntimePreviewAuditTrail auditTrail,
+        RuntimePreviewReportArchive reportArchive)
     {
         _store = store;
+        _sessionStore = sessionStore;
         _auditTrail = auditTrail;
+        _reportArchive = reportArchive;
+        _retentionCoordinator = RuntimePreviewRetentionCoordinator.For(store);
     }
 
     public RuntimePreviewRetentionCleanupResult Cleanup(int retentionDays, int maxSessions)
     {
-        var result = _store.Cleanup(retentionDays, maxSessions);
-        _auditTrail.Append("runtime_preview_governance", RuntimePreviewAuditEventTypes.RetentionCleanup, result);
-        return result;
+        lock (_retentionCoordinator.Gate)
+        {
+            var beforeSessionIds = _store.LoadSessions()
+                .Select(session => session.SessionId)
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+            var result = _store.Cleanup(retentionDays, maxSessions);
+            var retainedSessionIds = _store.LoadSessions()
+                .Select(session => session.SessionId)
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+            _retentionCoordinator.MarkPruned(beforeSessionIds.Except(retainedSessionIds, StringComparer.OrdinalIgnoreCase));
+
+            _sessionStore.ReloadFromGovernanceStore();
+            _auditTrail.ReloadFromGovernanceStore();
+            _reportArchive.ReloadFromGovernanceStore();
+            _auditTrail.Append("runtime_preview_governance", RuntimePreviewAuditEventTypes.RetentionCleanup, result);
+            return result;
+        }
     }
 }
 
@@ -3115,7 +3314,6 @@ public sealed class RuntimePreviewOperatorContractRegistry
             ContractWithOptional("SurfaceDefectDetection", ["image"], ["defect"], ["ModelId"], ["ModelKind"], ["modelMetadata"], ["ModelPath", "ImagePath"], ["deep_learning_runtime"], ["operatorType"], ["defect model kind supported"], ["deep_learning_review", "engineer_approval_required"], ["deep_learning_release_review"], ["defect model metadata must be catalog-bound"]),
             ContractWithOptional("AnomalyDetection", ["image"], ["anomaly"], ["ModelId"], ["ModelKind"], ["modelMetadata"], ["ModelPath", "ImagePath"], ["deep_learning_runtime"], ["operatorType"], ["anomaly model kind supported"], ["deep_learning_review", "engineer_approval_required"], ["deep_learning_release_review"], ["anomaly model metadata must be catalog-bound"]),
             Contract("ModbusCommunication", ["result"], ["plc"], [], ["plcEndpoint"], ["Address", "PlcAddress", "BaseUrl"], ["forbidden_for_preview"], ["operatorType"], ["plc write forbidden"], ["plc_write_forbidden"]),
-            Contract("ModbusRtuCommunication", ["result"], ["plc"], [], ["plcEndpoint"], ["Address", "PlcAddress", "BaseUrl"], ["forbidden_for_preview"], ["operatorType"], ["plc write forbidden"], ["plc_write_forbidden"]),
             Contract("SiemensS7Communication", ["result"], ["plc"], [], ["plcEndpoint"], ["Address", "PlcAddress", "BaseUrl"], ["forbidden_for_preview"], ["operatorType"], ["plc write forbidden"], ["plc_write_forbidden"]),
             Contract("MitsubishiMcCommunication", ["result"], ["plc"], [], ["plcEndpoint"], ["Address", "PlcAddress", "BaseUrl"], ["forbidden_for_preview"], ["operatorType"], ["plc write forbidden"], ["plc_write_forbidden"]),
             Contract("OmronFinsCommunication", ["result"], ["plc"], [], ["plcEndpoint"], ["Address", "PlcAddress", "BaseUrl"], ["forbidden_for_preview"], ["operatorType"], ["plc write forbidden"], ["plc_write_forbidden"]),

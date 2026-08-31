@@ -72,6 +72,7 @@ public static class VisionRuntimeServiceCollectionExtensions
         services.AddSingleton<IOperatorExecutor, TemplateMatchOperator>();
         services.AddSingleton<IOperatorExecutor, FindContoursOperator>();
         services.AddSingleton<IOperatorExecutor, MeasureDistanceOperator>();
+        services.AddSingleton<IResultOutputStorage, ResultOutputStorage>();
         services.AddSingleton<IOperatorExecutor, ResultOutputOperator>();
         services.AddSingleton<IOperatorExecutor, DeepLearningOperator>();
         services.AddSingleton<IOperatorExecutor, MedianBlurOperator>();
@@ -271,6 +272,7 @@ public static class VisionRuntimeServiceCollectionExtensions
         services.AddSingleton<InspectionResultBackgroundService>();
         services.AddHostedService(sp => sp.GetRequiredService<InspectionResultBackgroundService>());
         services.AddSingleton<IInspectionResultChannelWriter>(sp => sp.GetRequiredService<InspectionResultBackgroundService>());
+        services.AddSingleton<IInspectionStorageFreeSpaceProvider, DriveInspectionStorageFreeSpaceProvider>();
         services.AddSingleton<InspectionImagePersistenceService>();
         services.AddSingleton<QueuedInspectionImagePersistenceService>();
         services.AddHostedService(sp => sp.GetRequiredService<QueuedInspectionImagePersistenceService>());

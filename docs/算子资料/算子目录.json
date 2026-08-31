@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-08-31T19:13:00.8983064+08:00",
-  "generationFingerprint": "A3AE8008883A543EAAD7EC0F21000C999CD704DA51E780111A44C8B2EB048204",
+  "generatedAt": "2026-08-31T21:08:42.6383451+08:00",
+  "generationFingerprint": "A4649A6D8A2E117E1F6784A4940A4C25C6C16B2839FE4632CEA0A893AC36FFCD",
   "totalCount": 158,
   "categories": {
     "采集": {
@@ -24120,7 +24120,7 @@
         "evidenceIdentity": "clearvision-operator-quality-phase5-evidence@1.0.0:7ed1d600eead23e8185d6fef730b3995bec7db29c7d65a6cc3248a1ca95770cf",
         "modeEvidence": []
       },
-      "version": "1.0.0",
+      "version": "1.0.1",
       "keywords": [],
       "tags": [
         "AlgorithmQuality:Unknown",
@@ -24261,7 +24261,7 @@
       "imageInputContracts": [],
       "resourceRequirements": [],
       "generationDependencies": [],
-      "generationFingerprint": "59EE5795D682E71A2E45648247E0726E3123A1EC214D9C1AB7D685CBDC325BF4",
+      "generationFingerprint": "9B2DDB4B238765CCDF75DCFD5F38F6C8A34404D98BF26EDD6CCDC81EB3C8DA53",
       "docPath": "算子资料/算子名片/DualModalVoting.md"
     },
     {
@@ -38938,7 +38938,7 @@
         "evidenceIdentity": "clearvision-operator-quality-phase5-evidence@1.0.0:7ed1d600eead23e8185d6fef730b3995bec7db29c7d65a6cc3248a1ca95770cf",
         "modeEvidence": []
       },
-      "version": "1.0.0",
+      "version": "1.0.1",
       "keywords": [
         "Compare",
         "GreaterThan",
@@ -39083,7 +39083,7 @@
       "imageInputContracts": [],
       "resourceRequirements": [],
       "generationDependencies": [],
-      "generationFingerprint": "30EF6DB530842A540E722F8E34E85C78C0D5CB0DD9BCAA931084CD4F0E866FD9",
+      "generationFingerprint": "3FD4BD6BB94D70D1198AE4C0CD8D9857CF4B2547E86CD19B35B1903366363303",
       "docPath": "算子资料/算子名片/Comparator.md"
     },
     {
@@ -43777,7 +43777,7 @@
       "id": "ModbusCommunication",
       "type": 27,
       "displayName": "Modbus TCP通信",
-      "description": "通过 Modbus TCP 读写线圈和保持寄存器；当前算子不执行 Modbus RTU 通信。",
+      "description": "通过受服务器 PLC 配置约束的 Modbus TCP 读写线圈和保持寄存器。",
       "categoryId": "Communication",
       "categoryOrder": 13,
       "category": "通信",
@@ -43796,7 +43796,7 @@
         "evidenceIdentity": "clearvision-operator-quality-phase5-evidence@1.0.0:7ed1d600eead23e8185d6fef730b3995bec7db29c7d65a6cc3248a1ca95770cf",
         "modeEvidence": []
       },
-      "version": "1.1.0",
+      "version": "1.1.1",
       "keywords": [
         "Communication",
         "Industrial",
@@ -43805,7 +43805,6 @@
         "Modbus通信",
         "PLC",
         "Register",
-        "RTU",
         "TCP"
       ],
       "tags": [
@@ -43818,7 +43817,7 @@
         "生命周期:Stable",
         "算法类型:自研"
       ],
-      "algorithm": "该算子用于通过 Modbus TCP 读写线圈和保持寄存器；当前算子不执行 Modb…",
+      "algorithm": "该算子用于通过受服务器 PLC 配置约束的 Modbus TCP 读写线圈和保持寄存…",
       "inputPorts": [
         {
           "name": "Data",
@@ -44132,7 +44131,7 @@
         }
       ],
       "generationDependencies": [],
-      "generationFingerprint": "BEE816D345431789919A2A52EFBE05EE737B08B392BB132BBCC850BD8D08682D",
+      "generationFingerprint": "37F4F681C1B9B8979BE1E41902487D34087D64437FEB78DD4D1FDD94D4C5C738",
       "docPath": "算子资料/算子名片/ModbusCommunication.md"
     },
     {
@@ -47791,7 +47790,7 @@
         "evidenceIdentity": "clearvision-operator-quality-phase5-evidence@1.0.0:7ed1d600eead23e8185d6fef730b3995bec7db29c7d65a6cc3248a1ca95770cf",
         "modeEvidence": []
       },
-      "version": "1.0.1",
+      "version": "1.0.2",
       "keywords": [
         "Display",
         "Output",
@@ -48030,7 +48029,7 @@
         }
       ],
       "generationDependencies": [],
-      "generationFingerprint": "0B158C24D2FFDD41D1EC343609E1F4FF10D6A344C2EC70F464D69E88CC4C9D15",
+      "generationFingerprint": "D090637C95E00274567686C42336670F2A13050660A511889E418B6E7E3716C6",
       "docPath": "算子资料/算子名片/ResultOutput.md"
     },
     {
@@ -48056,7 +48055,7 @@
         "evidenceIdentity": "clearvision-operator-quality-phase5-evidence@1.0.0:7ed1d600eead23e8185d6fef730b3995bec7db29c7d65a6cc3248a1ca95770cf",
         "modeEvidence": []
       },
-      "version": "1.0.1",
+      "version": "1.0.2",
       "keywords": [
         "export csv",
         "json export",
@@ -48213,7 +48212,7 @@
         }
       ],
       "generationDependencies": [],
-      "generationFingerprint": "E7AC8C29797BF923D3698BA333C41040E7A0E18959D67F08921183C5A0FB8AC6",
+      "generationFingerprint": "889EAA9585719A5A277CC1B651B0E8C56BCF8103C29297D48A181EAA43A36FE6",
       "docPath": "算子资料/算子名片/TextSave.md"
     }
   ]

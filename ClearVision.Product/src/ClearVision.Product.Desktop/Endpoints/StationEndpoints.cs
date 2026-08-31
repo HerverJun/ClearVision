@@ -43,21 +43,29 @@ public static class StationEndpoints
             [FromServices] StationRegistryService registry,
             HttpContext context) =>
         {
-            var resolvedPageSize = take.HasValue
-                ? Math.Clamp(take.Value, 1, 500)
-                : Math.Clamp(pageSize.GetValueOrDefault(50), 1, 500);
-            var resolvedPageIndex = Math.Max(0, pageIndex.GetValueOrDefault(0));
-            var page = registry.GetResultsPage(
-                stationId,
-                from,
-                to,
-                status,
-                diagnosticCode,
-                resolvedPageIndex,
-                resolvedPageSize);
-            return Results.Ok(IsStationAdmin(context)
-                ? page
-                : StationMonitoringProjection.ToSafeResultsPage(page));
+            try
+            {
+                var window = StationResultQueryBudget.Normalize(from, to, DateTimeOffset.UtcNow);
+                var resolvedPageSize = take.HasValue
+                    ? Math.Clamp(take.Value, 1, 500)
+                    : Math.Clamp(pageSize.GetValueOrDefault(50), 1, 500);
+                var resolvedPageIndex = Math.Max(0, pageIndex.GetValueOrDefault(0));
+                var page = registry.GetResultsPage(
+                    stationId,
+                    window.FromUtc,
+                    window.ToUtc,
+                    status,
+                    diagnosticCode,
+                    resolvedPageIndex,
+                    resolvedPageSize);
+                return Results.Ok(IsStationAdmin(context)
+                    ? page
+                    : StationMonitoringProjection.ToSafeResultsPage(page));
+            }
+            catch (StationResultQueryBudgetException exception)
+            {
+                return StationBudgetViolation(exception);
+            }
         });
 
         app.MapGet("/api/stations/{stationId}/results", (
@@ -276,8 +284,15 @@ public static class StationEndpoints
             string? diagnosticCode,
             [FromServices] StationRegistryService registry) =>
         {
-            var (fromUtc, toUtc) = ResolveStatisticsWindow(range, from, to);
-            return Results.Ok(registry.GetStatistics(fromUtc, toUtc, stationId, status, diagnosticCode));
+            try
+            {
+                var window = ResolveStatisticsWindow(range, from, to);
+                return Results.Ok(registry.GetStatistics(window.FromUtc, window.ToUtc, stationId, status, diagnosticCode));
+            }
+            catch (StationResultQueryBudgetException exception)
+            {
+                return StationBudgetViolation(exception);
+            }
         });
 
         app.MapGet("/api/stations/events", HandleSseEventsAsync);
@@ -429,31 +444,36 @@ public static class StationEndpoints
         }
     }
 
-    private static (DateTimeOffset? FromUtc, DateTimeOffset? ToUtc) ResolveStatisticsWindow(
+    private static StationResultWindow ResolveStatisticsWindow(
         string? range,
         DateTimeOffset? from,
         DateTimeOffset? to)
     {
-        if (from.HasValue && to.HasValue && from < to)
+        if (from.HasValue || to.HasValue)
         {
-            return (from.Value.ToUniversalTime(), to.Value.ToUniversalTime());
-        }
-
-        if (string.Equals(range, "all", StringComparison.OrdinalIgnoreCase))
-        {
-            return (null, null);
+            return StationResultQueryBudget.Normalize(from, to, DateTimeOffset.UtcNow);
         }
 
         var now = DateTimeOffset.UtcNow;
         var todayLocal = DateTime.Today;
         var todayUtc = new DateTimeOffset(todayLocal).ToUniversalTime();
-        return string.Equals(range, "week", StringComparison.OrdinalIgnoreCase) switch
+        var requestedWindow = string.Equals(range, "week", StringComparison.OrdinalIgnoreCase) switch
         {
             true => (now.AddDays(-7), now),
             _ when string.Equals(range, "month", StringComparison.OrdinalIgnoreCase) => (now.AddMonths(-1), now),
+            _ when string.Equals(range, "all", StringComparison.OrdinalIgnoreCase) => (now.AddDays(-StationResultQueryBudget.DefaultWindowDays), now),
             _ => (todayUtc, now)
         };
+        return StationResultQueryBudget.Normalize(requestedWindow.Item1, requestedWindow.Item2, now);
     }
+
+    private static IResult StationBudgetViolation(StationResultQueryBudgetException exception) =>
+        Results.BadRequest(new
+        {
+            error = exception.ErrorCode,
+            message = exception.Message,
+            maximumWindowDays = StationResultQueryBudget.MaximumWindowDays
+        });
 
     private static bool TryNormalizePayloadJson(string? payloadJson, out string normalizedPayloadJson, out string? error)
     {

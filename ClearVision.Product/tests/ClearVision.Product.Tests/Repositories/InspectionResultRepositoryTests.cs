@@ -1,5 +1,6 @@
 using ClearVision.Product.Core.Entities;
 using ClearVision.Product.Core.Enums;
+using ClearVision.Product.Core.Interfaces;
 using ClearVision.Product.Core.Outcomes;
 using ClearVision.Product.Infrastructure.Data;
 using ClearVision.Product.Infrastructure.Repositories;
@@ -86,6 +87,49 @@ public sealed class InspectionResultRepositoryTests
             stats.TimedOutCount.Should().Be(1);
             stats.ExecutionFailureCount.Should().Be(2);
             stats.DecisionCoverageRate.Should().Be(0.6);
+        }
+        finally
+        {
+            DeleteDirectoryIfExists(root);
+        }
+    }
+
+    [Fact]
+    public async Task GetAnalysisSamplesAsync_ShouldProjectOnlyBoundedRowsPlusOne()
+    {
+        var root = CreateTempPath();
+        try
+        {
+            await using var db = CreateContext(root);
+            await db.Database.EnsureCreatedAsync();
+            var repository = new InspectionResultRepository(db);
+            var projectId = Guid.NewGuid();
+            var start = new DateTime(2026, 8, 1, 8, 0, 0, DateTimeKind.Utc);
+            var results = Enumerable.Range(0, 5)
+                .Select(index =>
+                {
+                    var result = CreateResult(projectId, InspectionStatus.NG, 20 + index);
+                    result.SetOutputImage(Enumerable.Repeat((byte)(index + 1), 4096).ToArray());
+                    result.SetOutputDataJson($"{{\"payload\":\"{new string('x', 2048)}\"}}");
+                    result.RestorePersistenceMetadata(
+                        Guid.NewGuid(),
+                        start.AddMinutes(index),
+                        start.AddMinutes(index),
+                        null);
+                    return result;
+                })
+                .ToList();
+            await repository.AddRangeAsync(results);
+            db.ChangeTracker.Clear();
+
+            var samples = await repository.GetAnalysisSamplesAsync(
+                new InspectionAnalysisQuery(projectId, start, start.AddHours(1), null, null),
+                maxRows: 2);
+
+            samples.Should().HaveCount(3, "the repository must return only the budget sentinel row");
+            samples.Select(sample => sample.InspectionTime)
+                .Should().BeInAscendingOrder();
+            samples.Should().OnlyContain(sample => sample.DefectCount == 0);
         }
         finally
         {

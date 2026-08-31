@@ -3,6 +3,7 @@
 // 将流程文本结果按格式写入文件系统
 // 作者：蘅芜君
 using System.Text;
+using ClearVision.Product.Application.Exports;
 using System.Text.Json;
 using ClearVision.Product.Core.Attributes;
 using ClearVision.Product.Core.Entities;
@@ -19,7 +20,7 @@ namespace ClearVision.Product.Infrastructure.Operators;
     CategoryId = OperatorCategoryId.OutputAndAuxiliary,
     IconName = "save-text",
     Keywords = new[] { "save text", "export csv", "log", "json export" },
-    Version = "1.0.1"
+    Version = "1.0.2"
 )]
 [OperatorParameterRule("FilePath", RequiredPolicy = OperatorParameterRequiredPolicy.Required, ResourceKind = OperatorResourceKind.OutputFile, ReasonCode = "TEXT_SAVE_FILE_PATH_REQUIRED")]
 [InputPort("Data", "Data", PortDataType.Any, IsRequired = false)]
@@ -172,13 +173,7 @@ public class TextSaveOperator : OperatorBase
 
     private static string ToCsvCell(object? value)
     {
-        var text = value?.ToString() ?? string.Empty;
-        if (text.Contains(',') || text.Contains('"') || text.Contains('\n') || text.Contains('\r'))
-        {
-            return $"\"{text.Replace("\"", "\"\"", StringComparison.Ordinal)}\"";
-        }
-
-        return text;
+        return CsvSanitizer.FormatField(value);
     }
 
     private static Encoding ResolveEncoding(string encodingName)

@@ -482,6 +482,8 @@ public class InspectionService : IInspectionService
             "[InspectionService] 请求启动实时检测: ProjectId={ProjectId}, SessionId={SessionId}, CameraId={CameraId}",
             projectId, sessionId, effectiveCameraId ?? "(流程内)");
 
+        _imagePersistenceService?.EnsureProductionStartAllowed();
+
         // 步骤 1：注册会话（Coordinator 保证原子性）
         var startResult = await _coordinator.TryStartAsync(snapshot, sessionId, cancellationToken);
 
@@ -789,6 +791,7 @@ public class InspectionService : IInspectionService
     {
         var projectId = snapshot.ProjectId;
         var sessionId = snapshot.SessionId;
+        _imagePersistenceService?.EnsureProductionStartAllowed();
         var startResult = await _coordinator.TryStartAsync(snapshot, sessionId, cancellationToken);
         if (startResult != StartResult.Success)
         {
@@ -909,26 +912,7 @@ public class InspectionService : IInspectionService
                 result.SetOutputImage(inspectionImage);
             }
 
-            if (flowResult.OutputData?.TryGetValue("Defects", out var defectsObj) == true
-                && defectsObj is IList defectsList)
-            {
-                foreach (var item in defectsList)
-                {
-                    if (item is Dictionary<string, object> defectDict)
-                    {
-                        var defect = new Defect(
-                            result.Id,
-                            DefectType.Other,
-                            Convert.ToDouble(defectDict.GetValueOrDefault("X", 0.0)),
-                            Convert.ToDouble(defectDict.GetValueOrDefault("Y", 0.0)),
-                            Convert.ToDouble(defectDict.GetValueOrDefault("Width", 0.0)),
-                            Convert.ToDouble(defectDict.GetValueOrDefault("Height", 0.0)),
-                            Convert.ToDouble(defectDict.GetValueOrDefault("Confidence", 0.0)),
-                            defectDict.GetValueOrDefault("ClassName", "unknown")?.ToString() ?? "unknown");
-                        result.AddDefect(defect);
-                    }
-                }
-            }
+            AppendCanonicalDefects(result, flowResult.OutputData);
 
             var analysisData = _analysisDataBuilder.Build(actualFlow, flowResult, status);
             var outputPayload = EnsureTraceabilityPayload(flowResult.OutputData, result);
@@ -953,6 +937,35 @@ public class InspectionService : IInspectionService
             await _resultRepository.AddAsync(InspectionResultPersistenceSnapshot.WithoutOutputImage(result));
             await CaptureEvidenceManifestAsync(result, cancellationToken);
             return result;
+        }
+    }
+
+    private static void AppendCanonicalDefects(
+        InspectionResult result,
+        IReadOnlyDictionary<string, object>? outputData)
+    {
+        if (!DetectionResultAdapter.TryExtractFromOutput(outputData, out var detections, out var hasDetectionPayload))
+        {
+            if (hasDetectionPayload)
+            {
+                throw new InvalidOperationException(
+                    "DETECTION_OUTPUT_MALFORMED: The operator emitted an invalid detection payload.");
+            }
+
+            return;
+        }
+
+        foreach (var detection in detections)
+        {
+            result.AddDefect(new Defect(
+                result.Id,
+                DefectType.Other,
+                detection.X,
+                detection.Y,
+                detection.Width,
+                detection.Height,
+                detection.Confidence,
+                string.IsNullOrWhiteSpace(detection.Label) ? "unknown" : detection.Label));
         }
     }
 

@@ -8,7 +8,7 @@
 | 分类 ID (CategoryId) | `OutputAndAuxiliary` |
 | 分类 (Category) | 输出与辅助 |
 | 分类顺序 (CategoryOrder) | 14 |
-| 版本 (Version) | `1.0.1` |
+| 版本 (Version) | `1.0.2` |
 | 生命周期 (Lifecycle) | 稳定 `Stable` |
 | 生命周期说明 (Lifecycle Note) | - |
 | 默认隐藏 (Default Hidden) | No |
@@ -23,7 +23,7 @@
 
 ## 算法原理 / Algorithm Principle
 该算子用于汇总检测结果并输出，支持 JSON/CSV/Text 格式，可选保存到文件。运行时从声明输入端口读取数据，按参数表解析配置，并把处理结果写入输出字典。
-源码中包含外部资源访问逻辑，执行结果会受文件系统、网络、PLC、串口或外部服务状态影响。
+处理过程遵循统一算子框架：输入检查、参数解析、核心计算、输出封装和可选参数校验分层完成。
 
 ## 实现策略 / Implementation Strategy
 - 输入端口均为可选或该算子不依赖外部输入，执行时会优先读取可用输入并使用参数默认值兜底。
@@ -35,10 +35,6 @@
 
 ## 核心 API 调用链 / Core API Call Chain
 - `OperatorBase.Get*Param(...)`
-- `Path.Combine`
-- `Path.GetTempPath`
-- `Directory.CreateDirectory`
-- `File.WriteAllText`
 - `JsonSerializer.Serialize`
 - `Math.Min`
 - `ImageWrapper`
@@ -93,7 +89,7 @@
 | - | - | - |
 
 ## 生成依赖 / Generation Dependencies
-- 组合指纹 (Generation Fingerprint)：`0B158C24D2FFDD41D1EC343609E1F4FF10D6A344C2EC70F464D69E88CC4C9D15`
+- 组合指纹 (Generation Fingerprint)：`D090637C95E00274567686C42336670F2A13050660A511889E418B6E7E3716C6`
 - 显式共享依赖：无；指纹由最终运行时元数据与算子源码组成。
 
 ### 运行时附加输出 / Runtime Additional Outputs
@@ -108,9 +104,9 @@
 ## 性能特征 / Performance
 | 指标 (Metric) | 值 (Value) |
 |------|------|
-| 时间复杂度 (Time Complexity) | 主要受外部 I/O、网络或设备响应时间影响；本地处理通常随输入规模线性增长。 |
-| 典型耗时 (Typical Latency) | 未固定；取决于文件系统、网络、PLC/串口设备或外部服务响应。 |
-| 内存特征 (Memory Profile) | 主要由请求/响应缓冲、序列化数据和外部资源句柄占用决定。 |
+| 时间复杂度 (Time Complexity) | 多数图像路径近似 `O(W*H)`；涉及轮廓、匹配或排序时会叠加候选数量相关开销。 |
+| 典型耗时 (Typical Latency) | 未固定；一般由输入数据规模和运行时调度开销决定。 |
+| 内存特征 (Memory Profile) | 主要由输出字典、集合和少量中间对象决定。 |
 
 ## 证据与失败契约 / Evidence & Failure Contracts
 - 单元/契约测试：已在 `ClearVision.Product/tests/ClearVision.Product.Tests/Operators` 中发现对应测试入口。
@@ -118,15 +114,14 @@
 - 参数失败契约：源码包含 `ValidateParameters`，非法参数会被明确拦截或返回错误说明。
 
 ## 适用场景 / Use Cases
-- 适合 (Suitable)：需要把视觉流程与文件、HTTP、数据库、PLC、MQTT 或串口等外部系统连接的场景。
-- 不适合 (Not Suitable)：外部设备、路径、网络或权限不可控，且流程不能容忍 I/O 超时或失败的场景。
+- 适合 (Suitable)：输入图像质量稳定、参数范围明确，需要在流程中完成图像处理、定位、测量或可视化输出的场景。
+- 不适合 (Not Suitable)：上游输入字段不稳定、参数缺少验收范围或下游依赖未声明输出字段的场景。
 
 ## 已知限制 / Known Limitations
 1. 参数范围和枚举项来自当前元数据；旧流程若保存了过期参数值，加载后需要重新校验。
 2. 运行时附加输出字段来自源码输出字典，部分字段未声明为可连线端口，下游稳定连线应优先使用输出端口表。
-3. 外部文件、网络、PLC、数据库或消息系统不可用时，算子结果会受环境状态影响。
 
 ## 变更记录 / Changelog
 | 版本 (Version) | 日期 (Date) | 变更内容 (Changes) |
 |------|------|----------|
-| 1.0.1 | 2026-08-31 | 按当前最终运行时元数据、条件契约和显式依赖口径重生成 / Regenerated from effective runtime metadata and declared dependencies |
+| 1.0.2 | 2026-08-31 | 按当前最终运行时元数据、条件契约和显式依赖口径重生成 / Regenerated from effective runtime metadata and declared dependencies |

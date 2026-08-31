@@ -83,6 +83,8 @@ if ($LASTEXITCODE -ne 0) {
     throw "Studio publish failed with exit code $LASTEXITCODE"
 }
 
+& (Join-Path $repoRoot "scripts\Test-ReleasePublishHygiene.ps1") -PublishDirectory $studioStaging
+
 # Archive Studio
 $studioZipPath = Join-Path $publishDir $studioZipName
 Write-Host "  Archiving Studio to $studioZipName..." -ForegroundColor Gray
@@ -109,6 +111,8 @@ $stationProject = Join-Path $repoRoot "ClearVision.Product\src\ClearVision.Produ
 if ($LASTEXITCODE -ne 0) {
     throw "Station publish failed with exit code $LASTEXITCODE"
 }
+
+& (Join-Path $repoRoot "scripts\Test-ReleasePublishHygiene.ps1") -PublishDirectory $stationStaging
 
 # Archive Station
 $stationZipPath = Join-Path $publishDir $stationZipName

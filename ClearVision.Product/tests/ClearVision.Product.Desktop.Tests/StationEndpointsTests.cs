@@ -367,7 +367,55 @@ public sealed class StationEndpointsTests
         filtered.Items.Should().ContainSingle(item =>
             item.StationId == "station-a" &&
             item.Outcome == RuntimeRunOutcome.Ng &&
-            item.DiagnosticCode == "WIRE_SWAP");
+                item.DiagnosticCode == "WIRE_SWAP");
+    }
+
+    [Theory]
+    [InlineData("/api/stations/results?from=2026-08-02T00:00:00Z&to=2026-08-01T00:00:00Z", "STATION_TIME_RANGE_INVALID")]
+    [InlineData("/api/stations/results?from=2026-07-01T00:00:00Z&to=2026-08-02T00:00:00Z", "STATION_TIME_RANGE_LIMIT")]
+    [InlineData("/api/stations/statistics?from=2026-08-02T00:00:00Z&to=2026-08-01T00:00:00Z", "STATION_TIME_RANGE_INVALID")]
+    [InlineData("/api/stations/statistics?from=2026-07-01T00:00:00Z&to=2026-08-02T00:00:00Z", "STATION_TIME_RANGE_LIMIT")]
+    public async Task ResultMonitoringEndpoints_WhenTimeBudgetIsInvalid_ShouldReturnStableBadRequest(
+        string path,
+        string expectedError)
+    {
+        await using var host = await StationEndpointTestHost.CreateAsync();
+
+        using var response = await host.Client.GetAsync(path);
+
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        document.RootElement.GetProperty("error").GetString().Should().Be(expectedError);
+        document.RootElement.GetProperty("maximumWindowDays").GetInt32()
+            .Should().Be(StationResultQueryBudget.MaximumWindowDays);
+    }
+
+    [Fact]
+    public async Task ResultsEndpoint_ShouldClampLargeRequestedPageSize()
+    {
+        await using var host = await StationEndpointTestHost.CreateAsync();
+        const int total = 520;
+        for (var index = 0; index < total; index++)
+        {
+            var stationId = $"station-{index / 20:D2}";
+            var connectionId = $"conn-{stationId}";
+            if (index % 20 == 0)
+            {
+                host.Registry.UpsertRegistration(connectionId, BuildRegistration(stationId));
+            }
+
+            host.Registry.UpsertResultSummary(
+                connectionId,
+                BuildResult(stationId, (index % 20) + 1, RuntimeRunOutcome.Ng, "BUDGET_TEST", -1));
+        }
+
+        var page = await host.Client.GetFromJsonAsync<StationResultsPageViewModel>(
+            "/api/stations/results?pageIndex=0&pageSize=50000");
+
+        page.Should().NotBeNull();
+        page!.PageSize.Should().Be(500);
+        page.Items.Should().HaveCount(500);
+        page.TotalCount.Should().Be(total);
     }
 
     [Fact]

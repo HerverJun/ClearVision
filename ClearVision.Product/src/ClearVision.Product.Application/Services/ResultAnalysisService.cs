@@ -4,6 +4,7 @@
 
 using System.Globalization;
 using ClearVision.Product.Application.DTOs;
+using ClearVision.Product.Application.Exports;
 using ClearVision.Product.Core.Entities;
 using ClearVision.Product.Core.Enums;
 using ClearVision.Product.Core.Interfaces;
@@ -79,211 +80,89 @@ public class ResultAnalysisService : IResultAnalysisService
     /// <inheritdoc />
     public async Task<InspectionStatisticsDto> GetStatisticsAsync(Guid projectId, DateTime? startTime = null, DateTime? endTime = null, string? status = null, string? defectType = null)
     {
+        var window = NormalizeWindow(startTime, endTime);
         if (!await IsActiveProjectAsync(projectId))
         {
-            return EmptyStatistics(projectId, startTime, endTime);
+            return EmptyStatistics(projectId, window.StartTime, window.EndTime);
         }
 
-        var statistics = await _resultRepository.GetStatisticsAsync(projectId, startTime, endTime, status, defectType);
-        var distribution = await _resultRepository.GetDefectDistributionAsync(projectId, startTime, endTime, status, defectType);
-
-        return new InspectionStatisticsDto
-        {
-            ProjectId = projectId,
-            StartTime = startTime,
-            EndTime = endTime,
-            TotalCount = statistics.TotalCount,
-            OKCount = statistics.OKCount,
-            NGCount = statistics.NGCount,
-            ErrorCount = statistics.ErrorCount,
-            OKRate = statistics.OKRate,
-            YieldRate = statistics.YieldRate,
-            ExecutionSucceededCount = statistics.ExecutionSucceededCount,
-            ValidDecisionCount = statistics.ValidDecisionCount,
-            DecisionCoverageRate = statistics.DecisionCoverageRate,
-            ExecutionFailureCount = statistics.ExecutionFailureCount,
-            UndeterminedCount = statistics.UndeterminedCount,
-            NotApplicableCount = statistics.NotApplicableCount,
-            InvalidCount = statistics.InvalidCount,
-            FailedCount = statistics.FailedCount,
-            CancelledCount = statistics.CancelledCount,
-            TimedOutCount = statistics.TimedOutCount,
-            SkippedCount = statistics.SkippedCount,
-            NGRate = statistics.ValidDecisionCount > 0 ? (double)statistics.NGCount / statistics.ValidDecisionCount : 0,
-            ErrorRate = statistics.TotalCount > 0 ? (double)statistics.ErrorCount / statistics.TotalCount : 0,
-            AverageProcessingTimeMs = statistics.AverageProcessingTimeMs,
-            TotalDefects = distribution.Values.Sum()
-        };
+        var (statistics, _) = await GetStatisticsAndDistributionAsync(projectId, window, status, defectType);
+        return statistics;
     }
 
     /// <inheritdoc />
     public async Task<DefectDistributionDto> GetDefectDistributionAsync(Guid projectId, DateTime? startTime = null, DateTime? endTime = null, string? status = null, string? defectType = null)
     {
+        var window = NormalizeWindow(startTime, endTime);
         if (!await IsActiveProjectAsync(projectId))
         {
-            return EmptyDefectDistribution(projectId, startTime, endTime);
+            return EmptyDefectDistribution(projectId, window.StartTime, window.EndTime);
         }
 
-        var distribution = await _resultRepository.GetDefectDistributionAsync(projectId, startTime, endTime, status, defectType);
-        var total = distribution.Values.Sum();
-
-        var items = distribution.Select(d => new DefectDistributionItemDto
-        {
-            DefectType = d.Key.ToString(),
-            Count = d.Value,
-            Percentage = total > 0 ? (double)d.Value / total * 100 : 0
-        }).OrderByDescending(i => i.Count).ToList();
-
-        return new DefectDistributionDto
-        {
-            ProjectId = projectId,
-            StartTime = startTime,
-            EndTime = endTime,
-            TotalDefects = total,
-            Items = items
-        };
+        var distribution = await _resultRepository.GetDefectDistributionAsync(
+            projectId,
+            window.StartTime,
+            window.EndTime,
+            status,
+            defectType);
+        return MapDefectDistribution(projectId, window, distribution);
     }
 
     /// <inheritdoc />
     public async Task<ConfidenceDistributionDto> GetConfidenceDistributionAsync(Guid projectId, DateTime? startTime = null, DateTime? endTime = null, string? status = null, string? defectType = null)
     {
+        var window = NormalizeWindow(startTime, endTime);
         if (!await IsActiveProjectAsync(projectId))
         {
-            return EmptyConfidenceDistribution(projectId, startTime, endTime);
+            return EmptyConfidenceDistribution(projectId, window.StartTime, window.EndTime);
         }
 
-        var results = await _resultRepository.GetByTimeRangeAsync(projectId, startTime ?? DateTime.MinValue, endTime ?? DateTime.MaxValue, status, defectType);
-
-        // 按时间筛选
-        var filtered = results.Where(r =>
-            (!startTime.HasValue || r.InspectionTime >= startTime.Value) &&
-            (!endTime.HasValue || r.InspectionTime <= endTime.Value));
-
-        var allDefects = filtered.SelectMany(r => r.Defects).ToList();
-
-        // 分桶统计
-        var buckets = new Dictionary<string, int>
-        {
-            { "90-100%", 0 },
-            { "80-90%", 0 },
-            { "70-80%", 0 },
-            { "60-70%", 0 },
-            { "50-60%", 0 },
-            { "<50%", 0 }
-        };
-
-        foreach (var defect in allDefects)
-        {
-            var score = defect.ConfidenceScore * 100;
-            switch (score)
-            {
-                case >= 90:
-                    buckets["90-100%"]++;
-                    break;
-                case >= 80:
-                    buckets["80-90%"]++;
-                    break;
-                case >= 70:
-                    buckets["70-80%"]++;
-                    break;
-                case >= 60:
-                    buckets["60-70%"]++;
-                    break;
-                case >= 50:
-                    buckets["50-60%"]++;
-                    break;
-                default:
-                    buckets["<50%"]++;
-                    break;
-            }
-        }
-
-        var total = allDefects.Count;
-
-        return new ConfidenceDistributionDto
-        {
-            ProjectId = projectId,
-            StartTime = startTime,
-            EndTime = endTime,
-            TotalDefects = total,
-            Buckets = buckets.Select(b => new ConfidenceBucketDto
-            {
-                Range = b.Key,
-                Count = b.Value,
-                Percentage = total > 0 ? (double)b.Value / total * 100 : 0
-            }).ToList(),
-            AverageConfidence = allDefects.Any() ? allDefects.Average(d => d.ConfidenceScore) : 0
-        };
+        return await GetConfidenceDistributionCoreAsync(projectId, window, status, defectType);
     }
 
     /// <inheritdoc />
     public async Task<TrendAnalysisDto> GetTrendAnalysisAsync(Guid projectId, TrendInterval interval, DateTime startTime, DateTime endTime, string? status = null, string? defectType = null)
     {
+        var window = ResultAnalysisQueryBudget.Validate(startTime, endTime);
+        var bucketStarts = ResultAnalysisQueryBudget.BuildTrendBuckets(interval, window.StartTime, window.EndTime);
         if (!await IsActiveProjectAsync(projectId))
         {
-            return EmptyTrend(projectId, interval, startTime, endTime);
+            return EmptyTrend(projectId, interval, window.StartTime, window.EndTime);
         }
 
-        var results = await _resultRepository.GetByTimeRangeAsync(projectId, startTime, endTime, status, defectType);
-        var resultList = results.ToList();
-
-        var dataPoints = new List<TrendDataPointDto>();
-
-        if (!resultList.Any())
+        var query = CreateAnalysisQuery(projectId, window, status, defectType);
+        var samples = await GetBoundedAnalysisSamplesAsync(query);
+        if (samples.Count == 0)
         {
             return new TrendAnalysisDto
             {
                 ProjectId = projectId,
                 Interval = interval.ToString(),
-                StartTime = startTime,
-                EndTime = endTime,
-                DataPoints = dataPoints
+                StartTime = window.StartTime,
+                EndTime = window.EndTime
             };
         }
 
-        // 按时间间隔分组
-        var current = startTime;
-        while (current < endTime)
+        var accumulators = bucketStarts.Select(_ => new TrendBucketAccumulator()).ToArray();
+
+        foreach (var sample in samples)
         {
-            var next = interval switch
+            var bucketIndex = FindBucketIndex(bucketStarts, sample.InspectionTime);
+            if (bucketIndex >= 0)
             {
-                TrendInterval.Hour => current.AddHours(1),
-                TrendInterval.Day => current.AddDays(1),
-                TrendInterval.Week => current.AddDays(7),
-                TrendInterval.Month => current.AddMonths(1),
-                _ => current.AddDays(1)
-            };
-
-            var periodResults = resultList.Where(r => r.InspectionTime >= current && r.InspectionTime < next).ToList();
-            var periodStatistics = InspectionOutcomeStatistics.Calculate(periodResults.Select(r => r.GetOutcome()));
-
-            dataPoints.Add(new TrendDataPointDto
-            {
-                Timestamp = current,
-                TotalCount = periodResults.Count,
-                OKCount = periodStatistics.OkCount,
-                NGCount = periodStatistics.NgCount,
-                ErrorCount = periodStatistics.ExecutionFailureCount + periodStatistics.InvalidCount,
-                OKRate = periodStatistics.YieldRate,
-                YieldRate = periodStatistics.YieldRate,
-                ValidDecisionCount = periodStatistics.ValidDecisionCount,
-                ExecutionFailureCount = periodStatistics.ExecutionFailureCount,
-                UndeterminedCount = periodStatistics.UndeterminedCount,
-                InvalidCount = periodStatistics.InvalidCount,
-                DefectCount = periodResults.Sum(r => r.Defects.Count),
-                AverageProcessingTime = periodResults.Any() ? periodResults.Average(r => r.ProcessingTimeMs) : 0
-            });
-
-            current = next;
+                accumulators[bucketIndex].Add(sample);
+            }
         }
 
         return new TrendAnalysisDto
         {
             ProjectId = projectId,
             Interval = interval.ToString(),
-            StartTime = startTime,
-            EndTime = endTime,
-            DataPoints = dataPoints
+            StartTime = window.StartTime,
+            EndTime = window.EndTime,
+            DataPoints = bucketStarts
+                .Select((bucketStart, index) => accumulators[index].ToDataPoint(bucketStart))
+                .ToList()
         };
     }
 
@@ -298,12 +177,12 @@ public class ResultAnalysisService : IResultAnalysisService
         var results = await _resultRepository.GetByTimeRangeAsync(projectId, startTime ?? DateTime.MinValue, endTime ?? DateTime.MaxValue, status, defectType);
 
         var csv = new System.Text.StringBuilder();
-        csv.AppendLine(ToCsvRow("检测ID", "工程ID", "检测时间", "兼容状态", "执行结果", "判定结果", "CanonicalOutcome", "原因码", "处理时间(ms)", "置信度", "缺陷数量", "错误信息", "缺陷类型", "X", "Y", "Width", "Height", "缺陷置信度", "缺陷描述"));
+        csv.AppendLine(CsvSanitizer.ToCsvRow("检测ID", "工程ID", "检测时间", "兼容状态", "执行结果", "判定结果", "CanonicalOutcome", "原因码", "处理时间(ms)", "置信度", "缺陷数量", "错误信息", "缺陷类型", "X", "Y", "Width", "Height", "缺陷置信度", "缺陷描述"));
 
         foreach (var result in results)
         {
             var outcome = result.GetOutcome();
-            csv.AppendLine(ToCsvRow(
+            csv.AppendLine(CsvSanitizer.ToCsvRow(
                 result.Id,
                 result.ProjectId,
                 result.InspectionTime.ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture),
@@ -326,7 +205,7 @@ public class ResultAnalysisService : IResultAnalysisService
 
             foreach (var defect in result.Defects)
             {
-                csv.AppendLine(ToCsvRow(
+                csv.AppendLine(CsvSanitizer.ToCsvRow(
                     null,
                     null,
                     null,
@@ -350,38 +229,6 @@ public class ResultAnalysisService : IResultAnalysisService
         }
 
         return csv.ToString();
-    }
-
-    private static string ToCsvRow(params object?[] fields)
-    {
-        return string.Join(",", fields.Select(FormatCsvField));
-    }
-
-    private static string FormatCsvField(object? value)
-    {
-        var text = value switch
-        {
-            null => string.Empty,
-            IFormattable formattable => formattable.ToString(null, CultureInfo.InvariantCulture),
-            _ => value.ToString() ?? string.Empty
-        };
-
-        if (text.Length > 0 && IsFormulaPrefix(text[0]))
-        {
-            text = "'" + text;
-        }
-
-        if (text.Contains(',') || text.Contains('"') || text.Contains('\r') || text.Contains('\n'))
-        {
-            return $"\"{text.Replace("\"", "\"\"")}\"";
-        }
-
-        return text;
-    }
-
-    private static bool IsFormulaPrefix(char value)
-    {
-        return value is '=' or '+' or '-' or '@';
     }
 
     /// <inheritdoc />
@@ -440,19 +287,27 @@ public class ResultAnalysisService : IResultAnalysisService
     /// <inheritdoc />
     public async Task<InspectionReportDto> GenerateReportAsync(Guid projectId, DateTime? startTime = null, DateTime? endTime = null, string? status = null, string? defectType = null)
     {
+        var window = NormalizeWindow(startTime, endTime);
         if (!await IsActiveProjectAsync(projectId))
         {
-            return EmptyReport(projectId, startTime, endTime);
+            return EmptyReport(projectId, window.StartTime, window.EndTime);
         }
 
-        var statistics = await GetStatisticsAsync(projectId, startTime, endTime, status, defectType);
-        var defectDistribution = await GetDefectDistributionAsync(projectId, startTime, endTime, status, defectType);
-        var confidenceDistribution = await GetConfidenceDistributionAsync(projectId, startTime, endTime, status, defectType);
+        // Reuse the same two aggregates for summary and distribution. This prevents a
+        // report from issuing a second full defect query after statistics has run.
+        var (statistics, defectDistribution) = await GetStatisticsAndDistributionAsync(projectId, window, status, defectType);
+        var confidenceDistribution = await GetConfidenceDistributionCoreAsync(projectId, window, status, defectType);
 
-        // 获取最近24小时的趋势（按小时）
-        var now = DateTime.UtcNow;
-        var yesterday = now.AddDays(-1);
-        var hourlyTrend = await GetTrendAnalysisAsync(projectId, TrendInterval.Hour, yesterday > (startTime ?? DateTime.MinValue) ? yesterday : startTime ?? DateTime.MinValue, now, status, defectType);
+        var hourlyStart = window.EndTime.AddHours(-24) > window.StartTime
+            ? window.EndTime.AddHours(-24)
+            : window.StartTime;
+        var hourlyTrend = await GetTrendAnalysisAsync(
+            projectId,
+            TrendInterval.Hour,
+            hourlyStart,
+            window.EndTime,
+            status,
+            defectType);
 
         return new InspectionReportDto
         {
@@ -460,8 +315,8 @@ public class ResultAnalysisService : IResultAnalysisService
             GeneratedAt = DateTime.UtcNow,
             Period = new ReportPeriodDto
             {
-                StartTime = startTime,
-                EndTime = endTime
+                StartTime = window.StartTime,
+                EndTime = window.EndTime
             },
             Summary = statistics,
             DefectDistribution = defectDistribution,
@@ -618,6 +473,326 @@ public class ResultAnalysisService : IResultAnalysisService
     }
 
     #region Private Methods
+
+    private static ResultAnalysisWindow NormalizeWindow(DateTime? startTime, DateTime? endTime) =>
+        ResultAnalysisQueryBudget.Normalize(startTime, endTime, DateTime.UtcNow);
+
+    private async Task<(InspectionStatisticsDto Statistics, DefectDistributionDto Distribution)> GetStatisticsAndDistributionAsync(
+        Guid projectId,
+        ResultAnalysisWindow window,
+        string? status,
+        string? defectType)
+    {
+        // The repository uses separate compact DB aggregates; run them serially because
+        // both operations share the request-scoped DbContext.
+        var statistics = await _resultRepository.GetStatisticsAsync(
+            projectId,
+            window.StartTime,
+            window.EndTime,
+            status,
+            defectType);
+        var distribution = await _resultRepository.GetDefectDistributionAsync(
+            projectId,
+            window.StartTime,
+            window.EndTime,
+            status,
+            defectType);
+        var distributionDto = MapDefectDistribution(projectId, window, distribution);
+
+        return (new InspectionStatisticsDto
+        {
+            ProjectId = projectId,
+            StartTime = window.StartTime,
+            EndTime = window.EndTime,
+            TotalCount = statistics.TotalCount,
+            OKCount = statistics.OKCount,
+            NGCount = statistics.NGCount,
+            ErrorCount = statistics.ErrorCount,
+            OKRate = statistics.OKRate,
+            YieldRate = statistics.YieldRate,
+            ExecutionSucceededCount = statistics.ExecutionSucceededCount,
+            ValidDecisionCount = statistics.ValidDecisionCount,
+            DecisionCoverageRate = statistics.DecisionCoverageRate,
+            ExecutionFailureCount = statistics.ExecutionFailureCount,
+            UndeterminedCount = statistics.UndeterminedCount,
+            NotApplicableCount = statistics.NotApplicableCount,
+            InvalidCount = statistics.InvalidCount,
+            FailedCount = statistics.FailedCount,
+            CancelledCount = statistics.CancelledCount,
+            TimedOutCount = statistics.TimedOutCount,
+            SkippedCount = statistics.SkippedCount,
+            NGRate = statistics.ValidDecisionCount > 0 ? (double)statistics.NGCount / statistics.ValidDecisionCount : 0,
+            ErrorRate = statistics.TotalCount > 0 ? (double)statistics.ErrorCount / statistics.TotalCount : 0,
+            AverageProcessingTimeMs = statistics.AverageProcessingTimeMs,
+            TotalDefects = distributionDto.TotalDefects
+        }, distributionDto);
+    }
+
+    private async Task<ConfidenceDistributionDto> GetConfidenceDistributionCoreAsync(
+        Guid projectId,
+        ResultAnalysisWindow window,
+        string? status,
+        string? defectType)
+    {
+        var query = CreateAnalysisQuery(projectId, window, status, defectType);
+        if (_resultRepository is IInspectionResultAnalysisRepository analysisRepository)
+        {
+            return MapConfidenceDistribution(
+                projectId,
+                window,
+                await analysisRepository.GetConfidenceSummaryAsync(query));
+        }
+
+        // Compatibility for narrow test doubles and third-party repository implementations.
+        // Built-in production storage takes the aggregate path above.
+        var results = await _resultRepository.GetByTimeRangeAsync(
+            projectId,
+            window.StartTime,
+            window.EndTime,
+            status,
+            defectType);
+        var defects = results
+            .SelectMany(result => result.Defects)
+            .Take(ResultAnalysisQueryBudget.MaximumTrendRows + 1)
+            .ToList();
+        if (defects.Count > ResultAnalysisQueryBudget.MaximumTrendRows)
+        {
+            throw new ResultAnalysisBudgetException(
+                "ANALYSIS_QUERY_ROW_LIMIT",
+                $"Analysis requests may scan at most {ResultAnalysisQueryBudget.MaximumTrendRows} result rows.");
+        }
+
+        return MapConfidenceDistribution(projectId, window, BuildConfidenceSummary(defects));
+    }
+
+    private async Task<IReadOnlyList<InspectionAnalysisSample>> GetBoundedAnalysisSamplesAsync(InspectionAnalysisQuery query)
+    {
+        IReadOnlyList<InspectionAnalysisSample> samples;
+        if (_resultRepository is IInspectionResultAnalysisRepository analysisRepository)
+        {
+            samples = await analysisRepository.GetAnalysisSamplesAsync(
+                query,
+                ResultAnalysisQueryBudget.MaximumTrendRows);
+        }
+        else
+        {
+            var results = await _resultRepository.GetByTimeRangeAsync(
+                query.ProjectId,
+                query.StartTime,
+                query.EndTime,
+                query.Status,
+                query.DefectType);
+            samples = results
+                .Take(ResultAnalysisQueryBudget.MaximumTrendRows + 1)
+                .Select(result => new InspectionAnalysisSample(
+                    result.InspectionTime,
+                    result.Status,
+                    result.ExecutionOutcome,
+                    result.DecisionOutcome,
+                    result.HasJudgmentSignal,
+                    result.ProcessingTimeMs,
+                    result.Defects.Count))
+                .ToList();
+        }
+
+        if (samples.Count > ResultAnalysisQueryBudget.MaximumTrendRows)
+        {
+            throw new ResultAnalysisBudgetException(
+                "ANALYSIS_QUERY_ROW_LIMIT",
+                $"Analysis requests may scan at most {ResultAnalysisQueryBudget.MaximumTrendRows} result rows.");
+        }
+
+        return samples;
+    }
+
+    private static InspectionAnalysisQuery CreateAnalysisQuery(
+        Guid projectId,
+        ResultAnalysisWindow window,
+        string? status,
+        string? defectType) =>
+        new(projectId, window.StartTime, window.EndTime, status, defectType);
+
+    private static DefectDistributionDto MapDefectDistribution(
+        Guid projectId,
+        ResultAnalysisWindow window,
+        IReadOnlyDictionary<DefectType, int> distribution)
+    {
+        var total = distribution.Values.Sum();
+        return new DefectDistributionDto
+        {
+            ProjectId = projectId,
+            StartTime = window.StartTime,
+            EndTime = window.EndTime,
+            TotalDefects = total,
+            Items = distribution
+                .Select(item => new DefectDistributionItemDto
+                {
+                    DefectType = item.Key.ToString(),
+                    Count = item.Value,
+                    Percentage = total > 0 ? item.Value / (double)total * 100 : 0
+                })
+                .OrderByDescending(item => item.Count)
+                .ThenBy(item => item.DefectType, StringComparer.Ordinal)
+                .ToList()
+        };
+    }
+
+    private static ConfidenceDistributionDto MapConfidenceDistribution(
+        Guid projectId,
+        ResultAnalysisWindow window,
+        InspectionConfidenceSummary summary)
+    {
+        var buckets = new (string Range, int Count)[]
+        {
+            ("90-100%", summary.NinetyToOneHundred),
+            ("80-90%", summary.EightyToNinety),
+            ("70-80%", summary.SeventyToEighty),
+            ("60-70%", summary.SixtyToSeventy),
+            ("50-60%", summary.FiftyToSixty),
+            ("<50%", summary.BelowFifty)
+        };
+
+        return new ConfidenceDistributionDto
+        {
+            ProjectId = projectId,
+            StartTime = window.StartTime,
+            EndTime = window.EndTime,
+            TotalDefects = summary.TotalDefects,
+            Buckets = buckets
+                .Select(bucket => new ConfidenceBucketDto
+                {
+                    Range = bucket.Range,
+                    Count = bucket.Count,
+                    Percentage = summary.TotalDefects > 0
+                        ? bucket.Count / (double)summary.TotalDefects * 100
+                        : 0
+                })
+                .ToList(),
+            AverageConfidence = summary.AverageConfidence
+        };
+    }
+
+    private static InspectionConfidenceSummary BuildConfidenceSummary(IEnumerable<Defect> defects)
+    {
+        var counts = new int[6];
+        var total = 0;
+        var confidenceTotal = 0d;
+        foreach (var defect in defects)
+        {
+            var score = defect.ConfidenceScore;
+            var bucket = score >= 0.9d ? 0
+                : score >= 0.8d ? 1
+                : score >= 0.7d ? 2
+                : score >= 0.6d ? 3
+                : score >= 0.5d ? 4
+                : 5;
+            counts[bucket]++;
+            total++;
+            confidenceTotal += score;
+        }
+
+        return new InspectionConfidenceSummary(
+            counts[0], counts[1], counts[2], counts[3], counts[4], counts[5],
+            total,
+            total == 0 ? 0 : confidenceTotal / total);
+    }
+
+    private static int FindBucketIndex(IReadOnlyList<DateTime> bucketStarts, DateTime timestamp)
+    {
+        if (bucketStarts.Count == 0 || timestamp < bucketStarts[0])
+        {
+            return -1;
+        }
+
+        var low = 0;
+        var high = bucketStarts.Count - 1;
+        while (low <= high)
+        {
+            var middle = low + (high - low) / 2;
+            if (bucketStarts[middle] <= timestamp)
+            {
+                low = middle + 1;
+            }
+            else
+            {
+                high = middle - 1;
+            }
+        }
+
+        return high;
+    }
+
+    private sealed class TrendBucketAccumulator
+    {
+        private int _totalCount;
+        private int _executionSucceededCount;
+        private int _okCount;
+        private int _ngCount;
+        private int _undeterminedCount;
+        private int _invalidCount;
+        private int _failedCount;
+        private int _timedOutCount;
+        private int _defectCount;
+        private double _processingTimeTotal;
+
+        public void Add(InspectionAnalysisSample sample)
+        {
+            _totalCount++;
+            _defectCount += sample.DefectCount;
+            _processingTimeTotal += sample.ProcessingTimeMs;
+
+            var outcome = sample.ToOutcome();
+            if (outcome.Execution == ExecutionOutcome.Succeeded)
+            {
+                _executionSucceededCount++;
+            }
+
+            switch (InspectionOutcomeClassifier.Classify(outcome))
+            {
+                case CanonicalInspectionOutcomeKind.Ok:
+                    _okCount++;
+                    break;
+                case CanonicalInspectionOutcomeKind.Ng:
+                    _ngCount++;
+                    break;
+                case CanonicalInspectionOutcomeKind.Undetermined:
+                    _undeterminedCount++;
+                    break;
+                case CanonicalInspectionOutcomeKind.Invalid:
+                    _invalidCount++;
+                    break;
+                case CanonicalInspectionOutcomeKind.Failed:
+                    _failedCount++;
+                    break;
+                case CanonicalInspectionOutcomeKind.TimedOut:
+                    _timedOutCount++;
+                    break;
+            }
+        }
+
+        public TrendDataPointDto ToDataPoint(DateTime timestamp)
+        {
+            var validDecisionCount = _okCount + _ngCount;
+            var executionFailureCount = _failedCount + _timedOutCount;
+            var yieldRate = validDecisionCount > 0 ? _okCount / (double)validDecisionCount : 0;
+            return new TrendDataPointDto
+            {
+                Timestamp = timestamp,
+                TotalCount = _totalCount,
+                OKCount = _okCount,
+                NGCount = _ngCount,
+                ErrorCount = executionFailureCount + _invalidCount,
+                OKRate = yieldRate,
+                YieldRate = yieldRate,
+                ValidDecisionCount = validDecisionCount,
+                ExecutionFailureCount = executionFailureCount,
+                UndeterminedCount = _undeterminedCount,
+                InvalidCount = _invalidCount,
+                DefectCount = _defectCount,
+                AverageProcessingTime = _totalCount == 0 ? 0 : _processingTimeTotal / _totalCount
+            };
+        }
+    }
 
     private List<string> GenerateRecommendations(InspectionStatisticsDto statistics, DefectDistributionDto defectDistribution)
     {

@@ -139,6 +139,135 @@ public class InspectionServiceSingleRunTests
     }
 
     [Fact]
+    public async Task ExecuteSingleAsync_WithDeepLearningDetectionList_ShouldPersistCanonicalDefects()
+    {
+        var projectId = Guid.NewGuid();
+        var flowExecution = Substitute.For<IFlowExecutionService>();
+        var resultRepository = Substitute.For<IInspectionResultRepository>();
+        var projectRepository = Substitute.For<IProjectRepository>();
+        var flow = CreateDetectionRunFlow((OperatorType.DeepLearning, []));
+        var project = new Project("deep-learning-single-run");
+        project.UpdateFlow(flow);
+        projectRepository.GetByIdFreshAsync(projectId).Returns(project);
+        projectRepository.GetWithFlowAsync(projectId).Returns(project);
+        flowExecution
+            .ExecuteWithSnapshotAsync(
+                Arg.Any<ExecutionSnapshot>(),
+                Arg.Any<Dictionary<string, object>?>(),
+                Arg.Any<bool>(),
+                Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(new FlowExecutionResult
+            {
+                IsSuccess = true,
+                ExecutionTimeMs = 7,
+                OutputData = new Dictionary<string, object>
+                {
+                    ["JudgmentResult"] = "NG",
+                    ["DetectionList"] = new DetectionList(
+                    [
+                        new ClearVision.Product.Core.ValueObjects.DetectionResult("wire-swap", 0.91f, 11f, 12f, 13f, 14f)
+                    ])
+                }
+            }));
+        resultRepository.AddAsync(Arg.Any<InspectionResult>())
+            .Returns(callInfo => Task.FromResult(callInfo.Arg<InspectionResult>()));
+
+        var service = new InspectionService(
+            resultRepository,
+            projectRepository,
+            flowExecution,
+            Substitute.For<IImageAcquisitionService>(),
+            Substitute.For<IConfigurationService>(),
+            Substitute.For<IInspectionRuntimeCoordinator>(),
+            Substitute.For<IInspectionWorker>(),
+            Substitute.For<IImageCacheRepository>(),
+            new AnalysisDataBuilder(),
+            Substitute.For<IProjectFlowStorage>(),
+            NullLogger<InspectionService>.Instance);
+
+        var result = await service.ExecuteSingleAsync(
+            projectId,
+            new byte[] { 1, 2, 3 },
+            flow: null);
+
+        result.Defects.Should().ContainSingle();
+        var defect = result.Defects.Single();
+        defect.Description.Should().Be("wire-swap");
+        defect.ConfidenceScore.Should().BeApproximately(0.91, 0.0001);
+        defect.X.Should().BeApproximately(11, 0.0001);
+        await resultRepository.Received(1).AddAsync(Arg.Is<InspectionResult>(persisted =>
+            persisted.Defects.Count == 1 &&
+            persisted.Defects.Single().Description == "wire-swap"));
+    }
+
+    [Fact]
+    public async Task ExecuteSingleAsync_WithMalformedDetectionList_ShouldPersistOnlyFailClosedError()
+    {
+        var projectId = Guid.NewGuid();
+        var flowExecution = Substitute.For<IFlowExecutionService>();
+        var resultRepository = Substitute.For<IInspectionResultRepository>();
+        var projectRepository = Substitute.For<IProjectRepository>();
+        var flow = CreateDetectionRunFlow((OperatorType.DeepLearning, []));
+        var project = new Project("deep-learning-malformed-single-run");
+        project.UpdateFlow(flow);
+        projectRepository.GetByIdFreshAsync(projectId).Returns(project);
+        projectRepository.GetWithFlowAsync(projectId).Returns(project);
+        flowExecution
+            .ExecuteWithSnapshotAsync(
+                Arg.Any<ExecutionSnapshot>(),
+                Arg.Any<Dictionary<string, object>?>(),
+                Arg.Any<bool>(),
+                Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(new FlowExecutionResult
+            {
+                IsSuccess = true,
+                ExecutionTimeMs = 7,
+                OutputData = new Dictionary<string, object>
+                {
+                    ["JudgmentResult"] = "NG",
+                    ["DetectionList"] = new object[]
+                    {
+                        new Dictionary<string, object>
+                        {
+                            ["Label"] = "missing-bounds",
+                            ["Confidence"] = 0.91f,
+                            ["X"] = 11f
+                        }
+                    }
+                }
+            }));
+        resultRepository.AddAsync(Arg.Any<InspectionResult>())
+            .Returns(callInfo => Task.FromResult(callInfo.Arg<InspectionResult>()));
+
+        var service = new InspectionService(
+            resultRepository,
+            projectRepository,
+            flowExecution,
+            Substitute.For<IImageAcquisitionService>(),
+            Substitute.For<IConfigurationService>(),
+            Substitute.For<IInspectionRuntimeCoordinator>(),
+            Substitute.For<IInspectionWorker>(),
+            Substitute.For<IImageCacheRepository>(),
+            new AnalysisDataBuilder(),
+            Substitute.For<IProjectFlowStorage>(),
+            NullLogger<InspectionService>.Instance);
+
+        var result = await service.ExecuteSingleAsync(
+            projectId,
+            new byte[] { 1, 2, 3 },
+            flow: null);
+
+        result.Status.Should().Be(InspectionStatus.Error);
+        result.ErrorMessage.Should().Contain("DETECTION_OUTPUT_MALFORMED");
+        result.Defects.Should().BeEmpty();
+        await resultRepository.Received(1).AddAsync(Arg.Is<InspectionResult>(persisted =>
+            persisted.Status == InspectionStatus.Error &&
+            persisted.ErrorMessage != null &&
+            persisted.ErrorMessage.Contains("DETECTION_OUTPUT_MALFORMED") &&
+            persisted.Defects.Count == 0));
+    }
+
+    [Fact]
     public async Task ExecuteSingleAsync_WhenFinalOutputHasNoImage_ShouldUseAcquisitionInputImageForResult()
     {
         var projectId = Guid.NewGuid();

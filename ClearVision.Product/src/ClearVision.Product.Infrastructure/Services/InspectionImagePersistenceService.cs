@@ -13,14 +13,26 @@ public sealed class InspectionImagePersistenceService : IInspectionImagePersiste
 
     private readonly IConfigurationService _configurationService;
     private readonly ILogger<InspectionImagePersistenceService> _logger;
+    private readonly InspectionImageStorageGovernor _storageGovernor;
 
     public InspectionImagePersistenceService(
         IConfigurationService configurationService,
-        ILogger<InspectionImagePersistenceService> logger)
+        ILogger<InspectionImagePersistenceService> logger,
+        IInspectionStorageFreeSpaceProvider? freeSpaceProvider = null,
+        Func<DateTimeOffset>? utcNow = null)
     {
         _configurationService = configurationService;
         _logger = logger;
+        _storageGovernor = new InspectionImageStorageGovernor(freeSpaceProvider, utcNow);
     }
+
+    public void EnsureProductionStartAllowed()
+    {
+        var storage = _configurationService.GetCurrent().Storage ?? new StorageConfig();
+        _storageGovernor.EnsureProductionStartAllowed(storage);
+    }
+
+    public InspectionImageStorageHealth GetStorageHealth() => _storageGovernor.GetHealth();
 
     public async Task PersistAsync(InspectionResult result, CancellationToken cancellationToken = default)
     {
@@ -53,7 +65,15 @@ public sealed class InspectionImagePersistenceService : IInspectionImagePersiste
 
             foreach (var rootPath in InspectionImagePersistencePaths.ResolveImageSaveRoots(storage.ImageSavePath))
             {
-                var targetDir = Path.Combine(rootPath, dateFolder, statusFolder);
+                if (!_storageGovernor.TryPrepareRoot(storage, rootPath, out var managedRoot))
+                {
+                    _logger.LogWarning(
+                        "[InspectionImagePersistence] 检测图像存储根未通过 retention/free-space 治理，将尝试下一个根目录。 Root={Root}",
+                        rootPath);
+                    continue;
+                }
+
+                var targetDir = Path.Combine(managedRoot, dateFolder, statusFolder);
                 var targetPath = Path.Combine(targetDir, fileName);
                 try
                 {

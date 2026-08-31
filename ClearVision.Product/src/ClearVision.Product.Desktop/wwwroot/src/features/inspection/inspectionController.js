@@ -1302,7 +1302,7 @@ class InspectionController {
             : (Array.isArray(flowData?.Operators) ? flowData.Operators : []);
         const networkTypes = new Set([
             'HttpRequest', 'TcpCommunication', 'SerialCommunication', 'ModbusCommunication',
-            'ModbusRtuCommunication', 'SiemensS7Communication', 'MitsubishiMcCommunication',
+            'SiemensS7Communication', 'MitsubishiMcCommunication',
             'OmronFinsCommunication', 'MqttPublish', 'DatabaseWrite'
         ]);
         const deviceWriteTypes = new Set([

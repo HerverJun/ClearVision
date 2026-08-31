@@ -8,7 +8,7 @@
 | 分类 ID (CategoryId) | `OutputAndAuxiliary` |
 | 分类 (Category) | 输出与辅助 |
 | 分类顺序 (CategoryOrder) | 14 |
-| 版本 (Version) | `1.0.1` |
+| 版本 (Version) | `1.0.2` |
 | 生命周期 (Lifecycle) | 稳定 `Stable` |
 | 生命周期说明 (Lifecycle Note) | - |
 | 默认隐藏 (Default Hidden) | No |
@@ -76,7 +76,7 @@
 | - | - | - |
 
 ## 生成依赖 / Generation Dependencies
-- 组合指纹 (Generation Fingerprint)：`E7AC8C29797BF923D3698BA333C41040E7A0E18959D67F08921183C5A0FB8AC6`
+- 组合指纹 (Generation Fingerprint)：`889EAA9585719A5A277CC1B651B0E8C56BCF8103C29297D48A181EAA43A36FE6`
 - 显式共享依赖：无；指纹由最终运行时元数据与算子源码组成。
 
 ### 运行时附加输出 / Runtime Additional Outputs
@@ -106,4 +106,4 @@
 ## 变更记录 / Changelog
 | 版本 (Version) | 日期 (Date) | 变更内容 (Changes) |
 |------|------|----------|
-| 1.0.1 | 2026-08-31 | 按当前最终运行时元数据、条件契约和显式依赖口径重生成 / Regenerated from effective runtime metadata and declared dependencies |
+| 1.0.2 | 2026-08-31 | 按当前最终运行时元数据、条件契约和显式依赖口径重生成 / Regenerated from effective runtime metadata and declared dependencies |

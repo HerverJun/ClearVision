@@ -1,4 +1,5 @@
 using ClearVision.Product.Desktop.Station;
+using ClearVision.Product.Core.Outcomes;
 using ClearVision.Product.Infrastructure.Data;
 using ClearVision.Product.Runtime.Abstractions;
 using FluentAssertions;
@@ -191,6 +192,175 @@ public sealed class StationRegistryServiceTests
                 item.DiagnosticCode == "WIRE_SWAP");
             statistics.RootElement.GetProperty("totalCount").GetInt32().Should().Be(1);
             statistics.RootElement.GetProperty("ngCount").GetInt32().Should().Be(1);
+        }
+        finally
+        {
+            await provider.DisposeAsync();
+            try
+            {
+                Directory.Delete(root, recursive: true);
+            }
+            catch (IOException)
+            {
+            }
+        }
+    }
+
+    [Fact]
+    public async Task CentralStore_ShouldKeepLargeResultPagesAndStatisticsInsideDatabaseBudgets()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "ClearVisionStationCentralStoreBudgetTests", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        var dbPath = Path.Combine(root, "vision.db");
+        var provider = new ServiceCollection()
+            .AddDbContext<VisionDbContext>(options => options.UseSqlite($"Data Source={dbPath}"))
+            .BuildServiceProvider();
+
+        try
+        {
+            await using (var scope = provider.CreateAsyncScope())
+            {
+                var db = scope.ServiceProvider.GetRequiredService<VisionDbContext>();
+                await db.Database.EnsureCreatedAsync();
+                var seededAtUtc = DateTimeOffset.UtcNow;
+                db.StationResultSummaries.AddRange(Enumerable.Range(1, 550).Select(index => new StationResultSummaryEntity
+                {
+                    StationId = $"station-{index % 2}",
+                    SequenceId = index,
+                    MessageId = $"budget-{index}",
+                    RunId = $"run-{index}",
+                    PackageId = "pkg-budget",
+                    PackageName = "Budget package",
+                    PackageVersion = "1.0.0",
+                    FlowHash = "sha256:budget",
+                    ImageId = $"image-{index}",
+                    Outcome = index % 2 == 0 ? RuntimeRunOutcome.Ok.ToString() : RuntimeRunOutcome.Ng.ToString(),
+                    InspectionStatus = index % 2 == 0 ? "OK" : "NG",
+                    ExecutionOutcome = ExecutionOutcome.Succeeded.ToString(),
+                    DecisionOutcome = index % 2 == 0 ? DecisionOutcome.Ok.ToString() : DecisionOutcome.Ng.ToString(),
+                    HasJudgmentSignal = true,
+                    ExecutionTimeMs = 10 + index,
+                    DiagnosticCode = "DATABASE_BUDGET",
+                    PrimaryOutputsPreviewJson = "{}",
+                    StartedAtUtc = seededAtUtc.AddMinutes(-1),
+                    CompletedAtUtc = seededAtUtc.AddSeconds(-index),
+                    CreatedAtUtc = seededAtUtc.AddSeconds(-index),
+                    ReceivedAtUtc = seededAtUtc.AddSeconds(-index)
+                }));
+                await db.SaveChangesAsync();
+            }
+
+            var store = CreateCentralStore(provider);
+            var now = DateTimeOffset.UtcNow;
+            var page = store.GetResultsPage(
+                stationId: null,
+                fromUtc: now.AddDays(-1),
+                toUtc: now.AddMinutes(1),
+                status: null,
+                diagnosticCode: null,
+                pageIndex: 0,
+                pageSize: 50_000);
+            var statistics = store.GetStatistics(
+                now.AddDays(-1),
+                now.AddMinutes(1),
+                stationId: null,
+                status: null,
+                diagnosticCode: "DATABASE_BUDGET");
+
+            page.TotalCount.Should().Be(550);
+            page.PageSize.Should().Be(500);
+            page.Items.Should().HaveCount(500, "the database page must be bounded before materialization");
+            statistics.TotalCount.Should().Be(550);
+            statistics.ByStation.Should().HaveCount(2);
+            statistics.ByDiagnosticCode.Should().ContainSingle(item =>
+                item.DiagnosticCode == "DATABASE_BUDGET" && item.Count == 550);
+            statistics.HourlyTrend.Should().NotBeEmpty();
+            statistics.HourlyTrend.Should().HaveCountLessOrEqualTo(StationResultQueryBudget.MaximumHourlyTrendPoints);
+        }
+        finally
+        {
+            await provider.DisposeAsync();
+            try
+            {
+                Directory.Delete(root, recursive: true);
+            }
+            catch (IOException)
+            {
+            }
+        }
+    }
+
+    [Fact]
+    public async Task CentralStore_ShouldMatchLegacyAndCanonicalErrorStatusSemantics()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "ClearVisionStationCentralStoreStatusTests", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        var dbPath = Path.Combine(root, "vision.db");
+        var provider = new ServiceCollection()
+            .AddDbContext<VisionDbContext>(options => options.UseSqlite($"Data Source={dbPath}"))
+            .BuildServiceProvider();
+
+        try
+        {
+            await using (var scope = provider.CreateAsyncScope())
+            {
+                await scope.ServiceProvider.GetRequiredService<VisionDbContext>().Database.EnsureCreatedAsync();
+            }
+
+            var now = DateTimeOffset.UtcNow;
+            var store = CreateCentralStore(provider);
+            var legacyError = BuildResult(1, "station-status", "LEGACY_ERROR");
+            legacyError.Outcome = RuntimeRunOutcome.Error;
+            legacyError.CompletedAtUtc = now;
+            legacyError.StartedAtUtc = now.AddMilliseconds(-1);
+
+            var partialLegacyError = BuildResult(2, "station-status", "PARTIAL_LEGACY_ERROR");
+            partialLegacyError.Outcome = RuntimeRunOutcome.Error;
+            partialLegacyError.ExecutionOutcome = ExecutionOutcome.Succeeded;
+            partialLegacyError.CompletedAtUtc = now;
+            partialLegacyError.StartedAtUtc = now.AddMilliseconds(-1);
+
+            var invalidDecision = BuildResult(3, "station-status", "INVALID_DECISION");
+            invalidDecision.Outcome = RuntimeRunOutcome.Error;
+            invalidDecision.ExecutionOutcome = ExecutionOutcome.Succeeded;
+            invalidDecision.DecisionOutcome = DecisionOutcome.Invalid;
+            invalidDecision.HasJudgmentSignal = false;
+            invalidDecision.CompletedAtUtc = now;
+            invalidDecision.StartedAtUtc = now.AddMilliseconds(-1);
+
+            var timedOut = BuildResult(4, "station-status", "TIMED_OUT");
+            timedOut.Outcome = RuntimeRunOutcome.Error;
+            timedOut.ExecutionOutcome = ExecutionOutcome.TimedOut;
+            timedOut.DecisionOutcome = DecisionOutcome.Undetermined;
+            timedOut.HasJudgmentSignal = false;
+            timedOut.CompletedAtUtc = now;
+            timedOut.StartedAtUtc = now.AddMilliseconds(-1);
+
+            store.UpsertResultSummary(legacyError);
+            store.UpsertResultSummary(partialLegacyError);
+            store.UpsertResultSummary(invalidDecision);
+            store.UpsertResultSummary(timedOut);
+
+            var page = store.GetResultsPage(
+                "station-status",
+                now.AddMinutes(-1),
+                now.AddMinutes(1),
+                "error",
+                diagnosticCode: null,
+                pageIndex: 0,
+                pageSize: 20);
+            var statistics = store.GetStatistics(
+                now.AddMinutes(-1),
+                now.AddMinutes(1),
+                "station-status",
+                "error",
+                diagnosticCode: null);
+
+            page.Items.Select(item => item.SequenceId).Should().BeEquivalentTo([1L, 2L, 4L]);
+            page.Items.Should().NotContain(item => item.SequenceId == 3);
+            statistics.TotalCount.Should().Be(3);
+            statistics.FailedCount.Should().Be(2);
+            statistics.TimedOutCount.Should().Be(1);
         }
         finally
         {
@@ -722,6 +892,63 @@ public sealed class StationRegistryServiceTests
             item.StationId == "station-c" &&
             item.Result.SequenceId == 11 &&
             item.Result.DiagnosticCode == "OK");
+    }
+
+    [Fact]
+    public async Task PollCommand_ShouldPersistCommandStateInReplayAndInitialSnapshot()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "ClearVisionStationCommandReplayTests", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        var dbPath = Path.Combine(root, "vision.db");
+        var provider = new ServiceCollection()
+            .AddDbContext<VisionDbContext>(options => options.UseSqlite($"Data Source={dbPath}"))
+            .BuildServiceProvider();
+
+        try
+        {
+            await using (var scope = provider.CreateAsyncScope())
+            {
+                await scope.ServiceProvider.GetRequiredService<VisionDbContext>().Database.EnsureCreatedAsync();
+            }
+
+            var store = CreateCentralStore(provider);
+            var registry = CreateRegistry(store);
+            registry.UpsertRegistration("conn-command", new StationRegistrationDto
+            {
+                StationId = "station-command-replay",
+                MachineName = "machine-command",
+                ClientVersion = "1.0.0"
+            });
+            var command = store.CreateCommand(
+                "station-command-replay",
+                StationCommandType.ReloadPackage,
+                "{}",
+                "unit-test",
+                TimeSpan.FromMinutes(5));
+            var checkpoint = registry.GetEventsAfter(0).Max(item => item.SequenceId);
+
+            registry.PollCommand("station-command-replay").Should().NotBeNull();
+
+            var replay = registry.GetEventsAfter(checkpoint)
+                .Single(item => item.EventType == "stationCommandUpdated");
+            replay.Data.Should().BeOfType<StationCommandDto>().Which.CommandId.Should().Be(command.CommandId);
+            var snapshot = registry.GetSseSnapshot();
+            snapshot.RecentCommands.Should().ContainSingle(item =>
+                item.StationId == "station-command-replay" &&
+                item.Command.CommandId == command.CommandId &&
+                item.Command.Status == StationCommandStatus.Delivered);
+        }
+        finally
+        {
+            await provider.DisposeAsync();
+            try
+            {
+                Directory.Delete(root, recursive: true);
+            }
+            catch (IOException)
+            {
+            }
+        }
     }
 
     [Fact]

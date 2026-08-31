@@ -355,6 +355,78 @@ public class ContinuousRuntimeTests
     }
 
     [Fact]
+    public async Task FrameReplayRecorder_ShouldTrimOldTracksAndExposeRetentionGap()
+    {
+        var root = Path.Combine(Path.GetTempPath(), $"cv-replay-retention-{Guid.NewGuid():N}");
+        var now = new DateTimeOffset(2026, 8, 31, 8, 0, 0, TimeSpan.Zero);
+        try
+        {
+            var recorder = new FrameReplayRecorder(
+                root,
+                new ReplayRetentionOptions(MaxTracks: 2, MaxBytes: 1024 * 1024, RetentionDays: 30),
+                () => now);
+
+            var first = await recorder.SaveTrackAsync("cam-1:first", new[] { CreateFrame(1, new Scalar(1, 1, 1)) });
+            now = now.AddMinutes(1);
+            var second = await recorder.SaveTrackAsync("cam-1:second", new[] { CreateFrame(2, new Scalar(2, 2, 2)) });
+            now = now.AddMinutes(1);
+            var third = await recorder.SaveTrackAsync("cam-1:third", new[] { CreateFrame(3, new Scalar(3, 3, 3)) });
+
+            Directory.Exists(first).Should().BeFalse();
+            Directory.Exists(second).Should().BeTrue();
+            Directory.Exists(third).Should().BeTrue();
+
+            var health = recorder.GetRetentionHealth();
+            health.TrackCount.Should().Be(2);
+            health.TrimmedTrackCount.Should().Be(1);
+            health.GapDetected.Should().BeTrue();
+            health.Degraded.Should().BeFalse();
+            health.LastSuccessfulCleanupAtUtc.Should().Be(now);
+        }
+        finally
+        {
+            if (Directory.Exists(root))
+            {
+                Directory.Delete(root, recursive: true);
+            }
+        }
+    }
+
+    [Fact]
+    public async Task FrameReplayRecorder_ShouldTrimExpiredTracksWithoutScanningPendingWrites()
+    {
+        var root = Path.Combine(Path.GetTempPath(), $"cv-replay-expiry-{Guid.NewGuid():N}");
+        var now = new DateTimeOffset(2026, 8, 1, 8, 0, 0, TimeSpan.Zero);
+        try
+        {
+            var recorder = new FrameReplayRecorder(
+                root,
+                new ReplayRetentionOptions(MaxTracks: 10, MaxBytes: 1024 * 1024, RetentionDays: 1),
+                () => now);
+            var oldTrack = await recorder.SaveTrackAsync("cam-1:old", new[] { CreateFrame(1, new Scalar(1, 1, 1)) });
+
+            var pending = Path.Combine(root, ".pending", "interrupted-track");
+            Directory.CreateDirectory(pending);
+            await File.WriteAllTextAsync(Path.Combine(pending, "partial.bin"), "not a completed replay");
+
+            now = now.AddDays(2);
+            var currentTrack = await recorder.SaveTrackAsync("cam-1:current", new[] { CreateFrame(2, new Scalar(2, 2, 2)) });
+
+            Directory.Exists(oldTrack).Should().BeFalse();
+            Directory.Exists(currentTrack).Should().BeTrue();
+            File.Exists(Path.Combine(pending, "partial.bin")).Should().BeTrue();
+            recorder.GetRetentionHealth().TrackCount.Should().Be(1);
+        }
+        finally
+        {
+            if (Directory.Exists(root))
+            {
+                Directory.Delete(root, recursive: true);
+            }
+        }
+    }
+
+    [Fact]
     public async Task ContinuousInspectionWorker_Primary_WhenReplayWriteFails_ShouldPublishCurrentAndNextResults()
     {
         var startedAt = DateTimeOffset.UtcNow;

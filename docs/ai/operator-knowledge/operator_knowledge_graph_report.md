@@ -1,22 +1,22 @@
 # Operator Knowledge Graph Report
 
-GeneratedAtUtc: `2026-08-31T11:13:16.7616077Z`
+GeneratedAtUtc: `2026-08-31T13:08:53.8695640Z`
 SchemaVersion: `2026-07.operator-knowledge-graph.v4`
 Source: `OperatorMetadata + FlowTemplate + operator_quality_evidence_manifest`
-GenerationFingerprint: `A3AE8008883A543EAAD7EC0F21000C999CD704DA51E780111A44C8B2EB048204`
+GenerationFingerprint: `A4649A6D8A2E117E1F6784A4940A4C25C6C16B2839FE4632CEA0A893AC36FFCD`
 
 ## Summary
 
 | Metric | Value |
 | --- | ---: |
 | Cards | 158 |
-| Edges | 1988 |
+| Edges | 1987 |
 
 ## Edge Types
 
 | RelationType | Count |
 | --- | ---: |
-| ALIAS_OF | 953 |
+| ALIAS_OF | 952 |
 | COMMONLY_FOLLOWS | 52 |
 | COMMONLY_PRECEDES | 52 |
 | CONSUMES | 208 |

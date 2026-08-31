@@ -78,6 +78,10 @@ public sealed class QueuedInspectionImagePersistenceService : BackgroundService,
 
     public long DroppedImageCount => Volatile.Read(ref _droppedImageCount);
 
+    public void EnsureProductionStartAllowed() => _inner.EnsureProductionStartAllowed();
+
+    public InspectionImageStorageHealth GetStorageHealth() => _inner.GetStorageHealth();
+
     public Task PersistAsync(InspectionResult result, CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();

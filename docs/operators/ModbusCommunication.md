@@ -8,7 +8,7 @@
 | 分类 ID (CategoryId) | `Communication` |
 | 分类 (Category) | 通信 |
 | 分类顺序 (CategoryOrder) | 13 |
-| 版本 (Version) | `1.1.0` |
+| 版本 (Version) | `1.1.1` |
 | 生命周期 (Lifecycle) | 稳定 `Stable` |
 | 生命周期说明 (Lifecycle Note) | - |
 | 默认隐藏 (Default Hidden) | No |
@@ -22,7 +22,7 @@
 | 标签 (Tags) | `AlgorithmQuality:Unknown`, `Execution:Implemented`, `FieldValidation:NotValidated`, `ProductionReadiness:Unknown`, `分类:Communication`, `分类显示:通信`, `生命周期:Stable`, `算法类型:自研` |
 
 ## 算法原理 / Algorithm Principle
-该算子用于通过 Modbus TCP 读写线圈和保持寄存器；当前算子不执行 Modbus RTU 通信。运行时从声明输入端口读取数据，按参数表解析配置，并把处理结果写入输出字典。
+该算子用于通过受服务器 PLC 配置约束的 Modbus TCP 读写线圈和保持寄存器。运行时从声明输入端口读取数据，按参数表解析配置，并把处理结果写入输出字典。
 源码中包含外部资源访问逻辑，执行结果会受文件系统、网络、PLC、串口或外部服务状态影响。
 
 ## 实现策略 / Implementation Strategy
@@ -76,7 +76,7 @@
 | - | - | - |
 
 ## 生成依赖 / Generation Dependencies
-- 组合指纹 (Generation Fingerprint)：`BEE816D345431789919A2A52EFBE05EE737B08B392BB132BBCC850BD8D08682D`
+- 组合指纹 (Generation Fingerprint)：`37F4F681C1B9B8979BE1E41902487D34087D64437FEB78DD4D1FDD94D4C5C738`
 - 显式共享依赖：无；指纹由最终运行时元数据与算子源码组成。
 
 ### 运行时附加输出 / Runtime Additional Outputs
@@ -111,4 +111,4 @@
 ## 变更记录 / Changelog
 | 版本 (Version) | 日期 (Date) | 变更内容 (Changes) |
 |------|------|----------|
-| 1.1.0 | 2026-08-31 | 按当前最终运行时元数据、条件契约和显式依赖口径重生成 / Regenerated from effective runtime metadata and declared dependencies |
+| 1.1.1 | 2026-08-31 | 按当前最终运行时元数据、条件契约和显式依赖口径重生成 / Regenerated from effective runtime metadata and declared dependencies |

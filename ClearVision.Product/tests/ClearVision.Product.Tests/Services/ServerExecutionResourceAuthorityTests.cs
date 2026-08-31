@@ -207,8 +207,7 @@ public sealed class ServerExecutionResourceAuthorityTests
 
     [Theory]
     [InlineData(OperatorType.SerialCommunication)]
-    [InlineData(OperatorType.ModbusRtuCommunication)]
-    public void Validate_SerialAndModbusRtuExactBinding_ShouldAllowAuthoritativeTarget(OperatorType operatorType)
+    public void Validate_SerialExactBinding_ShouldAllowAuthoritativeTarget(OperatorType operatorType)
     {
         var authority = CreateAuthority(CreateConfiguredAppConfig());
 
@@ -245,7 +244,7 @@ public sealed class ServerExecutionResourceAuthorityTests
     }
 
     [Fact]
-    public void ResourceManifest_ModbusRtuAliasClone_WithProfileOnly_ShouldKeepSerialAuthority()
+    public void ResourceManifest_ModbusRtuAliasClone_WithProfileOnly_ShouldRemainRetired()
     {
         const long revision = 42;
         var @operator = new Operator(
@@ -278,7 +277,27 @@ public sealed class ServerExecutionResourceAuthorityTests
         capturedFlow.Operators.Should().ContainSingle()
             .Which.Type.Should().Be(OperatorType.ModbusCommunication);
         afterClone.Should().BeEquivalentTo(beforeClone);
-        result.Allowed.Should().BeTrue();
+        result.Allowed.Should().BeFalse();
+        result.Code.Should().Be("MODBUS_RTU_UNSUPPORTED");
+    }
+
+    [Fact]
+    public async Task ExecuteWithSnapshotAsync_RetiredModbusRtu_ShouldFailClosedBeforeEngineHandler()
+    {
+        var engine = Substitute.For<IFlowExecutionEngine>();
+        var service = new GovernedFlowExecutionService(engine, CreateAuthority(CreateConfiguredAppConfig()));
+
+        var result = await service.ExecuteWithSnapshotAsync(
+            CreateStoredSnapshot(SingleOperatorFlow(CreateSerialOperator(OperatorType.ModbusRtuCommunication))));
+
+        result.IsSuccess.Should().BeFalse();
+        result.ErrorMessage.Should().StartWith("MODBUS_RTU_UNSUPPORTED:");
+        engine.DidNotReceive().ValidateFlow(Arg.Any<OperatorFlow>());
+        await engine.DidNotReceive().ExecuteFlowAsync(
+            Arg.Any<OperatorFlow>(),
+            Arg.Any<Dictionary<string, object>?>(),
+            Arg.Any<bool>(),
+            Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -316,11 +335,6 @@ public sealed class ServerExecutionResourceAuthorityTests
     [InlineData(OperatorType.SerialCommunication, "disabled-profile", "RESOURCE_SERIAL_PROFILE_DISABLED")]
     [InlineData(OperatorType.SerialCommunication, "invalid-profile", "RESOURCE_SERIAL_PROFILE_INVALID")]
     [InlineData(OperatorType.SerialCommunication, "duplicate-profile", "RESOURCE_SERIAL_PROFILE_AMBIGUOUS")]
-    [InlineData(OperatorType.ModbusRtuCommunication, "missing-id", "RESOURCE_SERIAL_PROFILE_REQUIRED")]
-    [InlineData(OperatorType.ModbusRtuCommunication, "missing-profile", "RESOURCE_SERIAL_PROFILE_NOT_FOUND")]
-    [InlineData(OperatorType.ModbusRtuCommunication, "disabled-profile", "RESOURCE_SERIAL_PROFILE_DISABLED")]
-    [InlineData(OperatorType.ModbusRtuCommunication, "invalid-profile", "RESOURCE_SERIAL_PROFILE_INVALID")]
-    [InlineData(OperatorType.ModbusRtuCommunication, "duplicate-profile", "RESOURCE_SERIAL_PROFILE_AMBIGUOUS")]
     public async Task ExecuteWithSnapshotAsync_UntrustedResourceProfile_ShouldRejectBeforeEngineHandler(
         OperatorType operatorType,
         string scenario,
@@ -361,9 +375,6 @@ public sealed class ServerExecutionResourceAuthorityTests
     [InlineData(OperatorType.SerialCommunication, "port-mismatch")]
     [InlineData(OperatorType.SerialCommunication, "baud-mismatch")]
     [InlineData(OperatorType.SerialCommunication, "format-mismatch")]
-    [InlineData(OperatorType.ModbusRtuCommunication, "port-mismatch")]
-    [InlineData(OperatorType.ModbusRtuCommunication, "baud-mismatch")]
-    [InlineData(OperatorType.ModbusRtuCommunication, "format-mismatch")]
     public async Task ExecuteWithSnapshotAsync_RawClientTargetMismatch_ShouldUseProfileAndReachEngine(
         OperatorType operatorType,
         string scenario)

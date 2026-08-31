@@ -338,6 +338,9 @@ public sealed class StationHeartbeatDto
     /// <summary>Number of locally queued result summaries waiting for ACK.</summary>
     public int SpoolPendingCount { get; set; }
 
+    /// <summary>Number of locally queued command-result reports waiting for ACK.</summary>
+    public int CommandResultSpoolPendingCount { get; set; }
+
     /// <summary>Last completed result timestamp.</summary>
     public DateTimeOffset? LastResultAtUtc { get; set; }
 
@@ -518,6 +521,25 @@ public sealed class StationHealthSnapshotDto
 
     /// <summary>Total spool size in bytes.</summary>
     public long SpoolBytes { get; set; }
+
+    /// <summary>Pending command-result report count.</summary>
+    public int CommandResultSpoolPendingCount { get; set; }
+
+    /// <summary>Canonical pending command-result payload bytes.</summary>
+    public long CommandResultSpoolBytes { get; set; }
+
+    /// <summary>Oldest retained command-result report, when one exists.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public DateTimeOffset? CommandResultSpoolOldestAtUtc { get; set; }
+
+    /// <summary>Count of command-result records removed by retention.</summary>
+    public long CommandResultSpoolTrimmedCount { get; set; }
+
+    /// <summary>Whether command-result retention created a replay gap.</summary>
+    public bool CommandResultSpoolGapDetected { get; set; }
+
+    /// <summary>Whether command-result spool cleanup is currently degraded.</summary>
+    public bool CommandResultSpoolDegraded { get; set; }
 
     /// <summary>Best-effort camera status summary.</summary>
     public string? CameraStatusSummary { get; set; }

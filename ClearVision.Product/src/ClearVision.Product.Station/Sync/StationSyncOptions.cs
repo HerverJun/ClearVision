@@ -32,6 +32,15 @@ public sealed class StationSyncOptions
 
     public int MaxSpoolDays { get; set; } = 7;
 
+    /// <summary>Maximum retained command-result records while Studio is unavailable.</summary>
+    public int MaxCommandResultSpoolRecords { get; set; } = 10_000;
+
+    /// <summary>Maximum on-disk command-result spool size in megabytes.</summary>
+    public int MaxCommandResultSpoolMb { get; set; } = 128;
+
+    /// <summary>Maximum age of an unacknowledged command-result record.</summary>
+    public int MaxCommandResultSpoolDays { get; set; } = 7;
+
     public int OutboundQueueCapacity { get; set; } = 1000;
 
     public int LogQueueCapacity { get; set; } = 500;

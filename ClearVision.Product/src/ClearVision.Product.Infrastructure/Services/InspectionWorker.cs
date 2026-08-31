@@ -1254,28 +1254,7 @@ public class InspectionWorker : IHostedService, IInspectionWorker, IAsyncDisposa
                 result.SetOutputImage(inspectionImage);
             }
 
-            // 提取缺陷列表
-            if (flowResult.OutputData?.TryGetValue("Defects", out var defectsObj) == true
-                && defectsObj is System.Collections.IList defectsList)
-            {
-                foreach (var item in defectsList)
-                {
-                    if (item is Dictionary<string, object> defectDict)
-                    {
-                        var defect = new Defect(
-                            result.Id,
-                            DefectType.Other,
-                            Convert.ToDouble(defectDict.GetValueOrDefault("X", 0.0)),
-                            Convert.ToDouble(defectDict.GetValueOrDefault("Y", 0.0)),
-                            Convert.ToDouble(defectDict.GetValueOrDefault("Width", 0.0)),
-                            Convert.ToDouble(defectDict.GetValueOrDefault("Height", 0.0)),
-                            Convert.ToDouble(defectDict.GetValueOrDefault("Confidence", 0.0)),
-                            defectDict.GetValueOrDefault("ClassName", "unknown")?.ToString() ?? "unknown"
-                        );
-                        result.AddDefect(defect);
-                    }
-                }
-            }
+            AppendCanonicalDefects(result, flowResult.OutputData);
 
             var analysisData = _analysisDataBuilder.Build(flow, flowResult, status);
             var outputPayload = EnsureTraceabilityPayload(flowResult.OutputData, result);
@@ -1324,6 +1303,35 @@ public class InspectionWorker : IHostedService, IInspectionWorker, IAsyncDisposa
             AnalysisPayloadSerialization.TrySetOutputDataJson(result, outputData, _logger);
 
             return result;
+        }
+    }
+
+    private static void AppendCanonicalDefects(
+        InspectionResult result,
+        IReadOnlyDictionary<string, object>? outputData)
+    {
+        if (!DetectionResultAdapter.TryExtractFromOutput(outputData, out var detections, out var hasDetectionPayload))
+        {
+            if (hasDetectionPayload)
+            {
+                throw new InvalidOperationException(
+                    "DETECTION_OUTPUT_MALFORMED: The operator emitted an invalid detection payload.");
+            }
+
+            return;
+        }
+
+        foreach (var detection in detections)
+        {
+            result.AddDefect(new Defect(
+                result.Id,
+                DefectType.Other,
+                detection.X,
+                detection.Y,
+                detection.Width,
+                detection.Height,
+                detection.Confidence,
+                string.IsNullOrWhiteSpace(detection.Label) ? "unknown" : detection.Label));
         }
     }
 

@@ -8,7 +8,7 @@
 | 分类 ID (CategoryId) | `DefectDetection` |
 | 分类 (Category) | 缺陷检测 |
 | 分类顺序 (CategoryOrder) | 6 |
-| 版本 (Version) | `1.0.0` |
+| 版本 (Version) | `1.0.1` |
 | 生命周期 (Lifecycle) | 稳定 `Stable` |
 | 生命周期说明 (Lifecycle Note) | - |
 | 默认隐藏 (Default Hidden) | No |
@@ -34,11 +34,7 @@
 ## 核心 API 调用链 / Core API Call Chain
 - `OperatorBase.Get*Param(...)`
 - `Math.Min`
-- `Convert.ToBoolean`
 - `Math.Clamp`
-- `Convert.ToDouble`
-- `Convert.ToInt32`
-- `Math.Max`
 - `Math.Abs`
 - `OperatorExecutionOutput.Success(...)`
 - `OperatorExecutionOutput.Failure(...)`
@@ -79,7 +75,7 @@
 | - | - | - |
 
 ## 生成依赖 / Generation Dependencies
-- 组合指纹 (Generation Fingerprint)：`59EE5795D682E71A2E45648247E0726E3123A1EC214D9C1AB7D685CBDC325BF4`
+- 组合指纹 (Generation Fingerprint)：`9B2DDB4B238765CCDF75DCFD5F38F6C8A34404D98BF26EDD6CCDC81EB3C8DA53`
 - 显式共享依赖：无；指纹由最终运行时元数据与算子源码组成。
 
 ### 运行时附加输出 / Runtime Additional Outputs
@@ -109,4 +105,4 @@
 ## 变更记录 / Changelog
 | 版本 (Version) | 日期 (Date) | 变更内容 (Changes) |
 |------|------|----------|
-| 1.0.0 | 2026-07-14 | 按当前最终运行时元数据、条件契约和显式依赖口径重生成 / Regenerated from effective runtime metadata and declared dependencies |
+| 1.0.1 | 2026-08-31 | 按当前最终运行时元数据、条件契约和显式依赖口径重生成 / Regenerated from effective runtime metadata and declared dependencies |

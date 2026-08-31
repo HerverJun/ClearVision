@@ -49,6 +49,112 @@ public class ResultAnalysisServiceIntegrationTests
     }
 
     [Fact]
+    public async Task GetStatisticsAsync_WhenStartIsAfterEnd_ShouldRejectBeforeReadingTheRepository()
+    {
+        var projectId = Guid.NewGuid();
+        var start = new DateTime(2026, 8, 2, 8, 0, 0, DateTimeKind.Utc);
+        var end = start.AddMinutes(-1);
+
+        var act = () => _analysisService.GetStatisticsAsync(projectId, start, end);
+
+        var exception = (await act.Should().ThrowAsync<ResultAnalysisBudgetException>()).Which;
+        exception.ErrorCode.Should().Be("ANALYSIS_TIME_RANGE_INVALID");
+        _resultRepository.ReceivedCalls().Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task GenerateReportAsync_WhenWindowExceedsMaximum_ShouldRejectBeforeReadingTheRepository()
+    {
+        var projectId = Guid.NewGuid();
+        var start = new DateTime(2026, 7, 1, 0, 0, 0, DateTimeKind.Utc);
+        var end = start.AddDays(ResultAnalysisQueryBudget.MaximumWindowDays).AddTicks(1);
+
+        var act = () => _analysisService.GenerateReportAsync(projectId, start, end);
+
+        var exception = (await act.Should().ThrowAsync<ResultAnalysisBudgetException>()).Which;
+        exception.ErrorCode.Should().Be("ANALYSIS_TIME_RANGE_LIMIT");
+        _resultRepository.ReceivedCalls().Should().BeEmpty();
+    }
+
+    [Fact]
+    public void QueryBudget_ShouldAllowExactlyTheMaximumNumberOfHourlyTrendPoints()
+    {
+        var start = new DateTime(2026, 8, 1, 0, 0, 0, DateTimeKind.Utc);
+
+        var buckets = ResultAnalysisQueryBudget.BuildTrendBuckets(
+            TrendInterval.Hour,
+            start,
+            start.AddDays(ResultAnalysisQueryBudget.MaximumWindowDays));
+
+        buckets.Should().HaveCount(ResultAnalysisQueryBudget.MaximumTrendPoints);
+        buckets.First().Should().Be(start);
+        buckets.Last().Should().Be(start.AddHours(ResultAnalysisQueryBudget.MaximumTrendPoints - 1));
+    }
+
+    [Fact]
+    public void QueryBudget_ShouldFailClosedAtDateTimeExtremesWithoutOverflowing()
+    {
+        var minimumWindow = ResultAnalysisQueryBudget.Normalize(null, DateTime.MinValue, DateTime.UtcNow);
+        minimumWindow.StartTime.Should().Be(DateTime.MinValue);
+        minimumWindow.EndTime.Should().Be(DateTime.MinValue);
+
+        var maximumWindow = ResultAnalysisQueryBudget.Normalize(null, DateTime.MaxValue, DateTime.UtcNow);
+        maximumWindow.StartTime.Should().Be(DateTime.MaxValue.AddDays(-ResultAnalysisQueryBudget.MaximumWindowDays));
+        maximumWindow.EndTime.Should().Be(DateTime.MaxValue);
+
+        var rangeAct = () => ResultAnalysisQueryBudget.Validate(DateTime.MinValue, DateTime.MaxValue);
+        rangeAct.Should().Throw<ResultAnalysisBudgetException>()
+            .Which.ErrorCode.Should().Be("ANALYSIS_TIME_RANGE_LIMIT");
+
+        var trendAct = () => ResultAnalysisQueryBudget.BuildTrendBuckets(
+            TrendInterval.Hour,
+            DateTime.MaxValue.AddTicks(-1),
+            DateTime.MaxValue);
+        trendAct.Should().Throw<ResultAnalysisBudgetException>()
+            .Which.ErrorCode.Should().Be("ANALYSIS_TREND_RANGE_INVALID");
+    }
+
+    [Fact]
+    public async Task GetTrendAnalysisAsync_WhenBoundedRepositoryReturnsMoreThanRowBudget_ShouldFailClosed()
+    {
+        var substitute = Substitute.For<IInspectionResultRepository, IInspectionResultAnalysisRepository>();
+        var repository = (IInspectionResultRepository)substitute;
+        var analysisRepository = (IInspectionResultAnalysisRepository)substitute;
+        var projectId = Guid.NewGuid();
+        var start = new DateTime(2026, 8, 1, 0, 0, 0, DateTimeKind.Utc);
+        IReadOnlyList<InspectionAnalysisSample> samples = Enumerable.Range(
+                0,
+                ResultAnalysisQueryBudget.MaximumTrendRows + 1)
+            .Select(_ => new InspectionAnalysisSample(
+                start,
+                InspectionStatus.NG,
+                null,
+                null,
+                null,
+                5,
+                1))
+            .ToList();
+        analysisRepository.GetAnalysisSamplesAsync(
+                Arg.Any<InspectionAnalysisQuery>(),
+                ResultAnalysisQueryBudget.MaximumTrendRows)
+            .Returns(Task.FromResult(samples));
+        var service = new ResultAnalysisService(repository);
+
+        var act = () => service.GetTrendAnalysisAsync(
+            projectId,
+            TrendInterval.Hour,
+            start,
+            start.AddHours(1));
+
+        var exception = (await act.Should().ThrowAsync<ResultAnalysisBudgetException>()).Which;
+        exception.ErrorCode.Should().Be("ANALYSIS_QUERY_ROW_LIMIT");
+        await analysisRepository.Received(1).GetAnalysisSamplesAsync(
+            Arg.Is<InspectionAnalysisQuery>(query =>
+                query.ProjectId == projectId && query.StartTime == start && query.EndTime == start.AddHours(1)),
+            ResultAnalysisQueryBudget.MaximumTrendRows);
+    }
+
+    [Fact]
     public async Task GetStatisticsAsync_WithResults_ShouldReturnCorrectStatistics()
     {
         // Arrange
@@ -64,9 +170,9 @@ public class ResultAnalysisServiceIntegrationTests
             AverageProcessingTimeMs = 150.5
         };
 
-        _resultRepository.GetStatisticsAsync(projectId, null, null)
+        _resultRepository.GetStatisticsAsync(projectId, Arg.Any<DateTime?>(), Arg.Any<DateTime?>())
             .Returns(expectedStats);
-        _resultRepository.GetDefectDistributionAsync(projectId, null, null)
+        _resultRepository.GetDefectDistributionAsync(projectId, Arg.Any<DateTime?>(), Arg.Any<DateTime?>())
             .Returns(new Dictionary<DefectType, int> { { DefectType.Scratch, 10 } });
 
         // Act
@@ -99,7 +205,7 @@ public class ResultAnalysisServiceIntegrationTests
             { DefectType.Deformation, 3 }
         };
 
-        _resultRepository.GetDefectDistributionAsync(projectId, null, null)
+        _resultRepository.GetDefectDistributionAsync(projectId, Arg.Any<DateTime?>(), Arg.Any<DateTime?>())
             .Returns(distribution);
 
         // Act
@@ -265,8 +371,8 @@ public class ResultAnalysisServiceIntegrationTests
             AverageProcessingTimeMs = 200
         };
 
-        _resultRepository.GetStatisticsAsync(projectId, null, null).Returns(stats);
-        _resultRepository.GetDefectDistributionAsync(projectId, null, null)
+        _resultRepository.GetStatisticsAsync(projectId, Arg.Any<DateTime?>(), Arg.Any<DateTime?>()).Returns(stats);
+        _resultRepository.GetDefectDistributionAsync(projectId, Arg.Any<DateTime?>(), Arg.Any<DateTime?>())
             .Returns(new Dictionary<DefectType, int> { { DefectType.Scratch, 20 } });
         _resultRepository.GetByProjectIdAsync(projectId, 0, 1000).Returns(new List<InspectionResult>());
         _resultRepository.GetByTimeRangeAsync(projectId, Arg.Any<DateTime>(), Arg.Any<DateTime>())

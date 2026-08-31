@@ -11,6 +11,7 @@ import {
     normalizeCanonicalOutcome,
     normalizeCanonicalStatistics
 } from '../inspection/canonicalOutcome.mjs';
+import { formatCsvRow } from '../../shared/csvSanitizer.js';
 
 class StationMonitorView {
     constructor(containerId) {
@@ -566,6 +567,7 @@ class StationMonitorView {
     applyInitialSnapshot(payload) {
         const stations = Array.isArray(payload?.stations) ? payload.stations : [];
         const recentResults = Array.isArray(payload?.recentResults) ? payload.recentResults : [];
+        const recentCommands = Array.isArray(payload?.recentCommands) ? payload.recentCommands : [];
         this.summary = this.normalizeSummary(payload?.summary);
         this.offlineThresholdSeconds = this.summary?.offlineThresholdSeconds || this.offlineThresholdSeconds;
         this.stations.clear();
@@ -578,6 +580,10 @@ class StationMonitorView {
         this.globalResults = recentResults
             .map((item) => this.normalizeMonitorResult(item?.result ?? item?.Result, item?.station ?? item?.Station))
             .filter(Boolean);
+
+        if (this.canReadSensitiveMonitoring()) {
+            recentCommands.forEach((item) => this.applyCommandEvent(item?.command ?? item?.Command ?? item));
+        }
 
         if (this.monitorResults.length === 0 && this.globalResults.length > 0) {
             const scoped = this.globalResults
@@ -741,6 +747,9 @@ class StationMonitorView {
             const commands = Array.isArray(detail.recentCommands) ? [...detail.recentCommands] : [];
             const existingIndex = commands.findIndex((item) => item.commandId === command.commandId);
             if (existingIndex >= 0) {
+                if (!this.shouldReplaceCommand(commands[existingIndex], command)) {
+                    return;
+                }
                 commands[existingIndex] = command;
             } else {
                 commands.unshift(command);
@@ -753,6 +762,46 @@ class StationMonitorView {
         }
 
         this.markDirty();
+    }
+
+    shouldReplaceCommand(existing, candidate) {
+        const existingRank = this.commandStatusRank(existing?.status);
+        const candidateRank = this.commandStatusRank(candidate?.status);
+        if (candidateRank < existingRank) {
+            return false;
+        }
+
+        const existingTimestamp = this.commandStateTimestamp(existing);
+        const candidateTimestamp = this.commandStateTimestamp(candidate);
+        if (candidateRank === existingRank && existingTimestamp && candidateTimestamp && candidateTimestamp < existingTimestamp) {
+            return false;
+        }
+
+        return candidateRank !== existingRank || Number(candidate?.progressPercent || 0) >= Number(existing?.progressPercent || 0) ||
+            !existingTimestamp || !candidateTimestamp || candidateTimestamp >= existingTimestamp;
+    }
+
+    commandStatusRank(status) {
+        const normalized = String(status ?? '').trim().toLowerCase();
+        const ranks = {
+            created: 10,
+            delivered: 20,
+            accepted: 30,
+            running: 40,
+            rejected: 100,
+            succeeded: 100,
+            failed: 100,
+            timedout: 100,
+            cancelled: 100,
+            canceled: 100
+        };
+        return ranks[normalized] ?? 0;
+    }
+
+    commandStateTimestamp(command) {
+        const raw = command?.completedAtUtc ?? command?.startedAtUtc ?? command?.acceptedAtUtc ?? command?.deliveredAtUtc ?? command?.createdAtUtc;
+        const timestamp = raw ? Date.parse(raw) : Number.NaN;
+        return Number.isFinite(timestamp) ? timestamp : null;
     }
 
     isActiveConnection(connectionId) {
@@ -1548,7 +1597,7 @@ class StationMonitorView {
                 <button type="button" data-monitor-refresh>刷新</button>
                 <button type="button" data-result-export="csv">CSV</button>
                 <button type="button" data-result-export="json">JSON</button>
-                <button type="button" data-result-export="excel">Excel</button>
+                <button type="button" data-result-export="excel">Excel CSV</button>
             </div>
         `;
 
@@ -2305,8 +2354,8 @@ class StationMonitorView {
         const csv = this.convertResultsToCsv(records);
         this.downloadBlob(
             csv,
-            normalizedFormat === 'excel' ? 'application/vnd.ms-excel' : 'text/csv;charset=utf-8',
-            `station-results-${Date.now()}.${normalizedFormat === 'excel' ? 'xls' : 'csv'}`);
+            'text/csv;charset=utf-8',
+            `station-results-${Date.now()}.csv`);
     }
 
     convertResultsToCsv(records) {
@@ -2333,7 +2382,7 @@ class StationMonitorView {
             record.packageName
         ]);
         return [headers, ...rows]
-            .map((row) => row.map((value) => `"${String(value ?? '').replaceAll('"', '""')}"`).join(','))
+            .map((row) => formatCsvRow(row))
             .join('\n');
     }
 

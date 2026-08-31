@@ -394,6 +394,15 @@ public sealed record RuntimePreviewRetentionCleanupResult
     [JsonPropertyName("reportsAfter")]
     public int ReportsAfter { get; init; }
 
+    [JsonPropertyName("trimmedSessions")]
+    public int TrimmedSessions => Math.Max(0, SessionsBefore - SessionsAfter);
+
+    [JsonPropertyName("trimmedRecords")]
+    public int TrimmedRecords => Math.Max(0, AuditEventsBefore - AuditEventsAfter) + Math.Max(0, ReportsBefore - ReportsAfter);
+
+    [JsonPropertyName("degraded")]
+    public bool Degraded { get; init; }
+
     [JsonPropertyName("metadataOnly")]
     public bool MetadataOnly { get; init; } = true;
 

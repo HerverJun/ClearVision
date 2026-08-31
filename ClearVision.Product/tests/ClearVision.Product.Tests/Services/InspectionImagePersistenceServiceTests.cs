@@ -411,7 +411,96 @@ public sealed class InspectionImagePersistenceServiceTests
         }
     }
 
-    private static IConfigurationService CreateConfigService(string imageSavePath, string savePolicy = "NgOnly")
+    [Fact]
+    public async Task PersistAsync_ShouldTrimExpiredFilesOnlyFromManifestOwnedRoot()
+    {
+        var root = CreateTempDirectory();
+        var now = new DateTimeOffset(2026, 8, 31, 12, 0, 0, TimeSpan.Zero);
+        var oldDay = Path.Combine(root, "20260801", "NG");
+        Directory.CreateDirectory(oldDay);
+        await File.WriteAllBytesAsync(Path.Combine(oldDay, "expired.jpg"), new byte[] { 1, 2, 3 });
+        await File.WriteAllTextAsync(
+            Path.Combine(root, ".clearvision-inspection-images.manifest"),
+            "ClearVision.InspectionImages.v1");
+        var configService = CreateConfigService(root, retentionDays: 7, minFreeSpaceGb: 0);
+        var service = CreatePersistenceService(configService, new FixedFreeSpaceProvider(64L * 1024 * 1024 * 1024), () => now);
+        var result = new InspectionResult(Guid.NewGuid());
+        result.SetResult(InspectionStatus.NG, 12);
+        result.SetOutputImage(CreatePngImageBytes());
+
+        try
+        {
+            await service.PersistAsync(result);
+
+            Directory.Exists(Path.Combine(root, "20260801")).Should().BeFalse();
+            var health = service.GetStorageHealth();
+            health.TrimmedFileCount.Should().Be(1);
+            health.GapDetected.Should().BeTrue();
+            health.Degraded.Should().BeFalse();
+        }
+        finally
+        {
+            DeleteTempDirectory(root);
+        }
+    }
+
+    [Fact]
+    public async Task PersistAsync_ShouldNotClaimOrCleanAnExistingUnownedDirectory()
+    {
+        var root = CreateTempDirectory();
+        var foreignDay = Path.Combine(root, "20200101", "NG");
+        Directory.CreateDirectory(foreignDay);
+        var foreignFile = Path.Combine(foreignDay, "foreign.jpg");
+        await File.WriteAllBytesAsync(foreignFile, new byte[] { 4, 5, 6 });
+        await File.WriteAllTextAsync(Path.Combine(root, "foreign.txt"), "not owned by ClearVision");
+        var configService = CreateConfigService(root, retentionDays: 1, minFreeSpaceGb: 0);
+        var service = CreatePersistenceService(configService, new FixedFreeSpaceProvider(64L * 1024 * 1024 * 1024));
+        var result = new InspectionResult(Guid.NewGuid());
+        result.SetResult(InspectionStatus.NG, 12);
+        result.SetOutputImage(CreatePngImageBytes());
+
+        try
+        {
+            await service.PersistAsync(result);
+
+            File.Exists(foreignFile).Should().BeTrue();
+            File.ReadAllText(Path.Combine(root, "foreign.txt")).Should().Be("not owned by ClearVision");
+            var managedRoot = Path.Combine(root, ".clearvision-managed-images");
+            File.Exists(Path.Combine(managedRoot, ".clearvision-inspection-images.manifest")).Should().BeTrue();
+            FindSavedImagePath(managedRoot, result, ".jpg").Should().NotBeNullOrWhiteSpace();
+        }
+        finally
+        {
+            DeleteTempDirectory(root);
+        }
+    }
+
+    [Fact]
+    public void EnsureProductionStartAllowed_WhenFreeSpaceIsBelowConfiguredFloor_ShouldFailClosedAndReportDegradedHealth()
+    {
+        var root = CreateTempDirectory();
+        var configService = CreateConfigService(root, minFreeSpaceGb: 5);
+        var service = CreatePersistenceService(configService, new FixedFreeSpaceProvider(4L * 1024 * 1024 * 1024));
+
+        try
+        {
+            var act = () => service.EnsureProductionStartAllowed();
+
+            act.Should().Throw<InvalidOperationException>()
+                .WithMessage("INSPECTION_STORAGE_START_BLOCKED*");
+            service.GetStorageHealth().Degraded.Should().BeTrue();
+        }
+        finally
+        {
+            DeleteTempDirectory(root);
+        }
+    }
+
+    private static IConfigurationService CreateConfigService(
+        string imageSavePath,
+        string savePolicy = "NgOnly",
+        int retentionDays = 30,
+        int minFreeSpaceGb = 5)
     {
         var configService = Substitute.For<IConfigurationService>();
         configService.GetCurrent().Returns(new AppConfig
@@ -419,17 +508,24 @@ public sealed class InspectionImagePersistenceServiceTests
             Storage = new StorageConfig
             {
                 ImageSavePath = imageSavePath,
-                SavePolicy = savePolicy
+                SavePolicy = savePolicy,
+                RetentionDays = retentionDays,
+                MinFreeSpaceGb = minFreeSpaceGb
             }
         });
         return configService;
     }
 
-    private static InspectionImagePersistenceService CreatePersistenceService(IConfigurationService configService)
+    private static InspectionImagePersistenceService CreatePersistenceService(
+        IConfigurationService configService,
+        IInspectionStorageFreeSpaceProvider? freeSpaceProvider = null,
+        Func<DateTimeOffset>? utcNow = null)
     {
         return new InspectionImagePersistenceService(
             configService,
-            NullLogger<InspectionImagePersistenceService>.Instance);
+            NullLogger<InspectionImagePersistenceService>.Instance,
+            freeSpaceProvider,
+            utcNow);
     }
 
     private static byte[] CreatePngImageBytes()
@@ -499,6 +595,18 @@ public sealed class InspectionImagePersistenceServiceTests
             Started.TrySetResult(result);
             await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
         }
+    }
+
+    private sealed class FixedFreeSpaceProvider : IInspectionStorageFreeSpaceProvider
+    {
+        private readonly long? _availableBytes;
+
+        public FixedFreeSpaceProvider(long? availableBytes)
+        {
+            _availableBytes = availableBytes;
+        }
+
+        public long? GetAvailableFreeBytes(string path) => _availableBytes;
     }
 
     private static void DeleteTempDirectory(string path)

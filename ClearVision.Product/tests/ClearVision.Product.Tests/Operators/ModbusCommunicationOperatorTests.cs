@@ -77,7 +77,7 @@ public class ModbusCommunicationOperatorTests
         var result = await _operator.ExecuteAsync(op, new Dictionary<string, object>());
 
         result.IsSuccess.Should().BeFalse();
-        result.ErrorMessage.Should().StartWith("PLC_RAW_TARGET_FORBIDDEN:");
+        result.ErrorMessage.Should().StartWith("MODBUS_RTU_UNSUPPORTED:");
     }
 
     [Fact]

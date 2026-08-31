@@ -42,7 +42,6 @@ CannyEdge|EdgeDetection
 FindContours|ContourDetection
 GaussianBlur|Filtering
 MeasureDistance|Measurement
-ModbusRtuCommunication|ModbusCommunication
 OnnxInference|DeepLearning
 Preprocessing|Filtering
 ReadImage|ImageAcquisition

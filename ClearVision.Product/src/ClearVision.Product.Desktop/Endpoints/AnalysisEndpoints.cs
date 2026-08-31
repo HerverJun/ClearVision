@@ -17,7 +17,14 @@ public static class AnalysisEndpoints
             string? defectType,
             IResultAnalysisService analysisService) =>
         {
-            return Results.Ok(await analysisService.GetStatisticsAsync(projectId, startTime, endTime, status, defectType));
+            try
+            {
+                return Results.Ok(await analysisService.GetStatisticsAsync(projectId, startTime, endTime, status, defectType));
+            }
+            catch (ResultAnalysisBudgetException exception)
+            {
+                return BudgetViolation(exception);
+            }
         });
 
         app.MapGet("/api/analysis/defect-distribution/{projectId}", async (
@@ -28,7 +35,14 @@ public static class AnalysisEndpoints
             string? defectType,
             IResultAnalysisService analysisService) =>
         {
-            return Results.Ok(await analysisService.GetDefectDistributionAsync(projectId, startTime, endTime, status, defectType));
+            try
+            {
+                return Results.Ok(await analysisService.GetDefectDistributionAsync(projectId, startTime, endTime, status, defectType));
+            }
+            catch (ResultAnalysisBudgetException exception)
+            {
+                return BudgetViolation(exception);
+            }
         });
 
         app.MapGet("/api/analysis/trend/{projectId}", async (
@@ -45,7 +59,14 @@ public static class AnalysisEndpoints
                 return Results.BadRequest($"无效间隔: {interval}");
             }
 
-            return Results.Ok(await analysisService.GetTrendAnalysisAsync(projectId, trendInterval, startTime, endTime, status, defectType));
+            try
+            {
+                return Results.Ok(await analysisService.GetTrendAnalysisAsync(projectId, trendInterval, startTime, endTime, status, defectType));
+            }
+            catch (ResultAnalysisBudgetException exception)
+            {
+                return BudgetViolation(exception);
+            }
         });
 
         app.MapGet("/api/analysis/report/{projectId}", async (
@@ -56,9 +77,26 @@ public static class AnalysisEndpoints
             string? defectType,
             IResultAnalysisService analysisService) =>
         {
-            return Results.Ok(await analysisService.GenerateReportAsync(projectId, startTime, endTime, status, defectType));
+            try
+            {
+                return Results.Ok(await analysisService.GenerateReportAsync(projectId, startTime, endTime, status, defectType));
+            }
+            catch (ResultAnalysisBudgetException exception)
+            {
+                return BudgetViolation(exception);
+            }
         });
 
         return app;
     }
+
+    private static IResult BudgetViolation(ResultAnalysisBudgetException exception) =>
+        Results.BadRequest(new
+        {
+            error = exception.ErrorCode,
+            message = exception.Message,
+            maximumWindowDays = ResultAnalysisQueryBudget.MaximumWindowDays,
+            maximumTrendPoints = ResultAnalysisQueryBudget.MaximumTrendPoints,
+            maximumTrendRows = ResultAnalysisQueryBudget.MaximumTrendRows
+        });
 }

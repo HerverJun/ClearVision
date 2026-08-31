@@ -146,6 +146,49 @@ public class ResultOutputOperatorTests
     }
 
     [Fact]
+    public async Task ExecuteAsync_SaveToFile_ShouldUseGovernedQuotaBoundedStorage()
+    {
+        var root = Path.Combine(Path.GetTempPath(), $"cv-result-output-{Guid.NewGuid():N}");
+        var now = DateTimeOffset.Parse("2026-08-31T00:00:00Z");
+        try
+        {
+            var storage = new ResultOutputStorage(
+                root,
+                maxFiles: 2,
+                maxBytes: 1024,
+                retention: TimeSpan.FromDays(1),
+                utcNow: () => now);
+            var sut = new ResultOutputOperator(Substitute.For<ILogger<ResultOutputOperator>>(), storage);
+            var op = new Operator("test", OperatorType.ResultOutput, 0, 0);
+            op.AddParameter(TestHelpers.CreateParameter("SaveToFile", true, "bool"));
+
+            for (var index = 0; index < 3; index++)
+            {
+                now = now.AddSeconds(1);
+                var result = await sut.ExecuteAsync(op, new Dictionary<string, object> { ["Text"] = $"output-{index}" });
+                result.IsSuccess.Should().BeTrue();
+                result.OutputData!["FilePath"].Should().BeOfType<string>().Subject.Should().StartWith(Path.GetFullPath(root));
+            }
+
+            var health = sut.GetOutputStorageHealth();
+            health.FileCount.Should().Be(2);
+            health.TotalBytes.Should().BeLessThanOrEqualTo(1024);
+            health.TrimmedFileCount.Should().BeGreaterThan(0);
+            health.GapDetected.Should().BeTrue();
+
+            now = now.AddDays(2);
+            sut.GetOutputStorageHealth().FileCount.Should().Be(0);
+        }
+        finally
+        {
+            if (Directory.Exists(root))
+            {
+                Directory.Delete(root, recursive: true);
+            }
+        }
+    }
+
+    [Fact]
     public async Task ExecuteAsync_WithDetectionDiagnostics_ShouldNormalizeDetectionListForJsonOutput()
     {
         var op = new Operator("test", OperatorType.ResultOutput, 0, 0);

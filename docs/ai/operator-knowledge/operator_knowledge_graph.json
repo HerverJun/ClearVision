@@ -1,8 +1,8 @@
 {
   "SchemaVersion": "2026-07.operator-knowledge-graph.v4",
-  "GeneratedAtUtc": "2026-08-31T11:13:16.7616077Z",
+  "GeneratedAtUtc": "2026-08-31T13:08:53.869564Z",
   "Source": "OperatorMetadata \u002B FlowTemplate \u002B operator_quality_evidence_manifest",
-  "GenerationFingerprint": "A3AE8008883A543EAAD7EC0F21000C999CD704DA51E780111A44C8B2EB048204",
+  "GenerationFingerprint": "A4649A6D8A2E117E1F6784A4940A4C25C6C16B2839FE4632CEA0A893AC36FFCD",
   "Cards": [
     {
       "SchemaVersion": "2026-07.operator-knowledge-card.v2",
@@ -7479,7 +7479,7 @@
       "ImageInputContracts": [],
       "ResourceRequirements": [],
       "GenerationDependencies": [],
-      "GenerationFingerprint": "30EF6DB530842A540E722F8E34E85C78C0D5CB0DD9BCAA931084CD4F0E866FD9",
+      "GenerationFingerprint": "3FD4BD6BB94D70D1198AE4C0CD8D9857CF4B2547E86CD19B35B1903366363303",
       "RequiredResources": [],
       "TypicalUpstream": [],
       "TypicalDownstream": [],
@@ -12569,7 +12569,7 @@
       "ImageInputContracts": [],
       "ResourceRequirements": [],
       "GenerationDependencies": [],
-      "GenerationFingerprint": "59EE5795D682E71A2E45648247E0726E3123A1EC214D9C1AB7D685CBDC325BF4",
+      "GenerationFingerprint": "9B2DDB4B238765CCDF75DCFD5F38F6C8A34404D98BF26EDD6CCDC81EB3C8DA53",
       "RequiredResources": [],
       "TypicalUpstream": [],
       "TypicalDownstream": [],
@@ -27559,7 +27559,6 @@
         "PLC",
         "Communication",
         "Register",
-        "RTU",
         "TCP",
         "Industrial",
         "Modbus\u901A\u4FE1",
@@ -27874,7 +27873,7 @@
         }
       ],
       "GenerationDependencies": [],
-      "GenerationFingerprint": "BEE816D345431789919A2A52EFBE05EE737B08B392BB132BBCC850BD8D08682D",
+      "GenerationFingerprint": "37F4F681C1B9B8979BE1E41902487D34087D64437FEB78DD4D1FDD94D4C5C738",
       "RequiredResources": [
         "ModbusCommunication.ProfileId",
         "ModbusCommunication.RegisterAddress"
@@ -37267,7 +37266,7 @@
         }
       ],
       "GenerationDependencies": [],
-      "GenerationFingerprint": "0B158C24D2FFDD41D1EC343609E1F4FF10D6A344C2EC70F464D69E88CC4C9D15",
+      "GenerationFingerprint": "D090637C95E00274567686C42336670F2A13050660A511889E418B6E7E3716C6",
       "RequiredResources": [
         "ResultOutput.SaveToFile"
       ],
@@ -46581,7 +46580,7 @@
         }
       ],
       "GenerationDependencies": [],
-      "GenerationFingerprint": "E7AC8C29797BF923D3698BA333C41040E7A0E18959D67F08921183C5A0FB8AC6",
+      "GenerationFingerprint": "889EAA9585719A5A277CC1B651B0E8C56BCF8103C29297D48A181EAA43A36FE6",
       "RequiredResources": [
         "TextSave.FilePath"
       ],
@@ -52834,13 +52833,6 @@
       "RelationType": "ALIAS_OF",
       "Source": "rotation",
       "Target": "TranslationRotationCalibration",
-      "Weight": 1,
-      "Metadata": {}
-    },
-    {
-      "RelationType": "ALIAS_OF",
-      "Source": "RTU",
-      "Target": "ModbusCommunication",
       "Weight": 1,
       "Metadata": {}
     },

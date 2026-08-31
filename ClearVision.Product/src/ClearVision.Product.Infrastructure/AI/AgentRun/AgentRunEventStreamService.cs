@@ -32,6 +32,7 @@ public interface IAgentRunEventStreamService
     bool IsRunOwner(string runId, string? ownerHash);
     string? IssueStreamToken(string runId, string? ownerHash, TimeSpan? ttl = null);
     AgentRunStreamTokenValidationResult ValidateStreamToken(string runId, string? token, bool consume = true);
+    AgentRunEventStreamRetentionSnapshot GetRetentionSnapshot();
 }
 
 public enum AgentRunTerminalReservationOutcome
@@ -53,15 +54,34 @@ public sealed record AgentRunTerminalReservationResult(
     public bool Acquired => Outcome == AgentRunTerminalReservationOutcome.Acquired;
 }
 
+public sealed record AgentRunEventStreamRetentionSnapshot(
+    int HotRunCount,
+    int ActiveRunCount,
+    int TerminalRunCount,
+    int StreamTokenCount,
+    DateTimeOffset? OldestTerminalUpdatedAt,
+    long TrimmedTerminalRunCount,
+    long ExpiredTokenCount,
+    long CapacityTrimmedTokenCount,
+    DateTimeOffset? LastSuccessfulSweepAt,
+    bool Degraded);
+
 public sealed class AgentRunEventStreamService : IAgentRunEventStreamService
 {
     private const int MaxRecentEvents = 4096;
     private const int MaxSubscriberBufferedEvents = 256;
+    private const int DefaultMaxHotRuns = 256;
+    private const int DefaultMaxStreamTokens = 2048;
+    private static readonly TimeSpan DefaultTerminalHotRetention = TimeSpan.FromMinutes(15);
 
     private readonly ConcurrentDictionary<string, AgentRunState> _runs = new(StringComparer.OrdinalIgnoreCase);
     private readonly ConcurrentDictionary<string, AgentRunStreamToken> _streamTokens = new(StringComparer.Ordinal);
     private readonly AgentRunEventStore _store;
     private readonly AgentRunEventRedactor _redactor;
+    private long _trimmedTerminalRunCount;
+    private long _expiredTokenCount;
+    private long _capacityTrimmedTokenCount;
+    private DateTimeOffset? _lastSuccessfulSweepAt;
 
     public AgentRunEventStreamService()
         : this(new AgentRunEventStore(), new AgentRunEventRedactor())
@@ -76,6 +96,15 @@ public sealed class AgentRunEventStreamService : IAgentRunEventStreamService
 
     public Func<DateTimeOffset> UtcNowProvider { get; set; } = static () => DateTimeOffset.UtcNow;
 
+    /// <summary>Maximum in-memory hot states. Only terminal states are evicted.</summary>
+    public int MaxHotRuns { get; set; } = DefaultMaxHotRuns;
+
+    /// <summary>Maximum outstanding one-time stream tokens.</summary>
+    public int MaxStreamTokens { get; set; } = DefaultMaxStreamTokens;
+
+    /// <summary>How long a terminal run remains hot before durable replay is used.</summary>
+    public TimeSpan TerminalHotRetention { get; set; } = DefaultTerminalHotRetention;
+
     public string HostInstanceId { get; } = Guid.NewGuid().ToString("N");
 
     public AgentRunCreateResult CreateRun(
@@ -84,6 +113,7 @@ public sealed class AgentRunEventStreamService : IAgentRunEventStreamService
         string? ownerHash = null,
         string? requestedRunId = null)
     {
+        SweepRetention();
         var runId = string.IsNullOrWhiteSpace(requestedRunId)
             ? $"ar_{Guid.NewGuid():N}"
             : requestedRunId.Trim();
@@ -433,7 +463,7 @@ public sealed class AgentRunEventStreamService : IAgentRunEventStreamService
                 "Submit the request again when you are ready to continue.")
         }, reservation);
 
-        if (!string.IsNullOrWhiteSpace(runId))
+        if (terminal == null && !string.IsNullOrWhiteSpace(runId))
         {
             TryCancelToken(runId);
         }
@@ -609,6 +639,7 @@ public sealed class AgentRunEventStreamService : IAgentRunEventStreamService
 
     public string? IssueStreamToken(string runId, string? ownerHash, TimeSpan? ttl = null)
     {
+        SweepRetention();
         if (!IsRunOwner(runId, ownerHash))
         {
             return null;
@@ -620,6 +651,7 @@ public sealed class AgentRunEventStreamService : IAgentRunEventStreamService
             effectiveTtl = TimeSpan.FromSeconds(45);
         }
 
+        TrimStreamTokensToCapacity();
         var token = CreateOpaqueToken();
         _streamTokens[token] = new AgentRunStreamToken(
             runId.Trim(),
@@ -691,6 +723,7 @@ public sealed class AgentRunEventStreamService : IAgentRunEventStreamService
         AgentRunEvent evt;
         AgentRunSummary summary;
         List<ChannelWriter<AgentRunEvent>> subscribers;
+        var cancelToken = false;
         lock (state.Gate)
         {
             if (state.IsTerminal)
@@ -707,6 +740,7 @@ public sealed class AgentRunEventStreamService : IAgentRunEventStreamService
             state.Events.Add(evt);
             UpdateSummaryFromEvent(state, evt);
             state.IsTerminal = true;
+            cancelToken = string.Equals(targetStatus, AgentRunEventStatuses.Cancelled, StringComparison.OrdinalIgnoreCase);
             state.TerminalIntentStatus = targetStatus;
             state.TerminalIntentState = targetStatus;
             if (state.TerminalIntent != null)
@@ -723,6 +757,11 @@ public sealed class AgentRunEventStreamService : IAgentRunEventStreamService
 
         _store.AppendEventWithSummary(evt, summary);
 
+        if (cancelToken)
+        {
+            TryCancelStateToken(state);
+        }
+
         foreach (var subscriber in subscribers)
         {
             if (!subscriber.TryWrite(evt))
@@ -733,6 +772,7 @@ public sealed class AgentRunEventStreamService : IAgentRunEventStreamService
             subscriber.TryComplete();
         }
 
+        SweepRetention();
         return evt;
     }
 
@@ -940,8 +980,172 @@ public sealed class AgentRunEventStreamService : IAgentRunEventStreamService
         }
 
         restored.Events.AddRange(events.OrderBy(evt => evt.Sequence));
-        restored = _runs.GetOrAdd(runId, restored);
-        return restored;
+        SweepRetention();
+        var cached = _runs.GetOrAdd(runId, restored);
+        if (!ReferenceEquals(cached, restored))
+        {
+            restored.DisposeCancellation();
+        }
+
+        SweepRetention();
+        return cached;
+    }
+
+    /// <summary>
+    /// Returns cache/token retention health without exposing run content. It
+    /// also performs the lightweight sweep so abandoned tokens do not need a
+    /// validation request before they are reclaimed.
+    /// </summary>
+    public AgentRunEventStreamRetentionSnapshot GetRetentionSnapshot()
+    {
+        SweepRetention();
+        var terminalStates = _runs.Values
+            .Where(state =>
+            {
+                lock (state.Gate)
+                {
+                    return state.IsTerminal;
+                }
+            })
+            .ToList();
+        var activeCount = _runs.Count - terminalStates.Count;
+        DateTimeOffset? oldestTerminal = null;
+        foreach (var state in terminalStates)
+        {
+            lock (state.Gate)
+            {
+                if (oldestTerminal == null || state.UpdatedAt < oldestTerminal)
+                {
+                    oldestTerminal = state.UpdatedAt;
+                }
+            }
+        }
+
+        return new AgentRunEventStreamRetentionSnapshot(
+            _runs.Count,
+            activeCount,
+            terminalStates.Count,
+            _streamTokens.Count,
+            oldestTerminal,
+            Interlocked.Read(ref _trimmedTerminalRunCount),
+            Interlocked.Read(ref _expiredTokenCount),
+            Interlocked.Read(ref _capacityTrimmedTokenCount),
+            _lastSuccessfulSweepAt,
+            Degraded: false);
+    }
+
+    private void SweepRetention()
+    {
+        SweepExpiredStreamTokens();
+        TrimTerminalRuns();
+        _lastSuccessfulSweepAt = UtcNowProvider();
+    }
+
+    private void SweepExpiredStreamTokens()
+    {
+        var now = UtcNowProvider();
+        foreach (var pair in _streamTokens)
+        {
+            if (pair.Value.ExpiresAt > now || !_streamTokens.TryRemove(pair.Key, out _))
+            {
+                continue;
+            }
+
+            Interlocked.Increment(ref _expiredTokenCount);
+        }
+    }
+
+    private void TrimStreamTokensToCapacity()
+    {
+        var capacity = Math.Max(1, MaxStreamTokens);
+        var overflow = _streamTokens.Count - capacity + 1;
+        if (overflow <= 0)
+        {
+            return;
+        }
+
+        foreach (var token in _streamTokens
+            .OrderBy(pair => pair.Value.ExpiresAt)
+            .ThenBy(pair => pair.Key, StringComparer.Ordinal)
+            .Take(overflow))
+        {
+            if (_streamTokens.TryRemove(token.Key, out _))
+            {
+                Interlocked.Increment(ref _capacityTrimmedTokenCount);
+            }
+        }
+    }
+
+    private void TrimTerminalRuns()
+    {
+        var now = UtcNowProvider();
+        var retention = TerminalHotRetention <= TimeSpan.Zero
+            ? DefaultTerminalHotRetention
+            : TerminalHotRetention;
+        var cutoff = now - retention;
+        var terminalRuns = _runs
+            .Select(pair => (pair.Key, State: pair.Value, UpdatedAt: GetTerminalUpdatedAt(pair.Value)))
+            .Where(item => item.UpdatedAt != null)
+            .OrderBy(item => item.UpdatedAt)
+            .ThenBy(item => item.Key, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        var capacity = Math.Max(1, MaxHotRuns);
+        var overflow = Math.Max(0, _runs.Count - capacity);
+        foreach (var item in terminalRuns)
+        {
+            var expired = item.UpdatedAt <= cutoff;
+            if (!expired && overflow <= 0)
+            {
+                continue;
+            }
+
+            if (!TryEvictTerminalRun(item.Key, item.State))
+            {
+                continue;
+            }
+
+            if (!expired)
+            {
+                overflow--;
+            }
+        }
+    }
+
+    private static DateTimeOffset? GetTerminalUpdatedAt(AgentRunState state)
+    {
+        lock (state.Gate)
+        {
+            return state.IsTerminal && state.Subscribers.Count == 0
+                ? state.UpdatedAt
+                : null;
+        }
+    }
+
+    private bool TryEvictTerminalRun(string runId, AgentRunState state)
+    {
+        lock (state.Gate)
+        {
+            if (!state.IsTerminal || state.Subscribers.Count != 0)
+            {
+                return false;
+            }
+        }
+
+        if (!_runs.TryRemove(runId, out var removed))
+        {
+            return false;
+        }
+
+        if (!ReferenceEquals(removed, state))
+        {
+            _runs.TryAdd(runId, removed);
+            return false;
+        }
+
+        removed.DisposeCancellation();
+        Interlocked.Increment(ref _trimmedTerminalRunCount);
+        return true;
     }
 
     private static void UpdateSummaryFromEvent(AgentRunState state, AgentRunEvent evt)
@@ -1194,6 +1398,17 @@ public sealed class AgentRunEventStreamService : IAgentRunEventStreamService
         {
             LastSequence++;
             return LastSequence;
+        }
+
+        public void DisposeCancellation()
+        {
+            try
+            {
+                Cancellation.Dispose();
+            }
+            catch (ObjectDisposedException)
+            {
+            }
         }
 
         public AgentRunSummary ToSummary()

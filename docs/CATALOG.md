@@ -1,6 +1,6 @@
 # 算子目录 / Operator Catalog
 
-> 生成时间 / Generated At: `2026-08-31 19:13:00 +08:00`
+> 生成时间 / Generated At: `2026-08-31 21:08:42 +08:00`
 > 算子总数 / Total Operators: **158**
 
 ## 分类统计 / Category Summary
@@ -130,7 +130,7 @@
 | 枚举 (Enum) | 显示名 (DisplayName) | Execution | AlgorithmQuality | ProductionReadiness | FieldValidation | 输入 | 输出 | 参数 | 版本 (Version) | 算法 (Algorithm) | 文档 |
 |------|------|------|------|------|------|------:|------:|------:|------|------|------|
 | `OperatorType.DetectionSequenceJudge` | 检测顺序判定 | `Implemented` | `Unknown` | `Experimental` | `NotValidated` | 4 | 13 | 13 | `1.0.1` | 该算子用于对检测结果排序，并与期望标签序列进行比对。运行时从声明输入端口读取数据，按… | [DetectionSequenceJudge](./operators/DetectionSequenceJudge.md) |
-| `OperatorType.DualModalVoting` | 双模态投票 | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | 2 | 3 | 6 | `1.0.0` | 该算子用于融合深度学习与传统视觉检测结果，输出最终判定。运行时从声明输入端口读取数据… | [DualModalVoting](./operators/DualModalVoting.md) |
+| `OperatorType.DualModalVoting` | 双模态投票 | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | 2 | 3 | 6 | `1.0.1` | 该算子用于融合深度学习与传统视觉检测结果，输出最终判定。运行时从声明输入端口读取数据… | [DualModalVoting](./operators/DualModalVoting.md) |
 | `OperatorType.EdgePairDefect` | 边缘间距缺陷检测 | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | 3 | 4 | 4 | `1.0.1` | 该算子用于沿边缘对采样间距，按期望宽度与容差判定偏差点并输出缺陷数量和最大偏差。运行… | [EdgePairDefect](./operators/EdgePairDefect.md) |
 | `OperatorType.SurfaceDefectDetection` | 表面缺陷检测 | `Implemented` | `Unknown` | `Experimental` | `NotValidated` | 2 | 8 | 24 | `2.0.1` | 该算子用于使用梯度、配准后的参考差分或局部对比度检测表面缺陷。运行时从声明输入端口读… | [SurfaceDefectDetection](./operators/SurfaceDefectDetection.md) |
 
@@ -196,7 +196,7 @@
 | `OperatorType.ArrayIndexer` | 数组索引器 | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | 1 | 3 | 3 | `1.0.0` | 该算子用于从列表中按索引或条件提取元素。运行时从声明输入端口读取数据，按参数表解析配… | [ArrayIndexer](./operators/ArrayIndexer.md) |
 | `OperatorType.BoxFilter` | 候选框筛选 | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | 2 | 3 | 9 | `1.0.0` | 该算子用于按面积、类别、区域或分数过滤检测结果。运行时从声明输入端口读取数据，按参数… | [BoxFilter](./operators/BoxFilter.md) |
 | `OperatorType.BoxNms` | 候选框抑制 | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | 3 | 7 | 4 | `1.0.0` | 该算子用于对检测框执行非极大值抑制。运行时从声明输入端口读取数据，按参数表解析配置，… | [BoxNms](./operators/BoxNms.md) |
-| `OperatorType.Comparator` | 数值比较 | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | 2 | 2 | 5 | `1.0.0` | 该算子用于比较两个数值的大小关系，输出布尔判定结果与差值。运行时从声明输入端口读取数… | [Comparator](./operators/Comparator.md) |
+| `OperatorType.Comparator` | 数值比较 | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | 2 | 2 | 5 | `1.0.1` | 该算子用于比较两个数值的大小关系，输出布尔判定结果与差值。运行时从声明输入端口读取数… | [Comparator](./operators/Comparator.md) |
 | `OperatorType.JsonExtractor` | JSON 提取器 | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | 1 | 2 | 4 | `1.0.0` | 该算子用于按 JSONPath 从字符串中提取字段。运行时从声明输入端口读取数据，按… | [JsonExtractor](./operators/JsonExtractor.md) |
 | `OperatorType.LogicGate` | 逻辑门 | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | 2 | 1 | 1 | `1.0.0` | 该算子用于布尔逻辑运算 (AND, OR, NOT, XOR, NAND, NOR)… | [LogicGate](./operators/LogicGate.md) |
 | `OperatorType.MathOperation` | 数值计算 | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | 2 | 2 | 1 | `1.0.0` | 该算子用于支持加减乘除、取绝对值、开方等常用运算。运行时从声明输入端口读取数据，按参… | [MathOperation](./operators/MathOperation.md) |
@@ -228,7 +228,7 @@
 |------|------|------|------|------|------|------:|------:|------:|------|------|------|
 | `OperatorType.HttpRequest` | HTTP 请求 | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | 2 | 3 | 6 | `1.0.1` | 该算子用于调用外部 REST API。运行时从声明输入端口读取数据，按参数表解析配置… | [HttpRequest](./operators/HttpRequest.md) |
 | `OperatorType.MitsubishiMcCommunication` | 三菱MC通信 | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | 1 | 2 | 10 | `1.1.0` | 该算子用于三菱 MC 协议 PLC 读写通信。运行时从声明输入端口读取数据，按参数表… | [MitsubishiMcCommunication](./operators/MitsubishiMcCommunication.md) |
-| `OperatorType.ModbusCommunication` | Modbus TCP通信 | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | 1 | 2 | 6 | `1.1.0` | 该算子用于通过 Modbus TCP 读写线圈和保持寄存器；当前算子不执行 Modb… | [ModbusCommunication](./operators/ModbusCommunication.md) |
+| `OperatorType.ModbusCommunication` | Modbus TCP通信 | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | 1 | 2 | 6 | `1.1.1` | 该算子用于通过受服务器 PLC 配置约束的 Modbus TCP 读写线圈和保持寄存… | [ModbusCommunication](./operators/ModbusCommunication.md) |
 | `OperatorType.MqttPublish` | MQTT 发布 | `Implemented` | `Unknown` | `Reference` | `NotValidated` | 2 | 1 | 6 | `0.1.0` | 该算子用于在启用可选 MQTT 集成时发布检测数据。运行时从声明输入端口读取数据，按… | [MqttPublish](./operators/MqttPublish.md) |
 | `OperatorType.OmronFinsCommunication` | 欧姆龙FINS通信 | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | 1 | 2 | 10 | `1.1.0` | 该算子用于欧姆龙FINS/TCP协议PLC读写通信（CP1H/CJ2M/NJ/NX）… | [OmronFinsCommunication](./operators/OmronFinsCommunication.md) |
 | `OperatorType.SerialCommunication` | 串口通信 | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | 1 | 1 | 10 | `1.1.0` | 该算子用于RS-232/485 串口数据收发。运行时从声明输入端口读取数据，按参数表… | [SerialCommunication](./operators/SerialCommunication.md) |
@@ -241,5 +241,5 @@
 | `OperatorType.Comment` | 注释 | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | 1 | 2 | 1 | `1.0.1` | Workflow annotation passthrough | [Comment](./operators/Comment.md) |
 | `OperatorType.DatabaseWrite` | 数据库写入 | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | 2 | 2 | 4 | `1.1.0` | 该算子用于将输入数据写入 SQLite / SQL Server / MySQL 表… | [DatabaseWrite](./operators/DatabaseWrite.md) |
 | `OperatorType.ImageSave` | 图像保存 | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | 1 | 2 | 3 | `1.0.0` | 该算子用于保存检测图像到本地硬盘。运行时从声明输入端口读取数据，按参数表解析配置，并… | [ImageSave](./operators/ImageSave.md) |
-| `OperatorType.ResultOutput` | 结果输出 | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | 4 | 6 | 3 | `1.0.1` | 该算子用于汇总检测结果并输出，支持 JSON/CSV/Text 格式，可选保存到文件… | [ResultOutput](./operators/ResultOutput.md) |
-| `OperatorType.TextSave` | 文本保存 | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | 2 | 2 | 5 | `1.0.1` | 该算子用于将文本或结构化数据保存为 text/csv/json 文件。运行时从声明输… | [TextSave](./operators/TextSave.md) |
+| `OperatorType.ResultOutput` | 结果输出 | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | 4 | 6 | 3 | `1.0.2` | 该算子用于汇总检测结果并输出，支持 JSON/CSV/Text 格式，可选保存到文件… | [ResultOutput](./operators/ResultOutput.md) |
+| `OperatorType.TextSave` | 文本保存 | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | 2 | 2 | 5 | `1.0.2` | 该算子用于将文本或结构化数据保存为 text/csv/json 文件。运行时从声明输… | [TextSave](./operators/TextSave.md) |

@@ -29,8 +29,7 @@ const COMM_OPERATOR_TYPES = new Set([
 const LEGACY_OPERATOR_TYPE_ALIASES = {
     'Preprocessing': 'Filtering',
     'GaussianBlur': 'Filtering',
-    'OnnxInference': 'DeepLearning',
-    'ModbusRtuCommunication': 'ModbusCommunication'
+    'OnnxInference': 'DeepLearning'
 };
 
 const PORT_HIT_RADIUS_PX = 12;       // 端口屏幕命中半径

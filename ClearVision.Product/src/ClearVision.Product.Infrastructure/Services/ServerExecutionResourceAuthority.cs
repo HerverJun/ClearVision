@@ -166,6 +166,15 @@ public sealed class ServerExecutionResourceAuthority : IExecutionResourceAuthori
         IReadOnlyList<string> approvedRoots,
         IExecutionResourceProfileResolver resourceProfileResolver)
     {
+        if (@operator.Type == OperatorType.ModbusRtuCommunication ||
+            (@operator.Type == OperatorType.ModbusCommunication &&
+             ExecutionResourceBindingManifest.UsesModbusRtuAuthority(@operator)))
+        {
+            return ExecutionResourceAuthorityResult.Reject(
+                "MODBUS_RTU_UNSUPPORTED",
+                "Modbus RTU is a retired compatibility type and is not supported by this package operator.");
+        }
+
         foreach (var pathField in ExecutionResourceBindingManifest.AuthorityFieldNames(@operator)
                      .Where(ExecutionResourceBindingManifest.IsPathFieldName))
         {
@@ -202,12 +211,9 @@ public sealed class ServerExecutionResourceAuthority : IExecutionResourceAuthori
             OperatorType.ImageAcquisition => ValidateImageAcquisition(@operator, config),
             OperatorType.HttpRequest => ValidateHttp(@operator),
             OperatorType.DatabaseWrite => ValidateDatabase(@operator, resourceProfileResolver),
-            OperatorType.SerialCommunication or
-            OperatorType.ModbusRtuCommunication => ValidateSerial(@operator, resourceProfileResolver),
+            OperatorType.SerialCommunication => ValidateSerial(@operator, resourceProfileResolver),
             OperatorType.TcpCommunication => ValidateTcp(@operator, config),
-            OperatorType.ModbusCommunication when
-                ExecutionResourceBindingManifest.UsesModbusRtuAuthority(@operator) ||
-                HasSerialTargetShape(@operator) =>
+            OperatorType.ModbusCommunication when HasSerialTargetShape(@operator) =>
                 ValidateCanonicalModbusRtu(@operator, resourceProfileResolver),
             OperatorType.ModbusCommunication or
             OperatorType.SiemensS7Communication or

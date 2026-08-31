@@ -605,6 +605,59 @@ public sealed class VisionAgentRuntimePreviewGovernanceTests
     }
 
     [Fact]
+    public void MaintenanceService_ShouldPruneInMemoryIndexesAndRejectLateWritesForTrimmedSessions()
+    {
+        var directory = TempDirectory();
+        try
+        {
+            var store = new RuntimePreviewGovernanceStore(directory);
+            var oldSession = new RuntimePreviewSession
+            {
+                SessionId = "rp_session_trimmed",
+                WorkflowDraftHash = "old_hash",
+                PilotConfigRevision = "old_config",
+                CatalogSnapshotId = "old_catalog",
+                CreatedAtUtc = DateTimeOffset.UtcNow.AddDays(-10),
+                UpdatedAtUtc = DateTimeOffset.UtcNow.AddDays(-10)
+            };
+            var retainedSession = oldSession with
+            {
+                SessionId = "rp_session_retained",
+                WorkflowDraftHash = "retained_hash",
+                CreatedAtUtc = DateTimeOffset.UtcNow,
+                UpdatedAtUtc = DateTimeOffset.UtcNow
+            };
+            store.SaveSession(oldSession);
+            store.SaveSession(retainedSession);
+            store.SaveAuditEvent(new RuntimePreviewAuditEvent
+            {
+                EventId = "rp_audit_trimmed",
+                SessionId = oldSession.SessionId,
+                EventType = RuntimePreviewAuditEventTypes.SessionCreated,
+                CreatedAtUtc = oldSession.CreatedAtUtc,
+                Payload = Args(new { metadataOnly = true })
+            });
+
+            var sessions = new RuntimePreviewSessionStore(store);
+            var audit = new RuntimePreviewAuditTrail(store);
+            var archive = new RuntimePreviewReportArchive(store);
+            var service = new RuntimePreviewGovernanceMaintenanceService(store, sessions, audit, archive);
+
+            var cleanup = service.Cleanup(retentionDays: 1, maxSessions: 10);
+
+            cleanup.TrimmedSessions.Should().Be(1);
+            sessions.Get(oldSession.SessionId).Should().BeNull();
+            audit.ListForSession(oldSession.SessionId).Should().BeEmpty();
+            var act = () => audit.Append(oldSession.SessionId, RuntimePreviewAuditEventTypes.SessionReplayed, Args(new { metadataOnly = true }));
+            act.Should().Throw<InvalidOperationException>().WithMessage("*removed by retention cleanup*");
+        }
+        finally
+        {
+            DeleteDirectory(directory);
+        }
+    }
+
+    [Fact]
     public async Task ScenarioEvidenceService_ShouldCoverMetadataOnlyBusinessScenarios()
     {
         var archive = new RuntimePreviewReportArchive();

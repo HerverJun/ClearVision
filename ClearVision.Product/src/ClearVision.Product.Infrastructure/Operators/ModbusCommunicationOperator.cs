@@ -40,11 +40,11 @@ internal interface IModbusConnectionResource : IDisposable
 
 [OperatorMeta(
     DisplayName = "Modbus TCP通信",
-    Description = "通过 Modbus TCP 读写线圈和保持寄存器；当前算子不执行 Modbus RTU 通信。",
+    Description = "通过受服务器 PLC 配置约束的 Modbus TCP 读写线圈和保持寄存器。",
     CategoryId = OperatorCategoryId.Communication,
     IconName = "modbus",
-    Keywords = new[] { "Modbus", "PLC", "Communication", "Register", "RTU", "TCP", "Industrial", "Modbus通信", "Modbus Communication" },
-    Version = "1.1.0"
+    Keywords = new[] { "Modbus", "PLC", "Communication", "Register", "TCP", "Industrial", "Modbus通信", "Modbus Communication" },
+    Version = "1.1.1"
 )]
 [OperatorParameterRule("ProfileId", RequiredPolicy = OperatorParameterRequiredPolicy.Required, ResourceKind = OperatorResourceKind.PlcProfile, ReasonCode = "MODBUS_PLC_PROFILE_REQUIRED")]
 [OperatorParameterRule("RegisterAddress", RequiredPolicy = OperatorParameterRequiredPolicy.Required, ResourceKind = OperatorResourceKind.PlcAddress, ReasonCode = "MODBUS_REGISTER_ADDRESS_REQUIRED")]
@@ -118,6 +118,16 @@ public class ModbusCommunicationOperator : OperatorBase
         Dictionary<string, object>? inputs,
         CancellationToken cancellationToken)
     {
+        var profileId = GetStringParam(@operator, "ProfileId", string.Empty);
+        var protocol = GetStringParam(@operator, "Protocol", "TCP");
+        if (!protocol.Equals("TCP", StringComparison.OrdinalIgnoreCase))
+        {
+            return OperatorExecutionOutput.Failure(
+                protocol.Equals("RTU", StringComparison.OrdinalIgnoreCase)
+                    ? "MODBUS_RTU_UNSUPPORTED: Modbus RTU is not supported by this package operator."
+                    : "MODBUS_PROTOCOL_UNSUPPORTED: ModbusCommunication only supports TCP.");
+        }
+
         var forbiddenRawTarget = FindForbiddenRawTargetParameter(@operator);
         if (forbiddenRawTarget != null)
         {
@@ -125,19 +135,12 @@ public class ModbusCommunicationOperator : OperatorBase
                 $"PLC_RAW_TARGET_FORBIDDEN: {forbiddenRawTarget} cannot grant execution authority; use ProfileId and an allow-listed RegisterAddress/FunctionCode binding.");
         }
 
-        var profileId = GetStringParam(@operator, "ProfileId", string.Empty);
-        var protocol = GetStringParam(@operator, "Protocol", "TCP");
         var registerAddress = GetIntParam(@operator, "RegisterAddress", 0);
         var registerCount = GetIntParam(@operator, "RegisterCount", 1, 1, 125);
         var functionCode = GetStringParam(@operator, "FunctionCode", "ReadHolding");
         // 写操作优先使用上游连线到 "Data" 端口的动态值，否则回退参数面板中的静态 WriteValue。
         var writeValue = ResolveWriteValue(@operator, inputs);
         var timeoutMs = GetIntParam(@operator, "TimeoutMs", DefaultOperationTimeoutMs, 100, 60000);
-
-        if (!protocol.Equals("TCP", StringComparison.OrdinalIgnoreCase))
-        {
-            return OperatorExecutionOutput.Failure("Modbus RTU requires serial-port lifecycle configuration and is not supported by this package operator.");
-        }
 
         var effectiveElementCount = functionCode switch
         {
@@ -238,13 +241,6 @@ public class ModbusCommunicationOperator : OperatorBase
 
     public override ValidationResult ValidateParameters(Operator @operator)
     {
-        var forbiddenRawTarget = FindForbiddenRawTargetParameter(@operator);
-        if (forbiddenRawTarget != null)
-        {
-            return ValidationResult.Invalid(
-                $"PLC_RAW_TARGET_FORBIDDEN: {forbiddenRawTarget} cannot grant execution authority; use ProfileId and an allow-listed RegisterAddress/FunctionCode binding.");
-        }
-
         var profileId = GetStringParam(@operator, "ProfileId", string.Empty);
         var registerAddress = GetIntParam(@operator, "RegisterAddress", 0);
         var registerCount = GetIntParam(@operator, "RegisterCount", 1);
@@ -257,20 +253,24 @@ public class ModbusCommunicationOperator : OperatorBase
             return ValidationResult.Invalid("RegisterCount must be between 1 and 125.");
         }
 
-        if (!protocol.Equals("TCP", StringComparison.OrdinalIgnoreCase) &&
-            !protocol.Equals("RTU", StringComparison.OrdinalIgnoreCase))
+        if (!protocol.Equals("TCP", StringComparison.OrdinalIgnoreCase))
         {
-            return ValidationResult.Invalid("Protocol must be TCP or RTU.");
+            return ValidationResult.Invalid(
+                protocol.Equals("RTU", StringComparison.OrdinalIgnoreCase)
+                    ? "MODBUS_RTU_UNSUPPORTED: Modbus RTU is not supported by this package operator."
+                    : "MODBUS_PROTOCOL_UNSUPPORTED: ModbusCommunication only supports TCP.");
+        }
+
+        var forbiddenRawTarget = FindForbiddenRawTargetParameter(@operator);
+        if (forbiddenRawTarget != null)
+        {
+            return ValidationResult.Invalid(
+                $"PLC_RAW_TARGET_FORBIDDEN: {forbiddenRawTarget} cannot grant execution authority; use ProfileId and an allow-listed RegisterAddress/FunctionCode binding.");
         }
 
         if (timeoutMs < 100 || timeoutMs > 60000)
         {
             return ValidationResult.Invalid("TimeoutMs must be between 100 and 60000.");
-        }
-
-        if (!protocol.Equals("TCP", StringComparison.OrdinalIgnoreCase))
-        {
-            return ValidationResult.Invalid("Modbus RTU is not supported by this operator.");
         }
 
         var resolution = _executionResourceProfileResolver.ResolvePlc(
@@ -290,7 +290,6 @@ public class ModbusCommunicationOperator : OperatorBase
 
     private static string? FindForbiddenRawTargetParameter(Operator @operator) =>
         @operator.Parameters.FirstOrDefault(parameter =>
-            parameter.Name.Equals("Protocol", StringComparison.OrdinalIgnoreCase) ||
             parameter.Name.Equals("IpAddress", StringComparison.OrdinalIgnoreCase) ||
             parameter.Name.Equals("Port", StringComparison.OrdinalIgnoreCase) ||
             parameter.Name.Equals("SlaveId", StringComparison.OrdinalIgnoreCase))?.Name;

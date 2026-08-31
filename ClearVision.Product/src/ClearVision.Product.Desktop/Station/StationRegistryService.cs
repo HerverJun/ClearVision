@@ -404,13 +404,15 @@ public sealed class StationRegistryService
             return null;
         }
 
+        StoredStationRegistryEvent storedEvent;
         lock (_syncRoot)
         {
             var entry = GetOrCreateEntryLocked(stationId);
             UpsertCommandLocked(entry, command);
+            storedEvent = CreateEventLocked("stationCommandUpdated", command);
         }
 
-        PublishEvents([new StoredStationRegistryEvent(Interlocked.Increment(ref _nextEventSequenceId), "stationCommandUpdated", command, DateTimeOffset.UtcNow)]);
+        PublishEvents([storedEvent]);
         return command;
     }
 
@@ -631,12 +633,13 @@ public sealed class StationRegistryService
         int pageIndex,
         int pageSize)
     {
+        var window = StationResultQueryBudget.Normalize(fromUtc, toUtc, DateTimeOffset.UtcNow);
         if (_centralStore != null)
         {
             return _centralStore.GetResultsPage(
                 stationId,
-                fromUtc,
-                toUtc,
+                window.FromUtc,
+                window.ToUtc,
                 status,
                 diagnosticCode,
                 pageIndex,
@@ -651,8 +654,8 @@ public sealed class StationRegistryService
                 .Where(entry => string.IsNullOrWhiteSpace(stationId) ||
                                 string.Equals(entry.StationId, stationId, StringComparison.OrdinalIgnoreCase))
                 .SelectMany(entry => entry.RecentResults.Select(CloneResult))
-                .Where(result => !fromUtc.HasValue || result.CompletedAtUtc >= fromUtc.Value)
-                .Where(result => !toUtc.HasValue || result.CompletedAtUtc <= toUtc.Value)
+                .Where(result => result.CompletedAtUtc >= window.FromUtc)
+                .Where(result => result.CompletedAtUtc <= window.ToUtc)
                 .Where(result => MatchesStatus(result, status))
                 .Where(result => MatchesText(result.DiagnosticCode, diagnosticCode))
                 .OrderByDescending(result => result.CompletedAtUtc)
@@ -679,9 +682,10 @@ public sealed class StationRegistryService
         string? status,
         string? diagnosticCode)
     {
+        var window = StationResultQueryBudget.Normalize(fromUtc, toUtc, DateTimeOffset.UtcNow);
         if (_centralStore != null)
         {
-            return _centralStore.GetStatistics(fromUtc, toUtc, stationId, status, diagnosticCode);
+            return _centralStore.GetStatistics(window.FromUtc, window.ToUtc, stationId, status, diagnosticCode);
         }
 
         lock (_syncRoot)
@@ -690,13 +694,13 @@ public sealed class StationRegistryService
                 .Where(entry => string.IsNullOrWhiteSpace(stationId) ||
                                 string.Equals(entry.StationId, stationId, StringComparison.OrdinalIgnoreCase))
                 .SelectMany(entry => entry.RecentResults.Select(CloneResult))
-                .Where(result => !fromUtc.HasValue || result.CompletedAtUtc >= fromUtc.Value)
-                .Where(result => !toUtc.HasValue || result.CompletedAtUtc <= toUtc.Value)
+                .Where(result => result.CompletedAtUtc >= window.FromUtc)
+                .Where(result => result.CompletedAtUtc <= window.ToUtc)
                 .Where(result => MatchesStatus(result, status))
                 .Where(result => MatchesText(result.DiagnosticCode, diagnosticCode))
                 .ToList();
 
-            return StationOutcomeStatisticsBuilder.Build(results, fromUtc, toUtc);
+            return StationOutcomeStatisticsBuilder.Build(results, window.FromUtc, window.ToUtc);
         }
     }
 
@@ -773,12 +777,28 @@ public sealed class StationRegistryService
                         : new StationStatusViewModel { StationId = item.StationId }
                 })
                 .ToList();
+            var recentCommands = _entries.Values
+                .SelectMany(entry => entry.RecentCommands.Select(command => new StationCommandEventViewModel
+                {
+                    StationId = entry.StationId,
+                    Command = command
+                }))
+                .OrderByDescending(item => item.Command.CompletedAtUtc ?? item.Command.StartedAtUtc ?? item.Command.AcceptedAtUtc ?? item.Command.DeliveredAtUtc ?? item.Command.CreatedAtUtc)
+                .ThenBy(item => item.Command.CommandId, StringComparer.Ordinal)
+                .Take(Math.Max(20, _options.CommandBufferPerStation))
+                .Select(item => new StationCommandEventViewModel
+                {
+                    StationId = item.StationId,
+                    Command = item.Command
+                })
+                .ToList();
 
             return new StationSseSnapshotViewModel
             {
                 Summary = BuildSummaryLocked(now),
                 Stations = stationViewModels,
-                RecentResults = recentResults
+                RecentResults = recentResults,
+                RecentCommands = recentCommands
             };
         }
     }

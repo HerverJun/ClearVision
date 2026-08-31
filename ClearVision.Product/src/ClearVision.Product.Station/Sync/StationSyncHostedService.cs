@@ -609,6 +609,7 @@ public sealed class StationSyncHostedService : BackgroundService
         var heartbeat = BuildHeartbeatDto(identity, _runtimeHost.GetSnapshot());
         heartbeat.SequenceId = Interlocked.Increment(ref _nextControlSequenceId);
         heartbeat.SpoolPendingCount = _spoolStore.PendingCount;
+        heartbeat.CommandResultSpoolPendingCount = _commandResultSpoolStore.PendingCount;
         heartbeat.LastResultAtUtc = _lastResultAtUtc;
         var response = await _hubClient.PushHeartbeatAsync(
             heartbeat,
@@ -1157,6 +1158,7 @@ public sealed class StationSyncHostedService : BackgroundService
         var droppedResultSummaries = Volatile.Read(ref _droppedResultSummaries);
         var spoolPendingCount = spoolStore.PendingCount;
         var spoolBytes = spoolStore.SpoolBytes;
+        var commandResultSpool = _commandResultSpoolStore.GetHealth();
         var resultSyncDiagnostic = BuildResultSyncDiagnostic(
             queuedResultSummaries,
             resultBackpressureWaits,
@@ -1164,7 +1166,8 @@ public sealed class StationSyncHostedService : BackgroundService
             spoolPendingCount,
             spoolBytes,
             driveInfo?.AvailableFreeSpace / 1024 / 1024 ?? 0,
-            (gap.FromSequenceId, gap.ThroughSequenceId));
+            (gap.FromSequenceId, gap.ThroughSequenceId),
+            commandResultSpool);
 
         return new StationHealthSnapshotDto
         {
@@ -1180,6 +1183,12 @@ public sealed class StationSyncHostedService : BackgroundService
             DiskTotalMb = driveInfo?.TotalSize / 1024 / 1024 ?? 0,
             SpoolPendingCount = spoolPendingCount,
             SpoolBytes = spoolBytes,
+            CommandResultSpoolPendingCount = commandResultSpool.PendingCount,
+            CommandResultSpoolBytes = commandResultSpool.PendingBytes,
+            CommandResultSpoolOldestAtUtc = commandResultSpool.OldestPendingAtUtc,
+            CommandResultSpoolTrimmedCount = commandResultSpool.TrimmedCount,
+            CommandResultSpoolGapDetected = commandResultSpool.GapDetected,
+            CommandResultSpoolDegraded = commandResultSpool.Degraded,
             CameraStatusSummary = BuildCameraStatusSummary(_runtimeHost.LoadedPackage),
             PlcStatusSummary = BuildPlcStatusSummary(_runtimeHost.LoadedPackage, snapshot),
             CurrentPackageId = snapshot.PackageId,
@@ -1355,20 +1364,21 @@ public sealed class StationSyncHostedService : BackgroundService
         int spoolPending,
         long spoolBytes,
         long diskFreeMb,
-        (long From, long Through) spoolTrimmingRange)
+        (long From, long Through) spoolTrimmingRange,
+        StationCommandResultSpoolHealth commandResultSpool)
     {
-        if (dropped > 0 || spoolTrimmingRange.From > 0)
+        if (dropped > 0 || spoolTrimmingRange.From > 0 || commandResultSpool.GapDetected || commandResultSpool.Degraded)
         {
             return (
                 ResultSpoolPersistFailedDiagnosticCode,
-                BuildResultSyncDiagnosticMessage(queued, backpressureWaits, dropped, spoolPending, spoolBytes, diskFreeMb, spoolTrimmingRange));
+                BuildResultSyncDiagnosticMessage(queued, backpressureWaits, dropped, spoolPending, spoolBytes, diskFreeMb, spoolTrimmingRange, commandResultSpool));
         }
 
         if (IsResultBackpressured(queued, spoolPending))
         {
             return (
                 ResultBackpressureDiagnosticCode,
-                BuildResultSyncDiagnosticMessage(queued, backpressureWaits, dropped, spoolPending, spoolBytes, diskFreeMb, spoolTrimmingRange));
+                BuildResultSyncDiagnosticMessage(queued, backpressureWaits, dropped, spoolPending, spoolBytes, diskFreeMb, spoolTrimmingRange, commandResultSpool));
         }
 
         return (null, null);
@@ -1396,14 +1406,18 @@ public sealed class StationSyncHostedService : BackgroundService
         int spoolPending,
         long spoolBytes,
         long diskFreeMb,
-        (long From, long Through) spoolTrimmingRange)
+        (long From, long Through) spoolTrimmingRange,
+        StationCommandResultSpoolHealth commandResultSpool)
     {
         var trimmingText = spoolTrimmingRange.From > 0
             ? $"spoolTrimmingRange={spoolTrimmingRange.From}-{spoolTrimmingRange.Through}; "
             : "";
         return "Station 结果同步出现背压。请检查：Studio 连接、工站到 Studio 的网络、防火墙规则、spool 磁盘空间/权限、StationSync 队列容量。 " +
             $"queued={queued}; outboundQueueCapacity={Math.Max(1, _options.OutboundQueueCapacity)}; backpressureWaits={backpressureWaits}; " +
-            $"spoolPending={spoolPending}; spoolBytes={spoolBytes}; diskFreeMb={diskFreeMb}; {trimmingText}failedResultSpoolWrites={dropped}";
+            $"spoolPending={spoolPending}; spoolBytes={spoolBytes}; commandResultPending={commandResultSpool.PendingCount}; " +
+            $"commandResultBytes={commandResultSpool.PendingBytes}; commandResultOldest={commandResultSpool.OldestPendingAtUtc:O}; " +
+            $"commandResultTrimmed={commandResultSpool.TrimmedCount}; commandResultGap={commandResultSpool.GapDetected}; " +
+            $"commandResultDegraded={commandResultSpool.Degraded}; diskFreeMb={diskFreeMb}; {trimmingText}failedResultSpoolWrites={dropped}";
     }
 
     private static string BuildPlcStatusSummary(RuntimePackage? package, RuntimeHostSnapshot snapshot)

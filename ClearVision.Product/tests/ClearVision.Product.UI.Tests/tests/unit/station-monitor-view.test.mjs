@@ -115,6 +115,84 @@ test('station monitor preserves explicit zero execution failures over legacy err
   assert.equal(statistics.executionFailures, 0);
 });
 
+test('station monitor command replay deduplicates updates and never regresses a terminal command state', async () => {
+  const { StationMonitorView } = await import(
+    '../../../../src/ClearVision.Product.Desktop/wwwroot/src/features/stations/stationMonitorView.js'
+  );
+
+  const view = Object.create(StationMonitorView.prototype);
+  view.selectedStationId = 'station-command';
+  view.selectedStationDetail = {
+    stationId: 'station-command',
+    recentCommands: []
+  };
+  view.stations = new Map([['station-command', { stationId: 'station-command' }]]);
+  view.canReadSensitiveMonitoring = () => true;
+  view.markDirty = () => {};
+
+  view.applyCommandEvent({
+    commandId: 'cmd-1',
+    stationId: 'station-command',
+    status: 'Succeeded',
+    progressPercent: 100,
+    completedAtUtc: '2026-08-31T00:02:00Z'
+  });
+  view.applyCommandEvent({
+    commandId: 'cmd-1',
+    stationId: 'station-command',
+    status: 'Running',
+    progressPercent: 80,
+    startedAtUtc: '2026-08-31T00:01:00Z'
+  });
+  view.applyCommandEvent({
+    commandId: 'cmd-1',
+    stationId: 'station-command',
+    status: 'Succeeded',
+    progressPercent: 100,
+    completedAtUtc: '2026-08-31T00:02:00Z'
+  });
+
+  assert.equal(view.selectedStationDetail.recentCommands.length, 1);
+  assert.equal(view.selectedStationDetail.recentCommands[0].status, 'Succeeded');
+  assert.equal(view.selectedStationDetail.recentCommands[0].progressPercent, 100);
+});
+
+test('shared CSV sanitizer neutralizes whitespace-prefixed formulas while preserving normal Unicode', async () => {
+  const { formatCsvField, sanitizeCsvText } = await import(
+    '../../../../src/ClearVision.Product.Desktop/wwwroot/src/shared/csvSanitizer.js'
+  );
+
+  for (const value of ['=SUM(1,2)', ' +SUM(1,2)', '\t-1+1', '\r\n@HYPERLINK("https://example.test")']) {
+    assert.match(sanitizeCsvText(value), /^'/);
+    assert.match(formatCsvField(value), /^(?:'|"')/);
+  }
+
+  assert.equal(formatCsvField('正常中文 · 检测通过 ✅'), '正常中文 · 检测通过 ✅');
+});
+
+test('station monitor CSV export uses the shared sanitizer for Station-controlled fields', async () => {
+  const { StationMonitorView } = await import(
+    '../../../../src/ClearVision.Product.Desktop/wwwroot/src/features/stations/stationMonitorView.js'
+  );
+
+  const view = Object.create(StationMonitorView.prototype);
+  const csv = view.convertResultsToCsv([{
+    stationId: 'station-a',
+    stationLabel: '工站 A',
+    sequenceId: 1,
+    status: 'NG',
+    diagnosticCode: ' \t=CMD()',
+    diagnosticMessage: '\r\n@HYPERLINK("https://example.test")',
+    executionTimeMs: 12,
+    completedAtUtc: '2026-08-31T00:00:00Z',
+    packageName: '正常包名'
+  }]);
+
+  assert.match(csv, /' \t=CMD\(\)/);
+  assert.match(csv, /"'\r\n@HYPERLINK\(""https:\/\/example\.test""\)"/);
+  assert.doesNotMatch(csv, /\.xls/i);
+});
+
 test('station monitor skips KPI DOM rebuild when summary signature is unchanged', async () => {
   const { StationMonitorView } = await import(
     '../../../../src/ClearVision.Product.Desktop/wwwroot/src/features/stations/stationMonitorView.js'

@@ -1,6 +1,6 @@
 # 算子版本变更记录 / Operator Version Changelog
 
-> 生成时间 / Generated At: `2026-08-31 19:13:00 +08:00`
+> 生成时间 / Generated At: `2026-08-31 21:08:42 +08:00`
 > 算子总数 / Total Operators: **158**
 
 ## 当前版本快照 / Current Snapshot
@@ -83,7 +83,7 @@
 | `OperatorType.ShapeMatching` | 旋转尺度模板匹配 | `MatchingAndLocalization` | 匹配与定位 | `Stable` | `1.2.0` |
 | `OperatorType.TemplateMatching` | 模板匹配 | `MatchingAndLocalization` | 匹配与定位 | `Stable` | `1.2.0` |
 | `OperatorType.DetectionSequenceJudge` | 检测顺序判定 | `DefectDetection` | 缺陷检测 | `Experimental` | `1.0.1` |
-| `OperatorType.DualModalVoting` | 双模态投票 | `DefectDetection` | 缺陷检测 | `Stable` | `1.0.0` |
+| `OperatorType.DualModalVoting` | 双模态投票 | `DefectDetection` | 缺陷检测 | `Stable` | `1.0.1` |
 | `OperatorType.EdgePairDefect` | 边缘间距缺陷检测 | `DefectDetection` | 缺陷检测 | `Stable` | `1.0.1` |
 | `OperatorType.SurfaceDefectDetection` | 表面缺陷检测 | `DefectDetection` | 缺陷检测 | `Experimental` | `2.0.1` |
 | `OperatorType.AngleMeasurement` | 角度测量 | `Measurement` | 测量 | `Stable` | `1.0.0` |
@@ -129,7 +129,7 @@
 | `OperatorType.ArrayIndexer` | 数组索引器 | `DataProcessing` | 数据处理 | `Stable` | `1.0.0` |
 | `OperatorType.BoxFilter` | 候选框筛选 | `DataProcessing` | 数据处理 | `Stable` | `1.0.0` |
 | `OperatorType.BoxNms` | 候选框抑制 | `DataProcessing` | 数据处理 | `Stable` | `1.0.0` |
-| `OperatorType.Comparator` | 数值比较 | `DataProcessing` | 数据处理 | `Stable` | `1.0.0` |
+| `OperatorType.Comparator` | 数值比较 | `DataProcessing` | 数据处理 | `Stable` | `1.0.1` |
 | `OperatorType.JsonExtractor` | JSON 提取器 | `DataProcessing` | 数据处理 | `Stable` | `1.0.0` |
 | `OperatorType.LogicGate` | 逻辑门 | `DataProcessing` | 数据处理 | `Stable` | `1.0.0` |
 | `OperatorType.MathOperation` | 数值计算 | `DataProcessing` | 数据处理 | `Stable` | `1.0.0` |
@@ -153,7 +153,7 @@
 | `OperatorType.TryCatch` | Try分支透传 | `FlowControl` | 流程控制 | `Stable` | `1.0.0` |
 | `OperatorType.HttpRequest` | HTTP 请求 | `Communication` | 通信 | `Stable` | `1.0.1` |
 | `OperatorType.MitsubishiMcCommunication` | 三菱MC通信 | `Communication` | 通信 | `Stable` | `1.1.0` |
-| `OperatorType.ModbusCommunication` | Modbus TCP通信 | `Communication` | 通信 | `Stable` | `1.1.0` |
+| `OperatorType.ModbusCommunication` | Modbus TCP通信 | `Communication` | 通信 | `Stable` | `1.1.1` |
 | `OperatorType.MqttPublish` | MQTT 发布 | `Communication` | 通信 | `Reference` | `0.1.0` |
 | `OperatorType.OmronFinsCommunication` | 欧姆龙FINS通信 | `Communication` | 通信 | `Stable` | `1.1.0` |
 | `OperatorType.SerialCommunication` | 串口通信 | `Communication` | 通信 | `Stable` | `1.1.0` |
@@ -162,8 +162,8 @@
 | `OperatorType.Comment` | 注释 | `OutputAndAuxiliary` | 输出与辅助 | `Stable` | `1.0.1` |
 | `OperatorType.DatabaseWrite` | 数据库写入 | `OutputAndAuxiliary` | 输出与辅助 | `Stable` | `1.1.0` |
 | `OperatorType.ImageSave` | 图像保存 | `OutputAndAuxiliary` | 输出与辅助 | `Stable` | `1.0.0` |
-| `OperatorType.ResultOutput` | 结果输出 | `OutputAndAuxiliary` | 输出与辅助 | `Stable` | `1.0.1` |
-| `OperatorType.TextSave` | 文本保存 | `OutputAndAuxiliary` | 输出与辅助 | `Stable` | `1.0.1` |
+| `OperatorType.ResultOutput` | 结果输出 | `OutputAndAuxiliary` | 输出与辅助 | `Stable` | `1.0.2` |
+| `OperatorType.TextSave` | 文本保存 | `OutputAndAuxiliary` | 输出与辅助 | `Stable` | `1.0.2` |
 
 ## 历史变更 / Historical Changes
 
@@ -614,6 +614,7 @@
 ### OperatorType.Comparator / 数值比较
 | 版本 (Version) | 记录时间 (Recorded At) | 组合指纹 (Generation Fingerprint) | 指纹方案 |
 |------|------|------|------|
+| `1.0.1` | `2026-08-31T21:08:42.6383451+08:00` | `3FD4BD6BB94D` | `operator-runtime-metadata-v2` |
 | `1.0.0` | `2026-07-14T15:07:23.3198726+08:00` | `30EF6DB53084` | `operator-runtime-metadata-v2` |
 | `1.0.0` | `2026-07-06T21:35:46.7699945+08:00` | `35E3716B920F` | `legacy-source-only` |
 | `1.0.0` | `2026-07-05T18:24:06.3177828+08:00` | `E3B0C44298FC` | `legacy-source-only` |
@@ -855,6 +856,7 @@
 ### OperatorType.DualModalVoting / 双模态投票
 | 版本 (Version) | 记录时间 (Recorded At) | 组合指纹 (Generation Fingerprint) | 指纹方案 |
 |------|------|------|------|
+| `1.0.1` | `2026-08-31T21:08:42.6383451+08:00` | `9B2DDB4B2387` | `operator-runtime-metadata-v2` |
 | `1.0.0` | `2026-07-14T15:07:23.3198726+08:00` | `59EE5795D682` | `operator-runtime-metadata-v2` |
 | `1.0.0` | `2026-07-06T21:35:46.7699945+08:00` | `5BD094789A35` | `legacy-source-only` |
 | `1.0.0` | `2026-07-05T18:24:06.3177828+08:00` | `E3B0C44298FC` | `legacy-source-only` |
@@ -1724,6 +1726,7 @@
 ### OperatorType.ModbusCommunication / Modbus TCP通信
 | 版本 (Version) | 记录时间 (Recorded At) | 组合指纹 (Generation Fingerprint) | 指纹方案 |
 |------|------|------|------|
+| `1.1.1` | `2026-08-31T21:08:42.6383451+08:00` | `37F4F681C1B9` | `operator-runtime-metadata-v2` |
 | `1.1.0` | `2026-08-31T19:13:00.8983064+08:00` | `BEE816D34543` | `operator-runtime-metadata-v2` |
 | `1.0.0` | `2026-08-31T19:06:29.2575855+08:00` | `9CFC65E310C0` | `operator-runtime-metadata-v2` |
 | `1.0.0` | `2026-08-01T23:43:18.9236021+08:00` | `178A9106719B` | `operator-runtime-metadata-v2` |
@@ -2402,6 +2405,7 @@
 ### OperatorType.ResultOutput / 结果输出
 | 版本 (Version) | 记录时间 (Recorded At) | 组合指纹 (Generation Fingerprint) | 指纹方案 |
 |------|------|------|------|
+| `1.0.2` | `2026-08-31T21:08:42.6383451+08:00` | `D090637C95E0` | `operator-runtime-metadata-v2:image-contract-v2.1` |
 | `1.0.1` | `2026-07-15T11:26:25.6098568+08:00` | `0B158C24D2FF` | `operator-runtime-metadata-v2:image-contract-v2.1` |
 | `1.0.1` | `2026-07-14T15:07:23.3198726+08:00` | `6655F87B33D9` | `operator-runtime-metadata-v2` |
 | `1.0.1` | `2026-07-08T13:57:46.2325088+08:00` | `F238F5781AC8` | `legacy-source-only` |
@@ -2752,6 +2756,7 @@
 ### OperatorType.TextSave / 文本保存
 | 版本 (Version) | 记录时间 (Recorded At) | 组合指纹 (Generation Fingerprint) | 指纹方案 |
 |------|------|------|------|
+| `1.0.2` | `2026-08-31T21:08:42.6383451+08:00` | `889EAA958571` | `operator-runtime-metadata-v2` |
 | `1.0.1` | `2026-08-31T19:13:00.8983064+08:00` | `E7AC8C29797B` | `operator-runtime-metadata-v2` |
 | `1.0.0` | `2026-08-31T19:06:29.2575855+08:00` | `B70B542CE7F5` | `operator-runtime-metadata-v2` |
 | `1.0.0` | `2026-07-14T15:07:23.3198726+08:00` | `BE9E2F907C85` | `operator-runtime-metadata-v2` |

@@ -395,6 +395,54 @@ public sealed class AgentRunEventStreamServiceTests : IDisposable
             .FailureReason.Should().Be("expired_token");
     }
 
+    [Fact(DisplayName = "AgentRun retention evicts only terminal hot states and retains durable replay")]
+    public void Retention_ShouldEvictTerminalHotStatesWithoutLosingReplay()
+    {
+        var now = DateTimeOffset.Parse("2026-06-07T00:00:00Z");
+        _service.UtcNowProvider = () => now;
+        _service.MaxHotRuns = 2;
+        _service.TerminalHotRetention = TimeSpan.FromDays(1);
+
+        var first = _service.CreateRun("first");
+        _service.Complete(first.RunId, "first complete");
+        now = now.AddSeconds(1);
+        var second = _service.CreateRun("second");
+        _service.Complete(second.RunId, "second complete");
+        now = now.AddSeconds(1);
+        var third = _service.CreateRun("third");
+        _service.Complete(third.RunId, "third complete");
+
+        var health = _service.GetRetentionSnapshot();
+        health.HotRunCount.Should().BeLessThanOrEqualTo(2);
+        health.ActiveRunCount.Should().Be(0);
+        health.TrimmedTerminalRunCount.Should().BeGreaterThan(0);
+        health.LastSuccessfulSweepAt.Should().Be(now);
+
+        _service.Replay(first.RunId)!.Summary.Summary.Should().Be("first complete");
+    }
+
+    [Fact(DisplayName = "AgentRun retention sweeps expired tokens and hard-limits outstanding tokens")]
+    public void Retention_ShouldSweepAndBoundStreamTokens()
+    {
+        var now = DateTimeOffset.Parse("2026-06-07T00:00:00Z");
+        _service.UtcNowProvider = () => now;
+        _service.MaxStreamTokens = 2;
+        var run = _service.CreateRun("tokens", ownerHash: "usr_tokens");
+
+        _service.IssueStreamToken(run.RunId, "usr_tokens").Should().NotBeNull();
+        _service.IssueStreamToken(run.RunId, "usr_tokens").Should().NotBeNull();
+        _service.IssueStreamToken(run.RunId, "usr_tokens").Should().NotBeNull();
+
+        var bounded = _service.GetRetentionSnapshot();
+        bounded.StreamTokenCount.Should().Be(2);
+        bounded.CapacityTrimmedTokenCount.Should().Be(1);
+
+        now = now.AddMinutes(1);
+        var swept = _service.GetRetentionSnapshot();
+        swept.StreamTokenCount.Should().Be(0);
+        swept.ExpiredTokenCount.Should().Be(2);
+    }
+
     [Fact(DisplayName = "AgentRun append after terminal is ignored")]
     public void AppendAfterTerminal_ShouldBeIgnored()
     {

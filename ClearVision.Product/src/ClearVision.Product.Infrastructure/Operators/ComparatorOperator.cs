@@ -14,7 +14,8 @@ namespace ClearVision.Product.Infrastructure.Operators;
     Description = "比较两个数值的大小关系，输出布尔判定结果与差值",
     CategoryId = OperatorCategoryId.DataProcessing,
     IconName = "compare",
-    Keywords = new[] { "比较", "判断", "大于", "小于", "等于", "超限", "阈值判定", "公差", "Compare", "Threshold", "GreaterThan", "LessThan" }
+    Keywords = new[] { "比较", "判断", "大于", "小于", "等于", "超限", "阈值判定", "公差", "Compare", "Threshold", "GreaterThan", "LessThan" },
+    Version = "1.0.1"
 )]
 [InputPort("ValueA", "数值 A", PortDataType.Float, IsRequired = true)]
 [InputPort("ValueB", "数值 B", PortDataType.Float, IsRequired = false)]
@@ -27,6 +28,17 @@ namespace ClearVision.Product.Infrastructure.Operators;
 [OperatorParam("RangeMax", "范围上限", "double", Description = "InRange 模式的上限", DefaultValue = 1.0)]
 public class ComparatorOperator : OperatorBase
 {
+    private static readonly HashSet<string> ValidConditions = new(StringComparer.Ordinal)
+    {
+        "GreaterThan",
+        "GreaterThanOrEqual",
+        "LessThan",
+        "LessThanOrEqual",
+        "Equal",
+        "NotEqual",
+        "InRange"
+    };
+
     public override OperatorType OperatorType => OperatorType.Comparator;
 
     public ComparatorOperator(ILogger<ComparatorOperator> logger) : base(logger) { }
@@ -53,21 +65,27 @@ public class ComparatorOperator : OperatorBase
         }
 
         var condition = GetStringParam(@operator, "Condition", "GreaterThan");
+        if (!ValidConditions.Contains(condition))
+        {
+            return Task.FromResult(OperatorExecutionOutput.Failure(
+                $"COMPARATOR_CONDITION_UNSUPPORTED: '{condition}' is not a supported Condition."));
+        }
+
         var tolerance = Math.Abs(GetDoubleParam(@operator, "Tolerance", 0.0001));
         var min = GetDoubleParam(@operator, "RangeMin", 0);
         var max = GetDoubleParam(@operator, "RangeMax", 1);
         var diff = a - b;
 
-        var result = condition.ToLower() switch
+        var result = condition switch
         {
-            "greaterthan" => a > b,
-            "greaterthanorequal" => a >= b,
-            "lessthan" => a < b,
-            "lessthanorequal" => a <= b,
-            "equal" => Math.Abs(diff) <= tolerance,
-            "notequal" => Math.Abs(diff) > tolerance,
-            "inrange" => a >= min && a <= max,
-            _ => false
+            "GreaterThan" => a > b,
+            "GreaterThanOrEqual" => a >= b,
+            "LessThan" => a < b,
+            "LessThanOrEqual" => a <= b,
+            "Equal" => Math.Abs(diff) <= tolerance,
+            "NotEqual" => Math.Abs(diff) > tolerance,
+            "InRange" => a >= min && a <= max,
+            _ => throw new InvalidOperationException("Validated Comparator condition was not dispatched.")
         };
 
         return Task.FromResult(OperatorExecutionOutput.Success(new Dictionary<string, object>
@@ -130,5 +148,12 @@ public class ComparatorOperator : OperatorBase
         };
     }
 
-    public override ValidationResult ValidateParameters(Operator @operator) => ValidationResult.Valid();
+    public override ValidationResult ValidateParameters(Operator @operator)
+    {
+        var condition = GetStringParam(@operator, "Condition", "GreaterThan");
+        return ValidConditions.Contains(condition)
+            ? ValidationResult.Valid()
+            : ValidationResult.Invalid(
+                $"COMPARATOR_CONDITION_UNSUPPORTED: '{condition}' is not a supported Condition.");
+    }
 }

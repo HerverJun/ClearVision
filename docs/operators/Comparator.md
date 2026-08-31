@@ -8,7 +8,7 @@
 | 分类 ID (CategoryId) | `DataProcessing` |
 | 分类 (Category) | 数据处理 |
 | 分类顺序 (CategoryOrder) | 11 |
-| 版本 (Version) | `1.0.0` |
+| 版本 (Version) | `1.0.1` |
 | 生命周期 (Lifecycle) | 稳定 `Stable` |
 | 生命周期说明 (Lifecycle Note) | - |
 | 默认隐藏 (Default Hidden) | No |
@@ -72,7 +72,7 @@
 | - | - | - |
 
 ## 生成依赖 / Generation Dependencies
-- 组合指纹 (Generation Fingerprint)：`30EF6DB530842A540E722F8E34E85C78C0D5CB0DD9BCAA931084CD4F0E866FD9`
+- 组合指纹 (Generation Fingerprint)：`3FD4BD6BB94D70D1198AE4C0CD8D9857CF4B2547E86CD19B35B1903366363303`
 - 显式共享依赖：无；指纹由最终运行时元数据与算子源码组成。
 
 ### 运行时附加输出 / Runtime Additional Outputs
@@ -89,7 +89,7 @@
 - 单元/契约测试：未发现同名算子测试入口，建议补充关键路径和边界输入验证。
 - Golden/回放证据：质量报告中存在通过的 baseline 证据。
 - 参数失败契约：源码包含 `ValidateParameters`，非法参数会被明确拦截或返回错误说明。
-- 执行失败契约：源码中发现 2 条 `OperatorExecutionOutput.Failure(...)` 路径。
+- 执行失败契约：源码中发现 3 条 `OperatorExecutionOutput.Failure(...)` 路径。
 
 ## 适用场景 / Use Cases
 - 适合 (Suitable)：输入数据结构稳定、下游明确消费当前输出字段的常规流程节点。
@@ -102,4 +102,4 @@
 ## 变更记录 / Changelog
 | 版本 (Version) | 日期 (Date) | 变更内容 (Changes) |
 |------|------|----------|
-| 1.0.0 | 2026-07-14 | 按当前最终运行时元数据、条件契约和显式依赖口径重生成 / Regenerated from effective runtime metadata and declared dependencies |
+| 1.0.1 | 2026-08-31 | 按当前最终运行时元数据、条件契约和显式依赖口径重生成 / Regenerated from effective runtime metadata and declared dependencies |

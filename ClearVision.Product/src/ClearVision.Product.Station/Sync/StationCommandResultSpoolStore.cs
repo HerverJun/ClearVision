@@ -7,6 +7,20 @@ using Microsoft.Extensions.Options;
 
 namespace ClearVision.Product.Station.Sync;
 
+public sealed record StationCommandResultSpoolHealth(
+    int PendingCount,
+    long PendingBytes,
+    DateTimeOffset? OldestPendingAtUtc,
+    long TrimmedCount,
+    bool GapDetected,
+    bool Degraded,
+    DateTimeOffset? LastSuccessfulCleanupAtUtc);
+
+/// <summary>
+/// A durable, bounded operation log for command-result delivery. Command results use a
+/// distinct spool from inspection results because acknowledgements are keyed by
+/// CommandId+Status and must preserve that replay contract.
+/// </summary>
 public sealed class StationCommandResultSpoolStore
 {
     private const int OperationCompactionThreshold = 512;
@@ -16,6 +30,10 @@ public sealed class StationCommandResultSpoolStore
     private readonly object _syncRoot = new();
     private readonly string _filePath;
     private readonly ILogger<StationCommandResultSpoolStore> _logger;
+    private readonly int _maxPendingRecords;
+    private readonly long _maxPendingBytes;
+    private readonly TimeSpan _maxPendingAge;
+    private readonly Func<DateTimeOffset> _utcNow;
     private readonly JsonSerializerOptions _jsonOptions = new()
     {
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
@@ -29,18 +47,36 @@ public sealed class StationCommandResultSpoolStore
 
     private readonly List<StationCommandResultDto> _pending = [];
     private int _operationCountSinceCompaction;
+    private long _trimmedCount;
+    private bool _gapDetected;
+    private bool _degraded;
+    private DateTimeOffset? _lastSuccessfulCleanupAtUtc;
 
     public StationCommandResultSpoolStore(
         IOptions<StationSyncOptions> options,
         ILogger<StationCommandResultSpoolStore> logger)
+        : this(options, logger, null)
     {
-        _logger = logger;
-        var directoryPath = string.IsNullOrWhiteSpace(options.Value.ResolvedSpoolDirectory)
+    }
+
+    internal StationCommandResultSpoolStore(
+        IOptions<StationSyncOptions> options,
+        ILogger<StationCommandResultSpoolStore> logger,
+        Func<DateTimeOffset>? utcNow)
+    {
+        ArgumentNullException.ThrowIfNull(options);
+        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        var configured = options.Value;
+        _maxPendingRecords = Math.Max(1, configured.MaxCommandResultSpoolRecords);
+        _maxPendingBytes = Math.Max(1, configured.MaxCommandResultSpoolMb) * 1024L * 1024L;
+        _maxPendingAge = TimeSpan.FromDays(Math.Max(1, configured.MaxCommandResultSpoolDays));
+        _utcNow = utcNow ?? (() => DateTimeOffset.UtcNow);
+        var directoryPath = string.IsNullOrWhiteSpace(configured.ResolvedSpoolDirectory)
             ? Path.Combine(
                 Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
                 "ClearVisionStation",
                 "spool")
-            : options.Value.ResolvedSpoolDirectory;
+            : configured.ResolvedSpoolDirectory;
         Directory.CreateDirectory(directoryPath);
         _filePath = Path.Combine(directoryPath, "station-command-results.jsonl");
         Load();
@@ -57,6 +93,50 @@ public sealed class StationCommandResultSpoolStore
         }
     }
 
+    /// <summary>Estimated canonical pending payload bytes, not unbounded append-log bytes.</summary>
+    public long PendingBytes
+    {
+        get
+        {
+            lock (_syncRoot)
+            {
+                return EstimatePendingBytesLocked();
+            }
+        }
+    }
+
+    public StationCommandResultSpoolHealth GetHealth()
+    {
+        lock (_syncRoot)
+        {
+            try
+            {
+                var trimmed = TrimPendingLocked();
+                if (trimmed > 0)
+                {
+                    RewriteLocked();
+                }
+
+                _degraded = false;
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                _logger.LogWarning(ex, "Failed to clean Station command-result spool.");
+                _degraded = true;
+            }
+
+            var ordered = OrderedPendingLocked();
+            return new StationCommandResultSpoolHealth(
+                ordered.Count,
+                ordered.Sum(EstimateResultBytes),
+                ordered.Count == 0 ? null : EffectiveCreatedAtUtc(ordered[0]),
+                _trimmedCount,
+                _gapDetected,
+                _degraded,
+                _lastSuccessfulCleanupAtUtc);
+        }
+    }
+
     public void Enqueue(StationCommandResultDto result)
     {
         ArgumentNullException.ThrowIfNull(result);
@@ -66,7 +146,7 @@ public sealed class StationCommandResultSpoolStore
             var clone = Clone(result);
             if (clone.ReportedAtUtc == default)
             {
-                clone.ReportedAtUtc = DateTimeOffset.UtcNow;
+                clone.ReportedAtUtc = _utcNow();
             }
 
             if (clone.CreatedAtUtc == default)
@@ -74,9 +154,26 @@ public sealed class StationCommandResultSpoolStore
                 clone.CreatedAtUtc = clone.ReportedAtUtc;
             }
 
-            UpsertLocked(clone);
-            AppendRecordLocked(StationCommandResultSpoolRecord.Upsert(clone));
-            CompactIfNeededLocked();
+            try
+            {
+                UpsertLocked(clone);
+                AppendRecordLocked(StationCommandResultSpoolRecord.Upsert(clone));
+                var trimmed = TrimPendingLocked();
+                if (trimmed > 0)
+                {
+                    RewriteLocked();
+                }
+                else
+                {
+                    CompactIfNeededLocked();
+                    MarkCleanupSucceededLocked();
+                }
+            }
+            catch
+            {
+                _degraded = true;
+                throw;
+            }
         }
     }
 
@@ -84,7 +181,7 @@ public sealed class StationCommandResultSpoolStore
     {
         lock (_syncRoot)
         {
-            return _pending
+            return OrderedPendingLocked()
                 .Take(Math.Max(1, take))
                 .Select(Clone)
                 .ToList();
@@ -100,13 +197,22 @@ public sealed class StationCommandResultSpoolStore
 
         lock (_syncRoot)
         {
-            var removed = _pending.RemoveAll(item =>
-                string.Equals(item.CommandId, commandId, StringComparison.OrdinalIgnoreCase) &&
-                item.Status == status);
-            if (removed > 0)
+            try
             {
-                AppendRecordLocked(StationCommandResultSpoolRecord.Acknowledge(commandId.Trim(), status));
-                CompactIfNeededLocked();
+                var removed = _pending.RemoveAll(item =>
+                    string.Equals(item.CommandId, commandId, StringComparison.OrdinalIgnoreCase) &&
+                    item.Status == status);
+                if (removed > 0)
+                {
+                    AppendRecordLocked(StationCommandResultSpoolRecord.Acknowledge(commandId.Trim(), status));
+                    CompactIfNeededLocked();
+                    MarkCleanupSucceededLocked();
+                }
+            }
+            catch
+            {
+                _degraded = true;
+                throw;
             }
         }
     }
@@ -118,6 +224,7 @@ public sealed class StationCommandResultSpoolStore
             _pending.Clear();
             if (!File.Exists(_filePath))
             {
+                MarkCleanupSucceededLocked();
                 return;
             }
 
@@ -136,13 +243,22 @@ public sealed class StationCommandResultSpoolStore
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogWarning(ex, "Failed to load Station command result spool line.");
+                    _logger.LogWarning(ex, "Failed to load Station command-result spool line.");
+                    _gapDetected = true;
+                    _trimmedCount++;
                 }
             }
 
-            if (loadedLineCount >= OperationCompactionThreshold)
+            var trimmed = TrimPendingLocked();
+            if (trimmed > 0 ||
+                loadedLineCount >= OperationCompactionThreshold ||
+                GetFileLength(_filePath) > _maxPendingBytes)
             {
                 RewriteLocked();
+            }
+            else
+            {
+                MarkCleanupSucceededLocked();
             }
         }
     }
@@ -160,6 +276,16 @@ public sealed class StationCommandResultSpoolStore
                 var result = resultProperty.Deserialize<StationCommandResultDto>(_jsonOptions);
                 if (result != null && !string.IsNullOrWhiteSpace(result.CommandId))
                 {
+                    if (result.ReportedAtUtc == default)
+                    {
+                        result.ReportedAtUtc = _utcNow();
+                    }
+
+                    if (result.CreatedAtUtc == default)
+                    {
+                        result.CreatedAtUtc = result.ReportedAtUtc;
+                    }
+
                     UpsertLocked(result);
                 }
 
@@ -188,6 +314,16 @@ public sealed class StationCommandResultSpoolStore
         var legacyResult = JsonSerializer.Deserialize<StationCommandResultDto>(line, _jsonOptions);
         if (legacyResult != null && !string.IsNullOrWhiteSpace(legacyResult.CommandId))
         {
+            if (legacyResult.ReportedAtUtc == default)
+            {
+                legacyResult.ReportedAtUtc = _utcNow();
+            }
+
+            if (legacyResult.CreatedAtUtc == default)
+            {
+                legacyResult.CreatedAtUtc = legacyResult.ReportedAtUtc;
+            }
+
             UpsertLocked(legacyResult);
         }
     }
@@ -207,38 +343,114 @@ public sealed class StationCommandResultSpoolStore
         }
     }
 
+    private int TrimPendingLocked()
+    {
+        var ordered = OrderedPendingLocked();
+        var cutoff = _utcNow() - _maxPendingAge;
+        var removed = 0;
+
+        while (ordered.Count > 0 && EffectiveCreatedAtUtc(ordered[0]) < cutoff)
+        {
+            _pending.Remove(ordered[0]);
+            ordered.RemoveAt(0);
+            removed++;
+        }
+
+        while (ordered.Count > _maxPendingRecords)
+        {
+            _pending.Remove(ordered[0]);
+            ordered.RemoveAt(0);
+            removed++;
+        }
+
+        var bytes = ordered.Sum(EstimateResultBytes);
+        while (ordered.Count > 0 && bytes > _maxPendingBytes)
+        {
+            var oldest = ordered[0];
+            bytes -= EstimateResultBytes(oldest);
+            _pending.Remove(oldest);
+            ordered.RemoveAt(0);
+            removed++;
+        }
+
+        if (removed > 0)
+        {
+            _trimmedCount += removed;
+            _gapDetected = true;
+            _logger.LogWarning(
+                "Trimmed Station command-result spool records due to retention. Trimmed={Trimmed}, Pending={Pending}, Bytes={Bytes}",
+                removed,
+                ordered.Count,
+                bytes);
+        }
+
+        return removed;
+    }
+
+    private List<StationCommandResultDto> OrderedPendingLocked() => _pending
+        .OrderBy(EffectiveCreatedAtUtc)
+        .ThenBy(item => item.CommandId, StringComparer.Ordinal)
+        .ThenBy(item => item.Status)
+        .ToList();
+
+    private long EstimatePendingBytesLocked() => OrderedPendingLocked().Sum(EstimateResultBytes);
+
+    private long EstimateResultBytes(StationCommandResultDto result) =>
+        Encoding.UTF8.GetByteCount(JsonSerializer.Serialize(result, _jsonOptions)) + Environment.NewLine.Length;
+
+    private static DateTimeOffset EffectiveCreatedAtUtc(StationCommandResultDto result) =>
+        result.CreatedAtUtc != default ? result.CreatedAtUtc : result.ReportedAtUtc;
+
     private void AppendRecordLocked(StationCommandResultSpoolRecord record)
     {
         var line = JsonSerializer.Serialize(record, _jsonOptions);
-        File.AppendAllText(_filePath, line + Environment.NewLine, Encoding.UTF8);
+        File.AppendAllText(_filePath, line + Environment.NewLine, new UTF8Encoding(false));
         _operationCountSinceCompaction++;
     }
 
     private void CompactIfNeededLocked()
     {
-        if (_operationCountSinceCompaction < OperationCompactionThreshold)
+        if (_operationCountSinceCompaction >= OperationCompactionThreshold ||
+            GetFileLength(_filePath) > _maxPendingBytes)
         {
-            return;
+            RewriteLocked();
         }
-
-        RewriteLocked();
     }
 
     private void RewriteLocked()
     {
         var tempPath = $"{_filePath}.{Guid.NewGuid():N}.tmp";
-        using (var stream = File.Create(tempPath))
-        using (var writer = new StreamWriter(stream, new UTF8Encoding(false)))
+        try
         {
-            foreach (var result in _pending)
+            using (var stream = File.Create(tempPath))
+            using (var writer = new StreamWriter(stream, new UTF8Encoding(false)))
             {
-                writer.WriteLine(JsonSerializer.Serialize(result, _jsonOptions));
+                foreach (var result in OrderedPendingLocked())
+                {
+                    writer.WriteLine(JsonSerializer.Serialize(result, _jsonOptions));
+                }
+            }
+
+            File.Move(tempPath, _filePath, overwrite: true);
+            _operationCountSinceCompaction = 0;
+            MarkCleanupSucceededLocked();
+        }
+        finally
+        {
+            if (File.Exists(tempPath))
+            {
+                File.Delete(tempPath);
             }
         }
-
-        File.Move(tempPath, _filePath, overwrite: true);
-        _operationCountSinceCompaction = 0;
     }
+
+    private void MarkCleanupSucceededLocked()
+    {
+        _degraded = false;
+        _lastSuccessfulCleanupAtUtc = _utcNow();
+    }
+
+    private static long GetFileLength(string path) => File.Exists(path) ? new FileInfo(path).Length : 0;
 
     private static StationCommandResultDto Clone(StationCommandResultDto result)
     {

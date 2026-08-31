@@ -1,4 +1,7 @@
 using System.Linq.Expressions;
+using System.Reflection;
+using System.Text.Json;
+using ClearVision.Product.Application.Services;
 using ClearVision.Product.Core.Entities;
 using ClearVision.Product.Core.Enums;
 using ClearVision.Product.Core.Interfaces;
@@ -7,6 +10,7 @@ using FluentAssertions;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
+using NSubstitute;
 
 namespace ClearVision.Product.Tests.Services;
 
@@ -184,10 +188,193 @@ public sealed class InspectionResultBackgroundServiceTests
         }
     }
 
+    [Fact]
+    public async Task Spool_ShouldStoreImageByBlobReferenceAndTrimToConfiguredRecordBudget()
+    {
+        var root = CreateTempPath();
+        try
+        {
+            var repository = new CapturingInspectionResultRepository { FailAdds = true };
+            await using var provider = CreateProvider(repository);
+            var service = CreateService(
+                provider,
+                root,
+                new Dictionary<string, string?>
+                {
+                    ["Performance:Persistence:MaxSpoolRecords"] = "2",
+                    ["Performance:Persistence:MaxSpoolBytes"] = "65536",
+                    ["Performance:Persistence:MaxSpoolDays"] = "7"
+                });
+
+            await service.StartAsync(CancellationToken.None);
+            await service.WriteAsync(CreateResult(outputImageBytes: 2048), CancellationToken.None);
+            await service.WriteAsync(CreateResult(outputImageBytes: 2048), CancellationToken.None);
+            await service.WriteAsync(CreateResult(outputImageBytes: 2048), CancellationToken.None);
+            await WaitUntilAsync(() =>
+            {
+                var current = service.GetSpoolHealth();
+                return current.Spool.RecordCount == 2 && current.Spool.TrimmedRecordCount == 1;
+            });
+
+            var health = service.GetSpoolHealth();
+            await service.StopAsync(CancellationToken.None);
+
+            var spoolLines = File.ReadAllLines(Path.Combine(root, "inspection-results.jsonl"));
+            foreach (var line in spoolLines)
+            {
+                using var document = JsonDocument.Parse(line);
+                document.RootElement.TryGetProperty("outputImage", out _).Should().BeFalse();
+                var blobId = document.RootElement.GetProperty("outputImageBlobId").GetString();
+                blobId.Should().NotBeNullOrWhiteSpace();
+                File.Exists(Path.Combine(root, "inspection-result-blobs", blobId + ".bin")).Should().BeTrue();
+            }
+
+            health.Spool.RecordCount.Should().Be(2);
+            health.Spool.TrimmedRecordCount.Should().Be(1);
+            health.Spool.GapDetected.Should().BeTrue();
+            health.Degraded.Should().BeFalse();
+        }
+        finally
+        {
+            DeleteDirectoryIfExists(root);
+        }
+    }
+
+    [Fact]
+    public async Task Spool_ShouldPruneExpiredRecordsAndReferencedBlobsOnRestart()
+    {
+        var root = CreateTempPath();
+        var now = new DateTimeOffset(2026, 8, 1, 8, 0, 0, TimeSpan.Zero);
+        try
+        {
+            var failingRepository = new CapturingInspectionResultRepository { FailAdds = true };
+            await using (var provider = CreateProvider(failingRepository))
+            {
+                var service = CreateService(
+                    provider,
+                    root,
+                    new Dictionary<string, string?>
+                    {
+                        ["Performance:Persistence:MaxSpoolDays"] = "1"
+                    },
+                    () => now);
+                await service.StartAsync(CancellationToken.None);
+                await service.WriteAsync(CreateResult(outputImageBytes: 128), CancellationToken.None);
+                await WaitUntilAsync(() => TryGetSpoolLineCount(root, out var lineCount) && lineCount == 1);
+                await service.StopAsync(CancellationToken.None);
+            }
+
+            now = now.AddDays(2);
+            var replayRepository = new CapturingInspectionResultRepository { FailAdds = true };
+            await using (var provider = CreateProvider(replayRepository))
+            {
+                var service = CreateService(
+                    provider,
+                    root,
+                    new Dictionary<string, string?>
+                    {
+                        ["Performance:Persistence:MaxSpoolDays"] = "1"
+                    },
+                    () => now);
+                await service.StartAsync(CancellationToken.None);
+                await WaitUntilAsync(() => TryGetSpoolLineCount(root, out var lineCount) && lineCount == 0);
+                service.GetSpoolHealth().Spool.TrimmedRecordCount.Should().BeGreaterThan(0);
+                Directory.EnumerateFiles(Path.Combine(root, "inspection-result-blobs"), "*.bin").Should().BeEmpty();
+                await service.StopAsync(CancellationToken.None);
+            }
+        }
+        finally
+        {
+            DeleteDirectoryIfExists(root);
+        }
+    }
+
+    [Fact]
+    public async Task AppendSpoolAsync_ShouldSerializeBlobPublishWithConcurrentHealthCleanup()
+    {
+        var root = CreateTempPath();
+        try
+        {
+            var result = CreateResult(outputImageBytes: 256);
+            var failingRepository = new CapturingInspectionResultRepository { FailAdds = true };
+            await using (var provider = CreateProvider(failingRepository))
+            {
+                var service = CreateService(provider, root);
+                var gate = GetSpoolFileGate(service);
+                await gate.WaitAsync();
+                var gateReleased = false;
+                try
+                {
+                    var appendTask = InvokeAppendSpoolAsync(
+                        service,
+                        [result],
+                        Path.Combine(root, "inspection-results.jsonl"));
+
+                    // The append has reached the file gate before it can publish a
+                    // blob.  A concurrent health cleanup therefore cannot observe
+                    // an orphan blob between its creation and its JSONL reference.
+                    Directory.EnumerateFiles(
+                        Path.Combine(root, "inspection-result-blobs"),
+                        "*.bin").Should().BeEmpty();
+
+                    var healthTask = Task.Run(service.GetSpoolHealth);
+                    await Task.Yield();
+                    healthTask.IsCompleted.Should().BeFalse();
+
+                    gate.Release();
+                    gateReleased = true;
+                    await appendTask;
+                    var health = await healthTask;
+                    health.Spool.RecordCount.Should().Be(1);
+                }
+                finally
+                {
+                    if (!gateReleased)
+                    {
+                        gate.Release();
+                    }
+                }
+            }
+
+            var spoolLine = File.ReadAllLines(Path.Combine(root, "inspection-results.jsonl")).Should().ContainSingle().Subject;
+            using (var document = JsonDocument.Parse(spoolLine))
+            {
+                var blobId = document.RootElement.GetProperty("outputImageBlobId").GetString();
+                blobId.Should().NotBeNullOrWhiteSpace();
+                File.Exists(Path.Combine(root, "inspection-result-blobs", blobId + ".bin")).Should().BeTrue();
+            }
+
+            var replayRepository = new CapturingInspectionResultRepository();
+            var evidenceService = Substitute.For<IInspectionEvidenceManifestService>();
+            InspectionResult? capturedEvidence = null;
+            evidenceService.CaptureAsync(
+                    Arg.Do<InspectionResult>(item => capturedEvidence = item),
+                    Arg.Any<CancellationToken>())
+                .Returns(Task.CompletedTask);
+            await using (var provider = CreateProvider(replayRepository, evidenceService))
+            {
+                var replayService = CreateService(provider, root);
+                await replayService.StartAsync(CancellationToken.None);
+                await WaitUntilAsync(() => replayRepository.Added.Count == 1);
+                await replayService.StopAsync(CancellationToken.None);
+            }
+
+            replayRepository.Added.Single().OutputImage.Should().BeNull(
+                "the database snapshot intentionally excludes image bytes");
+            capturedEvidence.Should().NotBeNull();
+            capturedEvidence!.OutputImage.Should().Equal(result.OutputImage);
+        }
+        finally
+        {
+            DeleteDirectoryIfExists(root);
+        }
+    }
+
     private static InspectionResultBackgroundService CreateService(
         IServiceProvider provider,
         string spoolRoot,
-        Dictionary<string, string?>? overrides = null)
+        Dictionary<string, string?>? overrides = null,
+        Func<DateTimeOffset>? utcNow = null)
     {
         var settings = new Dictionary<string, string?>
         {
@@ -212,13 +399,45 @@ public sealed class InspectionResultBackgroundServiceTests
         return new InspectionResultBackgroundService(
             NullLogger<InspectionResultBackgroundService>.Instance,
             provider,
-            configuration);
+            configuration,
+            utcNow);
     }
 
-    private static ServiceProvider CreateProvider(IInspectionResultRepository repository)
+    private static SemaphoreSlim GetSpoolFileGate(InspectionResultBackgroundService service)
+    {
+        var field = typeof(InspectionResultBackgroundService).GetField(
+            "_spoolFileGate",
+            BindingFlags.Instance | BindingFlags.NonPublic);
+        field.Should().NotBeNull();
+        return field!.GetValue(service).Should().BeOfType<SemaphoreSlim>().Subject;
+    }
+
+    private static Task InvokeAppendSpoolAsync(
+        InspectionResultBackgroundService service,
+        IEnumerable<InspectionResult> results,
+        string path)
+    {
+        var method = typeof(InspectionResultBackgroundService).GetMethod(
+            "AppendSpoolAsync",
+            BindingFlags.Instance | BindingFlags.NonPublic);
+        method.Should().NotBeNull();
+        var invocation = method!.Invoke(
+            service,
+            new object?[] { results, path, CancellationToken.None });
+        return invocation.Should().BeAssignableTo<Task>().Subject;
+    }
+
+    private static ServiceProvider CreateProvider(
+        IInspectionResultRepository repository,
+        IInspectionEvidenceManifestService? evidenceService = null)
     {
         var services = new ServiceCollection();
         services.AddScoped(_ => repository);
+        if (evidenceService != null)
+        {
+            services.AddScoped(_ => evidenceService);
+        }
+
         return services.BuildServiceProvider();
     }
 

@@ -20,6 +20,7 @@ import {
     renderResultCardHtml,
     summarizeResultField
 } from './portDataTypeRenderer.mjs';
+import { formatCsvField, formatCsvRow } from '../../shared/csvSanitizer.js';
 
 const LIVE_RESULT_HISTORY_REFRESH_DELAY_MS = 2000;
 const LIVE_RESULT_ANALYTICS_REFRESH_DELAY_MS = 5000;
@@ -661,17 +662,6 @@ class ResultPanel {
                 return null;
             });
 
-        const statisticsPromise = httpClient.get(`/analysis/statistics/${projectId}`, commonParams)
-            .catch(error => {
-                debugLogger.warn('[ResultPanel] Failed to load statistics:', error);
-                return null;
-            });
-        const defectDistributionPromise = httpClient.get(`/analysis/defect-distribution/${projectId}`, commonParams)
-            .catch(error => {
-                debugLogger.warn('[ResultPanel] 获取缺陷分布失败:', error);
-                return null;
-            });
-
         const trendPromise = commonParams.startTime && commonParams.endTime
             ? httpClient.get(`/analysis/trend/${projectId}`, {
                 ...commonParams,
@@ -682,14 +672,15 @@ class ResultPanel {
             })
             : Promise.resolve(null);
 
-        const [report, statistics, defectDistribution, trend] = await Promise.all([
+        const [report, trend] = await Promise.all([
             reportPromise,
-            statisticsPromise,
-            defectDistributionPromise,
             trendPromise
         ]);
 
-        if (report || statistics || defectDistribution || trend) {
+        const statistics = null;
+        const defectDistribution = null;
+
+        if (report || trend) {
             this.applyServerAnalysis({ report, statistics, defectDistribution, trend });
             this.render();
             return;
@@ -1763,20 +1754,11 @@ class ResultPanel {
     }
 
     toCsvRow(fields) {
-        return fields.map(value => this.escapeCsvField(value)).join(',');
+        return formatCsvRow(fields);
     }
 
     escapeCsvField(value) {
-        let text = value === null || value === undefined ? '' : String(value);
-        if (/^[=+\-@]/.test(text)) {
-            text = `'${text}`;
-        }
-
-        if (/[",\r\n]/.test(text)) {
-            return `"${text.replace(/"/g, '""')}"`;
-        }
-
-        return text;
+        return formatCsvField(value);
     }
     
     /**

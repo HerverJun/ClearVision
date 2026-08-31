@@ -3,6 +3,7 @@ using System.Globalization;
 using System.Reflection;
 using System.Text.Json;
 using ClearVision.Product.Core.ValueObjects;
+using DetectionAdapter = ClearVision.Product.Core.Services.DetectionResultAdapter;
 
 namespace ClearVision.Product.Infrastructure.Services;
 
@@ -139,17 +140,9 @@ public static class DetectionOutputInspector
 
     public static List<DetectionResult> ExtractDetections(object? value)
     {
-        return value switch
-        {
-            null => new List<DetectionResult>(),
-            DetectionList detectionList => detectionList.Detections.Select(Clone).ToList(),
-            IEnumerable<DetectionResult> typedDetections => typedDetections.Select(Clone).ToList(),
-            JsonElement element when element.ValueKind == JsonValueKind.Array => ExtractDetectionsFromJsonArray(element),
-            string => new List<DetectionResult>(),
-            IDictionary dictionary => ExtractDetectionsFromDictionaryEnumerable(new[] { dictionary }),
-            IEnumerable enumerable => ExtractDetectionsFromEnumerable(enumerable),
-            _ => new List<DetectionResult>()
-        };
+        return DetectionAdapter.TryExtract(value, out var detections)
+            ? detections.ToList()
+            : [];
     }
 
     private static List<DetectionResult> ExtractDetectionsFromEnumerable(IEnumerable enumerable)

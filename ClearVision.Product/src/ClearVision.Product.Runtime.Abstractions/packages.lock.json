@@ -39,6 +39,14 @@
         "resolved": "4.9.0.20240103",
         "contentHash": "PkV3ge6rE//gj0OlG4TRXzmcLVDoKsJx0lYN1ogx9gZhqUPHlzrnWqKk2hAFK+nU8T0chRhrwHL0U2hSMyoCWw=="
       }
+    },
+    "net8.0/win-x64": {
+      "OpenCvSharp4.runtime.win": {
+        "type": "CentralTransitive",
+        "requested": "[4.9.0.20240103, )",
+        "resolved": "4.9.0.20240103",
+        "contentHash": "PkV3ge6rE//gj0OlG4TRXzmcLVDoKsJx0lYN1ogx9gZhqUPHlzrnWqKk2hAFK+nU8T0chRhrwHL0U2hSMyoCWw=="
+      }
     }
   }
 }

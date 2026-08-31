@@ -5,7 +5,10 @@ using ClearVision.Product.Infrastructure.Operators;
 using FluentAssertions;
 using Microsoft.Extensions.Logging;
 using NSubstitute;
+using OpenCvSharp;
 using Xunit;
+using VisionDetection = ClearVision.Product.Core.ValueObjects.DetectionResult;
+using VisionDetectionList = ClearVision.Product.Core.ValueObjects.DetectionList;
 
 namespace ClearVision.Product.Tests.Operators;
 
@@ -109,6 +112,109 @@ public class DualModalVotingOperatorTests
         result.OutputData.Should().NotBeNull();
         result.OutputData!["IsOk"].Should().Be(true);
         ((double)result.OutputData["Confidence"]).Should().BeApproximately(0.62, 0.001);
+    }
+
+    [Fact]
+    public async Task Execute_WithRealDetectionListOutput_ShouldUseCanonicalAdapter()
+    {
+        _operatorEntity.AddParameter(TestHelpers.CreateParameter(
+            "VotingStrategy",
+            "PrioritizeDeepLearning",
+            "string"));
+
+        var deepLearningOutput = new VisionDetectionList(
+        [
+            new VisionDetection("wire-swap", 0.93f, 12f, 8f, 16f, 10f)
+        ]);
+        var traditionalOutput = new VisionDetectionList();
+
+        var result = await _operator.ExecuteAsync(
+            _operatorEntity,
+            new Dictionary<string, object>
+            {
+                ["DLResult"] = deepLearningOutput,
+                ["TraditionalResult"] = traditionalOutput
+            },
+            CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        result.OutputData!["IsOk"].Should().Be(false);
+        ((double)result.OutputData["Confidence"]).Should().BeApproximately(0.93, 0.001);
+        result.OutputData["JudgmentValue"].Should().Be("0");
+    }
+
+    [Fact]
+    public async Task Execute_WithActualDeepLearningOperatorOutput_ShouldVoteUsingDirectDetectionListContract()
+    {
+        var fixtureDirectory = Path.Combine(
+            Path.GetTempPath(),
+            "ClearVision.DualModalVoting.Tests",
+            Guid.NewGuid().ToString("N"));
+        var modelPath = Path.Combine(fixtureDirectory, "constant-detection.onnx");
+        ImageWrapper? outputImage = null;
+        ImageWrapper? originalImage = null;
+        try
+        {
+            Directory.CreateDirectory(fixtureDirectory);
+            await File.WriteAllBytesAsync(modelPath, Convert.FromBase64String(ConstantDetectionModelBase64));
+
+            var deepLearningOperator = new DeepLearningOperator(
+                Substitute.For<ILogger<DeepLearningOperator>>());
+            var deepLearningDefinition = new Operator("deep-learning", OperatorType.DeepLearning, 0, 0);
+            deepLearningDefinition.AddParameter(TestHelpers.CreateParameter("TaskType", "ObjectDetection", "enum"));
+            deepLearningDefinition.AddParameter(TestHelpers.CreateParameter("ModelPath", modelPath, "file"));
+            deepLearningDefinition.AddParameter(TestHelpers.CreateParameter("ExecutionProvider", "CPU", "enum"));
+            deepLearningDefinition.AddParameter(TestHelpers.CreateParameter("InputSize", 640, "int"));
+            deepLearningDefinition.AddParameter(TestHelpers.CreateParameter("Confidence", 0.5d, "double"));
+            deepLearningDefinition.AddParameter(TestHelpers.CreateParameter("NmsIouThreshold", 0.45d, "double"));
+            deepLearningDefinition.AddParameter(TestHelpers.CreateParameter("OutputFormat", "EndToEndNms", "enum"));
+            deepLearningDefinition.AddParameter(TestHelpers.CreateParameter("DetectionMode", "Defect", "enum"));
+
+            using var source = new ImageWrapper(new Mat(8, 8, MatType.CV_8UC3, Scalar.Black));
+            var deepLearningResult = await deepLearningOperator.ExecuteAsync(
+                deepLearningDefinition,
+                TestHelpers.CreateImageInputs(source),
+                CancellationToken.None);
+
+            deepLearningResult.IsSuccess.Should().BeTrue(deepLearningResult.ErrorMessage);
+            deepLearningResult.OutputData.Should().NotBeNull();
+            deepLearningResult.OutputData!["Defects"].Should().BeOfType<VisionDetectionList>();
+            ((VisionDetectionList)deepLearningResult.OutputData["Defects"]).Detections
+                .Should().ContainSingle(detection => detection.Label == "wire-swap");
+            outputImage = deepLearningResult.OutputData.GetValueOrDefault("Image") as ImageWrapper;
+            originalImage = deepLearningResult.OutputData.GetValueOrDefault("OriginalImage") as ImageWrapper;
+
+            _operatorEntity.AddParameter(TestHelpers.CreateParameter(
+                "VotingStrategy",
+                "PrioritizeDeepLearning",
+                "string"));
+            var vote = await _operator.ExecuteAsync(
+                _operatorEntity,
+                new Dictionary<string, object>
+                {
+                    ["DLResult"] = deepLearningResult.OutputData["Defects"],
+                    ["TraditionalResult"] = new VisionDetectionList()
+                },
+                CancellationToken.None);
+
+            vote.IsSuccess.Should().BeTrue(vote.ErrorMessage);
+            vote.OutputData!["IsOk"].Should().Be(false);
+            ((double)vote.OutputData["Confidence"]).Should().BeApproximately(0.95d, 0.001d);
+            vote.OutputData["JudgmentValue"].Should().Be("0");
+        }
+        finally
+        {
+            outputImage?.Dispose();
+            if (originalImage != null && !ReferenceEquals(originalImage, outputImage))
+            {
+                originalImage.Dispose();
+            }
+
+            if (Directory.Exists(fixtureDirectory))
+            {
+                Directory.Delete(fixtureDirectory, recursive: true);
+            }
+        }
     }
 
     [Fact]
@@ -245,4 +351,9 @@ public class DualModalVotingOperatorTests
         result.IsSuccess.Should().BeFalse();
         result.ErrorMessage.Should().Contain("DLWeight + TraditionalWeight > 0");
     }
+
+    // ONNX IR v7 / opset 11: one constant end-to-end NMS row [x1,y1,x2,y2,score,class]
+    // plus empty rows. The model metadata supplies the canonical wire-swap label.
+    private const string ConstantDetectionModelBase64 =
+        "CAcSJkNsZWFyVmlzaW9uIGRldGVybWluaXN0aWMgdGVzdCBmaXh0dXJlOqwECsMDEgpkZXRlY3Rpb25zIghDb25zdGFudCqqAwoFdmFsdWUqnQMIAQgGCBAQAUIQZGV0ZWN0aW9uc192YWx1ZUqAA83MzD0AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAADNzMw9AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAZmZmPwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAGZmZj8AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAzM3M/AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAKABBBIeY2xlYXJ2aXNpb25fY29uc3RhbnRfZGV0ZWN0aW9uWiIKBmltYWdlcxIYChYIARISCgIIAQoCCAMKAwiABQoDCIAFYiAKCmRldGVjdGlvbnMSEgoQCAESDAoCCAEKAggGCgIIEEIECgAQC3IWCgVuYW1lcxINWyJ3aXJlLXN3YXAiXQ==";
 }

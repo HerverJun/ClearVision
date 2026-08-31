@@ -4,6 +4,7 @@
 using System.Globalization;
 using System.Text;
 using System.Text.Json;
+using ClearVision.Product.Application.Exports;
 using ClearVision.Product.Core.Attributes;
 using ClearVision.Product.Core.Entities;
 using ClearVision.Product.Core.Enums;
@@ -22,7 +23,7 @@ namespace ClearVision.Product.Infrastructure.Operators;
     CategoryId = OperatorCategoryId.OutputAndAuxiliary,
     IconName = "output",
     Keywords = new[] { "输出", "结果", "结束", "呈现", "记录", "Output", "Result", "Display" },
-    Version = "1.0.1"
+    Version = "1.0.2"
 )]
 [OperatorParameterRule("SaveToFile", ResourceKind = OperatorResourceKind.OutputFile, ReasonCode = "RESULT_OUTPUT_OPTIONAL_INTERNAL_FILE_WRITE")]
 [InputPort("Image", "图像", PortDataType.Image, IsRequired = false)]
@@ -41,10 +42,22 @@ namespace ClearVision.Product.Infrastructure.Operators;
 public class ResultOutputOperator : OperatorBase
 {
     private const int DefaultMaxFormattedCollectionItems = 256;
+    private readonly IResultOutputStorage _outputStorage;
 
     public override OperatorType OperatorType => OperatorType.ResultOutput;
 
-    public ResultOutputOperator(ILogger<ResultOutputOperator> logger) : base(logger) { }
+    public ResultOutputOperator(ILogger<ResultOutputOperator> logger)
+        : this(logger, new ResultOutputStorage())
+    {
+    }
+
+    public ResultOutputOperator(ILogger<ResultOutputOperator> logger, IResultOutputStorage outputStorage)
+        : base(logger)
+    {
+        _outputStorage = outputStorage ?? throw new ArgumentNullException(nameof(outputStorage));
+    }
+
+    public ResultOutputStorageHealth GetOutputStorageHealth() => _outputStorage.GetHealth();
 
     protected override Task<OperatorExecutionOutput> ExecuteCoreAsync(
         Operator @operator,
@@ -98,7 +111,7 @@ public class ResultOutputOperator : OperatorBase
             {
                 try
                 {
-                    var filePath = SaveFormattedOutput(formattedText, format);
+                    var filePath = _outputStorage.Save(formattedText, format);
                     output["FilePath"] = filePath;
                 }
                 catch (Exception ex)
@@ -294,33 +307,7 @@ public class ResultOutputOperator : OperatorBase
 
     private static string EscapeCsv(string value)
     {
-        if (value.Length > 0 && value[0] is '=' or '+' or '-' or '@')
-        {
-            value = "'" + value;
-        }
-
-        if (value.Contains(',') || value.Contains('"') || value.Contains('\n') || value.Contains('\r'))
-        {
-            return $"\"{value.Replace("\"", "\"\"")}\"";
-        }
-
-        return value;
+        return CsvSanitizer.FormatField(value);
     }
 
-    private static string SaveFormattedOutput(string formattedText, string format)
-    {
-        var extension = format.ToUpperInvariant() switch
-        {
-            "CSV" => ".csv",
-            "TEXT" => ".txt",
-            _ => ".json"
-        };
-
-        var directory = Path.Combine(Path.GetTempPath(), "ClearVision.Product", "result-output", DateTime.UtcNow.ToString("yyyyMMdd", CultureInfo.InvariantCulture));
-        Directory.CreateDirectory(directory);
-
-        var filePath = Path.Combine(directory, $"result_{DateTime.UtcNow:HHmmssfff}_{Guid.NewGuid():N}{extension}");
-        File.WriteAllText(filePath, formattedText, Encoding.UTF8);
-        return filePath;
-    }
 }

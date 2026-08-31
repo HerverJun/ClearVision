@@ -11,7 +11,8 @@ namespace ClearVision.Product.Infrastructure.Operators;
     DisplayName = "双模态投票",
     Description = "融合深度学习与传统视觉检测结果，输出最终判定。",
     CategoryId = OperatorCategoryId.DefectDetection,
-    IconName = "voting"
+    IconName = "voting",
+    Version = "1.0.1"
 )]
 [InputPort("DLResult", "Deep learning result", PortDataType.Any, IsRequired = true)]
 [InputPort("TraditionalResult", "Traditional result", PortDataType.Any, IsRequired = true)]
@@ -149,59 +150,16 @@ public class DualModalVotingOperator : OperatorBase
         return Task.FromResult(OperatorExecutionOutput.Success(outputData));
     }
 
-    private DetectionResult? ExtractDetectionResult(Dictionary<string, object>? inputs, string key)
+    private static DetectionResult? ExtractDetectionResult(Dictionary<string, object>? inputs, string key)
     {
         if (inputs == null || !inputs.TryGetValue(key, out var value) || value == null)
         {
             return null;
         }
 
-        if (value is DetectionResult detectionResult)
-        {
-            return detectionResult;
-        }
-
-        if (value is not Dictionary<string, object> dict)
-        {
-            return null;
-        }
-
-        if (dict.TryGetValue("IsOk", out var okVal) && dict.TryGetValue("Confidence", out var confVal))
-        {
-            return DetectionResult.Success(
-                Convert.ToBoolean(okVal),
-                Math.Clamp(Convert.ToDouble(confVal), 0.0, 1.0));
-        }
-
-        if (!dict.TryGetValue("DefectCount", out var defectCountVal))
-        {
-            return null;
-        }
-
-        var defectCount = Convert.ToInt32(defectCountVal);
-        var isOk = defectCount == 0;
-        var maxDefectConfidence = 0.0;
-        var hasDefectConfidence = false;
-
-        if (dict.TryGetValue("Defects", out var defectsVal) && defectsVal is IEnumerable<object> defectsList)
-        {
-            foreach (var defect in defectsList)
-            {
-                if (defect is Dictionary<string, object> defectDict &&
-                    defectDict.TryGetValue("Confidence", out var defectConfidenceValue))
-                {
-                    hasDefectConfidence = true;
-                    maxDefectConfidence = Math.Max(maxDefectConfidence, Convert.ToDouble(defectConfidenceValue));
-                }
-            }
-        }
-
-        var labelConfidence = isOk
-            ? 1.0
-            : hasDefectConfidence
-                ? Math.Clamp(maxDefectConfidence, 0.0, 1.0)
-                : 1.0;
-        return DetectionResult.Success(isOk, labelConfidence);
+        return DetectionResultAdapter.TryCreateDecision(value, out var decision)
+            ? DetectionResult.Success(decision.IsOk, decision.Confidence)
+            : null;
     }
 
     private static double ToOkProbability(DetectionResult result)

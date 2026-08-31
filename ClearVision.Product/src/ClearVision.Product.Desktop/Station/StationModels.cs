@@ -243,6 +243,19 @@ public sealed class StationSseSnapshotViewModel
     public IReadOnlyList<StationStatusViewModel> Stations { get; set; } = Array.Empty<StationStatusViewModel>();
 
     public IReadOnlyList<StationResultEventViewModel> RecentResults { get; set; } = Array.Empty<StationResultEventViewModel>();
+
+    /// <summary>
+    /// Latest command state per Station. Commands are included in the sensitive initial snapshot so an
+    /// administrator reconnecting after a dropped SSE channel converges even if the replay buffer rolled over.
+    /// </summary>
+    public IReadOnlyList<StationCommandEventViewModel> RecentCommands { get; set; } = Array.Empty<StationCommandEventViewModel>();
+}
+
+public sealed class StationCommandEventViewModel
+{
+    public string StationId { get; set; } = string.Empty;
+
+    public StationCommandDto Command { get; set; } = new();
 }
 
 public sealed class StationResultsPageViewModel

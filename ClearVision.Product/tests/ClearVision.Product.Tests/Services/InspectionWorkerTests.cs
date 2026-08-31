@@ -795,6 +795,71 @@ public class InspectionWorkerTests
     }
 
     [Fact]
+    public async Task ExecuteCycleAsync_WithDeepLearningDetectionList_ShouldPersistCanonicalDefects()
+    {
+        var flowExecution = Substitute.For<IFlowExecutionService>();
+        flowExecution.ExecuteWithSnapshotAsync(
+                Arg.Any<ExecutionSnapshot>(),
+                Arg.Any<Dictionary<string, object>?>(),
+                Arg.Any<bool>(),
+                Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(new FlowExecutionResult
+            {
+                IsSuccess = true,
+                ExecutionTimeMs = 1,
+                OutputData = new Dictionary<string, object>
+                {
+                    ["JudgmentResult"] = "NG",
+                    ["DetectionList"] = new DetectionList(
+                    [
+                        new ClearVision.Product.Core.ValueObjects.DetectionResult(
+                            "worker-wire-swap", 0.88f, 21f, 22f, 23f, 24f)
+                    ])
+                }
+            }));
+
+        var imageAcquisition = Substitute.For<IImageAcquisitionService>();
+        var imagePersistence = Substitute.For<IInspectionImagePersistenceService>();
+        using var serviceProvider = BuildScopedServices(
+            flowExecution,
+            imageAcquisition,
+            Substitute.For<IInspectionResultChannelWriter>(),
+            Substitute.For<IInspectionResultRepository>(),
+            Substitute.For<IProjectRepository>());
+
+        var worker = new InspectionWorker(
+            serviceProvider.GetRequiredService<IServiceScopeFactory>(),
+            new InspectionRuntimeCoordinator(NullLogger<InspectionRuntimeCoordinator>.Instance),
+            new InMemoryInspectionEventBus(
+                NullLogger<InMemoryInspectionEventBus>.Instance,
+                new InMemoryEventStore(NullLogger<InMemoryEventStore>.Instance)),
+            NullLogger<InspectionWorker>.Instance,
+            Substitute.For<IHostApplicationLifetime>(),
+            new InspectionMetrics(),
+            Substitute.For<IImageCacheRepository>(),
+            new AnalysisDataBuilder(),
+            imagePersistence);
+
+        var result = await InvokeExecuteCycleAsync(
+            worker,
+            CreateDecisionFlow("DeepLearningDetectionListFlow", "JudgmentResult"),
+            null,
+            flowExecution,
+            imageAcquisition,
+            CancellationToken.None);
+
+        result.Status.Should().Be(InspectionStatus.NG);
+        result.Defects.Should().ContainSingle();
+        result.Defects.Single().Description.Should().Be("worker-wire-swap");
+        result.Defects.Single().ConfidenceScore.Should().BeApproximately(0.88, 0.0001);
+        result.Defects.Single().X.Should().BeApproximately(21, 0.0001);
+        await imagePersistence.Received(1).PersistAsync(Arg.Is<InspectionResult>(persisted =>
+            persisted.Defects.Count == 1 &&
+            persisted.Defects.Single().Description == "worker-wire-swap"),
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
     public async Task RunRealtimeLoopAsync_WithDefaultRuntimeProtection_DoesNotStopAfterSixConsecutiveNg()
     {
         var flowExecution = Substitute.For<IFlowExecutionService>();
