@@ -175,6 +175,16 @@ async function installRoutes(page: Page, previewMode: PreviewMode) {
     });
   });
 
+  // 静态 UI server 不承载 production-only 的最终判定校验端点；预览协调器会在
+  // 选中节点时调用它，因此本 fixture 必须提供与 production contract 对齐的响应。
+  await page.route('**/api/inspection/decision-configuration/validate', async route => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ isValid: true, issues: [], eligibleOutputs: [] }),
+    });
+  });
+
   await page.route('**/api/operators/library', async route => {
     await route.fulfill({
       status: 200,
@@ -289,6 +299,7 @@ async function setCurrentProject(page: Page) {
       name: '流程布局验证',
       description: '',
       flow: null,
+      persistenceRevision: 0,
     });
     inspectionModule.default.setProject('flow-layout-vm');
   });

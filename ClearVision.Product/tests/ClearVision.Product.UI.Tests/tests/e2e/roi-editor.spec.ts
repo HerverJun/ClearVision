@@ -33,6 +33,7 @@ async function setCurrentProject(page: Page) {
       name: 'E2E ROI Project',
       description: '',
       flow: null,
+      persistenceRevision: 0,
     });
     inspectionModule.default.setProject('e2e-roi-project');
   });

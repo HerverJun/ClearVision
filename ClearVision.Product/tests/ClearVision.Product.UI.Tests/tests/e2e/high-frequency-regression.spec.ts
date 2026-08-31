@@ -252,7 +252,7 @@ async function mockResultsApis(page: Page) {
     const stationId = 'station-regression-001';
     const completedAtUtc = '2026-03-20T10:10:00Z';
     const buildStationResultsPage = (status: string | null) => {
-        const items = status === 'Ng'
+        const items = status === 'ng'
             ? [
                 {
                     stationId,
@@ -295,7 +295,7 @@ async function mockResultsApis(page: Page) {
 
         return {
             items,
-            totalCount: status === 'Ng' ? 1 : 10,
+            totalCount: status === 'ng' ? 1 : 10,
             pageIndex: 0,
             pageSize: 12,
         };
@@ -810,10 +810,8 @@ test.describe('High Frequency Regression', () => {
         await page.locator('#btn-run-continuous').click();
 
         await expect(page.locator('#protection-status')).toContainText('自动停止连续运行');
-        await expect(page.locator('#btn-stop')).toBeEnabled();
-
-        await page.locator('#btn-stop').click();
-        await expect(page.locator('#protection-status')).toContainText('连续运行已停止');
+        // 自动保护已经结束运行；继续暴露可用 Stop 会制造一次无效的二次停止。
+        await expect(page.locator('#btn-stop')).toBeDisabled();
         await expect(page.locator('#btn-run-continuous')).toBeEnabled();
     });
 
@@ -831,7 +829,7 @@ test.describe('High Frequency Regression', () => {
         await expect(page.locator('#sm-result-list')).toContainText('NG');
         await expect(page.locator('#sm-result-list')).toContainText('OK');
 
-        await page.locator('#sm-result-status-filter').selectOption('Ng');
+        await page.locator('#sm-result-status-filter').selectOption('ng');
 
         await expect(page.locator('#sm-results-meta')).toHaveText('1 条记录');
         await expect(page.locator('#sm-result-overview')).toContainText('总计 1');

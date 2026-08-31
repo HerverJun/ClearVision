@@ -1,6 +1,230 @@
 {
   "schemaVersion": "2026-07-15.test-gates.v1",
   "authoritativeClassification": "TestClassificationAttribute on every xUnit test class or method",
+  "failureRegistry": {
+    "schemaVersion": "2026-09-01.playwright-failure-registry.v1",
+    "scope": "Current-production Chromium UI failure accounting. This extends the repository's existing quality gate manifest; it is not a parallel test classification system.",
+    "environment": {
+      "os": "Microsoft Windows NT 10.0.26200.0",
+      "node": "v24.11.0",
+      "playwright": "1.58.1",
+      "browser": "Chrome for Testing 145.0.7632.6 (Playwright Chromium v1208)",
+      "project": "chromium",
+      "workers": 1,
+      "host": "static http-server fixture; no Desktop API, WebView2, real device, or external database"
+    },
+    "baselines": [
+      {
+        "id": "wave-2e-full-nonvisual",
+        "sha": "dd5c066764b3f2e7b7d73fcc0b379e57dae1d857",
+        "dirty": false,
+        "command": "npx playwright test --project=chromium --workers=1 --grep-invert \"visual baseline\" --reporter=list",
+        "discovered": 192,
+        "passed": 137,
+        "failed": 54,
+        "skipped": 1,
+        "disposition": "historical_starting_point"
+      },
+      {
+        "id": "u06a-seven-formal-specs",
+        "sha": "27dff8bc923905133a83d2f24d9764fca3cdc38b",
+        "dirty": true,
+        "command": "npx playwright test tests/e2e/ai-agent-responsive.spec.ts tests/e2e/ai-build-workspace.spec.ts tests/e2e/ai-plan-clarification.spec.ts tests/e2e/flow-editor-port-contract.spec.ts tests/e2e/flow-layout-vm.spec.ts tests/e2e/high-frequency-regression.spec.ts tests/e2e/plc-settings.spec.ts --project=chromium --workers=1 --grep-invert \"visual baseline\" --reporter=list",
+        "discovered": 77,
+        "passed": 47,
+        "failed": 29,
+        "skipped": 1,
+        "disposition": "current-head-recheck-before-confirmed-fixture-remediation"
+      }
+    ],
+    "entries": [
+      {
+        "id": "U06A-FIX-001",
+        "spec": "tests/e2e/flow-editor-port-contract.spec.ts",
+        "test": "preview workbench prompts to configure the acquisition source (no console errors)",
+        "stableSignature": "POST /api/inspection/decision-configuration/validate -> static http-server 405",
+        "owner": "Flow editor UI test owner",
+        "classification": "fixture",
+        "retry": { "attempts": 1, "passed": 1, "failed": 0 },
+        "expiry": "2026-12-01",
+        "disposition": "resolved_fixture_missing_production_endpoint_stub",
+        "evidence": "The current contract needs a 200 { isValid, issues, eligibleOutputs } response; the static server cannot implement the production POST endpoint. Targeted spec: 5/5 PASS."
+      },
+      {
+        "id": "U06A-FIX-002",
+        "spec": "tests/e2e/flow-layout-vm.spec.ts",
+        "test": [
+          "supports global operator search, scoped category search, drag-add, and rail scroll retention",
+          "adds an operator from flyout and switches inspector and preview workbench",
+          "resizes the preview workbench wider with a real splitter drag and keeps core controls first-screen",
+          "shows output image summary and debug image operations in the right workbench",
+          "routes a real retargeted pointermove through the image stage",
+          "marks old preview stale after parameter edit and clears stale after manual preview",
+          "prevents duplicate manual preview while loading and exposes cancel state",
+          "shows missing camera prerequisite for camera acquisition without CameraId",
+          "shows blank, no-image and preview-failure states",
+          "clears current preview state for connection, blank selection and deleted selected node",
+          "shows layered Chinese diagnostics for missing resources and failed operator metadata"
+        ],
+        "stableSignature": "Preview coordinator rejects unsaved fake project before request because persistenceRevision is absent; selected-node validation endpoint also falls through to static-server 405",
+        "owner": "Flow editor UI test owner",
+        "classification": "fixture",
+        "retry": { "attempts": 1, "passed": 11, "failed": 0 },
+        "expiry": "2026-12-01",
+        "disposition": "resolved_fixture_current_project_revision_and_endpoint_stub",
+        "evidence": "Production preview/draft execution requires a saved project with a valid persistence revision. The fixture now supplies persistenceRevision: 0 and the contract endpoint stub."
+      },
+      {
+        "id": "U06A-FIX-003",
+        "spec": "tests/e2e/high-frequency-regression.spec.ts",
+        "test": "station result filter regression: server-paged filters refresh monitor results",
+        "stableSignature": "selectOption('Ng') does not match production enum value 'ng'",
+        "owner": "Station results UI test owner",
+        "classification": "fixture",
+        "retry": { "attempts": 1, "passed": 1, "failed": 0 },
+        "expiry": "2026-12-01",
+        "disposition": "resolved_fixture_enum_case_drift",
+        "evidence": "Displayed label remains NG; only the transport value is canonical lowercase ng."
+      },
+      {
+        "id": "U06A-FIX-004",
+        "spec": "tests/e2e/high-frequency-regression.spec.ts",
+        "test": "continuous run regression: protection guidance is visible before and after continuous run",
+        "stableSignature": "after automatic protection stop, legacy assertion expects #btn-stop enabled",
+        "owner": "Inspection UI test owner",
+        "classification": "fixture",
+        "retry": { "attempts": 1, "passed": 1, "failed": 0 },
+        "expiry": "2026-12-01",
+        "disposition": "resolved_stale_assertion_for_automatic_stop",
+        "evidence": "The UI reports automatic stop and correctly disables a second Stop request while re-enabling continuous run. Targeted high-frequency spec: 9/9 PASS."
+      },
+      {
+        "id": "U06A-FIX-005",
+        "spec": "tests/e2e/roi-editor.spec.ts",
+        "test": "23 historical waitForRoiEditorReady failures",
+        "stableSignature": "currentImageSource && imageCanvas.image does not become ready when fake current project lacks persistenceRevision",
+        "owner": "ROI editor UI test owner",
+        "classification": "fixture",
+        "retry": {
+          "attempts": 3,
+          "passed": 72,
+          "failed": 0,
+          "successRate": 1.0,
+          "scope": "24-test ROI spec, including the 23 formerly failing cases",
+          "durationsSeconds": [55.7, 56.2, 56.7],
+          "p50Seconds": 56.2,
+          "p95Seconds": 56.7
+        },
+        "expiry": "2026-12-01",
+        "disposition": "resolved_fixture_current_project_revision",
+        "evidence": "No wait condition or production behavior changed; three serial runs of the full ROI spec passed."
+      },
+      {
+        "id": "U06A-OPEN-001",
+        "spec": "tests/e2e/ai-agent-responsive.spec.ts",
+        "test": [
+          "Plan pending recommendation records defer without becoming an effective answer",
+          "AI agent workbench default Plan view hides raw semantic trace until diagnostics expand",
+          "AI agent Plan to Build exposes visible Apply button and applies through real click path",
+          "AI agent Apply button keeps dimensions on narrow viewport after Build ready"
+        ],
+        "stableSignature": "plan/clarification and build-gate UI contracts do not reach the asserted ready state",
+        "owner": "AI experience owner",
+        "classification": "product",
+        "retry": { "attempts": 1, "passed": 0, "failed": 4 },
+        "expiry": "2026-10-01",
+        "disposition": "open_product_investigation",
+        "evidence": "No test relaxation, visual baseline update, or production behavior change in U06A."
+      },
+      {
+        "id": "U06A-OPEN-002",
+        "spec": "tests/e2e/ai-build-workspace.spec.ts",
+        "test": [
+          "resource workspace reuses the existing binding action and updates canonical result data",
+          "mixed ordinary and resource parameters stay partitioned through confirmation and binding",
+          "Applied remains inside Build and preserves the engineering history",
+          "Build remains reachable without horizontal overflow at 1024x768",
+          "Build remains reachable without horizontal overflow at 390x844"
+        ],
+        "stableSignature": "resource binding input is absent; applied history also has a screenshot diff",
+        "owner": "AI experience owner",
+        "classification": "product",
+        "retry": { "attempts": 1, "passed": 0, "failed": 5 },
+        "expiry": "2026-10-01",
+        "disposition": "open_product_and_visual_investigation",
+        "evidence": "Visual evidence remains open; no visual baseline was updated."
+      },
+      {
+        "id": "U06A-OPEN-003",
+        "spec": "tests/e2e/ai-plan-clarification.spec.ts",
+        "test": [
+          "manual supplement uses explicit_user_text and does not copy the main Composer",
+          "keyboard path reaches options and keeps the current action unique",
+          "confirmed clarification collapses into a low-emphasis light summary"
+        ],
+        "stableSignature": "clarification action/state differs from asserted current UI contract",
+        "owner": "AI experience owner",
+        "classification": "product",
+        "retry": { "attempts": 1, "passed": 0, "failed": 3 },
+        "expiry": "2026-10-01",
+        "disposition": "open_product_investigation"
+      },
+      {
+        "id": "U06A-OPEN-004",
+        "spec": "tests/e2e/flow-layout-vm.spec.ts",
+        "test": "keeps the pixel probe live across hover, lock, ROI, and preview changes",
+        "stableSignature": "after switching to original-size mode, a pointer move over the computed image point remains data-probe-state=default",
+        "owner": "Flow editor product owner",
+        "classification": "product",
+        "retry": { "attempts": 1, "passed": 0, "failed": 1 },
+        "expiry": "2026-10-01",
+        "disposition": "open_product_investigation",
+        "evidence": "Reproduced once at flow-layout-vm.spec.ts:1034; no wait was added because it is not shown to be timing-only."
+      },
+      {
+        "id": "U06A-OPEN-005",
+        "spec": "tests/e2e/flow-layout-vm.spec.ts",
+        "test": "syncs dependency-controlled fields for template matching",
+        "stableSignature": "after TemplateId=tpl-01, TemplatePath is readonly but remains enabled and data-effective-disabled=false",
+        "owner": "Flow editor contract owner",
+        "classification": "fixture",
+        "retry": { "attempts": 1, "passed": 0, "failed": 1 },
+        "expiry": "2026-10-01",
+        "disposition": "open_requires_authoritative_template_parameter_contract",
+        "evidence": "The fixture asserts a legacy TemplatePath/TemplateId mutual-exclusion rule that is not present in its supplied metadata; do not choose between restoring the product contract and retiring the assertion without a design decision."
+      },
+      {
+        "id": "U06A-OPEN-006",
+        "spec": "tests/e2e/flow-layout-vm.spec.ts",
+        "test": "captures one camera frame into the preview workbench and reuses it in the ROI editor at 1920x1080",
+        "stableSignature": "after a successful mocked soft-trigger frame, ROI editor displays '请先让该节点成功生成一次预览输入图像'",
+        "owner": "Preview and ROI product owner",
+        "classification": "product",
+        "retry": { "attempts": 1, "passed": 0, "failed": 1 },
+        "expiry": "2026-10-01",
+        "disposition": "open_product_investigation",
+        "evidence": "Reproduced at flow-layout-vm.spec.ts:1335; no production behavior was changed to make the fixture pass."
+      },
+      {
+        "id": "U06A-OPEN-007",
+        "spec": "tests/e2e/plc-settings.spec.ts",
+        "test": "all non-visual current formal cases",
+        "stableSignature": "none",
+        "owner": "PLC settings UI test owner",
+        "classification": "environment",
+        "retry": { "attempts": 1, "passed": 1, "failed": 0 },
+        "expiry": "2026-12-01",
+        "disposition": "passing_no_failure_record",
+        "evidence": "Included to make the seven formal T01 specs explicit; it is not an open failure."
+      }
+    ],
+    "nonBlockingBoundaries": [
+      "G08 remains report-only.",
+      "G02 remains open because this branch has not been pushed; local results are not CI evidence.",
+      "Quiet Precision and visual-difference failures remain open and are not relabeled as fixture fixes.",
+      "No real WebView2, device, external database, clean clone, visual baseline update, or same-SHA CI run was performed."
+    ]
+  },
   "projects": {
     "Product": "ClearVision.Product/tests/ClearVision.Product.Tests/ClearVision.Product.Tests.csproj",
     "Desktop": "ClearVision.Product/tests/ClearVision.Product.Desktop.Tests/ClearVision.Product.Desktop.Tests.csproj",

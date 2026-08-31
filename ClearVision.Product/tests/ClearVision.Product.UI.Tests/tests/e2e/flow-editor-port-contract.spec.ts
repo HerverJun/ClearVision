@@ -42,6 +42,15 @@ const IMAGE_ACQUISITION = {
 };
 
 async function stubOperatorLibrary(page: Page) {
+  // 静态 UI server 不承载 production-only 的最终判定校验端点；预览协调器会在
+  // 选中节点时调用它，因此在本 contract fixture 中显式提供其稳定成功响应。
+  await page.route('**/api/inspection/decision-configuration/validate', async route => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ isValid: true, issues: [], eligibleOutputs: [] }),
+    });
+  });
   await page.route('**/api/operators/library', async route => {
     await route.fulfill({
       status: 200,
@@ -82,6 +91,7 @@ async function setCurrentProject(page: Page) {
       name: 'E2E Project',
       description: '',
       flow: null,
+      persistenceRevision: 0,
     });
     inspectionModule.default.setProject('e2e-project');
   });
