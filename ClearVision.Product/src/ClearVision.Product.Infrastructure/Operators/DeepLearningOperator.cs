@@ -69,7 +69,7 @@ public enum DetectionOutputFormat
     CategoryId = OperatorCategoryId.AiInference,
     IconName = "ai",
     Keywords = new[] { "深度学习", "AI", "模型", "推理", "缺陷识别", "目标检测", "图像分类", "语义分割", "ONNX", "YOLO", "Deep learning" },
-    Version = "1.1.0"
+    Version = "1.1.1"
 )]
 [OperatorParameterRule("TaskType", ReasonCode = "DEEP_LEARNING_TASK_TYPE")]
 [OperatorParameterRule("ModelPath", RequiredPolicy = OperatorParameterRequiredPolicy.Required,

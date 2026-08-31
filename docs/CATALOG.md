@@ -1,6 +1,6 @@
 # 算子目录 / Operator Catalog
 
-> 生成时间 / Generated At: `2026-08-29 14:18:20 +08:00`
+> 生成时间 / Generated At: `2026-08-31 19:13:00 +08:00`
 > 算子总数 / Total Operators: **158**
 
 ## 分类统计 / Category Summary
@@ -33,7 +33,7 @@
 ### 采集 / `Acquisition` (1)
 | 枚举 (Enum) | 显示名 (DisplayName) | Execution | AlgorithmQuality | ProductionReadiness | FieldValidation | 输入 | 输出 | 参数 | 版本 (Version) | 算法 (Algorithm) | 文档 |
 |------|------|------|------|------|------|------:|------:|------:|------|------|------|
-| `OperatorType.ImageAcquisition` | 图像采集 | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | 2 | 1 | 6 | `1.0.0` | 该算子用于从文件或相机采集图像。运行时从声明输入端口读取数据，按参数表解析配置，并把… | [ImageAcquisition](./operators/ImageAcquisition.md) |
+| `OperatorType.ImageAcquisition` | 图像采集 | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | 2 | 1 | 6 | `1.0.1` | 该算子用于从文件或相机采集图像。运行时从声明输入端口读取数据，按参数表解析配置，并把… | [ImageAcquisition](./operators/ImageAcquisition.md) |
 
 ### 图像预处理 / `ImagePreprocessing` (28)
 | 枚举 (Enum) | 显示名 (DisplayName) | Execution | AlgorithmQuality | ProductionReadiness | FieldValidation | 输入 | 输出 | 参数 | 版本 (Version) | 算法 (Algorithm) | 文档 |
@@ -45,7 +45,7 @@
 | `OperatorType.CopyMakeBorder` | 边界填充 | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | 1 | 1 | 6 | `1.0.0` | 该算子用于使用 OpenCV 边界策略填充图像边缘。运行时从声明输入端口读取数据，按… | [CopyMakeBorder](./operators/CopyMakeBorder.md) |
 | `OperatorType.FFT1D` | 信号/图像傅里叶变换（FFT） | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | 2 | 4 | 0 | `1.0.0` | 该算子用于对一维数值信号执行 FFT；图像输入执行完整二维 DFT，并输出复数频谱、… | [FFT1D](./operators/FFT1D.md) |
 | `OperatorType.Filtering` | 滤波 | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | 1 | 3 | 8 | `1.2.0` | Unified spatial smoothing filters (OpenCV) | [Filtering](./operators/Filtering.md) |
-| `OperatorType.FrameAveraging` | 帧平均 | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | 1 | 2 | 2 | `1.0.0` | 该算子用于对多帧输入取平均以降低时域噪声。运行时从声明输入端口读取数据，按参数表解析… | [FrameAveraging](./operators/FrameAveraging.md) |
+| `OperatorType.FrameAveraging` | 帧平均 | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | 1 | 2 | 2 | `1.0.1` | 该算子用于对多帧输入取平均以降低时域噪声。运行时从声明输入端口读取数据，按参数表解析… | [FrameAveraging](./operators/FrameAveraging.md) |
 | `OperatorType.FrequencyFilter` | 频域滤波 | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | 5 | 3 | 0 | `1.0.0` | 该算子用于对一维或二维复数频谱执行频域滤波，用于保留或抑制指定频率成分。运行时从声明… | [FrequencyFilter](./operators/FrequencyFilter.md) |
 | `OperatorType.HistogramEqualization` | 直方图均衡化 | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | 1 | 1 | 4 | `1.0.0` | 该算子用于支持全局直方图均衡与 CLAHE，用于增强图像对比度。运行时从声明输入端口… | [HistogramEqualization](./operators/HistogramEqualization.md) |
 | `OperatorType.ImageAdd` | 图像加法 | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | 2 | 1 | 6 | `1.0.0` | 该算子用于两幅图像叠加/合并。运行时从声明输入端口读取数据，按参数表解析配置，并把处… | [ImageAdd](./operators/ImageAdd.md) |
@@ -159,25 +159,25 @@
 | 枚举 (Enum) | 显示名 (DisplayName) | Execution | AlgorithmQuality | ProductionReadiness | FieldValidation | 输入 | 输出 | 参数 | 版本 (Version) | 算法 (Algorithm) | 文档 |
 |------|------|------|------|------|------|------:|------:|------:|------|------|------|
 | `OperatorType.CalibrationLoader` | 标定加载 | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | 0 | 3 | 1 | `1.0.0` | 该算子用于从 CalibrationBundleV2 JSON 文件加载标定数据并输… | [CalibrationLoader](./operators/CalibrationLoader.md) |
-| `OperatorType.CameraCalibration` | 相机标定 | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | 1 | 2 | 7 | `1.0.0` | 该算子用于根据棋盘格或圆点阵图像标定相机内参。运行时从声明输入端口读取数据，按参数表… | [CameraCalibration](./operators/CameraCalibration.md) |
+| `OperatorType.CameraCalibration` | 相机标定 | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | 1 | 5 | 7 | `1.1.0` | 该算子用于根据棋盘格或圆点阵图像标定相机内参。运行时从声明输入端口读取数据，按参数表… | [CameraCalibration](./operators/CameraCalibration.md) |
 | `OperatorType.CoordinateTransform` | 像素到物理坐标（单点） | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | 4 | 3 | 2 | `1.0.0` | 该算子用于使用 CalibrationBundleV2 的二维标定变换，将单个像素坐… | [CoordinateTransform](./operators/CoordinateTransform.md) |
-| `OperatorType.FisheyeCalibration` | 鱼眼标定 | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | 1 | 2 | 9 | `1.0.0` | 该算子用于使用棋盘格或圆点阵图案标定鱼眼相机内参和畸变参数。运行时从声明输入端口读取… | [FisheyeCalibration](./operators/FisheyeCalibration.md) |
+| `OperatorType.FisheyeCalibration` | 鱼眼标定 | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | 1 | 5 | 9 | `1.1.0` | 该算子用于使用棋盘格或圆点阵图案标定鱼眼相机内参和畸变参数。运行时从声明输入端口读取… | [FisheyeCalibration](./operators/FisheyeCalibration.md) |
 | `OperatorType.FisheyeUndistort` | 鱼眼去畸变 | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | 2 | 2 | 4 | `1.0.0` | 该算子用于使用标定数据校正鱼眼镜头畸变，并支持 LUT 加速。运行时从声明输入端口读… | [FisheyeUndistort](./operators/FisheyeUndistort.md) |
-| `OperatorType.HandEyeCalibration` | 手眼标定 | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | 2 | 7 | 4 | `1.0.0` | OpenCV Hand-Eye Calibration | [HandEyeCalibration](./operators/HandEyeCalibration.md) |
+| `OperatorType.HandEyeCalibration` | 手眼标定 | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | 2 | 10 | 5 | `1.1.0` | OpenCV Hand-Eye Calibration | [HandEyeCalibration](./operators/HandEyeCalibration.md) |
 | `OperatorType.HandEyeCalibrationValidator` | 手眼标定验证 | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | 3 | 8 | 1 | `1.0.1` | Hand-Eye Consistency Validation | [HandEyeCalibrationValidator](./operators/HandEyeCalibrationValidator.md) |
-| `OperatorType.NPointCalibration` | N点标定 | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | 1 | 9 | 10 | `1.0.0` | 该算子用于基于全部点对鲁棒估计仿射或单应性标定模型。运行时从声明输入端口读取数据，按… | [NPointCalibration](./operators/NPointCalibration.md) |
+| `OperatorType.NPointCalibration` | N点标定 | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | 1 | 12 | 10 | `1.1.0` | 该算子用于基于全部点对鲁棒估计仿射或单应性标定模型。运行时从声明输入端口读取数据，按… | [NPointCalibration](./operators/NPointCalibration.md) |
 | `OperatorType.PixelToWorldTransform` | 像素世界映射 | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | 3 | 3 | 11 | `1.0.1` | 该算子用于通过 CalibrationBundleV2 执行坐标转换，可使用 Tra… | [PixelToWorldTransform](./operators/PixelToWorldTransform.md) |
-| `OperatorType.StereoCalibration` | 双目标定 | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | 2 | 6 | 11 | `1.0.0` | 该算子用于标定双目相机并生成极线校正映射。运行时从声明输入端口读取数据，按参数表解析… | [StereoCalibration](./operators/StereoCalibration.md) |
-| `OperatorType.TranslationRotationCalibration` | 平移旋转标定 | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | 1 | 16 | 8 | `1.1.1` | 该算子用于从图像/机器人点对拟合二维刚性或相似变换，支持可选的 RANSAC 与 H… | [TranslationRotationCalibration](./operators/TranslationRotationCalibration.md) |
+| `OperatorType.StereoCalibration` | 双目标定 | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | 2 | 9 | 11 | `1.1.0` | 该算子用于标定双目相机并生成极线校正映射。运行时从声明输入端口读取数据，按参数表解析… | [StereoCalibration](./operators/StereoCalibration.md) |
+| `OperatorType.TranslationRotationCalibration` | 平移旋转标定 | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | 1 | 19 | 8 | `1.2.0` | 该算子用于从图像/机器人点对拟合二维刚性或相似变换，支持可选的 RANSAC 与 H… | [TranslationRotationCalibration](./operators/TranslationRotationCalibration.md) |
 | `OperatorType.Undistort` | 畸变校正 | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | 2 | 1 | 0 | `1.0.0` | 该算子用于使用标定数据校正镜头畸变。运行时从声明输入端口读取数据，按参数表解析配置，… | [Undistort](./operators/Undistort.md) |
 
 ### AI推理 / `AiInference` (4)
 | 枚举 (Enum) | 显示名 (DisplayName) | Execution | AlgorithmQuality | ProductionReadiness | FieldValidation | 输入 | 输出 | 参数 | 版本 (Version) | 算法 (Algorithm) | 文档 |
 |------|------|------|------|------|------|------:|------:|------:|------|------|------|
 | `OperatorType.AnomalyDetection` | 异常检测 | `Implemented` | `PublicDatasetEvidence` | `Experimental` | `NotValidated` | 2 | 8 | 17 | `1.2.0` | Simplified PatchCore | [AnomalyDetection](./operators/AnomalyDetection.md) |
-| `OperatorType.DeepLearning` | 深度学习 | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | 1 | 31 | 27 | `1.1.0` | 该算子用于统一 ONNX 深度学习推理入口，支持目标检测、图像分类和语义分割；默认保… | [DeepLearning](./operators/DeepLearning.md) |
+| `OperatorType.DeepLearning` | 深度学习 | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | 1 | 31 | 27 | `1.1.1` | 该算子用于统一 ONNX 深度学习推理入口，支持目标检测、图像分类和语义分割；默认保… | [DeepLearning](./operators/DeepLearning.md) |
 | `OperatorType.OcrRecognition` | OCR 识别 | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | 1 | 2 | 0 | `1.0.0` | 该算子用于识别图像中的文本内容。运行时从声明输入端口读取数据，按参数表解析配置，并把… | [OcrRecognition](./operators/OcrRecognition.md) |
-| `OperatorType.SemanticSegmentation` | 语义分割 | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | 1 | 12 | 12 | `1.0.0` | 该算子用于运行 ONNX 语义分割模型，输出类别图、着色可视化结果和各类别掩码。运行… | [SemanticSegmentation](./operators/SemanticSegmentation.md) |
+| `OperatorType.SemanticSegmentation` | 语义分割 | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | 1 | 12 | 12 | `1.0.1` | 该算子用于运行 ONNX 语义分割模型，输出类别图、着色可视化结果和各类别掩码。运行… | [SemanticSegmentation](./operators/SemanticSegmentation.md) |
 
 ### 3D点云 / `PointCloud3D` (6)
 | 枚举 (Enum) | 显示名 (DisplayName) | Execution | AlgorithmQuality | ProductionReadiness | FieldValidation | 输入 | 输出 | 参数 | 版本 (Version) | 算法 (Algorithm) | 文档 |
@@ -202,9 +202,9 @@
 | `OperatorType.MathOperation` | 数值计算 | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | 2 | 2 | 1 | `1.0.0` | 该算子用于支持加减乘除、取绝对值、开方等常用运算。运行时从声明输入端口读取数据，按参… | [MathOperation](./operators/MathOperation.md) |
 | `OperatorType.PointSetTool` | 点集工具 | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | 2 | 4 | 6 | `1.0.0` | 该算子用于合并、排序、过滤点列表并计算集合属性。运行时从声明输入端口读取数据，按参数… | [PointSetTool](./operators/PointSetTool.md) |
 | `OperatorType.ScriptOperator` | 脚本算子 | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | 4 | 2 | 3 | `1.0.1` | 该算子用于运行用户自定义 C# 表达式。运行时从声明输入端口读取数据，按参数表解析配… | [ScriptOperator](./operators/ScriptOperator.md) |
-| `OperatorType.Statistics` | 统计分析 | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | 1 | 7 | 5 | `1.0.0` | 该算子用于基于滚动历史计算均值、标准差和 Cpk 统计结果。运行时从声明输入端口读取… | [Statistics](./operators/Statistics.md) |
+| `OperatorType.Statistics` | 统计分析 | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | 1 | 7 | 5 | `1.0.1` | 该算子用于基于滚动历史计算均值、标准差和 Cpk 统计结果。运行时从声明输入端口读取… | [Statistics](./operators/Statistics.md) |
 | `OperatorType.StringFormat` | 字符串格式化 | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | 2 | 3 | 4 | `1.0.0` | 该算子用于按模板生成字符串。运行时从声明输入端口读取数据，按参数表解析配置，并把处理… | [StringFormat](./operators/StringFormat.md) |
-| `OperatorType.TimerStatistics` | 计时统计 | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | 1 | 4 | 4 | `1.0.1` | 该算子用于统计耗时和周期时间。运行时从声明输入端口读取数据，按参数表解析配置，并把处… | [TimerStatistics](./operators/TimerStatistics.md) |
+| `OperatorType.TimerStatistics` | 计时统计 | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | 1 | 4 | 4 | `1.0.2` | 该算子用于统计耗时和周期时间。运行时从声明输入端口读取数据，按参数表解析配置，并把处… | [TimerStatistics](./operators/TimerStatistics.md) |
 | `OperatorType.TypeConvert` | 类型转换 | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | 1 | 6 | 2 | `1.0.0` | 该算子用于在字符串、浮点、整数、布尔等类型之间转换输入数据。运行时从声明输入端口读取… | [TypeConvert](./operators/TypeConvert.md) |
 | `OperatorType.UnitConvert` | 单位换算 | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | 2 | 2 | 4 | `1.0.0` | 该算子用于在像素、mm、um 和英寸之间进行数值换算。运行时从声明输入端口读取数据，… | [UnitConvert](./operators/UnitConvert.md) |
 | `OperatorType.VariableIncrement` | 变量递增 | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | 0 | 5 | 7 | `1.0.0` | 该算子用于递增单次运行变量或项目全局 Int64 变量。运行时从声明输入端口读取数据… | [VariableIncrement](./operators/VariableIncrement.md) |
@@ -217,29 +217,29 @@
 | `OperatorType.ConditionalBranch` | 条件分支 | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | 2 | 5 | 12 | `1.0.0` | 该算子用于根据数值/字符串/布尔条件执行 True/False 两路分支，常用于 O… | [ConditionalBranch](./operators/ConditionalBranch.md) |
 | `OperatorType.CycleCounter` | 循环计数器 | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | 0 | 5 | 2 | `1.0.0` | 该算子用于获取当前循环次数和统计信息。运行时从声明输入端口读取数据，按参数表解析配置… | [CycleCounter](./operators/CycleCounter.md) |
 | `OperatorType.Delay` | 延时 | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | 1 | 2 | 1 | `1.0.0` | 该算子用于等待指定时间后继续执行，常用于通信前等待下位机就绪。运行时从声明输入端口读… | [Delay](./operators/Delay.md) |
-| `OperatorType.ForEach` | ForEach 循环 | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | 1 | 1 | 4 | `1.0.0` | 该算子用于对集合中的每个元素执行子图。运行时从声明输入端口读取数据，按参数表解析配置… | [ForEach](./operators/ForEach.md) |
-| `OperatorType.FrameChangeTrigger` | 帧变化触发 | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | 1 | 10 | 20 | `1.0.0` | 该算子用于通过连续帧 ROI 变化判断端子是否到达；未到料时短路当前检测周期，避免空… | [FrameChangeTrigger](./operators/FrameChangeTrigger.md) |
+| `OperatorType.ForEach` | ForEach 循环 | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | 1 | 1 | 4 | `1.0.1` | 该算子用于对集合中的每个元素执行子图。运行时从声明输入端口读取数据，按参数表解析配置… | [ForEach](./operators/ForEach.md) |
+| `OperatorType.FrameChangeTrigger` | 帧变化触发 | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | 1 | 10 | 20 | `1.0.1` | 该算子用于通过连续帧 ROI 变化判断端子是否到达；未到料时短路当前检测周期，避免空… | [FrameChangeTrigger](./operators/FrameChangeTrigger.md) |
 | `OperatorType.ResultJudgment` | 结果判定 | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | 2 | 5 | 8 | `1.0.1` | 该算子用于对数值、字符串等结果执行业务判定，输出条件检查结果。运行时从声明输入端口读… | [ResultJudgment](./operators/ResultJudgment.md) |
-| `OperatorType.TriggerModule` | 触发模块 | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | 1 | 3 | 3 | `1.0.0` | 该算子用于生成软件、定时或外部触发信号。运行时从声明输入端口读取数据，按参数表解析配… | [TriggerModule](./operators/TriggerModule.md) |
+| `OperatorType.TriggerModule` | 触发模块 | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | 1 | 3 | 3 | `1.0.1` | 该算子用于生成软件、定时或外部触发信号。运行时从声明输入端口读取数据，按参数表解析配… | [TriggerModule](./operators/TriggerModule.md) |
 | `OperatorType.TryCatch` | Try分支透传 | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | 1 | 4 | 3 | `1.0.0` | 该算子用于将输入透传到 Try 分支并输出空 Catch/无错误状态；本算子不捕获下… | [TryCatch](./operators/TryCatch.md) |
 
 ### 通信 / `Communication` (8)
 | 枚举 (Enum) | 显示名 (DisplayName) | Execution | AlgorithmQuality | ProductionReadiness | FieldValidation | 输入 | 输出 | 参数 | 版本 (Version) | 算法 (Algorithm) | 文档 |
 |------|------|------|------|------|------|------:|------:|------:|------|------|------|
-| `OperatorType.HttpRequest` | HTTP 请求 | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | 2 | 3 | 6 | `1.0.0` | 该算子用于调用外部 REST API。运行时从声明输入端口读取数据，按参数表解析配置… | [HttpRequest](./operators/HttpRequest.md) |
-| `OperatorType.MitsubishiMcCommunication` | 三菱MC通信 | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | 1 | 2 | 13 | `1.0.1` | 该算子用于三菱 MC 协议 PLC 读写通信。运行时从声明输入端口读取数据，按参数表… | [MitsubishiMcCommunication](./operators/MitsubishiMcCommunication.md) |
-| `OperatorType.ModbusCommunication` | Modbus TCP通信 | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | 1 | 2 | 9 | `1.0.0` | 该算子用于通过 Modbus TCP 读写线圈和保持寄存器；当前算子不执行 Modb… | [ModbusCommunication](./operators/ModbusCommunication.md) |
+| `OperatorType.HttpRequest` | HTTP 请求 | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | 2 | 3 | 6 | `1.0.1` | 该算子用于调用外部 REST API。运行时从声明输入端口读取数据，按参数表解析配置… | [HttpRequest](./operators/HttpRequest.md) |
+| `OperatorType.MitsubishiMcCommunication` | 三菱MC通信 | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | 1 | 2 | 10 | `1.1.0` | 该算子用于三菱 MC 协议 PLC 读写通信。运行时从声明输入端口读取数据，按参数表… | [MitsubishiMcCommunication](./operators/MitsubishiMcCommunication.md) |
+| `OperatorType.ModbusCommunication` | Modbus TCP通信 | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | 1 | 2 | 6 | `1.1.0` | 该算子用于通过 Modbus TCP 读写线圈和保持寄存器；当前算子不执行 Modb… | [ModbusCommunication](./operators/ModbusCommunication.md) |
 | `OperatorType.MqttPublish` | MQTT 发布 | `Implemented` | `Unknown` | `Reference` | `NotValidated` | 2 | 1 | 6 | `0.1.0` | 该算子用于在启用可选 MQTT 集成时发布检测数据。运行时从声明输入端口读取数据，按… | [MqttPublish](./operators/MqttPublish.md) |
-| `OperatorType.OmronFinsCommunication` | 欧姆龙FINS通信 | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | 1 | 2 | 13 | `1.0.1` | 该算子用于欧姆龙FINS/TCP协议PLC读写通信（CP1H/CJ2M/NJ/NX）… | [OmronFinsCommunication](./operators/OmronFinsCommunication.md) |
-| `OperatorType.SerialCommunication` | 串口通信 | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | 1 | 1 | 9 | `1.0.1` | 该算子用于RS-232/485 串口数据收发。运行时从声明输入端口读取数据，按参数表… | [SerialCommunication](./operators/SerialCommunication.md) |
-| `OperatorType.SiemensS7Communication` | 西门子S7通信 | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | 1 | 2 | 15 | `1.0.1` | 该算子用于西门子S7系列PLC读写通信（S7-200/300/400/1200/15… | [SiemensS7Communication](./operators/SiemensS7Communication.md) |
-| `OperatorType.TcpCommunication` | TCP通信 | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | 1 | 12 | 39 | `1.0.0` | 该算子用于TCP/IP网络通信。运行时从声明输入端口读取数据，按参数表解析配置，并把… | [TcpCommunication](./operators/TcpCommunication.md) |
+| `OperatorType.OmronFinsCommunication` | 欧姆龙FINS通信 | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | 1 | 2 | 10 | `1.1.0` | 该算子用于欧姆龙FINS/TCP协议PLC读写通信（CP1H/CJ2M/NJ/NX）… | [OmronFinsCommunication](./operators/OmronFinsCommunication.md) |
+| `OperatorType.SerialCommunication` | 串口通信 | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | 1 | 1 | 10 | `1.1.0` | 该算子用于RS-232/485 串口数据收发。运行时从声明输入端口读取数据，按参数表… | [SerialCommunication](./operators/SerialCommunication.md) |
+| `OperatorType.SiemensS7Communication` | 西门子S7通信 | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | 1 | 2 | 9 | `1.1.0` | 该算子用于西门子S7系列PLC读写通信（S7-200/300/400/1200/15… | [SiemensS7Communication](./operators/SiemensS7Communication.md) |
+| `OperatorType.TcpCommunication` | TCP通信 | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | 1 | 12 | 33 | `1.1.0` | 该算子用于TCP/IP网络通信。运行时从声明输入端口读取数据，按参数表解析配置，并把… | [TcpCommunication](./operators/TcpCommunication.md) |
 
 ### 输出与辅助 / `OutputAndAuxiliary` (5)
 | 枚举 (Enum) | 显示名 (DisplayName) | Execution | AlgorithmQuality | ProductionReadiness | FieldValidation | 输入 | 输出 | 参数 | 版本 (Version) | 算法 (Algorithm) | 文档 |
 |------|------|------|------|------|------|------:|------:|------:|------|------|------|
 | `OperatorType.Comment` | 注释 | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | 1 | 2 | 1 | `1.0.1` | Workflow annotation passthrough | [Comment](./operators/Comment.md) |
-| `OperatorType.DatabaseWrite` | 数据库写入 | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | 2 | 2 | 3 | `1.0.0` | 该算子用于将输入数据写入 SQLite / SQL Server / MySQL 表… | [DatabaseWrite](./operators/DatabaseWrite.md) |
+| `OperatorType.DatabaseWrite` | 数据库写入 | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | 2 | 2 | 4 | `1.1.0` | 该算子用于将输入数据写入 SQLite / SQL Server / MySQL 表… | [DatabaseWrite](./operators/DatabaseWrite.md) |
 | `OperatorType.ImageSave` | 图像保存 | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | 1 | 2 | 3 | `1.0.0` | 该算子用于保存检测图像到本地硬盘。运行时从声明输入端口读取数据，按参数表解析配置，并… | [ImageSave](./operators/ImageSave.md) |
 | `OperatorType.ResultOutput` | 结果输出 | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | 4 | 6 | 3 | `1.0.1` | 该算子用于汇总检测结果并输出，支持 JSON/CSV/Text 格式，可选保存到文件… | [ResultOutput](./operators/ResultOutput.md) |
-| `OperatorType.TextSave` | 文本保存 | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | 2 | 2 | 5 | `1.0.0` | 该算子用于将文本或结构化数据保存为 text/csv/json 文件。运行时从声明输… | [TextSave](./operators/TextSave.md) |
+| `OperatorType.TextSave` | 文本保存 | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | 2 | 2 | 5 | `1.0.1` | 该算子用于将文本或结构化数据保存为 text/csv/json 文件。运行时从声明输… | [TextSave](./operators/TextSave.md) |

@@ -20,7 +20,7 @@ namespace ClearVision.Product.Infrastructure.Operators;
     CategoryId = OperatorCategoryId.AiInference,
     IconName = "semantic-segmentation",
     Keywords = new[] { "semantic segmentation", "segmentation", "onnx", "mask", "语义分割" },
-    Version = "1.0.0"
+    Version = "1.0.1"
 )]
 [OperatorParameterRule("ModelPath", RequiredPolicy = OperatorParameterRequiredPolicy.Required,
     AtLeastOneGroup = "semantic-segmentation-model-source", MutuallyExclusiveGroup = "semantic-segmentation-model-source",

@@ -16,7 +16,8 @@ namespace ClearVision.Product.Infrastructure.Operators;
     DisplayName = "统计分析",
     Description = "基于滚动历史计算均值、标准差和 Cpk 统计结果。",
     CategoryId = OperatorCategoryId.DataProcessing,
-    IconName = "stats"
+    IconName = "stats",
+    Version = "1.0.1"
 )]
 [InputPort("Value", "Input Value", PortDataType.Float, IsRequired = true)]
 [OutputPort("Mean", "Mean", PortDataType.Float)]

@@ -8,7 +8,7 @@
 | 分类 ID (CategoryId) | `Acquisition` |
 | 分类 (Category) | 采集 |
 | 分类顺序 (CategoryOrder) | 1 |
-| 版本 (Version) | `1.0.0` |
+| 版本 (Version) | `1.0.1` |
 | 生命周期 (Lifecycle) | 稳定 `Stable` |
 | 生命周期说明 (Lifecycle Note) | - |
 | 默认隐藏 (Default Hidden) | No |
@@ -35,10 +35,10 @@
 
 ## 核心 API 调用链 / Core API Call Chain
 - `OperatorBase.Get*Param(...)`
-- `Cv2.ImRead`
 - `Cv2.ImDecode`
 - `Cv2.CvtColor`
 - `File.Exists`
+- `File.ReadAllBytesAsync`
 - `ImageWrapper`
 - `OperatorExecutionOutput.Success(...)`
 - `OperatorExecutionOutput.Failure(...)`
@@ -96,7 +96,7 @@
 | - | - | - |
 
 ## 生成依赖 / Generation Dependencies
-- 组合指纹 (Generation Fingerprint)：`A71333E3777265EDC5D7B98D0A62BCC14C84A9A92E8D0C9622D9595EE48EAA8C`
+- 组合指纹 (Generation Fingerprint)：`6F92E2DFC35875A87558C06B2DD9D498460B5EA9FF8442560B233D566B8D9E98`
 - 显式共享依赖：无；指纹由最终运行时元数据与算子源码组成。
 
 ### 运行时附加输出 / Runtime Additional Outputs
@@ -123,7 +123,7 @@
 - 单元/契约测试：未发现同名算子测试入口，建议补充关键路径和边界输入验证。
 - Golden/回放证据：质量报告中存在通过的 baseline 证据。
 - 参数失败契约：源码包含 `ValidateParameters`，非法参数会被明确拦截或返回错误说明。
-- 执行失败契约：源码中发现 14 条 `OperatorExecutionOutput.Failure(...)` 路径。
+- 执行失败契约：源码中发现 16 条 `OperatorExecutionOutput.Failure(...)` 路径。
 
 ## 适用场景 / Use Cases
 - 适合 (Suitable)：需要把视觉流程与文件、HTTP、数据库、PLC、MQTT 或串口等外部系统连接的场景。
@@ -138,4 +138,4 @@
 ## 变更记录 / Changelog
 | 版本 (Version) | 日期 (Date) | 变更内容 (Changes) |
 |------|------|----------|
-| 1.0.0 | 2026-07-16 | 按当前最终运行时元数据、条件契约和显式依赖口径重生成 / Regenerated from effective runtime metadata and declared dependencies |
+| 1.0.1 | 2026-08-31 | 按当前最终运行时元数据、条件契约和显式依赖口径重生成 / Regenerated from effective runtime metadata and declared dependencies |

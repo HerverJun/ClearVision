@@ -13,7 +13,8 @@ namespace ClearVision.Product.Infrastructure.Operators;
     Description = "使用棋盘格或圆点阵图案标定鱼眼相机内参和畸变参数。",
     CategoryId = OperatorCategoryId.CalibrationAndCoordinates,
     IconName = "fisheye-calibration",
-    Keywords = new[] { "Fisheye", "Calibration", "Distortion", "Kannala-Brandt" }
+    Keywords = new[] { "Fisheye", "Calibration", "Distortion", "Kannala-Brandt" },
+    Version = "1.1.0"
 )]
 [InputPort("Image", "Input Image", PortDataType.Image, IsRequired = true)]
 [OutputPort("Image", "Result Image", PortDataType.Image)]

@@ -79,7 +79,7 @@
 | - | - | - |
 
 ## 生成依赖 / Generation Dependencies
-- 组合指纹 (Generation Fingerprint)：`FB08128EEF7D6169261D342A45FEF736233041B85A24C0A6979FC449F50C703F`
+- 组合指纹 (Generation Fingerprint)：`FF674FDFC6384E3F53EC9ACACF9178E3CB9425140AC33A4F97C47F72B0CBFDE4`
 - 显式共享依赖：无；指纹由最终运行时元数据与算子源码组成。
 
 ### 运行时附加输出 / Runtime Additional Outputs
@@ -113,4 +113,4 @@
 ## 变更记录 / Changelog
 | 版本 (Version) | 日期 (Date) | 变更内容 (Changes) |
 |------|------|----------|
-| 1.0.0 | 2026-07-14 | 按当前最终运行时元数据、条件契约和显式依赖口径重生成 / Regenerated from effective runtime metadata and declared dependencies |
+| 1.0.0 | 2026-08-29 | 按当前最终运行时元数据、条件契约和显式依赖口径重生成 / Regenerated from effective runtime metadata and declared dependencies |

@@ -17,7 +17,8 @@ namespace ClearVision.Product.Infrastructure.Operators;
     Description = "生成软件、定时或外部触发信号。",
     CategoryId = OperatorCategoryId.FlowControl,
     IconName = "trigger",
-    Keywords = new[] { "trigger", "start", "timer", "external signal" }
+    Keywords = new[] { "trigger", "start", "timer", "external signal" },
+    Version = "1.0.1"
 )]
 [InputPort("Signal", "Signal", PortDataType.Boolean, IsRequired = false)]
 [OutputPort("Triggered", "Triggered", PortDataType.Boolean)]

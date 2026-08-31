@@ -22,7 +22,7 @@ namespace ClearVision.Product.Infrastructure.Operators;
     Description = "西门子S7系列PLC读写通信（S7-200/300/400/1200/1500）",
     CategoryId = OperatorCategoryId.Communication,
     IconName = "s7",
-    Version = "1.0.1"
+    Version = "1.1.0"
 )]
 [OperatorParameterRule("ProfileId", RequiredPolicy = OperatorParameterRequiredPolicy.Required, ResourceKind = OperatorResourceKind.PlcProfile, ReasonCode = "SIEMENS_PLC_PROFILE_REQUIRED")]
 [OperatorParameterRule("Address", RequiredPolicy = OperatorParameterRequiredPolicy.Required, ResourceKind = OperatorResourceKind.PlcAddress, ReasonCode = "SIEMENS_PLC_ADDRESS_REQUIRED")]

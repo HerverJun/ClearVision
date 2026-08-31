@@ -22,7 +22,8 @@ namespace ClearVision.Product.Infrastructure.Operators;
     Description = "标定双目相机并生成极线校正映射。",
     CategoryId = OperatorCategoryId.CalibrationAndCoordinates,
     IconName = "stereo-calibration",
-    Keywords = new[] { "Stereo", "Binocular", "Calibration", "Rectification", "Epipolar" }
+    Keywords = new[] { "Stereo", "Binocular", "Calibration", "Rectification", "Epipolar" },
+    Version = "1.1.0"
 )]
 [InputPort("LeftImage", "Left Input Image", PortDataType.Image, IsRequired = true)]
 [InputPort("RightImage", "Right Input Image", PortDataType.Image, IsRequired = true)]

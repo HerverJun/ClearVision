@@ -15,7 +15,7 @@ namespace ClearVision.Product.Infrastructure.Operators;
     Description = "三菱 MC 协议 PLC 读写通信。",
     CategoryId = OperatorCategoryId.Communication,
     IconName = "mc-plc",
-    Version = "1.0.1",
+    Version = "1.1.0",
     Keywords = new[] { "PLC", "Mitsubishi", "MC", "Read", "Write" }
 )]
 [OperatorParameterRule("ProfileId", RequiredPolicy = OperatorParameterRequiredPolicy.Required, ResourceKind = OperatorResourceKind.PlcProfile, ReasonCode = "MITSUBISHI_PLC_PROFILE_REQUIRED")]

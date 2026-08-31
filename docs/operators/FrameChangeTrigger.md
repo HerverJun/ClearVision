@@ -8,7 +8,7 @@
 | 分类 ID (CategoryId) | `FlowControl` |
 | 分类 (Category) | 流程控制 |
 | 分类顺序 (CategoryOrder) | 12 |
-| 版本 (Version) | `1.0.0` |
+| 版本 (Version) | `1.0.1` |
 | 生命周期 (Lifecycle) | 稳定 `Stable` |
 | 生命周期说明 (Lifecycle Note) | - |
 | 默认隐藏 (Default Hidden) | No |
@@ -109,7 +109,7 @@
 | - | - | - |
 
 ## 生成依赖 / Generation Dependencies
-- 组合指纹 (Generation Fingerprint)：`8B9104464950DF51722C25599B7357D485F4F08C52A7FC3FE41DD205C88A8B01`
+- 组合指纹 (Generation Fingerprint)：`CA564F99501677A069956B97308A3FCE5A595903D91E92EEDB6941DF5CCDAF0D`
 - 显式共享依赖：无；指纹由最终运行时元数据与算子源码组成。
 
 ### 运行时附加输出 / Runtime Additional Outputs
@@ -150,4 +150,4 @@
 ## 变更记录 / Changelog
 | 版本 (Version) | 日期 (Date) | 变更内容 (Changes) |
 |------|------|----------|
-| 1.0.0 | 2026-07-16 | 按当前最终运行时元数据、条件契约和显式依赖口径重生成 / Regenerated from effective runtime metadata and declared dependencies |
+| 1.0.1 | 2026-08-31 | 按当前最终运行时元数据、条件契约和显式依赖口径重生成 / Regenerated from effective runtime metadata and declared dependencies |

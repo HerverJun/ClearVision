@@ -1,6 +1,6 @@
 {
   "schemaVersion": "2026-07-15.operator-quality-four-axis.v1",
-  "generatedAtUtc": "2026-08-29T14:18:20.2419055+08:00",
+  "generatedAtUtc": "2026-08-31T19:13:00.8983064+08:00",
   "claimBoundary": "Four independent evidence axes. Unknown, compatibility-only and synthetic/public-dataset evidence never imply Release Ready or Field Verified.",
   "summary": {
     "total": 158,

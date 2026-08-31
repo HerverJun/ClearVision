@@ -8,7 +8,7 @@
 | 分类 ID (CategoryId) | `DataProcessing` |
 | 分类 (Category) | 数据处理 |
 | 分类顺序 (CategoryOrder) | 11 |
-| 版本 (Version) | `1.0.0` |
+| 版本 (Version) | `1.0.1` |
 | 生命周期 (Lifecycle) | 稳定 `Stable` |
 | 生命周期说明 (Lifecycle Note) | - |
 | 默认隐藏 (Default Hidden) | No |
@@ -78,7 +78,7 @@
 | - | - | - |
 
 ## 生成依赖 / Generation Dependencies
-- 组合指纹 (Generation Fingerprint)：`D003B6EEB0D00379DD2993A528B258E9A37E11078660BBAC7C5E564716759304`
+- 组合指纹 (Generation Fingerprint)：`710F28CB4814E73B1059B1212C77D40EC4F1581D3EFCE546EAD06B260EEE6293`
 - 显式共享依赖：无；指纹由最终运行时元数据与算子源码组成。
 
 ### 运行时附加输出 / Runtime Additional Outputs
@@ -115,4 +115,4 @@
 ## 变更记录 / Changelog
 | 版本 (Version) | 日期 (Date) | 变更内容 (Changes) |
 |------|------|----------|
-| 1.0.0 | 2026-07-14 | 按当前最终运行时元数据、条件契约和显式依赖口径重生成 / Regenerated from effective runtime metadata and declared dependencies |
+| 1.0.1 | 2026-08-31 | 按当前最终运行时元数据、条件契约和显式依赖口径重生成 / Regenerated from effective runtime metadata and declared dependencies |

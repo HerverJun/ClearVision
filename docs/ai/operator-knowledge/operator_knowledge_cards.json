@@ -5069,6 +5069,27 @@
         "DataType": "String",
         "IsRequired": false,
         "Description": ""
+      },
+      {
+        "Name": "CalibrationAssetId",
+        "DisplayName": "Calibration Asset Id",
+        "DataType": "String",
+        "IsRequired": false,
+        "Description": ""
+      },
+      {
+        "Name": "CalibrationAssetCandidate",
+        "DisplayName": "Calibration Asset Candidate",
+        "DataType": "Boolean",
+        "IsRequired": false,
+        "Description": ""
+      },
+      {
+        "Name": "CalibrationContentHash",
+        "DisplayName": "Calibration Content Hash",
+        "DataType": "String",
+        "IsRequired": false,
+        "Description": ""
       }
     ],
     "Parameters": [
@@ -5145,11 +5166,11 @@
         "AllowedValues": []
       },
       {
-        "Name": "CalibrationOutputPath",
-        "DisplayName": "\u6807\u5B9A\u8F93\u51FA\u8DEF\u5F84",
+        "Name": "CalibrationAssetId",
+        "DisplayName": "Calibration Asset Id",
         "DataType": "string",
         "Description": "",
-        "DefaultValue": "calibration_result.json",
+        "DefaultValue": "",
         "MinValue": null,
         "MaxValue": null,
         "IsRequired": true,
@@ -5233,7 +5254,7 @@
     ],
     "ResourceRequirements": [],
     "GenerationDependencies": [],
-    "GenerationFingerprint": "C4EF240DCDB5763491CF77CCC9CBFBD6DB0FDEB671EA2C4E671031E3038E2CD8",
+    "GenerationFingerprint": "E7B65D9393046CF5B79094998145B6D54DCE29C24C872035F85310D7BC10A859",
     "RequiredResources": [],
     "TypicalUpstream": [],
     "TypicalDownstream": [],
@@ -9281,6 +9302,17 @@
     ],
     "Parameters": [
       {
+        "Name": "ProfileId",
+        "DisplayName": "\u6570\u636E\u5E93Profile",
+        "DataType": "string",
+        "Description": "",
+        "DefaultValue": "",
+        "MinValue": null,
+        "MaxValue": null,
+        "IsRequired": true,
+        "AllowedValues": []
+      },
+      {
         "Name": "ConnectionString",
         "DisplayName": "\u8FDE\u63A5\u5B57\u7B26\u4E32",
         "DataType": "string",
@@ -9323,7 +9355,7 @@
     "ImageInputContracts": [],
     "ResourceRequirements": [],
     "GenerationDependencies": [],
-    "GenerationFingerprint": "399D8D35CF0F76E5BDD2D6E3417F6516D24EA084B35EB2E90D91C92556AA42C8",
+    "GenerationFingerprint": "B5AD0F86A0D57632A6CCD1C163A25AB9BB3A422F600E4126038E463E67DCA4D1",
     "RequiredResources": [],
     "TypicalUpstream": [],
     "TypicalDownstream": [],
@@ -11615,7 +11647,7 @@
       "type:ClearVision.Product.Infrastructure.Operators.SemanticSegmentationOperator",
       "type:ClearVision.Product.Infrastructure.Services.DeepLearningLabelResolver"
     ],
-    "GenerationFingerprint": "C438192588112353D92F31927FBA32A49E0955DACE787A203ACBDC3B7523F42B",
+    "GenerationFingerprint": "67F1BFF6738317B1185CA6E184CBB94797B66ED517065BB005F151917EB58145",
     "RequiredResources": [
       "DeepLearning.ModelPath",
       "DeepLearning.ModelId",
@@ -14652,6 +14684,27 @@
         "DataType": "String",
         "IsRequired": false,
         "Description": ""
+      },
+      {
+        "Name": "CalibrationAssetId",
+        "DisplayName": "Calibration Asset Id",
+        "DataType": "String",
+        "IsRequired": false,
+        "Description": ""
+      },
+      {
+        "Name": "CalibrationAssetCandidate",
+        "DisplayName": "Calibration Asset Candidate",
+        "DataType": "Boolean",
+        "IsRequired": false,
+        "Description": ""
+      },
+      {
+        "Name": "CalibrationContentHash",
+        "DisplayName": "Calibration Content Hash",
+        "DataType": "String",
+        "IsRequired": false,
+        "Description": ""
       }
     ],
     "Parameters": [
@@ -14728,11 +14781,11 @@
         "AllowedValues": []
       },
       {
-        "Name": "CalibrationOutputPath",
-        "DisplayName": "\u6807\u5B9A\u8F93\u51FA\u8DEF\u5F84",
+        "Name": "CalibrationAssetId",
+        "DisplayName": "Calibration Asset Id",
         "DataType": "string",
         "Description": "",
-        "DefaultValue": "fisheye_calibration_result.json",
+        "DefaultValue": "",
         "MinValue": null,
         "MaxValue": null,
         "IsRequired": true,
@@ -14838,7 +14891,7 @@
     ],
     "ResourceRequirements": [],
     "GenerationDependencies": [],
-    "GenerationFingerprint": "147BA40A3D44704B0CD81A7C7EC27780A68E86C161C5AD682FFF1EDDB9C6BC99",
+    "GenerationFingerprint": "80E3091CCD190574B459B8EB72A087FC0B2089C48AA2245DF7A72A1F4612061C",
     "RequiredResources": [],
     "TypicalUpstream": [],
     "TypicalDownstream": [],
@@ -15180,7 +15233,7 @@
     "ImageInputContracts": [],
     "ResourceRequirements": [],
     "GenerationDependencies": [],
-    "GenerationFingerprint": "92685762FCE936CB5ACB028AB1265367870C95E4E8CB2625F63349EEC6B81B83",
+    "GenerationFingerprint": "83A7A11063850361A29610D63D166BC3E4F890934B59F8DB61E0EDDA23C48401",
     "RequiredResources": [],
     "TypicalUpstream": [],
     "TypicalDownstream": [],
@@ -15366,7 +15419,7 @@
     ],
     "ResourceRequirements": [],
     "GenerationDependencies": [],
-    "GenerationFingerprint": "E3A544B34FB8905D343641E85039E91B740CC9C360DA2EA6335B2DA19573330E",
+    "GenerationFingerprint": "A2CBB33A0A428C7AA03CFF18EACE50BB52D83ACF6B57C0BF6404A2C412AEAA75",
     "RequiredResources": [],
     "TypicalUpstream": [],
     "TypicalDownstream": [],
@@ -15825,7 +15878,7 @@
     ],
     "ResourceRequirements": [],
     "GenerationDependencies": [],
-    "GenerationFingerprint": "8B9104464950DF51722C25599B7357D485F4F08C52A7FC3FE41DD205C88A8B01",
+    "GenerationFingerprint": "CA564F99501677A069956B97308A3FCE5A595903D91E92EEDB6941DF5CCDAF0D",
     "RequiredResources": [],
     "TypicalUpstream": [
       "ImageAcquisition"
@@ -17805,6 +17858,27 @@
         "DataType": "String",
         "IsRequired": false,
         "Description": ""
+      },
+      {
+        "Name": "CalibrationAssetId",
+        "DisplayName": "Calibration Asset Id",
+        "DataType": "String",
+        "IsRequired": false,
+        "Description": ""
+      },
+      {
+        "Name": "CalibrationAssetCandidate",
+        "DisplayName": "Calibration Asset Candidate",
+        "DataType": "Boolean",
+        "IsRequired": false,
+        "Description": ""
+      },
+      {
+        "Name": "CalibrationContentHash",
+        "DisplayName": "Calibration Content Hash",
+        "DataType": "String",
+        "IsRequired": false,
+        "Description": ""
       }
     ],
     "Parameters": [
@@ -17860,6 +17934,17 @@
         "MaxValue": null,
         "IsRequired": true,
         "AllowedValues": []
+      },
+      {
+        "Name": "CalibrationAssetId",
+        "DisplayName": "Calibration Asset Id",
+        "DataType": "string",
+        "Description": "",
+        "DefaultValue": "",
+        "MinValue": null,
+        "MaxValue": null,
+        "IsRequired": true,
+        "AllowedValues": []
       }
     ],
     "ParameterConditions": [],
@@ -17867,7 +17952,7 @@
     "ImageInputContracts": [],
     "ResourceRequirements": [],
     "GenerationDependencies": [],
-    "GenerationFingerprint": "CB4D33407E47D93FBA7918B42B5F24CC74F5B1E536970E14E5889ACEF0C8D7E6",
+    "GenerationFingerprint": "1743E8C565F80D17AA03E2675B211A5EB851C598C11FDEBCF3F6B70FDE5465FA",
     "RequiredResources": [],
     "TypicalUpstream": [],
     "TypicalDownstream": [],
@@ -18870,7 +18955,7 @@
     "ImageInputContracts": [],
     "ResourceRequirements": [],
     "GenerationDependencies": [],
-    "GenerationFingerprint": "63F21E1BDE5B0FD035E214BCFF3F98C85CAB80363D9EC34A686CF278B69F198C",
+    "GenerationFingerprint": "A89C8CE5EECD82CFA258DFBBAA6A6CBF6E3C29F2F013F3E51761F260FAECA017",
     "RequiredResources": [],
     "TypicalUpstream": [],
     "TypicalDownstream": [],
@@ -19455,7 +19540,7 @@
       }
     ],
     "GenerationDependencies": [],
-    "GenerationFingerprint": "EC476E1B09690CFEE7531B96898D659A910CEF553C16BE367035194B1D198781",
+    "GenerationFingerprint": "6F92E2DFC35875A87558C06B2DD9D498460B5EA9FF8442560B233D566B8D9E98",
     "RequiredResources": [
       "ImageAcquisition.FilePath",
       "ImageAcquisition.CameraId"
@@ -26853,33 +26938,11 @@
     ],
     "Parameters": [
       {
-        "Name": "IpAddress",
-        "DisplayName": "IP Address",
+        "Name": "ProfileId",
+        "DisplayName": "PLC Profile",
         "DataType": "string",
         "Description": "",
-        "DefaultValue": "192.168.3.39",
-        "MinValue": null,
-        "MaxValue": null,
-        "IsRequired": true,
-        "AllowedValues": []
-      },
-      {
-        "Name": "Port",
-        "DisplayName": "Port",
-        "DataType": "int",
-        "Description": "",
-        "DefaultValue": "5002",
-        "MinValue": "1",
-        "MaxValue": "65535",
-        "IsRequired": true,
-        "AllowedValues": []
-      },
-      {
-        "Name": "UseGlobalFallback",
-        "DisplayName": "Use Global Fallback",
-        "DataType": "bool",
-        "Description": "",
-        "DefaultValue": "False",
+        "DefaultValue": "",
         "MinValue": null,
         "MaxValue": null,
         "IsRequired": true,
@@ -26906,25 +26969,6 @@
         "MaxValue": "999",
         "IsRequired": true,
         "AllowedValues": []
-      },
-      {
-        "Name": "DataType",
-        "DisplayName": "Data Type",
-        "DataType": "enum",
-        "Description": "",
-        "DefaultValue": "Word",
-        "MinValue": null,
-        "MaxValue": null,
-        "IsRequired": true,
-        "AllowedValues": [
-          "Bit(Bool)",
-          "Word(UInt16)",
-          "Int16",
-          "DWord(UInt32)",
-          "Int32",
-          "\u6D6E\u70B9",
-          "Double"
-        ]
       },
       {
         "Name": "Operation",
@@ -27019,52 +27063,17 @@
     ],
     "ParameterConditions": [
       {
-        "Parameter": "IpAddress",
-        "RequiredPolicy": "metadata",
-        "RequiredWhen": {
-          "All": [
-            {
-              "Parameter": "UseGlobalFallback",
-              "Comparison": "equals",
-              "Value": false
-            }
-          ],
-          "Any": null
-        },
+        "Parameter": "ProfileId",
+        "RequiredPolicy": "required",
+        "RequiredWhen": null,
         "EnabledWhen": null,
         "DisabledWhen": null,
         "AtLeastOneGroup": null,
         "MutuallyExclusiveGroup": null,
         "AliasFor": null,
         "Deprecated": false,
-        "ResourceKind": "plc_endpoint",
-        "ReasonCode": "MITSUBISHI_OPERATOR_IP_REQUIRED_WITHOUT_GLOBAL_FALLBACK",
-        "VisibleWhen": null,
-        "HiddenWhen": null,
-        "IgnoredWhen": null,
-        "SatisfiedByInputPorts": null
-      },
-      {
-        "Parameter": "Port",
-        "RequiredPolicy": "metadata",
-        "RequiredWhen": {
-          "All": [
-            {
-              "Parameter": "UseGlobalFallback",
-              "Comparison": "equals",
-              "Value": false
-            }
-          ],
-          "Any": null
-        },
-        "EnabledWhen": null,
-        "DisabledWhen": null,
-        "AtLeastOneGroup": null,
-        "MutuallyExclusiveGroup": null,
-        "AliasFor": null,
-        "Deprecated": false,
-        "ResourceKind": null,
-        "ReasonCode": "MITSUBISHI_OPERATOR_PORT_REQUIRED_WITHOUT_GLOBAL_FALLBACK",
+        "ResourceKind": "plc_profile",
+        "ReasonCode": "MITSUBISHI_PLC_PROFILE_REQUIRED",
         "VisibleWhen": null,
         "HiddenWhen": null,
         "IgnoredWhen": null,
@@ -27082,6 +27091,23 @@
         "Deprecated": false,
         "ResourceKind": "plc_address",
         "ReasonCode": "MITSUBISHI_PLC_ADDRESS_REQUIRED",
+        "VisibleWhen": null,
+        "HiddenWhen": null,
+        "IgnoredWhen": null,
+        "SatisfiedByInputPorts": null
+      },
+      {
+        "Parameter": "Operation",
+        "RequiredPolicy": "required",
+        "RequiredWhen": null,
+        "EnabledWhen": null,
+        "DisabledWhen": null,
+        "AtLeastOneGroup": null,
+        "MutuallyExclusiveGroup": null,
+        "AliasFor": null,
+        "Deprecated": false,
+        "ResourceKind": null,
+        "ReasonCode": "MITSUBISHI_PLC_OPERATION_REQUIRED",
         "VisibleWhen": null,
         "HiddenWhen": null,
         "IgnoredWhen": null,
@@ -27460,20 +27486,11 @@
     "ImageInputContracts": [],
     "ResourceRequirements": [
       {
-        "Parameter": "IpAddress",
-        "ResourceKind": "plc_endpoint",
-        "ReasonCode": "MITSUBISHI_OPERATOR_IP_REQUIRED_WITHOUT_GLOBAL_FALLBACK",
+        "Parameter": "ProfileId",
+        "ResourceKind": "plc_profile",
+        "ReasonCode": "MITSUBISHI_PLC_PROFILE_REQUIRED",
         "AtLeastOneGroup": null,
-        "RequiredWhen": {
-          "All": [
-            {
-              "Parameter": "UseGlobalFallback",
-              "Comparison": "equals",
-              "Value": false
-            }
-          ],
-          "Any": null
-        }
+        "RequiredWhen": null
       },
       {
         "Parameter": "Address",
@@ -27484,9 +27501,9 @@
       }
     ],
     "GenerationDependencies": [],
-    "GenerationFingerprint": "CFFEEFB6ADB23B1F2AFF357B29E8FA0CBE027189E79E7BBBD7DE1BBF57470633",
+    "GenerationFingerprint": "D9DAA52E3334A95828B46E9A466902AB7E19759BD18B4DA1A5396FC83CD484CC",
     "RequiredResources": [
-      "MitsubishiMcCommunication.IpAddress",
+      "MitsubishiMcCommunication.ProfileId",
       "MitsubishiMcCommunication.Address"
     ],
     "TypicalUpstream": [],
@@ -27577,49 +27594,13 @@
     ],
     "Parameters": [
       {
-        "Name": "Protocol",
-        "DisplayName": "Protocol",
-        "DataType": "enum",
-        "Description": "\u5F53\u524D\u4EC5\u652F\u6301 TCP\uFF1BRTU \u9009\u9879\u7528\u4E8E\u65E7\u6D41\u7A0B\u517C\u5BB9\uFF0C\u6267\u884C\u65F6\u8FD4\u56DE\u4E0D\u652F\u6301\u3002",
-        "DefaultValue": "TCP",
-        "MinValue": null,
-        "MaxValue": null,
-        "IsRequired": true,
-        "AllowedValues": [
-          "TCP",
-          "RTU"
-        ]
-      },
-      {
-        "Name": "IpAddress",
-        "DisplayName": "IP Address",
+        "Name": "ProfileId",
+        "DisplayName": "PLC Profile",
         "DataType": "string",
         "Description": "",
-        "DefaultValue": "192.168.1.1",
+        "DefaultValue": "",
         "MinValue": null,
         "MaxValue": null,
-        "IsRequired": true,
-        "AllowedValues": []
-      },
-      {
-        "Name": "Port",
-        "DisplayName": "Port",
-        "DataType": "int",
-        "Description": "",
-        "DefaultValue": "502",
-        "MinValue": "1",
-        "MaxValue": "65535",
-        "IsRequired": true,
-        "AllowedValues": []
-      },
-      {
-        "Name": "SlaveId",
-        "DisplayName": "Slave ID",
-        "DataType": "int",
-        "Description": "",
-        "DefaultValue": "1",
-        "MinValue": "1",
-        "MaxValue": "255",
         "IsRequired": true,
         "AllowedValues": []
       },
@@ -27686,7 +27667,7 @@
     ],
     "ParameterConditions": [
       {
-        "Parameter": "IpAddress",
+        "Parameter": "ProfileId",
         "RequiredPolicy": "required",
         "RequiredWhen": null,
         "EnabledWhen": null,
@@ -27695,8 +27676,8 @@
         "MutuallyExclusiveGroup": null,
         "AliasFor": null,
         "Deprecated": false,
-        "ResourceKind": "plc_endpoint",
-        "ReasonCode": "MODBUS_TCP_ENDPOINT_REQUIRED",
+        "ResourceKind": "plc_profile",
+        "ReasonCode": "MODBUS_PLC_PROFILE_REQUIRED",
         "VisibleWhen": null,
         "HiddenWhen": null,
         "IgnoredWhen": null,
@@ -27714,6 +27695,23 @@
         "Deprecated": false,
         "ResourceKind": "plc_address",
         "ReasonCode": "MODBUS_REGISTER_ADDRESS_REQUIRED",
+        "VisibleWhen": null,
+        "HiddenWhen": null,
+        "IgnoredWhen": null,
+        "SatisfiedByInputPorts": null
+      },
+      {
+        "Parameter": "FunctionCode",
+        "RequiredPolicy": "required",
+        "RequiredWhen": null,
+        "EnabledWhen": null,
+        "DisabledWhen": null,
+        "AtLeastOneGroup": null,
+        "MutuallyExclusiveGroup": null,
+        "AliasFor": null,
+        "Deprecated": false,
+        "ResourceKind": null,
+        "ReasonCode": "MODBUS_FUNCTION_CODE_REQUIRED",
         "VisibleWhen": null,
         "HiddenWhen": null,
         "IgnoredWhen": null,
@@ -27856,9 +27854,9 @@
     "ImageInputContracts": [],
     "ResourceRequirements": [
       {
-        "Parameter": "IpAddress",
-        "ResourceKind": "plc_endpoint",
-        "ReasonCode": "MODBUS_TCP_ENDPOINT_REQUIRED",
+        "Parameter": "ProfileId",
+        "ResourceKind": "plc_profile",
+        "ReasonCode": "MODBUS_PLC_PROFILE_REQUIRED",
         "AtLeastOneGroup": null,
         "RequiredWhen": null
       },
@@ -27871,9 +27869,9 @@
       }
     ],
     "GenerationDependencies": [],
-    "GenerationFingerprint": "178A9106719B1EF3C8B9A04EF5C976D1487C24CB97A6B0DE70A746B3D9B53E5D",
+    "GenerationFingerprint": "BEE816D345431789919A2A52EFBE05EE737B08B392BB132BBCC850BD8D08682D",
     "RequiredResources": [
-      "ModbusCommunication.IpAddress",
+      "ModbusCommunication.ProfileId",
       "ModbusCommunication.RegisterAddress"
     ],
     "TypicalUpstream": [],
@@ -28640,6 +28638,27 @@
         "DataType": "String",
         "IsRequired": false,
         "Description": ""
+      },
+      {
+        "Name": "CalibrationAssetId",
+        "DisplayName": "Calibration Asset Id",
+        "DataType": "String",
+        "IsRequired": false,
+        "Description": ""
+      },
+      {
+        "Name": "CalibrationAssetCandidate",
+        "DisplayName": "Calibration Asset Candidate",
+        "DataType": "Boolean",
+        "IsRequired": false,
+        "Description": ""
+      },
+      {
+        "Name": "CalibrationContentHash",
+        "DisplayName": "Calibration Content Hash",
+        "DataType": "String",
+        "IsRequired": false,
+        "Description": ""
       }
     ],
     "Parameters": [
@@ -28669,9 +28688,9 @@
         "AllowedValues": []
       },
       {
-        "Name": "SavePath",
-        "DisplayName": "\u4FDD\u5B58\u8DEF\u5F84",
-        "DataType": "file",
+        "Name": "CalibrationAssetId",
+        "DisplayName": "Calibration Asset Id",
+        "DataType": "string",
         "Description": "",
         "DefaultValue": "",
         "MinValue": null,
@@ -28834,7 +28853,7 @@
     ],
     "ResourceRequirements": [],
     "GenerationDependencies": [],
-    "GenerationFingerprint": "5AA2FA9BB23C2793C51EE3DC6C16709DE45DD641D4EEA00611E2DEA891283D18",
+    "GenerationFingerprint": "835131B8B9B606FF8A4E12AEFF186918AC7E686D6998EA70023ADE48835E1932",
     "RequiredResources": [],
     "TypicalUpstream": [],
     "TypicalDownstream": [],
@@ -29073,33 +29092,11 @@
     ],
     "Parameters": [
       {
-        "Name": "IpAddress",
-        "DisplayName": "IP\u5730\u5740",
+        "Name": "ProfileId",
+        "DisplayName": "PLC Profile",
         "DataType": "string",
         "Description": "",
-        "DefaultValue": "192.168.250.1",
-        "MinValue": null,
-        "MaxValue": null,
-        "IsRequired": true,
-        "AllowedValues": []
-      },
-      {
-        "Name": "Port",
-        "DisplayName": "\u7AEF\u53E3",
-        "DataType": "int",
-        "Description": "",
-        "DefaultValue": "9600",
-        "MinValue": "1",
-        "MaxValue": "65535",
-        "IsRequired": true,
-        "AllowedValues": []
-      },
-      {
-        "Name": "UseGlobalFallback",
-        "DisplayName": "\u5141\u8BB8\u5168\u5C40\u56DE\u9000",
-        "DataType": "bool",
-        "Description": "\u542F\u7528\u540E\u7F3A\u5931\u7684IP/Port\u53EF\u56DE\u9000\u5230\u5168\u5C40\u901A\u4FE1\u914D\u7F6E",
-        "DefaultValue": "False",
+        "DefaultValue": "",
         "MinValue": null,
         "MaxValue": null,
         "IsRequired": true,
@@ -29126,25 +29123,6 @@
         "MaxValue": "999",
         "IsRequired": true,
         "AllowedValues": []
-      },
-      {
-        "Name": "DataType",
-        "DisplayName": "\u6570\u636E\u7C7B\u578B",
-        "DataType": "enum",
-        "Description": "",
-        "DefaultValue": "Word",
-        "MinValue": null,
-        "MaxValue": null,
-        "IsRequired": true,
-        "AllowedValues": [
-          "\u4F4D (Bool)",
-          "\u5B57 (Word/UInt16)",
-          "\u77ED\u6574\u578B (Int16)",
-          "\u53CC\u5B57 (DWord/UInt32)",
-          "\u6574\u578B (Int32)",
-          "\u6D6E\u70B9 (Float)",
-          "\u53CC\u7CBE\u5EA6 (Double)"
-        ]
       },
       {
         "Name": "Operation",
@@ -29239,52 +29217,17 @@
     ],
     "ParameterConditions": [
       {
-        "Parameter": "IpAddress",
-        "RequiredPolicy": "metadata",
-        "RequiredWhen": {
-          "All": [
-            {
-              "Parameter": "UseGlobalFallback",
-              "Comparison": "equals",
-              "Value": false
-            }
-          ],
-          "Any": null
-        },
+        "Parameter": "ProfileId",
+        "RequiredPolicy": "required",
+        "RequiredWhen": null,
         "EnabledWhen": null,
         "DisabledWhen": null,
         "AtLeastOneGroup": null,
         "MutuallyExclusiveGroup": null,
         "AliasFor": null,
         "Deprecated": false,
-        "ResourceKind": "plc_endpoint",
-        "ReasonCode": "OMRON_OPERATOR_IP_REQUIRED_WITHOUT_GLOBAL_FALLBACK",
-        "VisibleWhen": null,
-        "HiddenWhen": null,
-        "IgnoredWhen": null,
-        "SatisfiedByInputPorts": null
-      },
-      {
-        "Parameter": "Port",
-        "RequiredPolicy": "metadata",
-        "RequiredWhen": {
-          "All": [
-            {
-              "Parameter": "UseGlobalFallback",
-              "Comparison": "equals",
-              "Value": false
-            }
-          ],
-          "Any": null
-        },
-        "EnabledWhen": null,
-        "DisabledWhen": null,
-        "AtLeastOneGroup": null,
-        "MutuallyExclusiveGroup": null,
-        "AliasFor": null,
-        "Deprecated": false,
-        "ResourceKind": null,
-        "ReasonCode": "OMRON_OPERATOR_PORT_REQUIRED_WITHOUT_GLOBAL_FALLBACK",
+        "ResourceKind": "plc_profile",
+        "ReasonCode": "OMRON_PLC_PROFILE_REQUIRED",
         "VisibleWhen": null,
         "HiddenWhen": null,
         "IgnoredWhen": null,
@@ -29302,6 +29245,23 @@
         "Deprecated": false,
         "ResourceKind": "plc_address",
         "ReasonCode": "OMRON_PLC_ADDRESS_REQUIRED",
+        "VisibleWhen": null,
+        "HiddenWhen": null,
+        "IgnoredWhen": null,
+        "SatisfiedByInputPorts": null
+      },
+      {
+        "Parameter": "Operation",
+        "RequiredPolicy": "required",
+        "RequiredWhen": null,
+        "EnabledWhen": null,
+        "DisabledWhen": null,
+        "AtLeastOneGroup": null,
+        "MutuallyExclusiveGroup": null,
+        "AliasFor": null,
+        "Deprecated": false,
+        "ResourceKind": null,
+        "ReasonCode": "OMRON_PLC_OPERATION_REQUIRED",
         "VisibleWhen": null,
         "HiddenWhen": null,
         "IgnoredWhen": null,
@@ -29680,20 +29640,11 @@
     "ImageInputContracts": [],
     "ResourceRequirements": [
       {
-        "Parameter": "IpAddress",
-        "ResourceKind": "plc_endpoint",
-        "ReasonCode": "OMRON_OPERATOR_IP_REQUIRED_WITHOUT_GLOBAL_FALLBACK",
+        "Parameter": "ProfileId",
+        "ResourceKind": "plc_profile",
+        "ReasonCode": "OMRON_PLC_PROFILE_REQUIRED",
         "AtLeastOneGroup": null,
-        "RequiredWhen": {
-          "All": [
-            {
-              "Parameter": "UseGlobalFallback",
-              "Comparison": "equals",
-              "Value": false
-            }
-          ],
-          "Any": null
-        }
+        "RequiredWhen": null
       },
       {
         "Parameter": "Address",
@@ -29704,9 +29655,9 @@
       }
     ],
     "GenerationDependencies": [],
-    "GenerationFingerprint": "86DC1BA110A638A72A19624EC50B88BF23808346146F5B3F38F34B6FF19F508E",
+    "GenerationFingerprint": "119A6776F434026B281AD623CCC8026E35034DA5F5DF63426E13A85374AADF0E",
     "RequiredResources": [
-      "OmronFinsCommunication.IpAddress",
+      "OmronFinsCommunication.ProfileId",
       "OmronFinsCommunication.Address"
     ],
     "TypicalUpstream": [],
@@ -38332,7 +38283,7 @@
       }
     ],
     "GenerationDependencies": [],
-    "GenerationFingerprint": "55C1A04F54B1D0E1516441CE3924C246C807FFE2103E3DC188F4FBD80BDC8CEB",
+    "GenerationFingerprint": "EB8F533E2CFED3436FEAC5AB89A058C905396968EB3363521DDF2901FAB007F1",
     "RequiredResources": [
       "SemanticSegmentation.ModelPath",
       "SemanticSegmentation.ModelId",
@@ -38409,6 +38360,17 @@
       }
     ],
     "Parameters": [
+      {
+        "Name": "ProfileId",
+        "DisplayName": "\u4E32\u53E3Profile",
+        "DataType": "string",
+        "Description": "",
+        "DefaultValue": "",
+        "MinValue": null,
+        "MaxValue": null,
+        "IsRequired": true,
+        "AllowedValues": []
+      },
       {
         "Name": "PortName",
         "DisplayName": "\u4E32\u53E3\u53F7",
@@ -38532,7 +38494,7 @@
     "ImageInputContracts": [],
     "ResourceRequirements": [],
     "GenerationDependencies": [],
-    "GenerationFingerprint": "4668B4BC3F2C0495536B6F15E0FF6E3BF682B3F92C0E874E7B6315E714A3AD3D",
+    "GenerationFingerprint": "ADCC4C619D1E31EDEE1B5069B2E5D09F6E4249C34FB10AC0EE94DFCE2737B896",
     "RequiredResources": [],
     "TypicalUpstream": [],
     "TypicalDownstream": [],
@@ -41380,75 +41342,13 @@
     ],
     "Parameters": [
       {
-        "Name": "IpAddress",
-        "DisplayName": "IP\u5730\u5740",
+        "Name": "ProfileId",
+        "DisplayName": "PLC Profile",
         "DataType": "string",
         "Description": "",
-        "DefaultValue": "192.168.0.1",
+        "DefaultValue": "",
         "MinValue": null,
         "MaxValue": null,
-        "IsRequired": true,
-        "AllowedValues": []
-      },
-      {
-        "Name": "Port",
-        "DisplayName": "\u7AEF\u53E3",
-        "DataType": "int",
-        "Description": "",
-        "DefaultValue": "102",
-        "MinValue": "1",
-        "MaxValue": "65535",
-        "IsRequired": true,
-        "AllowedValues": []
-      },
-      {
-        "Name": "UseGlobalFallback",
-        "DisplayName": "\u5141\u8BB8\u5168\u5C40\u56DE\u9000",
-        "DataType": "bool",
-        "Description": "\u542F\u7528\u540E\u7F3A\u5931\u7684IP/Port\u53EF\u56DE\u9000\u5230\u5168\u5C40\u901A\u4FE1\u914D\u7F6E",
-        "DefaultValue": "False",
-        "MinValue": null,
-        "MaxValue": null,
-        "IsRequired": true,
-        "AllowedValues": []
-      },
-      {
-        "Name": "CpuType",
-        "DisplayName": "CPU\u7C7B\u578B",
-        "DataType": "enum",
-        "Description": "",
-        "DefaultValue": "S71200",
-        "MinValue": null,
-        "MaxValue": null,
-        "IsRequired": true,
-        "AllowedValues": [
-          "S7-200",
-          "S7-200 Smart",
-          "S7-300",
-          "S7-400",
-          "S7-1200",
-          "S7-1500"
-        ]
-      },
-      {
-        "Name": "Rack",
-        "DisplayName": "\u673A\u67B6\u53F7",
-        "DataType": "int",
-        "Description": "",
-        "DefaultValue": "0",
-        "MinValue": "0",
-        "MaxValue": "15",
-        "IsRequired": true,
-        "AllowedValues": []
-      },
-      {
-        "Name": "Slot",
-        "DisplayName": "\u63D2\u69FD\u53F7",
-        "DataType": "int",
-        "Description": "",
-        "DefaultValue": "1",
-        "MinValue": "0",
-        "MaxValue": "15",
         "IsRequired": true,
         "AllowedValues": []
       },
@@ -41462,27 +41362,6 @@
         "MaxValue": null,
         "IsRequired": true,
         "AllowedValues": []
-      },
-      {
-        "Name": "DataType",
-        "DisplayName": "\u6570\u636E\u7C7B\u578B",
-        "DataType": "enum",
-        "Description": "",
-        "DefaultValue": "Word",
-        "MinValue": null,
-        "MaxValue": null,
-        "IsRequired": true,
-        "AllowedValues": [
-          "\u4F4D (Bool)",
-          "\u5B57\u8282 (Byte)",
-          "\u5B57 (Word/UInt16)",
-          "\u77ED\u6574\u578B (Int16)",
-          "\u53CC\u5B57 (DWord/UInt32)",
-          "\u6574\u578B (Int32)",
-          "\u6D6E\u70B9 (Float)",
-          "\u53CC\u7CBE\u5EA6 (Double)",
-          "\u5B57\u7B26\u4E32 (String)"
-        ]
       },
       {
         "Name": "Operation",
@@ -41577,52 +41456,17 @@
     ],
     "ParameterConditions": [
       {
-        "Parameter": "IpAddress",
-        "RequiredPolicy": "metadata",
-        "RequiredWhen": {
-          "All": [
-            {
-              "Parameter": "UseGlobalFallback",
-              "Comparison": "equals",
-              "Value": false
-            }
-          ],
-          "Any": null
-        },
+        "Parameter": "ProfileId",
+        "RequiredPolicy": "required",
+        "RequiredWhen": null,
         "EnabledWhen": null,
         "DisabledWhen": null,
         "AtLeastOneGroup": null,
         "MutuallyExclusiveGroup": null,
         "AliasFor": null,
         "Deprecated": false,
-        "ResourceKind": "plc_endpoint",
-        "ReasonCode": "SIEMENS_OPERATOR_IP_REQUIRED_WITHOUT_GLOBAL_FALLBACK",
-        "VisibleWhen": null,
-        "HiddenWhen": null,
-        "IgnoredWhen": null,
-        "SatisfiedByInputPorts": null
-      },
-      {
-        "Parameter": "Port",
-        "RequiredPolicy": "metadata",
-        "RequiredWhen": {
-          "All": [
-            {
-              "Parameter": "UseGlobalFallback",
-              "Comparison": "equals",
-              "Value": false
-            }
-          ],
-          "Any": null
-        },
-        "EnabledWhen": null,
-        "DisabledWhen": null,
-        "AtLeastOneGroup": null,
-        "MutuallyExclusiveGroup": null,
-        "AliasFor": null,
-        "Deprecated": false,
-        "ResourceKind": null,
-        "ReasonCode": "SIEMENS_OPERATOR_PORT_REQUIRED_WITHOUT_GLOBAL_FALLBACK",
+        "ResourceKind": "plc_profile",
+        "ReasonCode": "SIEMENS_PLC_PROFILE_REQUIRED",
         "VisibleWhen": null,
         "HiddenWhen": null,
         "IgnoredWhen": null,
@@ -41640,6 +41484,23 @@
         "Deprecated": false,
         "ResourceKind": "plc_address",
         "ReasonCode": "SIEMENS_PLC_ADDRESS_REQUIRED",
+        "VisibleWhen": null,
+        "HiddenWhen": null,
+        "IgnoredWhen": null,
+        "SatisfiedByInputPorts": null
+      },
+      {
+        "Parameter": "Operation",
+        "RequiredPolicy": "required",
+        "RequiredWhen": null,
+        "EnabledWhen": null,
+        "DisabledWhen": null,
+        "AtLeastOneGroup": null,
+        "MutuallyExclusiveGroup": null,
+        "AliasFor": null,
+        "Deprecated": false,
+        "ResourceKind": null,
+        "ReasonCode": "SIEMENS_PLC_OPERATION_REQUIRED",
         "VisibleWhen": null,
         "HiddenWhen": null,
         "IgnoredWhen": null,
@@ -41974,20 +41835,11 @@
     "ImageInputContracts": [],
     "ResourceRequirements": [
       {
-        "Parameter": "IpAddress",
-        "ResourceKind": "plc_endpoint",
-        "ReasonCode": "SIEMENS_OPERATOR_IP_REQUIRED_WITHOUT_GLOBAL_FALLBACK",
+        "Parameter": "ProfileId",
+        "ResourceKind": "plc_profile",
+        "ReasonCode": "SIEMENS_PLC_PROFILE_REQUIRED",
         "AtLeastOneGroup": null,
-        "RequiredWhen": {
-          "All": [
-            {
-              "Parameter": "UseGlobalFallback",
-              "Comparison": "equals",
-              "Value": false
-            }
-          ],
-          "Any": null
-        }
+        "RequiredWhen": null
       },
       {
         "Parameter": "Address",
@@ -41998,9 +41850,9 @@
       }
     ],
     "GenerationDependencies": [],
-    "GenerationFingerprint": "4A0DFA0D37B90029DFAB10FF82E293AD51052A885DE1BFD222FEB2CFC2B91312",
+    "GenerationFingerprint": "64F3A29E33BD1139693B3102D9CCD072F348FC6529B20D7E2B3C7C14FE8DEF71",
     "RequiredResources": [
-      "SiemensS7Communication.IpAddress",
+      "SiemensS7Communication.ProfileId",
       "SiemensS7Communication.Address"
     ],
     "TypicalUpstream": [],
@@ -42297,7 +42149,7 @@
     "ImageInputContracts": [],
     "ResourceRequirements": [],
     "GenerationDependencies": [],
-    "GenerationFingerprint": "D003B6EEB0D00379DD2993A528B258E9A37E11078660BBAC7C5E564716759304",
+    "GenerationFingerprint": "710F28CB4814E73B1059B1212C77D40EC4F1581D3EFCE546EAD06B260EEE6293",
     "RequiredResources": [],
     "TypicalUpstream": [],
     "TypicalDownstream": [],
@@ -42414,6 +42266,27 @@
         "DataType": "Any",
         "IsRequired": false,
         "Description": ""
+      },
+      {
+        "Name": "CalibrationAssetId",
+        "DisplayName": "Calibration Asset Id",
+        "DataType": "String",
+        "IsRequired": false,
+        "Description": ""
+      },
+      {
+        "Name": "CalibrationAssetCandidate",
+        "DisplayName": "Calibration Asset Candidate",
+        "DataType": "Boolean",
+        "IsRequired": false,
+        "Description": ""
+      },
+      {
+        "Name": "CalibrationContentHash",
+        "DisplayName": "Calibration Content Hash",
+        "DataType": "String",
+        "IsRequired": false,
+        "Description": ""
       }
     ],
     "Parameters": [
@@ -42501,11 +42374,11 @@
         "AllowedValues": []
       },
       {
-        "Name": "CalibrationOutputPath",
-        "DisplayName": "\u6807\u5B9A\u8F93\u51FA\u8DEF\u5F84",
+        "Name": "CalibrationAssetId",
+        "DisplayName": "Calibration Asset Id",
         "DataType": "string",
         "Description": "",
-        "DefaultValue": "stereo_calibration_result.json",
+        "DefaultValue": "",
         "MinValue": null,
         "MaxValue": null,
         "IsRequired": true,
@@ -42693,7 +42566,7 @@
     ],
     "ResourceRequirements": [],
     "GenerationDependencies": [],
-    "GenerationFingerprint": "4B95BFC3A92A8F7406A1DA318C63AFD76C25CF27DE8F1FCA3C66031E0FBDA9AE",
+    "GenerationFingerprint": "946D7D637D7C3EE331ABE945E026288B1DE07224EB8F650CF2667A1DC59CFB2C",
     "RequiredResources": [],
     "TypicalUpstream": [],
     "TypicalDownstream": [],
@@ -43935,53 +43808,6 @@
         "AllowedValues": []
       },
       {
-        "Name": "UseGlobalProfile",
-        "DisplayName": "\u4F7F\u7528\u5168\u5C40Profile",
-        "DataType": "bool",
-        "Description": "",
-        "DefaultValue": "False",
-        "MinValue": null,
-        "MaxValue": null,
-        "IsRequired": true,
-        "AllowedValues": []
-      },
-      {
-        "Name": "Mode",
-        "DisplayName": "\u6A21\u5F0F",
-        "DataType": "enum",
-        "Description": "",
-        "DefaultValue": "Client",
-        "MinValue": null,
-        "MaxValue": null,
-        "IsRequired": true,
-        "AllowedValues": [
-          "\u5BA2\u6237\u7AEF",
-          "\u670D\u52A1\u5668"
-        ]
-      },
-      {
-        "Name": "IpAddress",
-        "DisplayName": "IP\u5730\u5740",
-        "DataType": "string",
-        "Description": "",
-        "DefaultValue": "127.0.0.1",
-        "MinValue": null,
-        "MaxValue": null,
-        "IsRequired": true,
-        "AllowedValues": []
-      },
-      {
-        "Name": "Port",
-        "DisplayName": "\u7AEF\u53E3",
-        "DataType": "int",
-        "Description": "",
-        "DefaultValue": "8080",
-        "MinValue": "1",
-        "MaxValue": "65535",
-        "IsRequired": true,
-        "AllowedValues": []
-      },
-      {
         "Name": "SendData",
         "DisplayName": "\u53D1\u9001\u6570\u636E",
         "DataType": "string",
@@ -44046,33 +43872,6 @@
         "MaxValue": "600000",
         "IsRequired": true,
         "AllowedValues": []
-      },
-      {
-        "Name": "Timeout",
-        "DisplayName": "\u8D85\u65F6(ms)",
-        "DataType": "int",
-        "Description": "",
-        "DefaultValue": "5000",
-        "MinValue": "100",
-        "MaxValue": "600000",
-        "IsRequired": true,
-        "AllowedValues": []
-      },
-      {
-        "Name": "Encoding",
-        "DisplayName": "\u7F16\u7801",
-        "DataType": "enum",
-        "Description": "",
-        "DefaultValue": "UTF8",
-        "MinValue": null,
-        "MaxValue": null,
-        "IsRequired": true,
-        "AllowedValues": [
-          "UTF-8",
-          "ASCII",
-          "GBK",
-          "HEX"
-        ]
       },
       {
         "Name": "FailOnUnresolvedPayloadPlaceholder",
@@ -44381,22 +44180,8 @@
     "ParameterConditions": [
       {
         "Parameter": "ProfileId",
-        "RequiredPolicy": "optional",
-        "RequiredWhen": {
-          "All": null,
-          "Any": [
-            {
-              "Parameter": "UseGlobalProfile",
-              "Comparison": "equals",
-              "Value": true
-            },
-            {
-              "Parameter": "Mode",
-              "Comparison": "equals",
-              "Value": "Server"
-            }
-          ]
-        },
+        "RequiredPolicy": "required",
+        "RequiredWhen": null,
         "EnabledWhen": null,
         "DisabledWhen": null,
         "AtLeastOneGroup": null,
@@ -44404,215 +44189,7 @@
         "AliasFor": null,
         "Deprecated": false,
         "ResourceKind": "tcp_profile",
-        "ReasonCode": "TCP_PROFILE_REQUIRED_FOR_GLOBAL_OR_SERVER_MODE",
-        "VisibleWhen": null,
-        "HiddenWhen": null,
-        "IgnoredWhen": null,
-        "SatisfiedByInputPorts": null
-      },
-      {
-        "Parameter": "Mode",
-        "RequiredPolicy": "metadata",
-        "RequiredWhen": null,
-        "EnabledWhen": null,
-        "DisabledWhen": {
-          "All": [
-            {
-              "Parameter": "ProfileId",
-              "Comparison": "not-empty",
-              "Value": null
-            }
-          ],
-          "Any": null
-        },
-        "AtLeastOneGroup": null,
-        "MutuallyExclusiveGroup": null,
-        "AliasFor": null,
-        "Deprecated": false,
-        "ResourceKind": null,
-        "ReasonCode": "TCP_MODE_IGNORED_WHEN_PROFILE_CONFIGURED",
-        "VisibleWhen": null,
-        "HiddenWhen": null,
-        "IgnoredWhen": null,
-        "SatisfiedByInputPorts": null
-      },
-      {
-        "Parameter": "IpAddress",
-        "RequiredPolicy": "metadata",
-        "RequiredWhen": {
-          "All": [
-            {
-              "Parameter": "ProfileId",
-              "Comparison": "empty",
-              "Value": null
-            },
-            {
-              "Parameter": "UseGlobalProfile",
-              "Comparison": "equals",
-              "Value": false
-            },
-            {
-              "Parameter": "Mode",
-              "Comparison": "equals",
-              "Value": "Client"
-            }
-          ],
-          "Any": null
-        },
-        "EnabledWhen": {
-          "All": [
-            {
-              "Parameter": "ProfileId",
-              "Comparison": "empty",
-              "Value": null
-            },
-            {
-              "Parameter": "UseGlobalProfile",
-              "Comparison": "equals",
-              "Value": false
-            },
-            {
-              "Parameter": "Mode",
-              "Comparison": "equals",
-              "Value": "Client"
-            }
-          ],
-          "Any": null
-        },
-        "DisabledWhen": null,
-        "AtLeastOneGroup": null,
-        "MutuallyExclusiveGroup": null,
-        "AliasFor": null,
-        "Deprecated": false,
-        "ResourceKind": "network_endpoint",
-        "ReasonCode": "TCP_LEGACY_CLIENT_HOST_REQUIRED",
-        "VisibleWhen": null,
-        "HiddenWhen": null,
-        "IgnoredWhen": null,
-        "SatisfiedByInputPorts": null
-      },
-      {
-        "Parameter": "Port",
-        "RequiredPolicy": "metadata",
-        "RequiredWhen": {
-          "All": [
-            {
-              "Parameter": "ProfileId",
-              "Comparison": "empty",
-              "Value": null
-            },
-            {
-              "Parameter": "UseGlobalProfile",
-              "Comparison": "equals",
-              "Value": false
-            },
-            {
-              "Parameter": "Mode",
-              "Comparison": "equals",
-              "Value": "Client"
-            }
-          ],
-          "Any": null
-        },
-        "EnabledWhen": {
-          "All": [
-            {
-              "Parameter": "ProfileId",
-              "Comparison": "empty",
-              "Value": null
-            },
-            {
-              "Parameter": "UseGlobalProfile",
-              "Comparison": "equals",
-              "Value": false
-            },
-            {
-              "Parameter": "Mode",
-              "Comparison": "equals",
-              "Value": "Client"
-            }
-          ],
-          "Any": null
-        },
-        "DisabledWhen": null,
-        "AtLeastOneGroup": null,
-        "MutuallyExclusiveGroup": null,
-        "AliasFor": null,
-        "Deprecated": false,
-        "ResourceKind": null,
-        "ReasonCode": "TCP_LEGACY_CLIENT_PORT_REQUIRED",
-        "VisibleWhen": null,
-        "HiddenWhen": null,
-        "IgnoredWhen": null,
-        "SatisfiedByInputPorts": null
-      },
-      {
-        "Parameter": "Timeout",
-        "RequiredPolicy": "metadata",
-        "RequiredWhen": null,
-        "EnabledWhen": {
-          "All": [
-            {
-              "Parameter": "ProfileId",
-              "Comparison": "empty",
-              "Value": null
-            },
-            {
-              "Parameter": "UseGlobalProfile",
-              "Comparison": "equals",
-              "Value": false
-            },
-            {
-              "Parameter": "Mode",
-              "Comparison": "equals",
-              "Value": "Client"
-            }
-          ],
-          "Any": null
-        },
-        "DisabledWhen": null,
-        "AtLeastOneGroup": null,
-        "MutuallyExclusiveGroup": null,
-        "AliasFor": null,
-        "Deprecated": false,
-        "ResourceKind": null,
-        "ReasonCode": "TCP_LEGACY_CLIENT_TIMEOUT_ONLY_WITHOUT_PROFILE",
-        "VisibleWhen": null,
-        "HiddenWhen": null,
-        "IgnoredWhen": null,
-        "SatisfiedByInputPorts": null
-      },
-      {
-        "Parameter": "Encoding",
-        "RequiredPolicy": "metadata",
-        "RequiredWhen": null,
-        "EnabledWhen": {
-          "All": [
-            {
-              "Parameter": "ProfileId",
-              "Comparison": "empty",
-              "Value": null
-            },
-            {
-              "Parameter": "UseGlobalProfile",
-              "Comparison": "equals",
-              "Value": false
-            },
-            {
-              "Parameter": "Mode",
-              "Comparison": "equals",
-              "Value": "Client"
-            }
-          ],
-          "Any": null
-        },
-        "DisabledWhen": null,
-        "AtLeastOneGroup": null,
-        "MutuallyExclusiveGroup": null,
-        "AliasFor": null,
-        "Deprecated": false,
-        "ResourceKind": null,
-        "ReasonCode": "TCP_LEGACY_CLIENT_ENCODING_ONLY_WITHOUT_PROFILE",
+        "ReasonCode": "TCP_PROFILE_REQUIRED",
         "VisibleWhen": null,
         "HiddenWhen": null,
         "IgnoredWhen": null,
@@ -45511,56 +45088,15 @@
       {
         "Parameter": "ProfileId",
         "ResourceKind": "tcp_profile",
-        "ReasonCode": "TCP_PROFILE_REQUIRED_FOR_GLOBAL_OR_SERVER_MODE",
+        "ReasonCode": "TCP_PROFILE_REQUIRED",
         "AtLeastOneGroup": null,
-        "RequiredWhen": {
-          "All": null,
-          "Any": [
-            {
-              "Parameter": "UseGlobalProfile",
-              "Comparison": "equals",
-              "Value": true
-            },
-            {
-              "Parameter": "Mode",
-              "Comparison": "equals",
-              "Value": "Server"
-            }
-          ]
-        }
-      },
-      {
-        "Parameter": "IpAddress",
-        "ResourceKind": "network_endpoint",
-        "ReasonCode": "TCP_LEGACY_CLIENT_HOST_REQUIRED",
-        "AtLeastOneGroup": null,
-        "RequiredWhen": {
-          "All": [
-            {
-              "Parameter": "ProfileId",
-              "Comparison": "empty",
-              "Value": null
-            },
-            {
-              "Parameter": "UseGlobalProfile",
-              "Comparison": "equals",
-              "Value": false
-            },
-            {
-              "Parameter": "Mode",
-              "Comparison": "equals",
-              "Value": "Client"
-            }
-          ],
-          "Any": null
-        }
+        "RequiredWhen": null
       }
     ],
     "GenerationDependencies": [],
-    "GenerationFingerprint": "EE7310E9731A7EAB3B10E80D16F8D3D80E321D6FD8FEAF6A23E0D688BC3CEF16",
+    "GenerationFingerprint": "CE7463C76C444B6CE795423B70363D7F28892193998630221049D89F8217C698",
     "RequiredResources": [
-      "TcpCommunication.ProfileId",
-      "TcpCommunication.IpAddress"
+      "TcpCommunication.ProfileId"
     ],
     "TypicalUpstream": [],
     "TypicalDownstream": [],
@@ -47040,7 +46576,7 @@
       }
     ],
     "GenerationDependencies": [],
-    "GenerationFingerprint": "BE9E2F907C853A4C4896B6412916DFD5311E2A66D9E2F6A72CC9659C3BB2920F",
+    "GenerationFingerprint": "E7AC8C29797BF923D3698BA333C41040E7A0E18959D67F08921183C5A0FB8AC6",
     "RequiredResources": [
       "TextSave.FilePath"
     ],
@@ -47570,7 +47106,7 @@
     "ImageInputContracts": [],
     "ResourceRequirements": [],
     "GenerationDependencies": [],
-    "GenerationFingerprint": "133D64456744069DB0C4F12F8A1AB3E1A405E1C3F0A76928C4EDC29CA7449109",
+    "GenerationFingerprint": "011A234C94717879D9B27D4760C33BB856A11DDE2B704713C4739507CD018CE3",
     "RequiredResources": [],
     "TypicalUpstream": [],
     "TypicalDownstream": [],
@@ -47752,6 +47288,27 @@
         "DataType": "Any",
         "IsRequired": false,
         "Description": ""
+      },
+      {
+        "Name": "CalibrationAssetId",
+        "DisplayName": "Calibration Asset Id",
+        "DataType": "String",
+        "IsRequired": false,
+        "Description": ""
+      },
+      {
+        "Name": "CalibrationAssetCandidate",
+        "DisplayName": "Calibration Asset Candidate",
+        "DataType": "Boolean",
+        "IsRequired": false,
+        "Description": ""
+      },
+      {
+        "Name": "CalibrationContentHash",
+        "DisplayName": "Calibration Content Hash",
+        "DataType": "String",
+        "IsRequired": false,
+        "Description": ""
       }
     ],
     "Parameters": [
@@ -47840,14 +47397,14 @@
         "AllowedValues": []
       },
       {
-        "Name": "SavePath",
-        "DisplayName": "\u4FDD\u5B58\u8DEF\u5F84",
-        "DataType": "file",
+        "Name": "CalibrationAssetId",
+        "DisplayName": "Calibration Asset Id",
+        "DataType": "string",
         "Description": "",
         "DefaultValue": "",
         "MinValue": null,
         "MaxValue": null,
-        "IsRequired": false,
+        "IsRequired": true,
         "AllowedValues": []
       }
     ],
@@ -47928,7 +47485,7 @@
     ],
     "ResourceRequirements": [],
     "GenerationDependencies": [],
-    "GenerationFingerprint": "8EBD8DB80A8D348C4A69C07F8D485FE602276DF21C27BD01DE1DB999F58334A2",
+    "GenerationFingerprint": "D39AC819B2036A4CDC205F7C689F18533B4A72B1F0C5CD428A145534E3C91983",
     "RequiredResources": [],
     "TypicalUpstream": [],
     "TypicalDownstream": [],
@@ -48062,7 +47619,7 @@
     "ImageInputContracts": [],
     "ResourceRequirements": [],
     "GenerationDependencies": [],
-    "GenerationFingerprint": "D13BAD545E6930D13C5F82CB232FAD61B046864ED2E69E041EED877BC16C6B7A",
+    "GenerationFingerprint": "44C0E9BD54DE0AD7AB6BD0023CE4932346A89A76C42043D7BEB74E674192A667",
     "RequiredResources": [],
     "TypicalUpstream": [],
     "TypicalDownstream": [],

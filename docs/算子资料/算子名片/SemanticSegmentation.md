@@ -8,7 +8,7 @@
 | 分类 ID (CategoryId) | `AiInference` |
 | 分类 (Category) | AI推理 |
 | 分类顺序 (CategoryOrder) | 9 |
-| 版本 (Version) | `1.0.0` |
+| 版本 (Version) | `1.0.1` |
 | 生命周期 (Lifecycle) | 稳定 `Stable` |
 | 生命周期说明 (Lifecycle Note) | - |
 | 默认隐藏 (Default Hidden) | No |
@@ -38,7 +38,6 @@
 - `Cv2.CvtColor`
 - `Cv2.Compare`
 - `File.Exists`
-- `Path.GetFullPath`
 - `JsonSerializer.Serialize`
 - `JsonSerializer.Deserialize`
 - `Math.Max`
@@ -47,6 +46,7 @@
 - `InferenceSession`
 - `ImageWrapper`
 - `OperatorExecutionOutput.Success(...)`
+- `OperatorExecutionOutput.Failure(...)`
 
 ## 参数说明 / Parameters
 | 参数名 (Name) | 显示名 (DisplayName) | 类型 (Type) | 默认值 (Default) | 范围/选项 (Range/Options) | 必填 (Required) | 说明 (Description) |
@@ -111,7 +111,7 @@
 | - | - | - |
 
 ## 生成依赖 / Generation Dependencies
-- 组合指纹 (Generation Fingerprint)：`55C1A04F54B1D0E1516441CE3924C246C807FFE2103E3DC188F4FBD80BDC8CEB`
+- 组合指纹 (Generation Fingerprint)：`EB8F533E2CFED3436FEAC5AB89A058C905396968EB3363521DDF2901FAB007F1`
 - 显式共享依赖：无；指纹由最终运行时元数据与算子源码组成。
 
 ### 运行时附加输出 / Runtime Additional Outputs
@@ -146,4 +146,4 @@
 ## 变更记录 / Changelog
 | 版本 (Version) | 日期 (Date) | 变更内容 (Changes) |
 |------|------|----------|
-| 1.0.0 | 2026-07-16 | 按当前最终运行时元数据、条件契约和显式依赖口径重生成 / Regenerated from effective runtime metadata and declared dependencies |
+| 1.0.1 | 2026-08-31 | 按当前最终运行时元数据、条件契约和显式依赖口径重生成 / Regenerated from effective runtime metadata and declared dependencies |

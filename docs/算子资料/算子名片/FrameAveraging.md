@@ -8,7 +8,7 @@
 | 分类 ID (CategoryId) | `ImagePreprocessing` |
 | 分类 (Category) | 图像预处理 |
 | 分类顺序 (CategoryOrder) | 2 |
-| 版本 (Version) | `1.0.0` |
+| 版本 (Version) | `1.0.1` |
 | 生命周期 (Lifecycle) | 稳定 `Stable` |
 | 生命周期说明 (Lifecycle Note) | - |
 | 默认隐藏 (Default Hidden) | No |
@@ -79,7 +79,7 @@
 | - | - | - |
 
 ## 生成依赖 / Generation Dependencies
-- 组合指纹 (Generation Fingerprint)：`E3A544B34FB8905D343641E85039E91B740CC9C360DA2EA6335B2DA19573330E`
+- 组合指纹 (Generation Fingerprint)：`A2CBB33A0A428C7AA03CFF18EACE50BB52D83ACF6B57C0BF6404A2C412AEAA75`
 - 显式共享依赖：无；指纹由最终运行时元数据与算子源码组成。
 
 ### 运行时附加输出 / Runtime Additional Outputs
@@ -114,4 +114,4 @@
 ## 变更记录 / Changelog
 | 版本 (Version) | 日期 (Date) | 变更内容 (Changes) |
 |------|------|----------|
-| 1.0.0 | 2026-07-16 | 按当前最终运行时元数据、条件契约和显式依赖口径重生成 / Regenerated from effective runtime metadata and declared dependencies |
+| 1.0.1 | 2026-08-31 | 按当前最终运行时元数据、条件契约和显式依赖口径重生成 / Regenerated from effective runtime metadata and declared dependencies |

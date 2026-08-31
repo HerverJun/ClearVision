@@ -8,7 +8,7 @@
 | 分类 ID (CategoryId) | `Communication` |
 | 分类 (Category) | 通信 |
 | 分类顺序 (CategoryOrder) | 13 |
-| 版本 (Version) | `1.0.1` |
+| 版本 (Version) | `1.1.0` |
 | 生命周期 (Lifecycle) | 稳定 `Stable` |
 | 生命周期说明 (Lifecycle Note) | - |
 | 默认隐藏 (Default Hidden) | No |
@@ -28,7 +28,7 @@
 ## 实现策略 / Implementation Strategy
 - 输入端口均为可选或该算子不依赖外部输入，执行时会优先读取可用输入并使用参数默认值兜底。
 - 可选输入用于覆盖或补充参数配置：`Data`。
-- 参数解析覆盖 13 个当前元数据字段，默认值、范围和枚举项以参数表为准。
+- 参数解析覆盖 10 个当前元数据字段，默认值、范围和枚举项以参数表为准。
 - `ValidateParameters` 已提供参数合法性检查，部分越界或非法组合会在运行前被拦截。
 - 源码包含异常捕获路径，外部依赖或运行时异常会被转为失败输出或诊断信息。
 - 非图像输出直接以 `Dictionary<string, object>` 返回，字段名称以输出端口和运行时附加输出表为准。
@@ -41,12 +41,9 @@
 ## 参数说明 / Parameters
 | 参数名 (Name) | 显示名 (DisplayName) | 类型 (Type) | 默认值 (Default) | 范围/选项 (Range/Options) | 必填 (Required) | 说明 (Description) |
 |--------|------|------|--------|------|------|------|
-| `IpAddress` | IP地址 | `string` | 192.168.250.1 | - | Yes | - |
-| `Port` | 端口 | `int` | 9600 | [1, 65535] | Yes | - |
-| `UseGlobalFallback` | 允许全局回退 | `bool` | false | - | Yes | 启用后缺失的IP/Port可回退到全局通信配置 |
+| `ProfileId` | PLC Profile | `string` | "" | - | Yes | - |
 | `Address` | PLC地址 | `string` | DM100 | - | Yes | - |
 | `Length` | 读取长度 | `int` | 1 | [1, 999] | Yes | - |
-| `DataType` | 数据类型 | `enum` | Word | Bit/位 (Bool)；Word/字 (Word/UInt16)；Int16/短整型 (Int16)；DWord/双字 (DWord/UInt32)；Int32/整型 (Int32)；Float/浮点 (Float)；Double/双精度 (Double) | Yes | - |
 | `Operation` | 操作 | `enum` | Read | Read/读取；Write/写入 | Yes | - |
 | `WriteValue` | 写入值 | `string` | "" | - | Yes | - |
 | `PollingMode` | 轮询模式 | `enum` | None | None/不等待；WaitForValue/等待指定值 | Yes | 读取时是否启用轮询等待 |
@@ -72,14 +69,14 @@
 | 参数 (Parameter) | 必填条件 (Required) | 可见条件 (Visible) | 启用/禁用条件 (Enabled/Disabled) | 忽略条件 (Ignored) | 资源 (Resource) | 输入可满足 (Satisfied By Inputs) | 原因码 (Reason) |
 |------|------|------|------|------|------|------|------|
 | `Address` | required; - | visible: -; hidden: - | enabled: -; disabled: - | - | plc_address | - | `OMRON_PLC_ADDRESS_REQUIRED` |
-| `IpAddress` | metadata; ALL(UseGlobalFallback == false) | visible: -; hidden: - | enabled: -; disabled: - | - | plc_endpoint | - | `OMRON_OPERATOR_IP_REQUIRED_WITHOUT_GLOBAL_FALLBACK` |
 | `Length` | metadata; - | visible: -; hidden: ALL(Operation != Read) | enabled: ALL(Operation == Read); disabled: - | ALL(Operation != Read) | - | - | `OMRON_READ_LENGTH_ONLY_FOR_READ` |
+| `Operation` | required; - | visible: -; hidden: - | enabled: -; disabled: - | - | - | - | `OMRON_PLC_OPERATION_REQUIRED` |
 | `PollingCondition` | metadata; - | visible: -; hidden: ANY(Operation != Read \|\| PollingMode != WaitForValue) | enabled: ALL(Operation == Read && PollingMode == WaitForValue); disabled: - | ANY(Operation != Read \|\| PollingMode != WaitForValue) | - | - | `OMRON_POLLING_CONDITION_ONLY_WHEN_WAITING` |
 | `PollingInterval` | metadata; - | visible: -; hidden: ANY(Operation != Read \|\| PollingMode != WaitForValue) | enabled: ALL(Operation == Read && PollingMode == WaitForValue); disabled: - | ANY(Operation != Read \|\| PollingMode != WaitForValue) | - | - | `OMRON_POLLING_INTERVAL_ONLY_WHEN_WAITING` |
 | `PollingMode` | metadata; - | visible: -; hidden: ALL(Operation != Read) | enabled: ALL(Operation == Read); disabled: - | ALL(Operation != Read) | - | - | `OMRON_POLLING_ONLY_FOR_READ` |
 | `PollingTimeout` | metadata; - | visible: -; hidden: ANY(Operation != Read \|\| PollingMode != WaitForValue) | enabled: ALL(Operation == Read && PollingMode == WaitForValue); disabled: - | ANY(Operation != Read \|\| PollingMode != WaitForValue) | - | - | `OMRON_POLLING_TIMEOUT_ONLY_WHEN_WAITING` |
 | `PollingValue` | metadata; - | visible: -; hidden: ANY(Operation != Read \|\| PollingMode != WaitForValue) | enabled: ALL(Operation == Read && PollingMode == WaitForValue); disabled: - | ANY(Operation != Read \|\| PollingMode != WaitForValue) | - | - | `OMRON_POLLING_VALUE_ONLY_WHEN_WAITING` |
-| `Port` | metadata; ALL(UseGlobalFallback == false) | visible: -; hidden: - | enabled: -; disabled: - | - | - | - | `OMRON_OPERATOR_PORT_REQUIRED_WITHOUT_GLOBAL_FALLBACK` |
+| `ProfileId` | required; - | visible: -; hidden: - | enabled: -; disabled: - | - | plc_profile | - | `OMRON_PLC_PROFILE_REQUIRED` |
 | `WriteValue` | optional; - | visible: -; hidden: ALL(Operation != Write) | enabled: ALL(Operation == Write); disabled: - | ALL(Operation != Write) | - | - | `OMRON_WRITE_VALUE_ONLY_FOR_WRITE` |
 
 ### 输出条件 / Output Conditions
@@ -88,7 +85,7 @@
 | - | - | - |
 
 ## 生成依赖 / Generation Dependencies
-- 组合指纹 (Generation Fingerprint)：`86DC1BA110A638A72A19624EC50B88BF23808346146F5B3F38F34B6FF19F508E`
+- 组合指纹 (Generation Fingerprint)：`119A6776F434026B281AD623CCC8026E35034DA5F5DF63426E13A85374AADF0E`
 - 显式共享依赖：无；指纹由最终运行时元数据与算子源码组成。
 
 ### 运行时附加输出 / Runtime Additional Outputs
@@ -122,4 +119,4 @@
 ## 变更记录 / Changelog
 | 版本 (Version) | 日期 (Date) | 变更内容 (Changes) |
 |------|------|----------|
-| 1.0.1 | 2026-08-29 | 按当前最终运行时元数据、条件契约和显式依赖口径重生成 / Regenerated from effective runtime metadata and declared dependencies |
+| 1.1.0 | 2026-08-31 | 按当前最终运行时元数据、条件契约和显式依赖口径重生成 / Regenerated from effective runtime metadata and declared dependencies |

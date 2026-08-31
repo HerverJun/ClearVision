@@ -18,7 +18,7 @@ namespace ClearVision.Product.Infrastructure.Operators;
     CategoryId = OperatorCategoryId.DataProcessing,
     IconName = "timer",
     Keywords = new[] { "timer", "elapsed", "cycle time", "ct", "statistics" },
-    Version = "1.0.1"
+    Version = "1.0.2"
 )]
 [InputPort("Trigger", "Trigger", PortDataType.Any, IsRequired = false)]
 [OutputPort("ElapsedMs", "Elapsed (ms)", PortDataType.Float)]

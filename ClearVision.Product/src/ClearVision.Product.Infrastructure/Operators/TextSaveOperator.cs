@@ -18,7 +18,8 @@ namespace ClearVision.Product.Infrastructure.Operators;
     Description = "将文本或结构化数据保存为 text/csv/json 文件。",
     CategoryId = OperatorCategoryId.OutputAndAuxiliary,
     IconName = "save-text",
-    Keywords = new[] { "save text", "export csv", "log", "json export" }
+    Keywords = new[] { "save text", "export csv", "log", "json export" },
+    Version = "1.0.1"
 )]
 [OperatorParameterRule("FilePath", RequiredPolicy = OperatorParameterRequiredPolicy.Required, ResourceKind = OperatorResourceKind.OutputFile, ReasonCode = "TEXT_SAVE_FILE_PATH_REQUIRED")]
 [InputPort("Data", "Data", PortDataType.Any, IsRequired = false)]

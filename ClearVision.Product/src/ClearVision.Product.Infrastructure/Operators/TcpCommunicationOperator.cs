@@ -27,7 +27,8 @@ namespace ClearVision.Product.Infrastructure.Operators;
     Description = "TCP/IP网络通信",
     CategoryId = OperatorCategoryId.Communication,
     IconName = "tcp",
-    Keywords = new[] { "TCP", "网络", "Socket", "通信", "发送", "接收", "IP", "Communication" }
+    Keywords = new[] { "TCP", "网络", "Socket", "通信", "发送", "接收", "IP", "Communication" },
+    Version = "1.1.0"
 )]
 [InputPort("Data", "数据", PortDataType.Any, IsRequired = false)]
 [OutputPort("Response", "响应", PortDataType.String)]

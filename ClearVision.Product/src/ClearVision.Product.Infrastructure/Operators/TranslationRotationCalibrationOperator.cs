@@ -17,7 +17,7 @@ namespace ClearVision.Product.Infrastructure.Operators;
     CategoryId = OperatorCategoryId.CalibrationAndCoordinates,
     IconName = "calibration",
     Keywords = new[] { "calibration", "translation", "rotation", "svd", "similarity", "ransac", "huber" },
-    Version = "1.1.1"
+    Version = "1.2.0"
 )]
 [InputPort("Image", "Image", PortDataType.Image, IsRequired = false)]
 [OutputPort("CalibrationData", "Calibration Data", PortDataType.String)]

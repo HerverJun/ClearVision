@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-08-29T14:18:20.2419055+08:00",
-  "generationFingerprint": "5686E6A8D15212F4B5CD953472941FB7088A6109028ED049374D8C99BCC08541",
+  "generatedAt": "2026-08-31T19:13:00.8983064+08:00",
+  "generationFingerprint": "A3AE8008883A543EAAD7EC0F21000C999CD704DA51E780111A44C8B2EB048204",
   "totalCount": 158,
   "categories": {
     "采集": {
@@ -298,7 +298,7 @@
         "evidenceIdentity": "clearvision-operator-quality-phase5-evidence@1.0.0:7ed1d600eead23e8185d6fef730b3995bec7db29c7d65a6cc3248a1ca95770cf",
         "modeEvidence": []
       },
-      "version": "1.0.0",
+      "version": "1.0.1",
       "keywords": [
         "Acquire",
         "Camera",
@@ -861,7 +861,7 @@
         }
       ],
       "generationDependencies": [],
-      "generationFingerprint": "EC476E1B09690CFEE7531B96898D659A910CEF553C16BE367035194B1D198781",
+      "generationFingerprint": "6F92E2DFC35875A87558C06B2DD9D498460B5EA9FF8442560B233D566B8D9E98",
       "docPath": "算子资料/算子名片/ImageAcquisition.md"
     },
     {
@@ -2939,7 +2939,7 @@
         "evidenceIdentity": "clearvision-operator-quality-phase5-evidence@1.0.0:7ed1d600eead23e8185d6fef730b3995bec7db29c7d65a6cc3248a1ca95770cf",
         "modeEvidence": []
       },
-      "version": "1.0.0",
+      "version": "1.0.1",
       "keywords": [
         "averaging",
         "denoise",
@@ -3089,7 +3089,7 @@
       ],
       "resourceRequirements": [],
       "generationDependencies": [],
-      "generationFingerprint": "E3A544B34FB8905D343641E85039E91B740CC9C360DA2EA6335B2DA19573330E",
+      "generationFingerprint": "A2CBB33A0A428C7AA03CFF18EACE50BB52D83ACF6B57C0BF6404A2C412AEAA75",
       "docPath": "算子资料/算子名片/FrameAveraging.md"
     },
     {
@@ -30669,7 +30669,7 @@
         "evidenceIdentity": "clearvision-operator-quality-phase5-evidence@1.0.0:7ed1d600eead23e8185d6fef730b3995bec7db29c7d65a6cc3248a1ca95770cf",
         "modeEvidence": []
       },
-      "version": "1.0.0",
+      "version": "1.1.0",
       "keywords": [
         "Calibration",
         "Chessboard",
@@ -30705,6 +30705,24 @@
         {
           "name": "CalibrationData",
           "displayName": "Calibration Data",
+          "dataType": "String",
+          "isRequired": false
+        },
+        {
+          "name": "CalibrationAssetId",
+          "displayName": "Calibration Asset Id",
+          "dataType": "String",
+          "isRequired": false
+        },
+        {
+          "name": "CalibrationAssetCandidate",
+          "displayName": "Calibration Asset Candidate",
+          "dataType": "Boolean",
+          "isRequired": false
+        },
+        {
+          "name": "CalibrationContentHash",
+          "displayName": "Calibration Content Hash",
           "dataType": "String",
           "isRequired": false
         }
@@ -30795,11 +30813,11 @@
           "options": null
         },
         {
-          "name": "CalibrationOutputPath",
-          "displayName": "标定输出路径",
+          "name": "CalibrationAssetId",
+          "displayName": "Calibration Asset Id",
           "dataType": "string",
           "description": "",
-          "defaultValue": "calibration_result.json",
+          "defaultValue": "",
           "min": null,
           "max": null,
           "isRequired": true,
@@ -30883,7 +30901,7 @@
       ],
       "resourceRequirements": [],
       "generationDependencies": [],
-      "generationFingerprint": "C4EF240DCDB5763491CF77CCC9CBFBD6DB0FDEB671EA2C4E671031E3038E2CD8",
+      "generationFingerprint": "E7B65D9393046CF5B79094998145B6D54DCE29C24C872035F85310D7BC10A859",
       "docPath": "算子资料/算子名片/CameraCalibration.md"
     },
     {
@@ -31103,7 +31121,7 @@
         "evidenceIdentity": "clearvision-operator-quality-phase5-evidence@1.0.0:7ed1d600eead23e8185d6fef730b3995bec7db29c7d65a6cc3248a1ca95770cf",
         "modeEvidence": []
       },
-      "version": "1.0.0",
+      "version": "1.1.0",
       "keywords": [
         "Calibration",
         "Distortion",
@@ -31139,6 +31157,24 @@
         {
           "name": "CalibrationData",
           "displayName": "Calibration Data",
+          "dataType": "String",
+          "isRequired": false
+        },
+        {
+          "name": "CalibrationAssetId",
+          "displayName": "Calibration Asset Id",
+          "dataType": "String",
+          "isRequired": false
+        },
+        {
+          "name": "CalibrationAssetCandidate",
+          "displayName": "Calibration Asset Candidate",
+          "dataType": "Boolean",
+          "isRequired": false
+        },
+        {
+          "name": "CalibrationContentHash",
+          "displayName": "Calibration Content Hash",
           "dataType": "String",
           "isRequired": false
         }
@@ -31229,11 +31265,11 @@
           "options": null
         },
         {
-          "name": "CalibrationOutputPath",
-          "displayName": "标定输出路径",
+          "name": "CalibrationAssetId",
+          "displayName": "Calibration Asset Id",
           "dataType": "string",
           "description": "",
-          "defaultValue": "fisheye_calibration_result.json",
+          "defaultValue": "",
           "min": null,
           "max": null,
           "isRequired": true,
@@ -31339,7 +31375,7 @@
       ],
       "resourceRequirements": [],
       "generationDependencies": [],
-      "generationFingerprint": "147BA40A3D44704B0CD81A7C7EC27780A68E86C161C5AD682FFF1EDDB9C6BC99",
+      "generationFingerprint": "80E3091CCD190574B459B8EB72A087FC0B2089C48AA2245DF7A72A1F4612061C",
       "docPath": "算子资料/算子名片/FisheyeCalibration.md"
     },
     {
@@ -31561,7 +31597,7 @@
         "evidenceIdentity": "clearvision-operator-quality-phase5-evidence@1.0.0:7ed1d600eead23e8185d6fef730b3995bec7db29c7d65a6cc3248a1ca95770cf",
         "modeEvidence": []
       },
-      "version": "1.0.0",
+      "version": "1.1.0",
       "keywords": [
         "AX=XB",
         "calibration",
@@ -31633,6 +31669,24 @@
         {
           "name": "SuggestedValidationPoses",
           "displayName": "Suggested Validation Poses",
+          "dataType": "String",
+          "isRequired": false
+        },
+        {
+          "name": "CalibrationAssetId",
+          "displayName": "Calibration Asset Id",
+          "dataType": "String",
+          "isRequired": false
+        },
+        {
+          "name": "CalibrationAssetCandidate",
+          "displayName": "Calibration Asset Candidate",
+          "dataType": "Boolean",
+          "isRequired": false
+        },
+        {
+          "name": "CalibrationContentHash",
+          "displayName": "Calibration Content Hash",
           "dataType": "String",
           "isRequired": false
         }
@@ -31711,6 +31765,17 @@
           "max": null,
           "isRequired": true,
           "options": null
+        },
+        {
+          "name": "CalibrationAssetId",
+          "displayName": "Calibration Asset Id",
+          "dataType": "string",
+          "description": "",
+          "defaultValue": "",
+          "min": null,
+          "max": null,
+          "isRequired": true,
+          "options": null
         }
       ],
       "parameterConditions": [],
@@ -31718,7 +31783,7 @@
       "imageInputContracts": [],
       "resourceRequirements": [],
       "generationDependencies": [],
-      "generationFingerprint": "CB4D33407E47D93FBA7918B42B5F24CC74F5B1E536970E14E5889ACEF0C8D7E6",
+      "generationFingerprint": "1743E8C565F80D17AA03E2675B211A5EB851C598C11FDEBCF3F6B70FDE5465FA",
       "docPath": "算子资料/算子名片/HandEyeCalibration.md"
     },
     {
@@ -31884,7 +31949,7 @@
         "evidenceIdentity": "clearvision-operator-quality-phase5-evidence@1.0.0:7ed1d600eead23e8185d6fef730b3995bec7db29c7d65a6cc3248a1ca95770cf",
         "modeEvidence": []
       },
-      "version": "1.0.0",
+      "version": "1.1.0",
       "keywords": [
         "affine",
         "calibration",
@@ -31965,6 +32030,24 @@
           "displayName": "Reprojection Error Scope",
           "dataType": "String",
           "isRequired": false
+        },
+        {
+          "name": "CalibrationAssetId",
+          "displayName": "Calibration Asset Id",
+          "dataType": "String",
+          "isRequired": false
+        },
+        {
+          "name": "CalibrationAssetCandidate",
+          "displayName": "Calibration Asset Candidate",
+          "dataType": "Boolean",
+          "isRequired": false
+        },
+        {
+          "name": "CalibrationContentHash",
+          "displayName": "Calibration Content Hash",
+          "dataType": "String",
+          "isRequired": false
         }
       ],
       "parameters": [
@@ -32000,9 +32083,9 @@
           "options": null
         },
         {
-          "name": "SavePath",
-          "displayName": "保存路径",
-          "dataType": "file",
+          "name": "CalibrationAssetId",
+          "displayName": "Calibration Asset Id",
+          "dataType": "string",
           "description": "",
           "defaultValue": "",
           "min": null,
@@ -32165,7 +32248,7 @@
       ],
       "resourceRequirements": [],
       "generationDependencies": [],
-      "generationFingerprint": "5AA2FA9BB23C2793C51EE3DC6C16709DE45DD641D4EEA00611E2DEA891283D18",
+      "generationFingerprint": "835131B8B9B606FF8A4E12AEFF186918AC7E686D6998EA70023ADE48835E1932",
       "docPath": "算子资料/算子名片/NPointCalibration.md"
     },
     {
@@ -32528,7 +32611,7 @@
         "evidenceIdentity": "clearvision-operator-quality-phase5-evidence@1.0.0:7ed1d600eead23e8185d6fef730b3995bec7db29c7d65a6cc3248a1ca95770cf",
         "modeEvidence": []
       },
-      "version": "1.0.0",
+      "version": "1.1.0",
       "keywords": [
         "Binocular",
         "Calibration",
@@ -32596,6 +32679,24 @@
           "name": "RightMap2",
           "displayName": "Right Rectification Map2",
           "dataType": "Any",
+          "isRequired": false
+        },
+        {
+          "name": "CalibrationAssetId",
+          "displayName": "Calibration Asset Id",
+          "dataType": "String",
+          "isRequired": false
+        },
+        {
+          "name": "CalibrationAssetCandidate",
+          "displayName": "Calibration Asset Candidate",
+          "dataType": "Boolean",
+          "isRequired": false
+        },
+        {
+          "name": "CalibrationContentHash",
+          "displayName": "Calibration Content Hash",
+          "dataType": "String",
           "isRequired": false
         }
       ],
@@ -32696,11 +32797,11 @@
           "options": null
         },
         {
-          "name": "CalibrationOutputPath",
-          "displayName": "标定输出路径",
+          "name": "CalibrationAssetId",
+          "displayName": "Calibration Asset Id",
           "dataType": "string",
           "description": "",
-          "defaultValue": "stereo_calibration_result.json",
+          "defaultValue": "",
           "min": null,
           "max": null,
           "isRequired": true,
@@ -32888,7 +32989,7 @@
       ],
       "resourceRequirements": [],
       "generationDependencies": [],
-      "generationFingerprint": "4B95BFC3A92A8F7406A1DA318C63AFD76C25CF27DE8F1FCA3C66031E0FBDA9AE",
+      "generationFingerprint": "946D7D637D7C3EE331ABE945E026288B1DE07224EB8F650CF2667A1DC59CFB2C",
       "docPath": "算子资料/算子名片/StereoCalibration.md"
     },
     {
@@ -32914,7 +33015,7 @@
         "evidenceIdentity": "clearvision-operator-quality-phase5-evidence@1.0.0:7ed1d600eead23e8185d6fef730b3995bec7db29c7d65a6cc3248a1ca95770cf",
         "modeEvidence": []
       },
-      "version": "1.1.1",
+      "version": "1.2.0",
       "keywords": [
         "calibration",
         "huber",
@@ -33039,6 +33140,24 @@
           "displayName": "Outlier Indices",
           "dataType": "Any",
           "isRequired": false
+        },
+        {
+          "name": "CalibrationAssetId",
+          "displayName": "Calibration Asset Id",
+          "dataType": "String",
+          "isRequired": false
+        },
+        {
+          "name": "CalibrationAssetCandidate",
+          "displayName": "Calibration Asset Candidate",
+          "dataType": "Boolean",
+          "isRequired": false
+        },
+        {
+          "name": "CalibrationContentHash",
+          "displayName": "Calibration Content Hash",
+          "dataType": "String",
+          "isRequired": false
         }
       ],
       "parameters": [
@@ -33142,14 +33261,14 @@
           "options": null
         },
         {
-          "name": "SavePath",
-          "displayName": "保存路径",
-          "dataType": "file",
+          "name": "CalibrationAssetId",
+          "displayName": "Calibration Asset Id",
+          "dataType": "string",
           "description": "",
           "defaultValue": "",
           "min": null,
           "max": null,
-          "isRequired": false,
+          "isRequired": true,
           "options": null
         }
       ],
@@ -33230,7 +33349,7 @@
       ],
       "resourceRequirements": [],
       "generationDependencies": [],
-      "generationFingerprint": "8EBD8DB80A8D348C4A69C07F8D485FE602276DF21C27BD01DE1DB999F58334A2",
+      "generationFingerprint": "D39AC819B2036A4CDC205F7C689F18533B4A72B1F0C5CD428A145534E3C91983",
       "docPath": "算子资料/算子名片/TranslationRotationCalibration.md"
     },
     {
@@ -34218,7 +34337,7 @@
         "evidenceIdentity": "clearvision-operator-quality-phase5-evidence@1.0.0:7ed1d600eead23e8185d6fef730b3995bec7db29c7d65a6cc3248a1ca95770cf",
         "modeEvidence": []
       },
-      "version": "1.1.0",
+      "version": "1.1.1",
       "keywords": [
         "AI",
         "Deep learning",
@@ -36501,7 +36620,7 @@
         "type:ClearVision.Product.Infrastructure.Operators.SemanticSegmentationOperator",
         "type:ClearVision.Product.Infrastructure.Services.DeepLearningLabelResolver"
       ],
-      "generationFingerprint": "C438192588112353D92F31927FBA32A49E0955DACE787A203ACBDC3B7523F42B",
+      "generationFingerprint": "67F1BFF6738317B1185CA6E184CBB94797B66ED517065BB005F151917EB58145",
       "docPath": "算子资料/算子名片/DeepLearning.md"
     },
     {
@@ -36666,7 +36785,7 @@
         "evidenceIdentity": "clearvision-operator-quality-phase5-evidence@1.0.0:7ed1d600eead23e8185d6fef730b3995bec7db29c7d65a6cc3248a1ca95770cf",
         "modeEvidence": []
       },
-      "version": "1.0.0",
+      "version": "1.0.1",
       "keywords": [
         "mask",
         "onnx",
@@ -37087,7 +37206,7 @@
         }
       ],
       "generationDependencies": [],
-      "generationFingerprint": "55C1A04F54B1D0E1516441CE3924C246C807FFE2103E3DC188F4FBD80BDC8CEB",
+      "generationFingerprint": "EB8F533E2CFED3436FEAC5AB89A058C905396968EB3363521DDF2901FAB007F1",
       "docPath": "算子资料/算子名片/SemanticSegmentation.md"
     },
     {
@@ -39674,7 +39793,7 @@
         "evidenceIdentity": "clearvision-operator-quality-phase5-evidence@1.0.0:7ed1d600eead23e8185d6fef730b3995bec7db29c7d65a6cc3248a1ca95770cf",
         "modeEvidence": []
       },
-      "version": "1.0.0",
+      "version": "1.0.1",
       "keywords": [],
       "tags": [
         "AlgorithmQuality:Unknown",
@@ -39801,7 +39920,7 @@
       "imageInputContracts": [],
       "resourceRequirements": [],
       "generationDependencies": [],
-      "generationFingerprint": "D003B6EEB0D00379DD2993A528B258E9A37E11078660BBAC7C5E564716759304",
+      "generationFingerprint": "710F28CB4814E73B1059B1212C77D40EC4F1581D3EFCE546EAD06B260EEE6293",
       "docPath": "算子资料/算子名片/Statistics.md"
     },
     {
@@ -40097,7 +40216,7 @@
         "evidenceIdentity": "clearvision-operator-quality-phase5-evidence@1.0.0:7ed1d600eead23e8185d6fef730b3995bec7db29c7d65a6cc3248a1ca95770cf",
         "modeEvidence": []
       },
-      "version": "1.0.1",
+      "version": "1.0.2",
       "keywords": [
         "ct",
         "cycle time",
@@ -40210,7 +40329,7 @@
       "imageInputContracts": [],
       "resourceRequirements": [],
       "generationDependencies": [],
-      "generationFingerprint": "133D64456744069DB0C4F12F8A1AB3E1A405E1C3F0A76928C4EDC29CA7449109",
+      "generationFingerprint": "011A234C94717879D9B27D4760C33BB856A11DDE2B704713C4739507CD018CE3",
       "docPath": "算子资料/算子名片/TimerStatistics.md"
     },
     {
@@ -41808,7 +41927,7 @@
         "evidenceIdentity": "clearvision-operator-quality-phase5-evidence@1.0.0:7ed1d600eead23e8185d6fef730b3995bec7db29c7d65a6cc3248a1ca95770cf",
         "modeEvidence": []
       },
-      "version": "1.0.0",
+      "version": "1.0.1",
       "keywords": [
         "循环处理"
       ],
@@ -41899,7 +42018,7 @@
       "imageInputContracts": [],
       "resourceRequirements": [],
       "generationDependencies": [],
-      "generationFingerprint": "92685762FCE936CB5ACB028AB1265367870C95E4E8CB2625F63349EEC6B81B83",
+      "generationFingerprint": "83A7A11063850361A29610D63D166BC3E4F890934B59F8DB61E0EDDA23C48401",
       "docPath": "算子资料/算子名片/ForEach.md"
     },
     {
@@ -41925,7 +42044,7 @@
         "evidenceIdentity": "clearvision-operator-quality-phase5-evidence@1.0.0:7ed1d600eead23e8185d6fef730b3995bec7db29c7d65a6cc3248a1ca95770cf",
         "modeEvidence": []
       },
-      "version": "1.0.0",
+      "version": "1.0.1",
       "keywords": [
         "arrival",
         "continuous",
@@ -42360,7 +42479,7 @@
       ],
       "resourceRequirements": [],
       "generationDependencies": [],
-      "generationFingerprint": "8B9104464950DF51722C25599B7357D485F4F08C52A7FC3FE41DD205C88A8B01",
+      "generationFingerprint": "CA564F99501677A069956B97308A3FCE5A595903D91E92EEDB6941DF5CCDAF0D",
       "docPath": "算子资料/算子名片/FrameChangeTrigger.md"
     },
     {
@@ -42602,7 +42721,7 @@
         "evidenceIdentity": "clearvision-operator-quality-phase5-evidence@1.0.0:7ed1d600eead23e8185d6fef730b3995bec7db29c7d65a6cc3248a1ca95770cf",
         "modeEvidence": []
       },
-      "version": "1.0.0",
+      "version": "1.0.1",
       "keywords": [
         "external signal",
         "start",
@@ -42701,7 +42820,7 @@
       "imageInputContracts": [],
       "resourceRequirements": [],
       "generationDependencies": [],
-      "generationFingerprint": "D13BAD545E6930D13C5F82CB232FAD61B046864ED2E69E041EED877BC16C6B7A",
+      "generationFingerprint": "44C0E9BD54DE0AD7AB6BD0023CE4932346A89A76C42043D7BEB74E674192A667",
       "docPath": "算子资料/算子名片/TriggerModule.md"
     },
     {
@@ -42847,7 +42966,7 @@
         "evidenceIdentity": "clearvision-operator-quality-phase5-evidence@1.0.0:7ed1d600eead23e8185d6fef730b3995bec7db29c7d65a6cc3248a1ca95770cf",
         "modeEvidence": []
       },
-      "version": "1.0.0",
+      "version": "1.0.1",
       "keywords": [
         "HTTP Request",
         "HTTP请求"
@@ -42987,7 +43106,7 @@
       "imageInputContracts": [],
       "resourceRequirements": [],
       "generationDependencies": [],
-      "generationFingerprint": "63F21E1BDE5B0FD035E214BCFF3F98C85CAB80363D9EC34A686CF278B69F198C",
+      "generationFingerprint": "A89C8CE5EECD82CFA258DFBBAA6A6CBF6E3C29F2F013F3E51761F260FAECA017",
       "docPath": "算子资料/算子名片/HttpRequest.md"
     },
     {
@@ -43013,7 +43132,7 @@
         "evidenceIdentity": "clearvision-operator-quality-phase5-evidence@1.0.0:7ed1d600eead23e8185d6fef730b3995bec7db29c7d65a6cc3248a1ca95770cf",
         "modeEvidence": []
       },
-      "version": "1.0.1",
+      "version": "1.1.0",
       "keywords": [
         "MC",
         "Mitsubishi",
@@ -43056,33 +43175,11 @@
       ],
       "parameters": [
         {
-          "name": "IpAddress",
-          "displayName": "IP Address",
+          "name": "ProfileId",
+          "displayName": "PLC Profile",
           "dataType": "string",
           "description": "",
-          "defaultValue": "192.168.3.39",
-          "min": null,
-          "max": null,
-          "isRequired": true,
-          "options": null
-        },
-        {
-          "name": "Port",
-          "displayName": "Port",
-          "dataType": "int",
-          "description": "",
-          "defaultValue": "5002",
-          "min": "1",
-          "max": "65535",
-          "isRequired": true,
-          "options": null
-        },
-        {
-          "name": "UseGlobalFallback",
-          "displayName": "Use Global Fallback",
-          "dataType": "bool",
-          "description": "",
-          "defaultValue": "false",
+          "defaultValue": "",
           "min": null,
           "max": null,
           "isRequired": true,
@@ -43109,46 +43206,6 @@
           "max": "999",
           "isRequired": true,
           "options": null
-        },
-        {
-          "name": "DataType",
-          "displayName": "Data Type",
-          "dataType": "enum",
-          "description": "",
-          "defaultValue": "Word",
-          "min": null,
-          "max": null,
-          "isRequired": true,
-          "options": [
-            {
-              "value": "Bit",
-              "label": "Bit(Bool)"
-            },
-            {
-              "value": "Word",
-              "label": "Word(UInt16)"
-            },
-            {
-              "value": "Int16",
-              "label": "Int16"
-            },
-            {
-              "value": "DWord",
-              "label": "DWord(UInt32)"
-            },
-            {
-              "value": "Int32",
-              "label": "Int32"
-            },
-            {
-              "value": "Float",
-              "label": "浮点"
-            },
-            {
-              "value": "Double",
-              "label": "Double"
-            }
-          ]
         },
         {
           "name": "Operation",
@@ -43290,32 +43347,6 @@
           "satisfiedByInputPorts": null
         },
         {
-          "parameter": "IpAddress",
-          "requiredPolicy": "metadata",
-          "requiredWhen": {
-            "all": [
-              {
-                "parameter": "UseGlobalFallback",
-                "comparison": "equals",
-                "value": false
-              }
-            ],
-            "any": null
-          },
-          "enabledWhen": null,
-          "disabledWhen": null,
-          "atLeastOneGroup": null,
-          "mutuallyExclusiveGroup": null,
-          "aliasFor": null,
-          "deprecated": false,
-          "resourceKind": "plc_endpoint",
-          "reasonCode": "MITSUBISHI_OPERATOR_IP_REQUIRED_WITHOUT_GLOBAL_FALLBACK",
-          "visibleWhen": null,
-          "hiddenWhen": null,
-          "ignoredWhen": null,
-          "satisfiedByInputPorts": null
-        },
-        {
           "parameter": "Length",
           "requiredPolicy": "metadata",
           "requiredWhen": null,
@@ -43357,6 +43388,23 @@
             ],
             "any": null
           },
+          "satisfiedByInputPorts": null
+        },
+        {
+          "parameter": "Operation",
+          "requiredPolicy": "required",
+          "requiredWhen": null,
+          "enabledWhen": null,
+          "disabledWhen": null,
+          "atLeastOneGroup": null,
+          "mutuallyExclusiveGroup": null,
+          "aliasFor": null,
+          "deprecated": false,
+          "resourceKind": null,
+          "reasonCode": "MITSUBISHI_PLC_OPERATION_REQUIRED",
+          "visibleWhen": null,
+          "hiddenWhen": null,
+          "ignoredWhen": null,
           "satisfiedByInputPorts": null
         },
         {
@@ -43640,26 +43688,17 @@
           "satisfiedByInputPorts": null
         },
         {
-          "parameter": "Port",
-          "requiredPolicy": "metadata",
-          "requiredWhen": {
-            "all": [
-              {
-                "parameter": "UseGlobalFallback",
-                "comparison": "equals",
-                "value": false
-              }
-            ],
-            "any": null
-          },
+          "parameter": "ProfileId",
+          "requiredPolicy": "required",
+          "requiredWhen": null,
           "enabledWhen": null,
           "disabledWhen": null,
           "atLeastOneGroup": null,
           "mutuallyExclusiveGroup": null,
           "aliasFor": null,
           "deprecated": false,
-          "resourceKind": null,
-          "reasonCode": "MITSUBISHI_OPERATOR_PORT_REQUIRED_WITHOUT_GLOBAL_FALLBACK",
+          "resourceKind": "plc_profile",
+          "reasonCode": "MITSUBISHI_PLC_PROFILE_REQUIRED",
           "visibleWhen": null,
           "hiddenWhen": null,
           "ignoredWhen": null,
@@ -43722,25 +43761,16 @@
           "satisfiedByInputPorts": []
         },
         {
-          "parameter": "IpAddress",
-          "resourceKind": "plc_endpoint",
-          "reasonCode": "MITSUBISHI_OPERATOR_IP_REQUIRED_WITHOUT_GLOBAL_FALLBACK",
+          "parameter": "ProfileId",
+          "resourceKind": "plc_profile",
+          "reasonCode": "MITSUBISHI_PLC_PROFILE_REQUIRED",
           "atLeastOneGroup": null,
-          "requiredWhen": {
-            "all": [
-              {
-                "parameter": "UseGlobalFallback",
-                "comparison": "equals",
-                "value": false
-              }
-            ],
-            "any": null
-          },
+          "requiredWhen": null,
           "satisfiedByInputPorts": []
         }
       ],
       "generationDependencies": [],
-      "generationFingerprint": "CFFEEFB6ADB23B1F2AFF357B29E8FA0CBE027189E79E7BBBD7DE1BBF57470633",
+      "generationFingerprint": "D9DAA52E3334A95828B46E9A466902AB7E19759BD18B4DA1A5396FC83CD484CC",
       "docPath": "算子资料/算子名片/MitsubishiMcCommunication.md"
     },
     {
@@ -43766,7 +43796,7 @@
         "evidenceIdentity": "clearvision-operator-quality-phase5-evidence@1.0.0:7ed1d600eead23e8185d6fef730b3995bec7db29c7d65a6cc3248a1ca95770cf",
         "modeEvidence": []
       },
-      "version": "1.0.0",
+      "version": "1.1.0",
       "keywords": [
         "Communication",
         "Industrial",
@@ -43813,55 +43843,13 @@
       ],
       "parameters": [
         {
-          "name": "Protocol",
-          "displayName": "Protocol",
-          "dataType": "enum",
-          "description": "当前仅支持 TCP；RTU 选项用于旧流程兼容，执行时返回不支持。",
-          "defaultValue": "TCP",
-          "min": null,
-          "max": null,
-          "isRequired": true,
-          "options": [
-            {
-              "value": "TCP",
-              "label": "TCP"
-            },
-            {
-              "value": "RTU",
-              "label": "RTU"
-            }
-          ]
-        },
-        {
-          "name": "IpAddress",
-          "displayName": "IP Address",
+          "name": "ProfileId",
+          "displayName": "PLC Profile",
           "dataType": "string",
           "description": "",
-          "defaultValue": "192.168.1.1",
+          "defaultValue": "",
           "min": null,
           "max": null,
-          "isRequired": true,
-          "options": null
-        },
-        {
-          "name": "Port",
-          "displayName": "Port",
-          "dataType": "int",
-          "description": "",
-          "defaultValue": "502",
-          "min": "1",
-          "max": "65535",
-          "isRequired": true,
-          "options": null
-        },
-        {
-          "name": "SlaveId",
-          "displayName": "Slave ID",
-          "dataType": "int",
-          "description": "",
-          "defaultValue": "1",
-          "min": "1",
-          "max": "255",
           "isRequired": true,
           "options": null
         },
@@ -43940,7 +43928,7 @@
       ],
       "parameterConditions": [
         {
-          "parameter": "IpAddress",
+          "parameter": "FunctionCode",
           "requiredPolicy": "required",
           "requiredWhen": null,
           "enabledWhen": null,
@@ -43949,8 +43937,25 @@
           "mutuallyExclusiveGroup": null,
           "aliasFor": null,
           "deprecated": false,
-          "resourceKind": "plc_endpoint",
-          "reasonCode": "MODBUS_TCP_ENDPOINT_REQUIRED",
+          "resourceKind": null,
+          "reasonCode": "MODBUS_FUNCTION_CODE_REQUIRED",
+          "visibleWhen": null,
+          "hiddenWhen": null,
+          "ignoredWhen": null,
+          "satisfiedByInputPorts": null
+        },
+        {
+          "parameter": "ProfileId",
+          "requiredPolicy": "required",
+          "requiredWhen": null,
+          "enabledWhen": null,
+          "disabledWhen": null,
+          "atLeastOneGroup": null,
+          "mutuallyExclusiveGroup": null,
+          "aliasFor": null,
+          "deprecated": false,
+          "resourceKind": "plc_profile",
+          "reasonCode": "MODBUS_PLC_PROFILE_REQUIRED",
           "visibleWhen": null,
           "hiddenWhen": null,
           "ignoredWhen": null,
@@ -44110,9 +44115,9 @@
       "imageInputContracts": [],
       "resourceRequirements": [
         {
-          "parameter": "IpAddress",
-          "resourceKind": "plc_endpoint",
-          "reasonCode": "MODBUS_TCP_ENDPOINT_REQUIRED",
+          "parameter": "ProfileId",
+          "resourceKind": "plc_profile",
+          "reasonCode": "MODBUS_PLC_PROFILE_REQUIRED",
           "atLeastOneGroup": null,
           "requiredWhen": null,
           "satisfiedByInputPorts": []
@@ -44127,7 +44132,7 @@
         }
       ],
       "generationDependencies": [],
-      "generationFingerprint": "178A9106719B1EF3C8B9A04EF5C976D1487C24CB97A6B0DE70A746B3D9B53E5D",
+      "generationFingerprint": "BEE816D345431789919A2A52EFBE05EE737B08B392BB132BBCC850BD8D08682D",
       "docPath": "算子资料/算子名片/ModbusCommunication.md"
     },
     {
@@ -44297,7 +44302,7 @@
         "evidenceIdentity": "clearvision-operator-quality-phase5-evidence@1.0.0:7ed1d600eead23e8185d6fef730b3995bec7db29c7d65a6cc3248a1ca95770cf",
         "modeEvidence": []
       },
-      "version": "1.0.1",
+      "version": "1.1.0",
       "keywords": [],
       "tags": [
         "AlgorithmQuality:Unknown",
@@ -44334,33 +44339,11 @@
       ],
       "parameters": [
         {
-          "name": "IpAddress",
-          "displayName": "IP地址",
+          "name": "ProfileId",
+          "displayName": "PLC Profile",
           "dataType": "string",
           "description": "",
-          "defaultValue": "192.168.250.1",
-          "min": null,
-          "max": null,
-          "isRequired": true,
-          "options": null
-        },
-        {
-          "name": "Port",
-          "displayName": "端口",
-          "dataType": "int",
-          "description": "",
-          "defaultValue": "9600",
-          "min": "1",
-          "max": "65535",
-          "isRequired": true,
-          "options": null
-        },
-        {
-          "name": "UseGlobalFallback",
-          "displayName": "允许全局回退",
-          "dataType": "bool",
-          "description": "启用后缺失的IP/Port可回退到全局通信配置",
-          "defaultValue": "false",
+          "defaultValue": "",
           "min": null,
           "max": null,
           "isRequired": true,
@@ -44387,46 +44370,6 @@
           "max": "999",
           "isRequired": true,
           "options": null
-        },
-        {
-          "name": "DataType",
-          "displayName": "数据类型",
-          "dataType": "enum",
-          "description": "",
-          "defaultValue": "Word",
-          "min": null,
-          "max": null,
-          "isRequired": true,
-          "options": [
-            {
-              "value": "Bit",
-              "label": "位 (Bool)"
-            },
-            {
-              "value": "Word",
-              "label": "字 (Word/UInt16)"
-            },
-            {
-              "value": "Int16",
-              "label": "短整型 (Int16)"
-            },
-            {
-              "value": "DWord",
-              "label": "双字 (DWord/UInt32)"
-            },
-            {
-              "value": "Int32",
-              "label": "整型 (Int32)"
-            },
-            {
-              "value": "Float",
-              "label": "浮点 (Float)"
-            },
-            {
-              "value": "Double",
-              "label": "双精度 (Double)"
-            }
-          ]
         },
         {
           "name": "Operation",
@@ -44568,32 +44511,6 @@
           "satisfiedByInputPorts": null
         },
         {
-          "parameter": "IpAddress",
-          "requiredPolicy": "metadata",
-          "requiredWhen": {
-            "all": [
-              {
-                "parameter": "UseGlobalFallback",
-                "comparison": "equals",
-                "value": false
-              }
-            ],
-            "any": null
-          },
-          "enabledWhen": null,
-          "disabledWhen": null,
-          "atLeastOneGroup": null,
-          "mutuallyExclusiveGroup": null,
-          "aliasFor": null,
-          "deprecated": false,
-          "resourceKind": "plc_endpoint",
-          "reasonCode": "OMRON_OPERATOR_IP_REQUIRED_WITHOUT_GLOBAL_FALLBACK",
-          "visibleWhen": null,
-          "hiddenWhen": null,
-          "ignoredWhen": null,
-          "satisfiedByInputPorts": null
-        },
-        {
           "parameter": "Length",
           "requiredPolicy": "metadata",
           "requiredWhen": null,
@@ -44635,6 +44552,23 @@
             ],
             "any": null
           },
+          "satisfiedByInputPorts": null
+        },
+        {
+          "parameter": "Operation",
+          "requiredPolicy": "required",
+          "requiredWhen": null,
+          "enabledWhen": null,
+          "disabledWhen": null,
+          "atLeastOneGroup": null,
+          "mutuallyExclusiveGroup": null,
+          "aliasFor": null,
+          "deprecated": false,
+          "resourceKind": null,
+          "reasonCode": "OMRON_PLC_OPERATION_REQUIRED",
+          "visibleWhen": null,
+          "hiddenWhen": null,
+          "ignoredWhen": null,
           "satisfiedByInputPorts": null
         },
         {
@@ -44918,26 +44852,17 @@
           "satisfiedByInputPorts": null
         },
         {
-          "parameter": "Port",
-          "requiredPolicy": "metadata",
-          "requiredWhen": {
-            "all": [
-              {
-                "parameter": "UseGlobalFallback",
-                "comparison": "equals",
-                "value": false
-              }
-            ],
-            "any": null
-          },
+          "parameter": "ProfileId",
+          "requiredPolicy": "required",
+          "requiredWhen": null,
           "enabledWhen": null,
           "disabledWhen": null,
           "atLeastOneGroup": null,
           "mutuallyExclusiveGroup": null,
           "aliasFor": null,
           "deprecated": false,
-          "resourceKind": null,
-          "reasonCode": "OMRON_OPERATOR_PORT_REQUIRED_WITHOUT_GLOBAL_FALLBACK",
+          "resourceKind": "plc_profile",
+          "reasonCode": "OMRON_PLC_PROFILE_REQUIRED",
           "visibleWhen": null,
           "hiddenWhen": null,
           "ignoredWhen": null,
@@ -45000,25 +44925,16 @@
           "satisfiedByInputPorts": []
         },
         {
-          "parameter": "IpAddress",
-          "resourceKind": "plc_endpoint",
-          "reasonCode": "OMRON_OPERATOR_IP_REQUIRED_WITHOUT_GLOBAL_FALLBACK",
+          "parameter": "ProfileId",
+          "resourceKind": "plc_profile",
+          "reasonCode": "OMRON_PLC_PROFILE_REQUIRED",
           "atLeastOneGroup": null,
-          "requiredWhen": {
-            "all": [
-              {
-                "parameter": "UseGlobalFallback",
-                "comparison": "equals",
-                "value": false
-              }
-            ],
-            "any": null
-          },
+          "requiredWhen": null,
           "satisfiedByInputPorts": []
         }
       ],
       "generationDependencies": [],
-      "generationFingerprint": "86DC1BA110A638A72A19624EC50B88BF23808346146F5B3F38F34B6FF19F508E",
+      "generationFingerprint": "119A6776F434026B281AD623CCC8026E35034DA5F5DF63426E13A85374AADF0E",
       "docPath": "算子资料/算子名片/OmronFinsCommunication.md"
     },
     {
@@ -45044,7 +44960,7 @@
         "evidenceIdentity": "clearvision-operator-quality-phase5-evidence@1.0.0:7ed1d600eead23e8185d6fef730b3995bec7db29c7d65a6cc3248a1ca95770cf",
         "modeEvidence": []
       },
-      "version": "1.0.1",
+      "version": "1.1.0",
       "keywords": [],
       "tags": [
         "AlgorithmQuality:Unknown",
@@ -45074,6 +44990,17 @@
         }
       ],
       "parameters": [
+        {
+          "name": "ProfileId",
+          "displayName": "串口Profile",
+          "dataType": "string",
+          "description": "",
+          "defaultValue": "",
+          "min": null,
+          "max": null,
+          "isRequired": true,
+          "options": null
+        },
         {
           "name": "PortName",
           "displayName": "串口号",
@@ -45239,7 +45166,7 @@
       "imageInputContracts": [],
       "resourceRequirements": [],
       "generationDependencies": [],
-      "generationFingerprint": "4668B4BC3F2C0495536B6F15E0FF6E3BF682B3F92C0E874E7B6315E714A3AD3D",
+      "generationFingerprint": "ADCC4C619D1E31EDEE1B5069B2E5D09F6E4249C34FB10AC0EE94DFCE2737B896",
       "docPath": "算子资料/算子名片/SerialCommunication.md"
     },
     {
@@ -45265,7 +45192,7 @@
         "evidenceIdentity": "clearvision-operator-quality-phase5-evidence@1.0.0:7ed1d600eead23e8185d6fef730b3995bec7db29c7d65a6cc3248a1ca95770cf",
         "modeEvidence": []
       },
-      "version": "1.0.1",
+      "version": "1.1.0",
       "keywords": [
         "西门子S7"
       ],
@@ -45304,93 +45231,13 @@
       ],
       "parameters": [
         {
-          "name": "IpAddress",
-          "displayName": "IP地址",
+          "name": "ProfileId",
+          "displayName": "PLC Profile",
           "dataType": "string",
           "description": "",
-          "defaultValue": "192.168.0.1",
+          "defaultValue": "",
           "min": null,
           "max": null,
-          "isRequired": true,
-          "options": null
-        },
-        {
-          "name": "Port",
-          "displayName": "端口",
-          "dataType": "int",
-          "description": "",
-          "defaultValue": "102",
-          "min": "1",
-          "max": "65535",
-          "isRequired": true,
-          "options": null
-        },
-        {
-          "name": "UseGlobalFallback",
-          "displayName": "允许全局回退",
-          "dataType": "bool",
-          "description": "启用后缺失的IP/Port可回退到全局通信配置",
-          "defaultValue": "false",
-          "min": null,
-          "max": null,
-          "isRequired": true,
-          "options": null
-        },
-        {
-          "name": "CpuType",
-          "displayName": "CPU类型",
-          "dataType": "enum",
-          "description": "",
-          "defaultValue": "S71200",
-          "min": null,
-          "max": null,
-          "isRequired": true,
-          "options": [
-            {
-              "value": "S7200",
-              "label": "S7-200"
-            },
-            {
-              "value": "S7200Smart",
-              "label": "S7-200 Smart"
-            },
-            {
-              "value": "S7300",
-              "label": "S7-300"
-            },
-            {
-              "value": "S7400",
-              "label": "S7-400"
-            },
-            {
-              "value": "S71200",
-              "label": "S7-1200"
-            },
-            {
-              "value": "S71500",
-              "label": "S7-1500"
-            }
-          ]
-        },
-        {
-          "name": "Rack",
-          "displayName": "机架号",
-          "dataType": "int",
-          "description": "",
-          "defaultValue": "0",
-          "min": "0",
-          "max": "15",
-          "isRequired": true,
-          "options": null
-        },
-        {
-          "name": "Slot",
-          "displayName": "插槽号",
-          "dataType": "int",
-          "description": "",
-          "defaultValue": "1",
-          "min": "0",
-          "max": "15",
           "isRequired": true,
           "options": null
         },
@@ -45404,54 +45251,6 @@
           "max": null,
           "isRequired": true,
           "options": null
-        },
-        {
-          "name": "DataType",
-          "displayName": "数据类型",
-          "dataType": "enum",
-          "description": "",
-          "defaultValue": "Word",
-          "min": null,
-          "max": null,
-          "isRequired": true,
-          "options": [
-            {
-              "value": "Bit",
-              "label": "位 (Bool)"
-            },
-            {
-              "value": "Byte",
-              "label": "字节 (Byte)"
-            },
-            {
-              "value": "Word",
-              "label": "字 (Word/UInt16)"
-            },
-            {
-              "value": "Int16",
-              "label": "短整型 (Int16)"
-            },
-            {
-              "value": "DWord",
-              "label": "双字 (DWord/UInt32)"
-            },
-            {
-              "value": "Int32",
-              "label": "整型 (Int32)"
-            },
-            {
-              "value": "Float",
-              "label": "浮点 (Float)"
-            },
-            {
-              "value": "Double",
-              "label": "双精度 (Double)"
-            },
-            {
-              "value": "String",
-              "label": "字符串 (String)"
-            }
-          ]
         },
         {
           "name": "Operation",
@@ -45593,26 +45392,17 @@
           "satisfiedByInputPorts": null
         },
         {
-          "parameter": "IpAddress",
-          "requiredPolicy": "metadata",
-          "requiredWhen": {
-            "all": [
-              {
-                "parameter": "UseGlobalFallback",
-                "comparison": "equals",
-                "value": false
-              }
-            ],
-            "any": null
-          },
+          "parameter": "Operation",
+          "requiredPolicy": "required",
+          "requiredWhen": null,
           "enabledWhen": null,
           "disabledWhen": null,
           "atLeastOneGroup": null,
           "mutuallyExclusiveGroup": null,
           "aliasFor": null,
           "deprecated": false,
-          "resourceKind": "plc_endpoint",
-          "reasonCode": "SIEMENS_OPERATOR_IP_REQUIRED_WITHOUT_GLOBAL_FALLBACK",
+          "resourceKind": null,
+          "reasonCode": "SIEMENS_PLC_OPERATION_REQUIRED",
           "visibleWhen": null,
           "hiddenWhen": null,
           "ignoredWhen": null,
@@ -45899,26 +45689,17 @@
           "satisfiedByInputPorts": null
         },
         {
-          "parameter": "Port",
-          "requiredPolicy": "metadata",
-          "requiredWhen": {
-            "all": [
-              {
-                "parameter": "UseGlobalFallback",
-                "comparison": "equals",
-                "value": false
-              }
-            ],
-            "any": null
-          },
+          "parameter": "ProfileId",
+          "requiredPolicy": "required",
+          "requiredWhen": null,
           "enabledWhen": null,
           "disabledWhen": null,
           "atLeastOneGroup": null,
           "mutuallyExclusiveGroup": null,
           "aliasFor": null,
           "deprecated": false,
-          "resourceKind": null,
-          "reasonCode": "SIEMENS_OPERATOR_PORT_REQUIRED_WITHOUT_GLOBAL_FALLBACK",
+          "resourceKind": "plc_profile",
+          "reasonCode": "SIEMENS_PLC_PROFILE_REQUIRED",
           "visibleWhen": null,
           "hiddenWhen": null,
           "ignoredWhen": null,
@@ -45981,25 +45762,16 @@
           "satisfiedByInputPorts": []
         },
         {
-          "parameter": "IpAddress",
-          "resourceKind": "plc_endpoint",
-          "reasonCode": "SIEMENS_OPERATOR_IP_REQUIRED_WITHOUT_GLOBAL_FALLBACK",
+          "parameter": "ProfileId",
+          "resourceKind": "plc_profile",
+          "reasonCode": "SIEMENS_PLC_PROFILE_REQUIRED",
           "atLeastOneGroup": null,
-          "requiredWhen": {
-            "all": [
-              {
-                "parameter": "UseGlobalFallback",
-                "comparison": "equals",
-                "value": false
-              }
-            ],
-            "any": null
-          },
+          "requiredWhen": null,
           "satisfiedByInputPorts": []
         }
       ],
       "generationDependencies": [],
-      "generationFingerprint": "4A0DFA0D37B90029DFAB10FF82E293AD51052A885DE1BFD222FEB2CFC2B91312",
+      "generationFingerprint": "64F3A29E33BD1139693B3102D9CCD072F348FC6529B20D7E2B3C7C14FE8DEF71",
       "docPath": "算子资料/算子名片/SiemensS7Communication.md"
     },
     {
@@ -46025,7 +45797,7 @@
         "evidenceIdentity": "clearvision-operator-quality-phase5-evidence@1.0.0:7ed1d600eead23e8185d6fef730b3995bec7db29c7d65a6cc3248a1ca95770cf",
         "modeEvidence": []
       },
-      "version": "1.0.0",
+      "version": "1.1.0",
       "keywords": [
         "Communication",
         "IP",
@@ -46143,59 +45915,6 @@
           "options": null
         },
         {
-          "name": "UseGlobalProfile",
-          "displayName": "使用全局Profile",
-          "dataType": "bool",
-          "description": "",
-          "defaultValue": "false",
-          "min": null,
-          "max": null,
-          "isRequired": true,
-          "options": null
-        },
-        {
-          "name": "Mode",
-          "displayName": "模式",
-          "dataType": "enum",
-          "description": "",
-          "defaultValue": "Client",
-          "min": null,
-          "max": null,
-          "isRequired": true,
-          "options": [
-            {
-              "value": "Client",
-              "label": "客户端"
-            },
-            {
-              "value": "Server",
-              "label": "服务器"
-            }
-          ]
-        },
-        {
-          "name": "IpAddress",
-          "displayName": "IP地址",
-          "dataType": "string",
-          "description": "",
-          "defaultValue": "127.0.0.1",
-          "min": null,
-          "max": null,
-          "isRequired": true,
-          "options": null
-        },
-        {
-          "name": "Port",
-          "displayName": "端口",
-          "dataType": "int",
-          "description": "",
-          "defaultValue": "8080",
-          "min": "1",
-          "max": "65535",
-          "isRequired": true,
-          "options": null
-        },
-        {
           "name": "SendData",
           "displayName": "发送数据",
           "dataType": "string",
@@ -46260,45 +45979,6 @@
           "max": "600000",
           "isRequired": true,
           "options": null
-        },
-        {
-          "name": "Timeout",
-          "displayName": "超时(ms)",
-          "dataType": "int",
-          "description": "",
-          "defaultValue": "5000",
-          "min": "100",
-          "max": "600000",
-          "isRequired": true,
-          "options": null
-        },
-        {
-          "name": "Encoding",
-          "displayName": "编码",
-          "dataType": "enum",
-          "description": "",
-          "defaultValue": "UTF8",
-          "min": null,
-          "max": null,
-          "isRequired": true,
-          "options": [
-            {
-              "value": "UTF8",
-              "label": "UTF-8"
-            },
-            {
-              "value": "ASCII",
-              "label": "ASCII"
-            },
-            {
-              "value": "GBK",
-              "label": "GBK"
-            },
-            {
-              "value": "HEX",
-              "label": "HEX"
-            }
-          ]
         },
         {
           "name": "FailOnUnresolvedPayloadPlaceholder",
@@ -46648,42 +46328,6 @@
       ],
       "parameterConditions": [
         {
-          "parameter": "Encoding",
-          "requiredPolicy": "metadata",
-          "requiredWhen": null,
-          "enabledWhen": {
-            "all": [
-              {
-                "parameter": "ProfileId",
-                "comparison": "empty",
-                "value": null
-              },
-              {
-                "parameter": "UseGlobalProfile",
-                "comparison": "equals",
-                "value": false
-              },
-              {
-                "parameter": "Mode",
-                "comparison": "equals",
-                "value": "Client"
-              }
-            ],
-            "any": null
-          },
-          "disabledWhen": null,
-          "atLeastOneGroup": null,
-          "mutuallyExclusiveGroup": null,
-          "aliasFor": null,
-          "deprecated": false,
-          "resourceKind": null,
-          "reasonCode": "TCP_LEGACY_CLIENT_ENCODING_ONLY_WITHOUT_PROFILE",
-          "visibleWhen": null,
-          "hiddenWhen": null,
-          "ignoredWhen": null,
-          "satisfiedByInputPorts": null
-        },
-        {
           "parameter": "ExpectedResponse",
           "requiredPolicy": "optional",
           "requiredWhen": null,
@@ -46788,159 +46432,9 @@
           "satisfiedByInputPorts": null
         },
         {
-          "parameter": "IpAddress",
-          "requiredPolicy": "metadata",
-          "requiredWhen": {
-            "all": [
-              {
-                "parameter": "ProfileId",
-                "comparison": "empty",
-                "value": null
-              },
-              {
-                "parameter": "UseGlobalProfile",
-                "comparison": "equals",
-                "value": false
-              },
-              {
-                "parameter": "Mode",
-                "comparison": "equals",
-                "value": "Client"
-              }
-            ],
-            "any": null
-          },
-          "enabledWhen": {
-            "all": [
-              {
-                "parameter": "ProfileId",
-                "comparison": "empty",
-                "value": null
-              },
-              {
-                "parameter": "UseGlobalProfile",
-                "comparison": "equals",
-                "value": false
-              },
-              {
-                "parameter": "Mode",
-                "comparison": "equals",
-                "value": "Client"
-              }
-            ],
-            "any": null
-          },
-          "disabledWhen": null,
-          "atLeastOneGroup": null,
-          "mutuallyExclusiveGroup": null,
-          "aliasFor": null,
-          "deprecated": false,
-          "resourceKind": "network_endpoint",
-          "reasonCode": "TCP_LEGACY_CLIENT_HOST_REQUIRED",
-          "visibleWhen": null,
-          "hiddenWhen": null,
-          "ignoredWhen": null,
-          "satisfiedByInputPorts": null
-        },
-        {
-          "parameter": "Mode",
-          "requiredPolicy": "metadata",
-          "requiredWhen": null,
-          "enabledWhen": null,
-          "disabledWhen": {
-            "all": [
-              {
-                "parameter": "ProfileId",
-                "comparison": "not-empty",
-                "value": null
-              }
-            ],
-            "any": null
-          },
-          "atLeastOneGroup": null,
-          "mutuallyExclusiveGroup": null,
-          "aliasFor": null,
-          "deprecated": false,
-          "resourceKind": null,
-          "reasonCode": "TCP_MODE_IGNORED_WHEN_PROFILE_CONFIGURED",
-          "visibleWhen": null,
-          "hiddenWhen": null,
-          "ignoredWhen": null,
-          "satisfiedByInputPorts": null
-        },
-        {
-          "parameter": "Port",
-          "requiredPolicy": "metadata",
-          "requiredWhen": {
-            "all": [
-              {
-                "parameter": "ProfileId",
-                "comparison": "empty",
-                "value": null
-              },
-              {
-                "parameter": "UseGlobalProfile",
-                "comparison": "equals",
-                "value": false
-              },
-              {
-                "parameter": "Mode",
-                "comparison": "equals",
-                "value": "Client"
-              }
-            ],
-            "any": null
-          },
-          "enabledWhen": {
-            "all": [
-              {
-                "parameter": "ProfileId",
-                "comparison": "empty",
-                "value": null
-              },
-              {
-                "parameter": "UseGlobalProfile",
-                "comparison": "equals",
-                "value": false
-              },
-              {
-                "parameter": "Mode",
-                "comparison": "equals",
-                "value": "Client"
-              }
-            ],
-            "any": null
-          },
-          "disabledWhen": null,
-          "atLeastOneGroup": null,
-          "mutuallyExclusiveGroup": null,
-          "aliasFor": null,
-          "deprecated": false,
-          "resourceKind": null,
-          "reasonCode": "TCP_LEGACY_CLIENT_PORT_REQUIRED",
-          "visibleWhen": null,
-          "hiddenWhen": null,
-          "ignoredWhen": null,
-          "satisfiedByInputPorts": null
-        },
-        {
           "parameter": "ProfileId",
-          "requiredPolicy": "optional",
-          "requiredWhen": {
-            "all": null,
-            "any": [
-              {
-                "parameter": "UseGlobalProfile",
-                "comparison": "equals",
-                "value": true
-              },
-              {
-                "parameter": "Mode",
-                "comparison": "equals",
-                "value": "Server"
-              }
-            ]
-          },
+          "requiredPolicy": "required",
+          "requiredWhen": null,
           "enabledWhen": null,
           "disabledWhen": null,
           "atLeastOneGroup": null,
@@ -46948,7 +46442,7 @@
           "aliasFor": null,
           "deprecated": false,
           "resourceKind": "tcp_profile",
-          "reasonCode": "TCP_PROFILE_REQUIRED_FOR_GLOBAL_OR_SERVER_MODE",
+          "reasonCode": "TCP_PROFILE_REQUIRED",
           "visibleWhen": null,
           "hiddenWhen": null,
           "ignoredWhen": null,
@@ -47685,42 +47179,6 @@
           "satisfiedByInputPorts": null
         },
         {
-          "parameter": "Timeout",
-          "requiredPolicy": "metadata",
-          "requiredWhen": null,
-          "enabledWhen": {
-            "all": [
-              {
-                "parameter": "ProfileId",
-                "comparison": "empty",
-                "value": null
-              },
-              {
-                "parameter": "UseGlobalProfile",
-                "comparison": "equals",
-                "value": false
-              },
-              {
-                "parameter": "Mode",
-                "comparison": "equals",
-                "value": "Client"
-              }
-            ],
-            "any": null
-          },
-          "disabledWhen": null,
-          "atLeastOneGroup": null,
-          "mutuallyExclusiveGroup": null,
-          "aliasFor": null,
-          "deprecated": false,
-          "resourceKind": null,
-          "reasonCode": "TCP_LEGACY_CLIENT_TIMEOUT_ONLY_WITHOUT_PROFILE",
-          "visibleWhen": null,
-          "hiddenWhen": null,
-          "ignoredWhen": null,
-          "satisfiedByInputPorts": null
-        },
-        {
           "parameter": "TrimResponseBeforeParse",
           "requiredPolicy": "metadata",
           "requiredWhen": null,
@@ -47777,57 +47235,16 @@
       "imageInputContracts": [],
       "resourceRequirements": [
         {
-          "parameter": "IpAddress",
-          "resourceKind": "network_endpoint",
-          "reasonCode": "TCP_LEGACY_CLIENT_HOST_REQUIRED",
-          "atLeastOneGroup": null,
-          "requiredWhen": {
-            "all": [
-              {
-                "parameter": "ProfileId",
-                "comparison": "empty",
-                "value": null
-              },
-              {
-                "parameter": "UseGlobalProfile",
-                "comparison": "equals",
-                "value": false
-              },
-              {
-                "parameter": "Mode",
-                "comparison": "equals",
-                "value": "Client"
-              }
-            ],
-            "any": null
-          },
-          "satisfiedByInputPorts": []
-        },
-        {
           "parameter": "ProfileId",
           "resourceKind": "tcp_profile",
-          "reasonCode": "TCP_PROFILE_REQUIRED_FOR_GLOBAL_OR_SERVER_MODE",
+          "reasonCode": "TCP_PROFILE_REQUIRED",
           "atLeastOneGroup": null,
-          "requiredWhen": {
-            "all": null,
-            "any": [
-              {
-                "parameter": "UseGlobalProfile",
-                "comparison": "equals",
-                "value": true
-              },
-              {
-                "parameter": "Mode",
-                "comparison": "equals",
-                "value": "Server"
-              }
-            ]
-          },
+          "requiredWhen": null,
           "satisfiedByInputPorts": []
         }
       ],
       "generationDependencies": [],
-      "generationFingerprint": "EE7310E9731A7EAB3B10E80D16F8D3D80E321D6FD8FEAF6A23E0D688BC3CEF16",
+      "generationFingerprint": "CE7463C76C444B6CE795423B70363D7F28892193998630221049D89F8217C698",
       "docPath": "算子资料/算子名片/TcpCommunication.md"
     },
     {
@@ -47941,7 +47358,7 @@
         "evidenceIdentity": "clearvision-operator-quality-phase5-evidence@1.0.0:7ed1d600eead23e8185d6fef730b3995bec7db29c7d65a6cc3248a1ca95770cf",
         "modeEvidence": []
       },
-      "version": "1.0.0",
+      "version": "1.1.0",
       "keywords": [
         "MySQL",
         "SQL",
@@ -47992,6 +47409,17 @@
         }
       ],
       "parameters": [
+        {
+          "name": "ProfileId",
+          "displayName": "数据库Profile",
+          "dataType": "string",
+          "description": "",
+          "defaultValue": "",
+          "min": null,
+          "max": null,
+          "isRequired": true,
+          "options": null
+        },
         {
           "name": "ConnectionString",
           "displayName": "连接字符串",
@@ -48044,7 +47472,7 @@
       "imageInputContracts": [],
       "resourceRequirements": [],
       "generationDependencies": [],
-      "generationFingerprint": "399D8D35CF0F76E5BDD2D6E3417F6516D24EA084B35EB2E90D91C92556AA42C8",
+      "generationFingerprint": "B5AD0F86A0D57632A6CCD1C163A25AB9BB3A422F600E4126038E463E67DCA4D1",
       "docPath": "算子资料/算子名片/DatabaseWrite.md"
     },
     {
@@ -48628,7 +48056,7 @@
         "evidenceIdentity": "clearvision-operator-quality-phase5-evidence@1.0.0:7ed1d600eead23e8185d6fef730b3995bec7db29c7d65a6cc3248a1ca95770cf",
         "modeEvidence": []
       },
-      "version": "1.0.0",
+      "version": "1.0.1",
       "keywords": [
         "export csv",
         "json export",
@@ -48785,7 +48213,7 @@
         }
       ],
       "generationDependencies": [],
-      "generationFingerprint": "BE9E2F907C853A4C4896B6412916DFD5311E2A66D9E2F6A72CC9659C3BB2920F",
+      "generationFingerprint": "E7AC8C29797BF923D3698BA333C41040E7A0E18959D67F08921183C5A0FB8AC6",
       "docPath": "算子资料/算子名片/TextSave.md"
     }
   ]

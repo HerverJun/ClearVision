@@ -13,7 +13,8 @@ namespace ClearVision.Product.Infrastructure.Operators;
     Description = "根据棋盘格或圆点阵图像标定相机内参。",
     CategoryId = OperatorCategoryId.CalibrationAndCoordinates,
     IconName = "calibration",
-    Keywords = new[] { "Calibration", "Chessboard", "Intrinsic", "Distortion" }
+    Keywords = new[] { "Calibration", "Chessboard", "Intrinsic", "Distortion" },
+    Version = "1.1.0"
 )]
 [InputPort("Image", "Input Image", PortDataType.Image, IsRequired = true)]
 [OutputPort("Image", "Result Image", PortDataType.Image)]

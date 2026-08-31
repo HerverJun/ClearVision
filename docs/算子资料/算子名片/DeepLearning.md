@@ -8,7 +8,7 @@
 | 分类 ID (CategoryId) | `AiInference` |
 | 分类 (Category) | AI推理 |
 | 分类顺序 (CategoryOrder) | 9 |
-| 版本 (Version) | `1.1.0` |
+| 版本 (Version) | `1.1.1` |
 | 生命周期 (Lifecycle) | 稳定 `Stable` |
 | 生命周期说明 (Lifecycle Note) | - |
 | 默认隐藏 (Default Hidden) | No |
@@ -42,11 +42,11 @@
 - `Cv2.Split`
 - `Cv2.GetTextSize`
 - `File.Exists`
+- `Path.GetFullPath`
 - `Path.GetDirectoryName`
 - `Path.Combine`
 - `JsonSerializer.Deserialize`
 - `Math.Clamp`
-- `Math.Min`
 
 ## 参数说明 / Parameters
 | 参数名 (Name) | 显示名 (DisplayName) | 类型 (Type) | 默认值 (Default) | 范围/选项 (Range/Options) | 必填 (Required) | 说明 (Description) |
@@ -184,7 +184,7 @@
 | `TopClassLabel` | ALL(TaskType == ImageClassification) | `DEEP_LEARNING_CLASSIFICATION_OUTPUT` |
 
 ## 生成依赖 / Generation Dependencies
-- 组合指纹 (Generation Fingerprint)：`C438192588112353D92F31927FBA32A49E0955DACE787A203ACBDC3B7523F42B`
+- 组合指纹 (Generation Fingerprint)：`67F1BFF6738317B1185CA6E184CBB94797B66ED517065BB005F151917EB58145`
 - `type:ClearVision.Product.Infrastructure.Operators.DeepLearningTaskResolver`
 - `type:ClearVision.Product.Infrastructure.Operators.SemanticSegmentationOperator`
 - `type:ClearVision.Product.Infrastructure.Services.DeepLearningLabelResolver`
@@ -248,4 +248,4 @@
 ## 变更记录 / Changelog
 | 版本 (Version) | 日期 (Date) | 变更内容 (Changes) |
 |------|------|----------|
-| 1.1.0 | 2026-07-16 | 按当前最终运行时元数据、条件契约和显式依赖口径重生成 / Regenerated from effective runtime metadata and declared dependencies |
+| 1.1.1 | 2026-08-31 | 按当前最终运行时元数据、条件契约和显式依赖口径重生成 / Regenerated from effective runtime metadata and declared dependencies |

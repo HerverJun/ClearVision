@@ -16,7 +16,8 @@ namespace ClearVision.Product.Infrastructure.Operators;
     Description = "通过连续帧 ROI 变化判断端子是否到达；未到料时短路当前检测周期，避免空帧进入深度学习。",
     CategoryId = OperatorCategoryId.FlowControl,
     IconName = "activity",
-    Keywords = new[] { "触发", "到料", "帧差", "视频流", "连续采集", "软触发", "去重", "冷却", "trigger", "arrival", "frame change", "continuous", "video" }
+    Keywords = new[] { "触发", "到料", "帧差", "视频流", "连续采集", "软触发", "去重", "冷却", "trigger", "arrival", "frame change", "continuous", "video" },
+    Version = "1.0.1"
 )]
 [InputPort("Image", "输入图像", PortDataType.Image, IsRequired = true)]
 [OutputPort("Image", "输出图像", PortDataType.Image)]

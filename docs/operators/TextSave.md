@@ -8,7 +8,7 @@
 | 分类 ID (CategoryId) | `OutputAndAuxiliary` |
 | 分类 (Category) | 输出与辅助 |
 | 分类顺序 (CategoryOrder) | 14 |
-| 版本 (Version) | `1.0.0` |
+| 版本 (Version) | `1.0.1` |
 | 生命周期 (Lifecycle) | 稳定 `Stable` |
 | 生命周期说明 (Lifecycle Note) | - |
 | 默认隐藏 (Default Hidden) | No |
@@ -76,7 +76,7 @@
 | - | - | - |
 
 ## 生成依赖 / Generation Dependencies
-- 组合指纹 (Generation Fingerprint)：`BE9E2F907C853A4C4896B6412916DFD5311E2A66D9E2F6A72CC9659C3BB2920F`
+- 组合指纹 (Generation Fingerprint)：`E7AC8C29797BF923D3698BA333C41040E7A0E18959D67F08921183C5A0FB8AC6`
 - 显式共享依赖：无；指纹由最终运行时元数据与算子源码组成。
 
 ### 运行时附加输出 / Runtime Additional Outputs
@@ -102,9 +102,8 @@
 ## 已知限制 / Known Limitations
 1. 参数范围和枚举项来自当前元数据；旧流程若保存了过期参数值，加载后需要重新校验。
 2. 外部文件、网络、PLC、数据库或消息系统不可用时，算子结果会受环境状态影响。
-3. 源码包含状态缓存或实例级状态，长流程运行时需要关注状态清理、并发调用和实例复用边界。
 
 ## 变更记录 / Changelog
 | 版本 (Version) | 日期 (Date) | 变更内容 (Changes) |
 |------|------|----------|
-| 1.0.0 | 2026-07-14 | 按当前最终运行时元数据、条件契约和显式依赖口径重生成 / Regenerated from effective runtime metadata and declared dependencies |
+| 1.0.1 | 2026-08-31 | 按当前最终运行时元数据、条件契约和显式依赖口径重生成 / Regenerated from effective runtime metadata and declared dependencies |

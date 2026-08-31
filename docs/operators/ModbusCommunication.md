@@ -8,7 +8,7 @@
 | 分类 ID (CategoryId) | `Communication` |
 | 分类 (Category) | 通信 |
 | 分类顺序 (CategoryOrder) | 13 |
-| 版本 (Version) | `1.0.0` |
+| 版本 (Version) | `1.1.0` |
 | 生命周期 (Lifecycle) | 稳定 `Stable` |
 | 生命周期说明 (Lifecycle Note) | - |
 | 默认隐藏 (Default Hidden) | No |
@@ -28,24 +28,20 @@
 ## 实现策略 / Implementation Strategy
 - 输入端口均为可选或该算子不依赖外部输入，执行时会优先读取可用输入并使用参数默认值兜底。
 - 可选输入用于覆盖或补充参数配置：`Data`。
-- 参数解析覆盖 9 个当前元数据字段，默认值、范围和枚举项以参数表为准。
+- 参数解析覆盖 6 个当前元数据字段，默认值、范围和枚举项以参数表为准。
 - `ValidateParameters` 已提供参数合法性检查，部分越界或非法组合会在运行前被拦截。
 - 源码包含异常捕获路径，外部依赖或运行时异常会被转为失败输出或诊断信息。
 - 非图像输出直接以 `Dictionary<string, object>` 返回，字段名称以输出端口和运行时附加输出表为准。
 
 ## 核心 API 调用链 / Core API Call Chain
 - `OperatorBase.Get*Param(...)`
-- `Math.Max`
 - `OperatorExecutionOutput.Success(...)`
 - `OperatorExecutionOutput.Failure(...)`
 
 ## 参数说明 / Parameters
 | 参数名 (Name) | 显示名 (DisplayName) | 类型 (Type) | 默认值 (Default) | 范围/选项 (Range/Options) | 必填 (Required) | 说明 (Description) |
 |--------|------|------|--------|------|------|------|
-| `Protocol` | Protocol | `enum` | TCP | TCP；RTU | Yes | 当前仅支持 TCP；RTU 选项用于旧流程兼容，执行时返回不支持。 |
-| `IpAddress` | IP Address | `string` | 192.168.1.1 | - | Yes | - |
-| `Port` | Port | `int` | 502 | [1, 65535] | Yes | - |
-| `SlaveId` | Slave ID | `int` | 1 | [1, 247] | Yes | - |
+| `ProfileId` | PLC Profile | `string` | "" | - | Yes | - |
 | `RegisterAddress` | Register Address | `int` | 0 | - | Yes | - |
 | `RegisterCount` | Register Count | `int` | 1 | [1, 125] | Yes | - |
 | `FunctionCode` | Function Code | `enum` | ReadHolding | ReadCoils/Read Coils；ReadHolding/Read Holding Registers；WriteSingle/Write Single Register；WriteMultiple/Write Multiple Registers | Yes | - |
@@ -68,7 +64,8 @@
 ### 参数条件 / Parameter Conditions
 | 参数 (Parameter) | 必填条件 (Required) | 可见条件 (Visible) | 启用/禁用条件 (Enabled/Disabled) | 忽略条件 (Ignored) | 资源 (Resource) | 输入可满足 (Satisfied By Inputs) | 原因码 (Reason) |
 |------|------|------|------|------|------|------|------|
-| `IpAddress` | required; - | visible: -; hidden: - | enabled: -; disabled: - | - | plc_endpoint | - | `MODBUS_TCP_ENDPOINT_REQUIRED` |
+| `FunctionCode` | required; - | visible: -; hidden: - | enabled: -; disabled: - | - | - | - | `MODBUS_FUNCTION_CODE_REQUIRED` |
+| `ProfileId` | required; - | visible: -; hidden: - | enabled: -; disabled: - | - | plc_profile | - | `MODBUS_PLC_PROFILE_REQUIRED` |
 | `RegisterAddress` | required; - | visible: -; hidden: - | enabled: -; disabled: - | - | plc_address | - | `MODBUS_REGISTER_ADDRESS_REQUIRED` |
 | `RegisterCount` | metadata; - | visible: -; hidden: ANY(FunctionCode == WriteSingle \|\| FunctionCode == WriteMultiple) | enabled: ANY(FunctionCode == ReadCoils \|\| FunctionCode == ReadHolding); disabled: - | ANY(FunctionCode == WriteSingle \|\| FunctionCode == WriteMultiple) | - | - | `MODBUS_REGISTER_COUNT_ONLY_FOR_READ` |
 | `WriteValue` | metadata; ANY(FunctionCode == WriteSingle \|\| FunctionCode == WriteMultiple) | visible: -; hidden: ANY(FunctionCode == ReadCoils \|\| FunctionCode == ReadHolding) | enabled: ANY(FunctionCode == WriteSingle \|\| FunctionCode == WriteMultiple); disabled: - | ANY(FunctionCode == ReadCoils \|\| FunctionCode == ReadHolding) | - | - | `MODBUS_WRITE_VALUE_ONLY_FOR_WRITE` |
@@ -79,11 +76,14 @@
 | - | - | - |
 
 ## 生成依赖 / Generation Dependencies
-- 组合指纹 (Generation Fingerprint)：`F44B9E02DAF4601B2B2D01922F1F62E7C6141FA1B4CF3DB7239783EC0BF9A468`
+- 组合指纹 (Generation Fingerprint)：`BEE816D345431789919A2A52EFBE05EE737B08B392BB132BBCC850BD8D08682D`
 - 显式共享依赖：无；指纹由最终运行时元数据与算子源码组成。
 
 ### 运行时附加输出 / Runtime Additional Outputs
-- 未在源码中发现除声明输出端口外的稳定附加输出字段；下游连线以输出端口表为准。
+| 名称 (Name) | 推断类型 (Inferred Type) | 说明 (Description) |
+|------|------|------|
+| `Protocol` | `Any` | 源码通过输出字典索引赋值写入。 |
+| `SlaveId` | `String` | 源码通过输出字典索引赋值写入。 |
 
 ## 性能特征 / Performance
 | 指标 (Metric) | 值 (Value) |
@@ -96,7 +96,7 @@
 - 单元/契约测试：已在 `ClearVision.Product/tests/ClearVision.Product.Tests/Operators` 中发现对应测试入口。
 - Golden/回放证据：质量报告中存在通过的 baseline 证据。
 - 参数失败契约：源码包含 `ValidateParameters`，非法参数会被明确拦截或返回错误说明。
-- 执行失败契约：源码中发现 2 条 `OperatorExecutionOutput.Failure(...)` 路径。
+- 执行失败契约：源码中发现 5 条 `OperatorExecutionOutput.Failure(...)` 路径。
 
 ## 适用场景 / Use Cases
 - 适合 (Suitable)：需要把视觉流程与文件、HTTP、数据库、PLC、MQTT 或串口等外部系统连接的场景。
@@ -104,10 +104,11 @@
 
 ## 已知限制 / Known Limitations
 1. 参数范围和枚举项来自当前元数据；旧流程若保存了过期参数值，加载后需要重新校验。
-2. 外部文件、网络、PLC、数据库或消息系统不可用时，算子结果会受环境状态影响。
-3. 源码包含状态缓存或实例级状态，长流程运行时需要关注状态清理、并发调用和实例复用边界。
+2. 运行时附加输出字段来自源码输出字典，部分字段未声明为可连线端口，下游稳定连线应优先使用输出端口表。
+3. 外部文件、网络、PLC、数据库或消息系统不可用时，算子结果会受环境状态影响。
+4. 源码包含状态缓存或实例级状态，长流程运行时需要关注状态清理、并发调用和实例复用边界。
 
 ## 变更记录 / Changelog
 | 版本 (Version) | 日期 (Date) | 变更内容 (Changes) |
 |------|------|----------|
-| 1.0.0 | 2026-07-14 | 按当前最终运行时元数据、条件契约和显式依赖口径重生成 / Regenerated from effective runtime metadata and declared dependencies |
+| 1.1.0 | 2026-08-31 | 按当前最终运行时元数据、条件契约和显式依赖口径重生成 / Regenerated from effective runtime metadata and declared dependencies |

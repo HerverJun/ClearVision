@@ -21,7 +21,7 @@ namespace ClearVision.Product.Infrastructure.Operators;
     Description = "RS-232/485 串口数据收发",
     CategoryId = OperatorCategoryId.Communication,
     IconName = "serial",
-    Version = "1.0.1"
+    Version = "1.1.0"
 )]
 [InputPort("Data", "发送数据", PortDataType.Any, IsRequired = false)]
 [OutputPort("Response", "接收数据", PortDataType.Any)]

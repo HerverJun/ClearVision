@@ -21,7 +21,7 @@ namespace ClearVision.Product.Infrastructure.Operators;
     Description = "欧姆龙FINS/TCP协议PLC读写通信（CP1H/CJ2M/NJ/NX）",
     CategoryId = OperatorCategoryId.Communication,
     IconName = "fins",
-    Version = "1.0.1"
+    Version = "1.1.0"
 )]
 [OperatorParameterRule("ProfileId", RequiredPolicy = OperatorParameterRequiredPolicy.Required, ResourceKind = OperatorResourceKind.PlcProfile, ReasonCode = "OMRON_PLC_PROFILE_REQUIRED")]
 [OperatorParameterRule("Address", RequiredPolicy = OperatorParameterRequiredPolicy.Required, ResourceKind = OperatorResourceKind.PlcAddress, ReasonCode = "OMRON_PLC_ADDRESS_REQUIRED")]

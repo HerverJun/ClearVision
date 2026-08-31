@@ -19,7 +19,8 @@ namespace ClearVision.Product.Infrastructure.Operators;
     Description = "将输入数据写入 SQLite / SQL Server / MySQL 表。",
     CategoryId = OperatorCategoryId.OutputAndAuxiliary,
     IconName = "database",
-    Keywords = new[] { "数据库", "写入", "存储", "SQL", "SQLite", "SQLServer", "MySQL", "Upsert" })]
+    Keywords = new[] { "数据库", "写入", "存储", "SQL", "SQLite", "SQLServer", "MySQL", "Upsert" },
+    Version = "1.1.0")]
 [InputPort("Data", "数据", PortDataType.Any, IsRequired = true)]
 [InputPort("RecordId", "记录ID", PortDataType.String, IsRequired = false)]
 [OutputPort("Status", "状态", PortDataType.Boolean)]

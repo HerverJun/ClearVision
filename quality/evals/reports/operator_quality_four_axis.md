@@ -1,6 +1,6 @@
 # Operator Quality Four-Axis State
 
-GeneratedAtUtc: `2026-08-29T14:18:20.2419055+08:00`
+GeneratedAtUtc: `2026-08-31T19:13:00.8983064+08:00`
 
 > Execution, AlgorithmQuality, ProductionReadiness and FieldValidation are independent. Synthetic/public-dataset evidence is not Release Ready or Field Verified evidence.
 

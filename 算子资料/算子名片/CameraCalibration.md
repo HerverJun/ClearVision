@@ -8,7 +8,7 @@
 | 分类 ID (CategoryId) | `CalibrationAndCoordinates` |
 | 分类 (Category) | 标定与坐标 |
 | 分类顺序 (CategoryOrder) | 8 |
-| 版本 (Version) | `1.0.0` |
+| 版本 (Version) | `1.1.0` |
 | 生命周期 (Lifecycle) | 稳定 `Stable` |
 | 生命周期说明 (Lifecycle Note) | - |
 | 默认隐藏 (Default Hidden) | No |
@@ -57,7 +57,7 @@
 | `SquareSize` | 方格尺寸（mm） | `double` | 25 | [0.1, 1000] | Yes | - |
 | `Mode` | 模式 | `enum` | SingleImage | SingleImage/单图像；FolderCalibration/目录标定 | Yes | - |
 | `ImageFolder` | 图像文件夹 | `string` | "" | - | Yes | - |
-| `CalibrationOutputPath` | 标定输出路径 | `string` | calibration_result.json | - | Yes | - |
+| `CalibrationAssetId` | Calibration Asset Id | `string` | "" | - | Yes | - |
 
 ## 输入/输出端口 / Input/Output Ports
 ### 输入 / Inputs
@@ -70,6 +70,9 @@
 |------|------|------|------|
 | `Image` | Result Image | `Image` | 图像输出，可供后续图像处理、显示或保存节点使用。 |
 | `CalibrationData` | Calibration Data | `String` | 文本结果，可用于显示、日志、保存或外部接口传输。 |
+| `CalibrationAssetId` | Calibration Asset Id | `String` | 文本结果，可用于显示、日志、保存或外部接口传输。 |
+| `CalibrationAssetCandidate` | Calibration Asset Candidate | `Boolean` | 布尔判定结果，适合连接条件分支、结果判定或通信写入。 |
+| `CalibrationContentHash` | Calibration Content Hash | `String` | 文本结果，可用于显示、日志、保存或外部接口传输。 |
 
 ## 模式与资源契约 / Mode & Resource Contracts
 ### 参数条件 / Parameter Conditions
@@ -94,7 +97,7 @@
 | - | - | - |
 
 ## 生成依赖 / Generation Dependencies
-- 组合指纹 (Generation Fingerprint)：`C4EF240DCDB5763491CF77CCC9CBFBD6DB0FDEB671EA2C4E671031E3038E2CD8`
+- 组合指纹 (Generation Fingerprint)：`E7B65D9393046CF5B79094998145B6D54DCE29C24C872035F85310D7BC10A859`
 - 显式共享依赖：无；指纹由最终运行时元数据与算子源码组成。
 
 ### 运行时附加输出 / Runtime Additional Outputs
@@ -108,7 +111,6 @@
 | `ImageCount` | `Integer` | 源码通过输出字典索引赋值写入。 |
 | `MaxReprojectionError` | `Float` | 源码通过输出字典索引赋值写入。 |
 | `Message` | `String` | 源码通过输出字典索引赋值写入。 |
-| `OutputPath` | `String` | 源码通过输出字典索引赋值写入。 |
 | `PerViewErrors` | `Any` | 源码通过输出字典索引赋值写入。 |
 | `RejectedDetectionCount` | `Integer` | 源码通过输出字典索引赋值写入。 |
 | `RejectedOutlierCount` | `Integer` | 源码通过输出字典索引赋值写入。 |
@@ -143,4 +145,4 @@
 ## 变更记录 / Changelog
 | 版本 (Version) | 日期 (Date) | 变更内容 (Changes) |
 |------|------|----------|
-| 1.0.0 | 2026-07-16 | 按当前最终运行时元数据、条件契约和显式依赖口径重生成 / Regenerated from effective runtime metadata and declared dependencies |
+| 1.1.0 | 2026-08-31 | 按当前最终运行时元数据、条件契约和显式依赖口径重生成 / Regenerated from effective runtime metadata and declared dependencies |

@@ -8,7 +8,7 @@
 | 分类 ID (CategoryId) | `Communication` |
 | 分类 (Category) | 通信 |
 | 分类顺序 (CategoryOrder) | 13 |
-| 版本 (Version) | `1.0.1` |
+| 版本 (Version) | `1.1.0` |
 | 生命周期 (Lifecycle) | 稳定 `Stable` |
 | 生命周期说明 (Lifecycle Note) | - |
 | 默认隐藏 (Default Hidden) | No |
@@ -28,7 +28,7 @@
 ## 实现策略 / Implementation Strategy
 - 输入端口均为可选或该算子不依赖外部输入，执行时会优先读取可用输入并使用参数默认值兜底。
 - 可选输入用于覆盖或补充参数配置：`Data`。
-- 参数解析覆盖 13 个当前元数据字段，默认值、范围和枚举项以参数表为准。
+- 参数解析覆盖 10 个当前元数据字段，默认值、范围和枚举项以参数表为准。
 - `ValidateParameters` 已提供参数合法性检查，部分越界或非法组合会在运行前被拦截。
 - 源码包含异常捕获路径，外部依赖或运行时异常会被转为失败输出或诊断信息。
 - 非图像输出直接以 `Dictionary<string, object>` 返回，字段名称以输出端口和运行时附加输出表为准。
@@ -41,12 +41,9 @@
 ## 参数说明 / Parameters
 | 参数名 (Name) | 显示名 (DisplayName) | 类型 (Type) | 默认值 (Default) | 范围/选项 (Range/Options) | 必填 (Required) | 说明 (Description) |
 |--------|------|------|--------|------|------|------|
-| `IpAddress` | IP Address | `string` | 192.168.3.39 | - | Yes | - |
-| `Port` | Port | `int` | 5002 | [1, 65535] | Yes | - |
-| `UseGlobalFallback` | Use Global Fallback | `bool` | false | - | Yes | - |
+| `ProfileId` | PLC Profile | `string` | "" | - | Yes | - |
 | `Address` | PLC Address | `string` | D100 | - | Yes | - |
 | `Length` | Read Length | `int` | 1 | [1, 999] | Yes | - |
-| `DataType` | Data Type | `enum` | Word | Bit/Bit(Bool)；Word/Word(UInt16)；Int16；DWord/DWord(UInt32)；Int32；Float/浮点；Double | Yes | - |
 | `Operation` | 操作 | `enum` | Read | Read；Write | Yes | - |
 | `WriteValue` | Write Value | `string` | "" | - | Yes | - |
 | `PollingMode` | Polling Mode | `enum` | None | None/无；WaitForValue/Wait For Value | Yes | 读取时是否启用轮询等待。 |
@@ -72,14 +69,14 @@
 | 参数 (Parameter) | 必填条件 (Required) | 可见条件 (Visible) | 启用/禁用条件 (Enabled/Disabled) | 忽略条件 (Ignored) | 资源 (Resource) | 输入可满足 (Satisfied By Inputs) | 原因码 (Reason) |
 |------|------|------|------|------|------|------|------|
 | `Address` | required; - | visible: -; hidden: - | enabled: -; disabled: - | - | plc_address | - | `MITSUBISHI_PLC_ADDRESS_REQUIRED` |
-| `IpAddress` | metadata; ALL(UseGlobalFallback == false) | visible: -; hidden: - | enabled: -; disabled: - | - | plc_endpoint | - | `MITSUBISHI_OPERATOR_IP_REQUIRED_WITHOUT_GLOBAL_FALLBACK` |
 | `Length` | metadata; - | visible: -; hidden: ALL(Operation != Read) | enabled: ALL(Operation == Read); disabled: - | ALL(Operation != Read) | - | - | `MITSUBISHI_READ_LENGTH_ONLY_FOR_READ` |
+| `Operation` | required; - | visible: -; hidden: - | enabled: -; disabled: - | - | - | - | `MITSUBISHI_PLC_OPERATION_REQUIRED` |
 | `PollingCondition` | metadata; - | visible: -; hidden: ANY(Operation != Read \|\| PollingMode != WaitForValue) | enabled: ALL(Operation == Read && PollingMode == WaitForValue); disabled: - | ANY(Operation != Read \|\| PollingMode != WaitForValue) | - | - | `MITSUBISHI_POLLING_CONDITION_ONLY_WHEN_WAITING` |
 | `PollingInterval` | metadata; - | visible: -; hidden: ANY(Operation != Read \|\| PollingMode != WaitForValue) | enabled: ALL(Operation == Read && PollingMode == WaitForValue); disabled: - | ANY(Operation != Read \|\| PollingMode != WaitForValue) | - | - | `MITSUBISHI_POLLING_INTERVAL_ONLY_WHEN_WAITING` |
 | `PollingMode` | metadata; - | visible: -; hidden: ALL(Operation != Read) | enabled: ALL(Operation == Read); disabled: - | ALL(Operation != Read) | - | - | `MITSUBISHI_POLLING_ONLY_FOR_READ` |
 | `PollingTimeout` | metadata; - | visible: -; hidden: ANY(Operation != Read \|\| PollingMode != WaitForValue) | enabled: ALL(Operation == Read && PollingMode == WaitForValue); disabled: - | ANY(Operation != Read \|\| PollingMode != WaitForValue) | - | - | `MITSUBISHI_POLLING_TIMEOUT_ONLY_WHEN_WAITING` |
 | `PollingValue` | metadata; - | visible: -; hidden: ANY(Operation != Read \|\| PollingMode != WaitForValue) | enabled: ALL(Operation == Read && PollingMode == WaitForValue); disabled: - | ANY(Operation != Read \|\| PollingMode != WaitForValue) | - | - | `MITSUBISHI_POLLING_VALUE_ONLY_WHEN_WAITING` |
-| `Port` | metadata; ALL(UseGlobalFallback == false) | visible: -; hidden: - | enabled: -; disabled: - | - | - | - | `MITSUBISHI_OPERATOR_PORT_REQUIRED_WITHOUT_GLOBAL_FALLBACK` |
+| `ProfileId` | required; - | visible: -; hidden: - | enabled: -; disabled: - | - | plc_profile | - | `MITSUBISHI_PLC_PROFILE_REQUIRED` |
 | `WriteValue` | optional; - | visible: -; hidden: ALL(Operation != Write) | enabled: ALL(Operation == Write); disabled: - | ALL(Operation != Write) | - | - | `MITSUBISHI_WRITE_VALUE_ONLY_FOR_WRITE` |
 
 ### 输出条件 / Output Conditions
@@ -88,7 +85,7 @@
 | - | - | - |
 
 ## 生成依赖 / Generation Dependencies
-- 组合指纹 (Generation Fingerprint)：`CFFEEFB6ADB23B1F2AFF357B29E8FA0CBE027189E79E7BBBD7DE1BBF57470633`
+- 组合指纹 (Generation Fingerprint)：`D9DAA52E3334A95828B46E9A466902AB7E19759BD18B4DA1A5396FC83CD484CC`
 - 显式共享依赖：无；指纹由最终运行时元数据与算子源码组成。
 
 ### 运行时附加输出 / Runtime Additional Outputs
@@ -123,4 +120,4 @@
 ## 变更记录 / Changelog
 | 版本 (Version) | 日期 (Date) | 变更内容 (Changes) |
 |------|------|----------|
-| 1.0.1 | 2026-08-29 | 按当前最终运行时元数据、条件契约和显式依赖口径重生成 / Regenerated from effective runtime metadata and declared dependencies |
+| 1.1.0 | 2026-08-31 | 按当前最终运行时元数据、条件契约和显式依赖口径重生成 / Regenerated from effective runtime metadata and declared dependencies |

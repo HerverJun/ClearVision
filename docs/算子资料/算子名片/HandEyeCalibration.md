@@ -8,7 +8,7 @@
 | 分类 ID (CategoryId) | `CalibrationAndCoordinates` |
 | 分类 (Category) | 标定与坐标 |
 | 分类顺序 (CategoryOrder) | 8 |
-| 版本 (Version) | `1.0.0` |
+| 版本 (Version) | `1.1.0` |
 | 生命周期 (Lifecycle) | 稳定 `Stable` |
 | 生命周期说明 (Lifecycle Note) | - |
 | 默认隐藏 (Default Hidden) | No |
@@ -28,7 +28,7 @@
 
 ## 实现策略 / Implementation Strategy
 - 先校验必填输入：`RobotPoses`、`CalibrationBoardPoses`；缺失时通常返回失败结果。
-- 参数解析覆盖 4 个当前元数据字段，默认值、范围和枚举项以参数表为准。
+- 参数解析覆盖 5 个当前元数据字段，默认值、范围和枚举项以参数表为准。
 - `ValidateParameters` 已提供参数合法性检查，部分越界或非法组合会在运行前被拦截。
 - 源码包含异常捕获路径，外部依赖或运行时异常会被转为失败输出或诊断信息。
 - 非图像输出直接以 `Dictionary<string, object>` 返回，字段名称以输出端口和运行时附加输出表为准。
@@ -48,6 +48,7 @@
 | `Method` | 方法 | `enum` | TSAI | TSAI/Tsai；PARK/Park；HORAUD/Horaud；ANDREFF/Andreff；DANIILIDIS/Daniilidis | Yes | - |
 | `CameraMatrix` | 相机矩阵 | `string` | "" | - | Yes | - |
 | `DistortionCoeffs` | 畸变系数 | `string` | "" | - | Yes | - |
+| `CalibrationAssetId` | Calibration Asset Id | `string` | "" | - | Yes | - |
 
 ## 输入/输出端口 / Input/Output Ports
 ### 输入 / Inputs
@@ -66,6 +67,9 @@
 | `HtmlReport` | HTML Report | `String` | 文本结果，可用于显示、日志、保存或外部接口传输。 |
 | `Suggestions` | Suggestions | `Any` | 业务输出字段，具体结构以源码输出和运行时结果为准。 |
 | `SuggestedValidationPoses` | Suggested Validation Poses | `String` | 文本结果，可用于显示、日志、保存或外部接口传输。 |
+| `CalibrationAssetId` | Calibration Asset Id | `String` | 文本结果，可用于显示、日志、保存或外部接口传输。 |
+| `CalibrationAssetCandidate` | Calibration Asset Candidate | `Boolean` | 布尔判定结果，适合连接条件分支、结果判定或通信写入。 |
+| `CalibrationContentHash` | Calibration Content Hash | `String` | 文本结果，可用于显示、日志、保存或外部接口传输。 |
 
 ## 模式与资源契约 / Mode & Resource Contracts
 ### 参数条件 / Parameter Conditions
@@ -79,7 +83,7 @@
 | - | - | - |
 
 ## 生成依赖 / Generation Dependencies
-- 组合指纹 (Generation Fingerprint)：`CB4D33407E47D93FBA7918B42B5F24CC74F5B1E536970E14E5889ACEF0C8D7E6`
+- 组合指纹 (Generation Fingerprint)：`1743E8C565F80D17AA03E2675B211A5EB851C598C11FDEBCF3F6B70FDE5465FA`
 - 显式共享依赖：无；指纹由最终运行时元数据与算子源码组成。
 
 ### 运行时附加输出 / Runtime Additional Outputs
@@ -109,4 +113,4 @@
 ## 变更记录 / Changelog
 | 版本 (Version) | 日期 (Date) | 变更内容 (Changes) |
 |------|------|----------|
-| 1.0.0 | 2026-07-14 | 按当前最终运行时元数据、条件契约和显式依赖口径重生成 / Regenerated from effective runtime metadata and declared dependencies |
+| 1.1.0 | 2026-08-31 | 按当前最终运行时元数据、条件契约和显式依赖口径重生成 / Regenerated from effective runtime metadata and declared dependencies |

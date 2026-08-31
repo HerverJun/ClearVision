@@ -15,7 +15,7 @@ namespace ClearVision.Product.Infrastructure.Operators;
     CategoryId = OperatorCategoryId.CalibrationAndCoordinates,
     IconName = "hand-eye-calibration",
     Keywords = new[] { "handeye", "robot", "calibration", "AX=XB" },
-    Version = "1.0.0"
+    Version = "1.1.0"
 )]
 [AlgorithmInfo(
     Name = "OpenCV Hand-Eye Calibration",

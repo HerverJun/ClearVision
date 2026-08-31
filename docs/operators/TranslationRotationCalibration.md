@@ -8,7 +8,7 @@
 | 分类 ID (CategoryId) | `CalibrationAndCoordinates` |
 | 分类 (Category) | 标定与坐标 |
 | 分类顺序 (CategoryOrder) | 8 |
-| 版本 (Version) | `1.1.1` |
+| 版本 (Version) | `1.2.0` |
 | 生命周期 (Lifecycle) | 稳定 `Stable` |
 | 生命周期说明 (Lifecycle Note) | - |
 | 默认隐藏 (Default Hidden) | No |
@@ -41,13 +41,13 @@
 - `Cv2.Determinant`
 - `Cv2.Circle`
 - `Cv2.PutText`
-- `Path.GetDirectoryName`
-- `Directory.CreateDirectory`
-- `File.WriteAllText`
 - `JsonSerializer.Serialize`
 - `JsonDocument.Parse`
 - `Enumerable.Range`
 - `Math.Atan2`
+- `Math.PI`
+- `Math.Max`
+- `Math.Ceiling`
 
 ## 参数说明 / Parameters
 | 参数名 (Name) | 显示名 (DisplayName) | 类型 (Type) | 默认值 (Default) | 范围/选项 (Range/Options) | 必填 (Required) | 说明 (Description) |
@@ -59,7 +59,7 @@
 | `RobustMaxIterations` | Robust Max Iterations | `int` | 256 | [1, 10000] | Yes | - |
 | `RobustMinInlierRatio` | Robust Minimum Inlier Ratio | `double` | 0.5 | [0.1, 1] | Yes | - |
 | `HuberDelta` | Huber Delta | `double` | 0.15 | [1E-12, 1000000000000] | Yes | - |
-| `SavePath` | 保存路径 | `file` | "" | - | No | - |
+| `CalibrationAssetId` | Calibration Asset Id | `string` | "" | - | Yes | - |
 
 ## 输入/输出端口 / Input/Output Ports
 ### 输入 / Inputs
@@ -86,6 +86,9 @@
 | `AllPointMaxCalibrationError` | All-point Max Calibration Error | `Float` | 数值结果，可用于测量、阈值判定、统计或报表输出。 |
 | `InlierIndices` | Inlier Indices | `Any` | 业务输出字段，具体结构以源码输出和运行时结果为准。 |
 | `OutlierIndices` | Outlier Indices | `Any` | 业务输出字段，具体结构以源码输出和运行时结果为准。 |
+| `CalibrationAssetId` | Calibration Asset Id | `String` | 文本结果，可用于显示、日志、保存或外部接口传输。 |
+| `CalibrationAssetCandidate` | Calibration Asset Candidate | `Boolean` | 布尔判定结果，适合连接条件分支、结果判定或通信写入。 |
+| `CalibrationContentHash` | Calibration Content Hash | `String` | 文本结果，可用于显示、日志、保存或外部接口传输。 |
 
 ## 模式与资源契约 / Mode & Resource Contracts
 ### 参数条件 / Parameter Conditions
@@ -110,7 +113,7 @@
 | - | - | - |
 
 ## 生成依赖 / Generation Dependencies
-- 组合指纹 (Generation Fingerprint)：`8EBD8DB80A8D348C4A69C07F8D485FE602276DF21C27BD01DE1DB999F58334A2`
+- 组合指纹 (Generation Fingerprint)：`D39AC819B2036A4CDC205F7C689F18533B4A72B1F0C5CD428A145534E3C91983`
 - 显式共享依赖：无；指纹由最终运行时元数据与算子源码组成。
 
 ### 运行时附加输出 / Runtime Additional Outputs
@@ -122,8 +125,8 @@
 ## 性能特征 / Performance
 | 指标 (Metric) | 值 (Value) |
 |------|------|
-| 时间复杂度 (Time Complexity) | 主要受外部 I/O、网络或设备响应时间影响；本地处理通常随输入规模线性增长。 |
-| 典型耗时 (Typical Latency) | 未固定；取决于文件系统、网络、PLC/串口设备或外部服务响应。 |
+| 时间复杂度 (Time Complexity) | 多数图像路径近似 `O(W*H)`；涉及轮廓、匹配或排序时会叠加候选数量相关开销。 |
+| 典型耗时 (Typical Latency) | 未固定；取决于图像分辨率、ROI 范围、OpenCV 算法分支和输出可视化成本。 |
 | 内存特征 (Memory Profile) | 通常需要输入图像、临时 Mat、结果图和输出封装内存；峰值随图像尺寸和中间副本数量增长。 |
 
 ## 证据与失败契约 / Evidence & Failure Contracts
@@ -133,16 +136,14 @@
 - 执行失败契约：源码中发现 6 条 `OperatorExecutionOutput.Failure(...)` 路径。
 
 ## 适用场景 / Use Cases
-- 适合 (Suitable)：需要把视觉流程与文件、HTTP、数据库、PLC、MQTT 或串口等外部系统连接的场景。
-- 不适合 (Not Suitable)：外部设备、路径、网络或权限不可控，且流程不能容忍 I/O 超时或失败的场景。
+- 适合 (Suitable)：相机、坐标、像素到世界坐标或工装几何关系需要被显式建模和复用的场景。
 - 不适合 (Not Suitable)：图像严重失焦、遮挡、反光、尺度变化过大，且没有前置校正或质量 gate 的场景。
 
 ## 已知限制 / Known Limitations
 1. 参数范围和枚举项来自当前元数据；旧流程若保存了过期参数值，加载后需要重新校验。
 2. 运行时附加输出字段来自源码输出字典，部分字段未声明为可连线端口，下游稳定连线应优先使用输出端口表。
-3. 外部文件、网络、PLC、数据库或消息系统不可用时，算子结果会受环境状态影响。
 
 ## 变更记录 / Changelog
 | 版本 (Version) | 日期 (Date) | 变更内容 (Changes) |
 |------|------|----------|
-| 1.1.1 | 2026-07-16 | 按当前最终运行时元数据、条件契约和显式依赖口径重生成 / Regenerated from effective runtime metadata and declared dependencies |
+| 1.2.0 | 2026-08-31 | 按当前最终运行时元数据、条件契约和显式依赖口径重生成 / Regenerated from effective runtime metadata and declared dependencies |

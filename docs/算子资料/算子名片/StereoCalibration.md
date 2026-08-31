@@ -8,7 +8,7 @@
 | 分类 ID (CategoryId) | `CalibrationAndCoordinates` |
 | 分类 (Category) | 标定与坐标 |
 | 分类顺序 (CategoryOrder) | 8 |
-| 版本 (Version) | `1.0.0` |
+| 版本 (Version) | `1.1.0` |
 | 生命周期 (Lifecycle) | 稳定 `Stable` |
 | 生命周期说明 (Lifecycle Note) | - |
 | 默认隐藏 (Default Hidden) | No |
@@ -58,7 +58,7 @@
 | `Mode` | 模式 | `enum` | SinglePair | SinglePair/单对图像；FolderCalibration/目录标定 | Yes | - |
 | `LeftImageFolder` | 左图像文件夹 | `string` | "" | - | Yes | - |
 | `RightImageFolder` | 右图像文件夹 | `string` | "" | - | Yes | - |
-| `CalibrationOutputPath` | 标定输出路径 | `string` | stereo_calibration_result.json | - | Yes | - |
+| `CalibrationAssetId` | Calibration Asset Id | `string` | "" | - | Yes | - |
 | `MinValidPairs` | 最少有效对数 | `int` | 12 | [3, 100] | Yes | - |
 | `ZeroDisparity` | 零视差 | `bool` | false | - | Yes | - |
 | `Alpha` | Alpha（0=裁剪，1=保留） | `double` | 0 | [-1, 1] | Yes | - |
@@ -79,6 +79,9 @@
 | `LeftMap2` | Left Rectification Map2 | `Any` | 业务输出字段，具体结构以源码输出和运行时结果为准。 |
 | `RightMap1` | Right Rectification Map1 | `Any` | 业务输出字段，具体结构以源码输出和运行时结果为准。 |
 | `RightMap2` | Right Rectification Map2 | `Any` | 业务输出字段，具体结构以源码输出和运行时结果为准。 |
+| `CalibrationAssetId` | Calibration Asset Id | `String` | 文本结果，可用于显示、日志、保存或外部接口传输。 |
+| `CalibrationAssetCandidate` | Calibration Asset Candidate | `Boolean` | 布尔判定结果，适合连接条件分支、结果判定或通信写入。 |
+| `CalibrationContentHash` | Calibration Content Hash | `String` | 文本结果，可用于显示、日志、保存或外部接口传输。 |
 
 ## 模式与资源契约 / Mode & Resource Contracts
 ### 参数条件 / Parameter Conditions
@@ -106,7 +109,7 @@
 | - | - | - |
 
 ## 生成依赖 / Generation Dependencies
-- 组合指纹 (Generation Fingerprint)：`4B95BFC3A92A8F7406A1DA318C63AFD76C25CF27DE8F1FCA3C66031E0FBDA9AE`
+- 组合指纹 (Generation Fingerprint)：`946D7D637D7C3EE331ABE945E026288B1DE07224EB8F650CF2667A1DC59CFB2C`
 - 显式共享依赖：无；指纹由最终运行时元数据与算子源码组成。
 
 ### 运行时附加输出 / Runtime Additional Outputs
@@ -129,7 +132,6 @@
 | `MaxPerViewErrorLeft` | `Float` | 源码输出字典初始化中可见字段。 |
 | `MaxPerViewErrorRight` | `Float` | 源码输出字典初始化中可见字段。 |
 | `Message` | `String` | 源码输出字典初始化中可见字段。 |
-| `OutputPath` | `String` | 源码输出字典初始化中可见字段。 |
 | `ReprojectionErrorLeft` | `Any` | 源码输出字典初始化中可见字段。 |
 | `ReprojectionErrorRight` | `Any` | 源码输出字典初始化中可见字段。 |
 | `ReprojectionErrorStereo` | `Any` | 源码输出字典初始化中可见字段。 |
@@ -168,4 +170,4 @@
 ## 变更记录 / Changelog
 | 版本 (Version) | 日期 (Date) | 变更内容 (Changes) |
 |------|------|----------|
-| 1.0.0 | 2026-07-16 | 按当前最终运行时元数据、条件契约和显式依赖口径重生成 / Regenerated from effective runtime metadata and declared dependencies |
+| 1.1.0 | 2026-08-31 | 按当前最终运行时元数据、条件契约和显式依赖口径重生成 / Regenerated from effective runtime metadata and declared dependencies |

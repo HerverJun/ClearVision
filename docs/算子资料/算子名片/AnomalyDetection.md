@@ -20,7 +20,7 @@
 | FieldValidation | `NotValidated` |
 | Quality Evidence Refs | quality/evals/reports/AnomalyDetection_mvtec_baseline.json<br>quality/evals/reports/operator-precision-after-acceptance.json<br>quality/evals/reports/operator-precision-phase5-comparison.json<br>quality/evals/reports/operator-quality-phase5-evidence.json |
 | Evidence Scope | `DefaultMode` |
-| Evidence Identity | `clearvision-operator-quality-phase5-evidence@1.0.0:0e45168d04633feceb1a6e79a52df2c064ee649680332fec76f6e0269774f68d/anomaly-mode-scoped-public-and-contract-evidence` |
+| Evidence Identity | `clearvision-operator-quality-phase5-evidence@1.0.0:7ed1d600eead23e8185d6fef730b3995bec7db29c7d65a6cc3248a1ca95770cf/anomaly-mode-scoped-public-and-contract-evidence` |
 | Mode Evidence | FeatureExtractor=lab_gradient_stats(default): PublicDatasetEvidence; adopted=True; default=True; Traditional mode has MVTec-lite public-dataset evidence.<br>FeatureExtractor=onnx_embedding: SyntheticBenchmarkEvidence; adopted=True; default=False; Preprocessing/model/feature-bank identity contract is fail-closed; no public-dataset accuracy claim is inherited from traditional mode. |
 | 标签 (Tags) | `AlgorithmQuality:PublicDatasetEvidence`, `Execution:Implemented`, `FieldValidation:NotValidated`, `ProductionReadiness:Experimental`, `anomaly-detection`, `experimental`, `industrial-remediation`, `分类:AiInference`, `分类显示:AI推理`, `生命周期:Experimental`, `算法类型:基于OpenCV` |
 
@@ -168,4 +168,4 @@
 ## 变更记录 / Changelog
 | 版本 (Version) | 日期 (Date) | 变更内容 (Changes) |
 |------|------|----------|
-| 1.2.0 | 2026-07-16 | 按当前最终运行时元数据、条件契约和显式依赖口径重生成 / Regenerated from effective runtime metadata and declared dependencies |
+| 1.2.0 | 2026-08-31 | 按当前最终运行时元数据、条件契约和显式依赖口径重生成 / Regenerated from effective runtime metadata and declared dependencies |

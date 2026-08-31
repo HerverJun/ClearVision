@@ -8,7 +8,7 @@
 | 分类 ID (CategoryId) | `Communication` |
 | 分类 (Category) | 通信 |
 | 分类顺序 (CategoryOrder) | 13 |
-| 版本 (Version) | `1.0.0` |
+| 版本 (Version) | `1.1.0` |
 | 生命周期 (Lifecycle) | 稳定 `Stable` |
 | 生命周期说明 (Lifecycle Note) | - |
 | 默认隐藏 (Default Hidden) | No |
@@ -28,7 +28,7 @@
 ## 实现策略 / Implementation Strategy
 - 输入端口均为可选或该算子不依赖外部输入，执行时会优先读取可用输入并使用参数默认值兜底。
 - 可选输入用于覆盖或补充参数配置：`Data`。
-- 参数解析覆盖 39 个当前元数据字段，默认值、范围和枚举项以参数表为准。
+- 参数解析覆盖 33 个当前元数据字段，默认值、范围和枚举项以参数表为准。
 - `ValidateParameters` 已提供参数合法性检查，部分越界或非法组合会在运行前被拦截。
 - 源码包含异常捕获路径，外部依赖或运行时异常会被转为失败输出或诊断信息。
 - 非图像输出直接以 `Dictionary<string, object>` 返回，字段名称以输出端口和运行时附加输出表为准。
@@ -45,18 +45,12 @@
 | 参数名 (Name) | 显示名 (DisplayName) | 类型 (Type) | 默认值 (Default) | 范围/选项 (Range/Options) | 必填 (Required) | 说明 (Description) |
 |--------|------|------|--------|------|------|------|
 | `ProfileId` | 全局Profile | `string` | "" | - | Yes | - |
-| `UseGlobalProfile` | 使用全局Profile | `bool` | false | - | Yes | - |
-| `Mode` | 模式 | `enum` | Client | Client/客户端；Server/服务器 | Yes | - |
-| `IpAddress` | IP地址 | `string` | 127.0.0.1 | - | Yes | - |
-| `Port` | 端口 | `int` | 8080 | [1, 65535] | Yes | - |
 | `SendData` | 发送数据 | `string` | "" | - | Yes | - |
 | `UseFixedSendData` | 固定发送数据 | `bool` | false | - | Yes | - |
 | `PayloadTemplate` | 报文模板 | `string` | "" | - | Yes | - |
 | `DecodeEscapeSequences` | 解码转义序列 | `bool` | false | - | Yes | 启用后解析发送报文、分隔符和匹配条件中的 \r、\n、\xHH 等转义序列。 |
 | `WaitResponse` | 等待响应 | `bool` | true | - | Yes | - |
 | `ResponseTimeoutMs` | 响应超时(ms) | `int` | 5000 | [100, 600000] | Yes | - |
-| `Timeout` | 超时(ms) | `int` | 5000 | [100, 600000] | Yes | - |
-| `Encoding` | 编码 | `enum` | UTF8 | UTF8/UTF-8；ASCII；GBK；HEX | Yes | - |
 | `FailOnUnresolvedPayloadPlaceholder` | 报文占位符未解析时失败 | `bool` | true | - | Yes | 启用后，请求报文模板中存在未解析占位符时执行失败。 |
 | `FailOnParseError` | 解析错误时失败 | `bool` | false | - | Yes | 启用后，响应解析失败时执行失败。 |
 | `FailOnUnexpectedResponse` | 非预期响应时失败 | `bool` | false | - | Yes | 启用后，响应未满足期望或命中拒绝条件时执行失败。 |
@@ -110,15 +104,11 @@
 ### 参数条件 / Parameter Conditions
 | 参数 (Parameter) | 必填条件 (Required) | 可见条件 (Visible) | 启用/禁用条件 (Enabled/Disabled) | 忽略条件 (Ignored) | 资源 (Resource) | 输入可满足 (Satisfied By Inputs) | 原因码 (Reason) |
 |------|------|------|------|------|------|------|------|
-| `Encoding` | metadata; - | visible: -; hidden: - | enabled: ALL(ProfileId is empty && UseGlobalProfile == false && Mode == Client); disabled: - | - | - | - | `TCP_LEGACY_CLIENT_ENCODING_ONLY_WITHOUT_PROFILE` |
 | `ExpectedResponse` | optional; - | visible: -; hidden: - | enabled: ALL(WaitResponse == true); disabled: - | - | - | - | `TCP_EXPECTED_RESPONSE_ONLY_WHEN_WAITING` |
 | `FailOnMissingResponseFrame` | metadata; - | visible: -; hidden: - | enabled: ALL(WaitResponse == true); disabled: - | - | - | - | `TCP_RESPONSE_FRAME_POLICY_ONLY_WHEN_WAITING` |
 | `FailOnParseError` | metadata; - | visible: -; hidden: - | enabled: ALL(WaitResponse == true); disabled: - | - | - | - | `TCP_PARSE_FAILURE_POLICY_ONLY_WHEN_WAITING` |
 | `FailOnUnexpectedResponse` | metadata; - | visible: -; hidden: - | enabled: ALL(WaitResponse == true); disabled: - | - | - | - | `TCP_RESPONSE_FAILURE_POLICY_ONLY_WHEN_WAITING` |
-| `IpAddress` | metadata; ALL(ProfileId is empty && UseGlobalProfile == false && Mode == Client) | visible: -; hidden: - | enabled: ALL(ProfileId is empty && UseGlobalProfile == false && Mode == Client); disabled: - | - | network_endpoint | - | `TCP_LEGACY_CLIENT_HOST_REQUIRED` |
-| `Mode` | metadata; - | visible: -; hidden: - | enabled: -; disabled: ALL(ProfileId is not empty) | - | - | - | `TCP_MODE_IGNORED_WHEN_PROFILE_CONFIGURED` |
-| `Port` | metadata; ALL(ProfileId is empty && UseGlobalProfile == false && Mode == Client) | visible: -; hidden: - | enabled: ALL(ProfileId is empty && UseGlobalProfile == false && Mode == Client); disabled: - | - | - | - | `TCP_LEGACY_CLIENT_PORT_REQUIRED` |
-| `ProfileId` | optional; ANY(UseGlobalProfile == true \|\| Mode == Server) | visible: -; hidden: - | enabled: -; disabled: - | - | tcp_profile | - | `TCP_PROFILE_REQUIRED_FOR_GLOBAL_OR_SERVER_MODE` |
+| `ProfileId` | required; - | visible: -; hidden: - | enabled: -; disabled: - | - | tcp_profile | - | `TCP_PROFILE_REQUIRED` |
 | `RejectedResponse` | optional; - | visible: -; hidden: - | enabled: ALL(WaitResponse == true); disabled: - | - | - | - | `TCP_REJECTED_RESPONSE_ONLY_WHEN_WAITING` |
 | `RequiredResponseFields` | optional; - | visible: -; hidden: - | enabled: ALL(WaitResponse == true); disabled: - | - | - | - | `TCP_REQUIRED_RESPONSE_FIELDS_ONLY_WHEN_WAITING` |
 | `ResponseDelimiter` | metadata; ALL(WaitResponse == true && ResponseParseMode == Delimited) | visible: -; hidden: - | enabled: ALL(WaitResponse == true && ResponseParseMode == Delimited); disabled: - | - | - | - | `TCP_DELIMITER_ONLY_FOR_DELIMITED_PARSE` |
@@ -140,7 +130,6 @@
 | `ResponseRegexPattern` | metadata; ALL(WaitResponse == true && ResponseParseMode == Regex) | visible: -; hidden: - | enabled: ALL(WaitResponse == true && ResponseParseMode == Regex); disabled: - | - | - | - | `TCP_REGEX_PATTERN_REQUIRED_FOR_REGEX_PARSE` |
 | `ResponseStartMarker` | optional; - | visible: -; hidden: - | enabled: ALL(WaitResponse == true); disabled: - | - | - | - | `TCP_RESPONSE_FRAME_ONLY_WHEN_WAITING` |
 | `ResponseTimeoutMs` | metadata; - | visible: -; hidden: - | enabled: ALL(WaitResponse == true); disabled: - | - | - | - | `TCP_RESPONSE_TIMEOUT_ONLY_WHEN_WAITING` |
-| `Timeout` | metadata; - | visible: -; hidden: - | enabled: ALL(ProfileId is empty && UseGlobalProfile == false && Mode == Client); disabled: - | - | - | - | `TCP_LEGACY_CLIENT_TIMEOUT_ONLY_WITHOUT_PROFILE` |
 | `TrimResponseBeforeParse` | metadata; - | visible: -; hidden: - | enabled: ALL(WaitResponse == true); disabled: - | - | - | - | `TCP_RESPONSE_TRIM_ONLY_WHEN_WAITING` |
 | `UseFixedSendData` | metadata; - | visible: -; hidden: - | enabled: -; disabled: ALL(PayloadTemplate is not empty) | - | - | - | `TCP_PAYLOAD_TEMPLATE_OWNS_PAYLOAD_SELECTION` |
 
@@ -150,12 +139,13 @@
 | - | - | - |
 
 ## 生成依赖 / Generation Dependencies
-- 组合指纹 (Generation Fingerprint)：`EE7310E9731A7EAB3B10E80D16F8D3D80E321D6FD8FEAF6A23E0D688BC3CEF16`
+- 组合指纹 (Generation Fingerprint)：`CE7463C76C444B6CE795423B70363D7F28892193998630221049D89F8217C698`
 - 显式共享依赖：无；指纹由最终运行时元数据与算子源码组成。
 
 ### 运行时附加输出 / Runtime Additional Outputs
 | 名称 (Name) | 推断类型 (Inferred Type) | 说明 (Description) |
 |------|------|------|
+| `Mode` | `String` | 源码输出字典初始化中可见字段。 |
 | `ResponseFrameError` | `Any` | 源码输出字典初始化中可见字段。 |
 | `ResponseFrameFound` | `Any` | 源码输出字典初始化中可见字段。 |
 
@@ -170,7 +160,7 @@
 - 单元/契约测试：已在 `ClearVision.Product/tests/ClearVision.Product.Tests/Operators` 中发现对应测试入口。
 - Golden/回放证据：质量报告中存在通过的 baseline 证据。
 - 参数失败契约：源码包含 `ValidateParameters`，非法参数会被明确拦截或返回错误说明。
-- 执行失败契约：源码中发现 5 条 `OperatorExecutionOutput.Failure(...)` 路径。
+- 执行失败契约：源码中发现 4 条 `OperatorExecutionOutput.Failure(...)` 路径。
 
 ## 适用场景 / Use Cases
 - 适合 (Suitable)：检测结果需要与现场设备、上位系统或网络服务进行读写交互的场景。
@@ -183,4 +173,4 @@
 ## 变更记录 / Changelog
 | 版本 (Version) | 日期 (Date) | 变更内容 (Changes) |
 |------|------|----------|
-| 1.0.0 | 2026-07-14 | 按当前最终运行时元数据、条件契约和显式依赖口径重生成 / Regenerated from effective runtime metadata and declared dependencies |
+| 1.1.0 | 2026-08-31 | 按当前最终运行时元数据、条件契约和显式依赖口径重生成 / Regenerated from effective runtime metadata and declared dependencies |

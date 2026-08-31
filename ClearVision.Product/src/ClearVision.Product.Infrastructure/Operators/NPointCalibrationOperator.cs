@@ -17,7 +17,8 @@ namespace ClearVision.Product.Infrastructure.Operators;
     Description = "基于全部点对鲁棒估计仿射或单应性标定模型。",
     CategoryId = OperatorCategoryId.CalibrationAndCoordinates,
     IconName = "n-point",
-    Keywords = new[] { "n-point", "affine", "homography", "calibration", "ransac" }
+    Keywords = new[] { "n-point", "affine", "homography", "calibration", "ransac" },
+    Version = "1.1.0"
 )]
 [InputPort("Image", "Image", PortDataType.Image, IsRequired = false)]
 [OutputPort("CalibrationData", "Calibration Data", PortDataType.String)]

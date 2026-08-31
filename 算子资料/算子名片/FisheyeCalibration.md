@@ -8,7 +8,7 @@
 | 分类 ID (CategoryId) | `CalibrationAndCoordinates` |
 | 分类 (Category) | 标定与坐标 |
 | 分类顺序 (CategoryOrder) | 8 |
-| 版本 (Version) | `1.0.0` |
+| 版本 (Version) | `1.1.0` |
 | 生命周期 (Lifecycle) | 稳定 `Stable` |
 | 生命周期说明 (Lifecycle Note) | - |
 | 默认隐藏 (Default Hidden) | No |
@@ -44,9 +44,9 @@
 - `Cv2.FindCirclesGrid`
 - `Directory.Exists`
 - `Path.GetFileName`
-- `Path.GetDirectoryName`
-- `Directory.CreateDirectory`
-- `File.WriteAllText`
+- `Directory.GetFiles`
+- `Path.GetExtension`
+- `Math.Max`
 
 ## 参数说明 / Parameters
 | 参数名 (Name) | 显示名 (DisplayName) | 类型 (Type) | 默认值 (Default) | 范围/选项 (Range/Options) | 必填 (Required) | 说明 (Description) |
@@ -57,7 +57,7 @@
 | `SquareSize` | 方格尺寸（mm） | `double` | 25 | [0.1, 1000] | Yes | - |
 | `Mode` | 模式 | `enum` | SingleImage | SingleImage/单图像；FolderCalibration/目录标定 | Yes | - |
 | `ImageFolder` | 图像文件夹 | `string` | "" | - | Yes | - |
-| `CalibrationOutputPath` | 标定输出路径 | `string` | fisheye_calibration_result.json | - | Yes | - |
+| `CalibrationAssetId` | Calibration Asset Id | `string` | "" | - | Yes | - |
 | `RecomputeExtrinsic` | 重新计算外参 | `bool` | true | - | Yes | - |
 | `CheckConditions` | 检查条件 | `bool` | true | - | Yes | - |
 
@@ -72,6 +72,9 @@
 |------|------|------|------|
 | `Image` | Result Image | `Image` | 图像输出，可供后续图像处理、显示或保存节点使用。 |
 | `CalibrationData` | Calibration Data | `String` | 文本结果，可用于显示、日志、保存或外部接口传输。 |
+| `CalibrationAssetId` | Calibration Asset Id | `String` | 文本结果，可用于显示、日志、保存或外部接口传输。 |
+| `CalibrationAssetCandidate` | Calibration Asset Candidate | `Boolean` | 布尔判定结果，适合连接条件分支、结果判定或通信写入。 |
+| `CalibrationContentHash` | Calibration Content Hash | `String` | 文本结果，可用于显示、日志、保存或外部接口传输。 |
 
 ## 模式与资源契约 / Mode & Resource Contracts
 ### 参数条件 / Parameter Conditions
@@ -96,7 +99,7 @@
 | - | - | - |
 
 ## 生成依赖 / Generation Dependencies
-- 组合指纹 (Generation Fingerprint)：`147BA40A3D44704B0CD81A7C7EC27780A68E86C161C5AD682FFF1EDDB9C6BC99`
+- 组合指纹 (Generation Fingerprint)：`80E3091CCD190574B459B8EB72A087FC0B2089C48AA2245DF7A72A1F4612061C`
 - 显式共享依赖：无；指纹由最终运行时元数据与算子源码组成。
 
 ### 运行时附加输出 / Runtime Additional Outputs
@@ -110,7 +113,6 @@
 | `ImageCount` | `Integer` | 源码通过输出字典索引赋值写入。 |
 | `MaxReprojectionError` | `Float` | 源码通过输出字典索引赋值写入。 |
 | `Message` | `String` | 源码通过输出字典索引赋值写入。 |
-| `OutputPath` | `String` | 源码通过输出字典索引赋值写入。 |
 | `TotalImages` | `Image` | 源码通过输出字典索引赋值写入。 |
 | `Width` | `Integer` | 由图像输出封装自动附加，表示输出图像宽度。 |
 
@@ -141,4 +143,4 @@
 ## 变更记录 / Changelog
 | 版本 (Version) | 日期 (Date) | 变更内容 (Changes) |
 |------|------|----------|
-| 1.0.0 | 2026-07-16 | 按当前最终运行时元数据、条件契约和显式依赖口径重生成 / Regenerated from effective runtime metadata and declared dependencies |
+| 1.1.0 | 2026-08-31 | 按当前最终运行时元数据、条件契约和显式依赖口径重生成 / Regenerated from effective runtime metadata and declared dependencies |

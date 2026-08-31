@@ -8,7 +8,7 @@
 | 分类 ID (CategoryId) | `Communication` |
 | 分类 (Category) | 通信 |
 | 分类顺序 (CategoryOrder) | 13 |
-| 版本 (Version) | `1.0.1` |
+| 版本 (Version) | `1.1.0` |
 | 生命周期 (Lifecycle) | 稳定 `Stable` |
 | 生命周期说明 (Lifecycle Note) | - |
 | 默认隐藏 (Default Hidden) | No |
@@ -28,7 +28,7 @@
 ## 实现策略 / Implementation Strategy
 - 输入端口均为可选或该算子不依赖外部输入，执行时会优先读取可用输入并使用参数默认值兜底。
 - 可选输入用于覆盖或补充参数配置：`Data`。
-- 参数解析覆盖 9 个当前元数据字段，默认值、范围和枚举项以参数表为准。
+- 参数解析覆盖 10 个当前元数据字段，默认值、范围和枚举项以参数表为准。
 - `ValidateParameters` 已提供参数合法性检查，部分越界或非法组合会在运行前被拦截。
 - 源码包含异常捕获路径，外部依赖或运行时异常会被转为失败输出或诊断信息。
 - 非图像输出直接以 `Dictionary<string, object>` 返回，字段名称以输出端口和运行时附加输出表为准。
@@ -45,6 +45,7 @@
 ## 参数说明 / Parameters
 | 参数名 (Name) | 显示名 (DisplayName) | 类型 (Type) | 默认值 (Default) | 范围/选项 (Range/Options) | 必填 (Required) | 说明 (Description) |
 |--------|------|------|--------|------|------|------|
+| `ProfileId` | 串口Profile | `string` | "" | - | Yes | - |
 | `PortName` | 串口号 | `string` | COM1 | - | Yes | - |
 | `BaudRate` | 波特率 | `enum` | 9600 | 9600；19200；38400；57600；115200 | Yes | - |
 | `DataBits` | 数据位 | `int` | 8 | [5, 8] | Yes | - |
@@ -78,7 +79,7 @@
 | - | - | - |
 
 ## 生成依赖 / Generation Dependencies
-- 组合指纹 (Generation Fingerprint)：`4668B4BC3F2C0495536B6F15E0FF6E3BF682B3F92C0E874E7B6315E714A3AD3D`
+- 组合指纹 (Generation Fingerprint)：`ADCC4C619D1E31EDEE1B5069B2E5D09F6E4249C34FB10AC0EE94DFCE2737B896`
 - 显式共享依赖：无；指纹由最终运行时元数据与算子源码组成。
 
 ### 运行时附加输出 / Runtime Additional Outputs
@@ -99,7 +100,7 @@
 - 单元/契约测试：已在 `ClearVision.Product/tests/ClearVision.Product.Tests/Operators` 中发现对应测试入口。
 - Golden/回放证据：质量报告中存在通过的 baseline 证据。
 - 参数失败契约：源码包含 `ValidateParameters`，非法参数会被明确拦截或返回错误说明。
-- 执行失败契约：源码中发现 9 条 `OperatorExecutionOutput.Failure(...)` 路径。
+- 执行失败契约：源码中发现 10 条 `OperatorExecutionOutput.Failure(...)` 路径。
 
 ## 适用场景 / Use Cases
 - 适合 (Suitable)：需要把视觉流程与文件、HTTP、数据库、PLC、MQTT 或串口等外部系统连接的场景。
@@ -113,4 +114,4 @@
 ## 变更记录 / Changelog
 | 版本 (Version) | 日期 (Date) | 变更内容 (Changes) |
 |------|------|----------|
-| 1.0.1 | 2026-08-29 | 按当前最终运行时元数据、条件契约和显式依赖口径重生成 / Regenerated from effective runtime metadata and declared dependencies |
+| 1.1.0 | 2026-08-31 | 按当前最终运行时元数据、条件契约和显式依赖口径重生成 / Regenerated from effective runtime metadata and declared dependencies |

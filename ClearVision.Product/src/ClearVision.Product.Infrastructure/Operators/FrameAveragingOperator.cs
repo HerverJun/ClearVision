@@ -17,7 +17,8 @@ namespace ClearVision.Product.Infrastructure.Operators;
     Description = "对多帧输入取平均以降低时域噪声。",
     CategoryId = OperatorCategoryId.ImagePreprocessing,
     IconName = "frame-average",
-    Keywords = new[] { "frame", "averaging", "multi-frame", "denoise" }
+    Keywords = new[] { "frame", "averaging", "multi-frame", "denoise" },
+    Version = "1.0.1"
 )]
 [InputPort("Image", "Image", PortDataType.Image, IsRequired = true)]
 [OutputPort("Image", "Image", PortDataType.Image)]

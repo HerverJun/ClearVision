@@ -43,7 +43,8 @@ internal interface IModbusConnectionResource : IDisposable
     Description = "通过 Modbus TCP 读写线圈和保持寄存器；当前算子不执行 Modbus RTU 通信。",
     CategoryId = OperatorCategoryId.Communication,
     IconName = "modbus",
-    Keywords = new[] { "Modbus", "PLC", "Communication", "Register", "RTU", "TCP", "Industrial", "Modbus通信", "Modbus Communication" }
+    Keywords = new[] { "Modbus", "PLC", "Communication", "Register", "RTU", "TCP", "Industrial", "Modbus通信", "Modbus Communication" },
+    Version = "1.1.0"
 )]
 [OperatorParameterRule("ProfileId", RequiredPolicy = OperatorParameterRequiredPolicy.Required, ResourceKind = OperatorResourceKind.PlcProfile, ReasonCode = "MODBUS_PLC_PROFILE_REQUIRED")]
 [OperatorParameterRule("RegisterAddress", RequiredPolicy = OperatorParameterRequiredPolicy.Required, ResourceKind = OperatorResourceKind.PlcAddress, ReasonCode = "MODBUS_REGISTER_ADDRESS_REQUIRED")]

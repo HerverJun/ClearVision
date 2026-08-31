@@ -23,7 +23,8 @@ namespace ClearVision.Product.Infrastructure.Operators;
     Description = "从文件或相机采集图像",
     CategoryId = OperatorCategoryId.Acquisition,
     IconName = "camera",
-    Keywords = new[] { "采集", "相机", "拍照", "取图", "摄像头", "图像输入", "Acquire", "Camera", "Capture" }
+    Keywords = new[] { "采集", "相机", "拍照", "取图", "摄像头", "图像输入", "Acquire", "Camera", "Capture" },
+    Version = "1.0.1"
 )]
 [OperatorParameterRule("SourceType", RequiredPolicy = OperatorParameterRequiredPolicy.Required, ReasonCode = "IMAGE_SOURCE_TYPE_REQUIRED")]
 [OperatorParameterRule("FilePath", RequiredPolicy = OperatorParameterRequiredPolicy.Optional,
