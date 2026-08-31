@@ -193,37 +193,41 @@ Wave 2A 关闭 Project authority/create，Wave 2B 关闭 AppConfig mutation/appl
 
 ### U10 执行来源、资源 capability、状态隔离与取消
 
-优先级：P0 安全/副作用。状态：`OPEN_RESCOPED`。Owner：Runtime/执行安全。
+优先级：P0 安全/副作用。状态：`CLOSED`。Owner：Runtime/执行安全。
 
-- [ ] 建立 ExecutionAuthorityMatrix，输入至少包含 `ExecutionSnapshot.Source`、`RunMode`、principal capabilities 和 `ResourceBindings`：Operator 只能运行 authoritative StoredProject/RuntimePackage；Engineer/Admin 的 Draft 正式执行必须绑定有效项目、expected revision、显式 capability manifest、审计与确认；Preview/Debug 可读取经批准且有界的输入文件并写隔离 session state，但不得执行外部写入、设备写入或网络副作用。
-- [ ] 正式 StoredProject/RuntimePackage 保留声明的真实 MES/PLC/相机/文件/网络 I/O；禁止的是未授权 Draft 借正式入口提升能力。以 operator resource metadata 生成唯一 manifest，通过 broker 解析批准资源：文件须做 canonical full-path、批准根和 Windows reparse point/symlink 检查；HTTP 校验 destination；DB/PLC/TCP 使用 profile；标定输出使用 project calibration asset。
-- [ ] 将 `CV-AUDIT-048-053` 作为 Draft capability escalation 回归矩阵；删除“不存在/已删除 project 可绕过”的已修复子复现。HTTP broker 校验 scheme/host/port/CIDR、DNS 与每次 redirect，限制响应大小。
-- [ ] 先检查公开文档、外部兼容调用和实际部署，再决定 `/autotune/operator`、`/autotune/flow-node`：确认无消费者后删除；否则 feature-gate，并在 service boundary 限制迭代、deadline、并发 quota、取消和副作用能力。
-- [ ] Statistics/Timer/Frame/Trigger 等状态使用 project/session/flow/run/operator 复合作用域；保留 GenerateFlow compare-and-remove 和客户端断开传播回归。
-- [ ] 取消后不再启动新副作用；目标协议支持时使用 idempotency key，否则持久记录 dispatch attempt/correlation/outcome；无法确认时标 `indeterminate` 并支持对账，不承诺虚假回滚。
-- [ ] 完成 user-facing execution surface matrix：正式/实时/node preview 已接 admission 的事实回填；补 Station package-load、operator preview/single-op 参数 validation。architecture guard 禁止 user-facing/external surface 绕过 admission；受控内部 coordinator 必须携带已准入 snapshot/capability context，而非一刀切禁止 raw engine 内部使用。
+- [x] 所有执行入口先构造不可变 admission snapshot，绑定 Source、RunMode、principal、Project/Package revision、flow hash、capability manifest 和 ResourceBindings；Operator 只接受 authoritative StoredProject/RuntimePackage。Draft 必须具备有效 project、expected revision、显式 capability、确认及审计，missing/deleted/stale/forged 一律 fail closed。
+- [x] Preview/Debug 只接收有界输入并使用隔离 state；文件、网络、数据库和设备副作用均在 dispatch 前拒绝。正式 StoredProject/RuntimePackage 保留其已声明且经服务端解析的工业 I/O，不以全面禁用副作用换取通过。
+- [x] Resource authority 在服务端 canonicalize 并绑定：文件受批准根、traversal/reparse-point/symlink 检查；HTTP 每次 DNS/redirect 校验 scheme/host/port/CIDR 与响应上限；DB、PLC、TCP、串口、相机仅能引用 profile/binding；标定写入 project calibration asset。Admin 身份不接收客户端 raw path、URL、connection string、CameraId 或 PLC/TCP/串口目标。
+- [x] `CV-AUDIT-048-053` 的 Draft capability-escalation、路径/reparse、HTTP redirect/DNS、raw device target 及拒绝路径零 filesystem/network/database/device handler 调用均纳入 deterministic fake/barrier 验收。
+- [x] 核实后删除无正式消费者的 `/autotune/operator` 与 `/autotune/flow-node`；保留的 scenario/flow-node preview 均经过 capability/admission gate，具有硬 iteration、deadline、per-principal/global concurrency quota、RequestAborted，并服从 Draft 无副作用规则。
+- [x] Statistics、Timer、Frame、Trigger state 使用 project/session/flow/run/operator 复合作用域，Draft 不能复用正式 operatorId 污染状态。GenerateFlow 改为 owner+session+request 精确 compare-and-remove，删除 latest/session fallback；错误或缺失 ID 不取消其它任务。
+- [x] dispatch journal 保证取消前未 dispatch 的副作用为零；已 dispatch 但结果未知时持久 correlation/outcome=`indeterminate`，不宣称回滚。正式、实时、Station package-load、node preview、single-op preview 与 AutoTune 均在副作用前完成 validation，architecture guard 阻止新外部入口绕过 admission。
+
+Wave 2D 已独立关闭 `CV-AUDIT-032/048/049/050/051/052/053/055/056/065/072/102`；每个 ID 保留独立负向、并发和零 dispatch acceptance，最终 implementation/integration evidence SHA 见 7.10。
 
 ### U11 长进程资源、缓存、连接池与保留策略
 
-优先级：P1；replay 阻断正式结果为 P0。状态：`OPEN_RESCOPED`。Owner：Runtime/Station/资源治理。
+优先级：P1；replay 阻断正式结果为 P0。状态：`OPEN_RESCOPED`，仅余 `066/067/068/086-P1/087/090/093`。Owner：Runtime/Station/资源治理。
 
 | ID | 精确剩余动作与验收 |
 | --- | --- |
-| 057 | 仅 DeepLearning/SemanticSegmentation session 增内容 hash 与 lease-safe replacement；同路径同长度换内容后新租约用新 session，旧租约释放后 dispose。OnnxPatch 已完成的模式不重做。 |
-| 058 | 用 bounded striped lock 或引用计数 keyed lock 替换永久 `FileLocks`；10k 唯一路径后回基线/受硬上限，同路径仍串行。 |
-| 059 | 失败探测和 Close 后竞态安全回收 per-camera lock；inline CameraId 授权归 U10。 |
-| 060 | 只为 abandoned preview session 增 heartbeat/TTL；direct acquire 已有 idle 机制，不重做。用虚拟时钟验证失联回收。 |
-| 063 | PLC pool 增容量、idle eviction、断线移除、lease-safe dispose 和可观察计数；目标授权归 U10。 |
+| 057 | [x] DeepLearning/SemanticSegmentation session key 增 canonical path + content hash；同路径同长度替换后新 lease 用新 session，旧 lease 释放后才 dispose。OnnxPatch 已完成子范围只回归。 |
+| 058 | [x] 永久 `FileLocks` 已替换为 bounded striped lock；10k 唯一路径后回到基线/硬上限内，同一路径写入仍严格串行。 |
+| 059 | [x] CameraId 先经 U10 binding authority；失败探测、Close、重复打开和并发 lease 后均安全回收 per-camera lock，不 double-open、不 dispose 使用中的 camera。 |
+| 060 | [x] 仅 abandoned preview 使用 owner/session heartbeat+TTL 与虚拟时钟回收；活跃 preview 不误回收，direct acquisition 既有 idle 机制只回归。 |
+| 063 | [x] PLC pool 已有 capacity、idle eviction、断线移除、lease-safe dispose 与可观察计数；目标仅来自 U10 profile，逐出不关闭仍有 lease 的连接。 |
 | 066 | `_runs` 改为 bounded hot cache，逐出终态时 dispose CTS 但保留持久 replay；stream token 清过期并设硬容量，验证逐出后可恢复。 |
 | 067 | 一次 cleanup 一致裁剪持久 store 与 sessions/events/reports 全部内存索引；同进程查询被裁剪 ID 必须不存在。 |
 | 068 | ResultOutput 的合法正式输出和 Draft 路径都受 bytes/days/count quota、清理与 health 约束；不得只阻断未授权 Draft 而放任正式流程在临时目录长期单调累积。 |
-| 071 | 不改变桌面进程期会话策略；增加每用户/全局容量、最旧 token 淘汰和密码/权限/安全事件撤销。 |
-| 081 | 上传图与正式结果图使用独立 namespace/budget；上传压力不得驱逐结果图。读取授权归 U08。 |
+| 071 | [x] 保持桌面进程期 session 策略；增加 opportunistic expiry cleanup、每用户/全局硬容量、最旧 token 淘汰，以及密码、权限与安全事件撤销相关 token；不记录 token 原文。 |
+| 081 | [x] 上传图与正式 InspectionResult 图片使用独立 namespace/预算，上传压力不能淘汰正式结果图；Project+Result metadata 与 U08 读取授权保持不变，未恢复旧 `/api/images/{guid}` authority。 |
 | 084 | [x] Wave 2B：绑定删除/换 SerialNumber 先检查活动 preview/acquisition，persist 后停止 idle stream 并 close/dispose 不再引用的 provider；共享 SerialNumber 不误关，apply/rollback/fence 归同一 AppConfig authority。该源 ID 已关闭；U11 其它资源项仍开放。 |
 | 086 | [x] P0：replay recorder/factory 可注入；初始化/写入失败 fail-soft，当前及后续正式结果与事件继续发布，记录 `replaySkipped`、`CONTINUOUS_REPLAY_WRITE_FAILED` 和公开摘要；subscriber 异常逐个隔离并进入日志/计数。[ ] P1：按 bytes/days/tracks trim 并暴露完整 health。状态：`OPEN_RESCOPED / P0_SUBRANGE_CLOSED`。 |
 | 087 | spool JSONL 不嵌大图；spool/deadletter 各有 records/bytes/days 上限、trim/gap/health，行大小与图像大小解耦。 |
 | 090 | command-result spool 独立 records/bytes/days 上限；trim 记录 gap，health 暴露 pending/bytes/oldest/trimmed，覆盖长断网恢复。 |
 | 093 | 实现图片 RetentionDays 与 MinFreeSpaceGb 告警/生产启动保护，或删除/禁用字段和承诺；Runtime Preview cleanup 不能替代。 |
+
+Wave 2D 已关闭 `CV-AUDIT-057/058/059/060/063/071/081`；U11 保持 `OPEN_RESCOPED`，不把 `066/067/068/086-P1/087/090/093` 的独立保留治理一并关闭。
 
 ### U12 端口恢复、发布洁净度、查询和导出边界
 
@@ -261,7 +265,7 @@ Wave 2A 关闭 Project authority/create，Wave 2B 关闭 AppConfig mutation/appl
 优先级：随项。状态：`OPEN_CONFIRMED`。Owner：文档治理。
 
 - [ ] 每个源 ID 建 ledger：disposition、精确剩余动作、acceptance、evidence SHA、Owner、依赖；合并实现不等于合并验收或丢失 ID。
-- [ ] 31 个 `IMPLEMENTED_SYNC_PENDING` 逐项回填实现/测试依据后才标 `CLOSED`；已关闭的 34 个 ID 保留独立证据，余下 37 个开放 ID 按本计划实际关闭，不能按治理线整体勾选。`CV-AUDIT-086` 的 P0 子范围完成不等于整体关闭。
+- [ ] 31 个 `IMPLEMENTED_SYNC_PENDING` 逐项回填实现/测试依据后才标 `CLOSED`；已关闭的 53 个 ID 保留独立证据，余下 18 个开放 ID 按本计划实际关闭，不能按治理线整体勾选。`CV-AUDIT-086` 的 P0 子范围完成不等于整体关闭。
 - [ ] 全面提升 TODO 回填 35 个已实现主题（106 checkbox），10 个窄化主题随 U01-U06 关闭，P2-2 标记由前端架构决定取代；5 个总关闭条件最后验收。
 - [ ] 0407、0418、深度学习文档继续保留为历史快照；Studio2 仅在 G16 当前 release 验收关闭后整批归档 Goal 卡。
 - [ ] U01-U13 与 U14 的逐 ID ledger、源文档回填、关闭核对全部完成后，才关闭 U14、将本文改为 `closed` 并生成归档说明；任一 required release profile 仍外部阻断时不得宣称全项目闭环。
@@ -274,18 +278,17 @@ Wave 2A 关闭 Project authority/create，Wave 2B 关闭 AppConfig mutation/appl
 
 这些 ID 只能在源文档补齐当前事实和证据后转 `CLOSED`。其中 `CV-AUDIT-094` 的关闭依据是全局 Profile/TcpDeviceManager 已实现真实 TCP Server；node-local UX 是派生项，不占用该 ID。
 
-### 5.2 仍开放（37）
+### 5.2 仍开放（18）
 
 | 唯一治理线 | ID |
 | --- | --- |
-| U10 execution authority/state | `CV-AUDIT-032, CV-AUDIT-048, CV-AUDIT-049, CV-AUDIT-050, CV-AUDIT-051, CV-AUDIT-052, CV-AUDIT-053, CV-AUDIT-055, CV-AUDIT-056, CV-AUDIT-065, CV-AUDIT-072, CV-AUDIT-102` |
-| U11 长进程资源/保留 | `CV-AUDIT-057, CV-AUDIT-058, CV-AUDIT-059, CV-AUDIT-060, CV-AUDIT-063, CV-AUDIT-066, CV-AUDIT-067, CV-AUDIT-068, CV-AUDIT-071, CV-AUDIT-081, CV-AUDIT-086, CV-AUDIT-087, CV-AUDIT-090, CV-AUDIT-093` |
+| U11 长进程资源/保留 | `CV-AUDIT-066, CV-AUDIT-067, CV-AUDIT-068, CV-AUDIT-086 (P1), CV-AUDIT-087, CV-AUDIT-090, CV-AUDIT-093` |
 | U12 查询/发布/导出 | `CV-AUDIT-001, CV-AUDIT-003, CV-AUDIT-074, CV-AUDIT-075, CV-AUDIT-076, CV-AUDIT-078, CV-AUDIT-088` |
 | U13 算子契约 | `CV-AUDIT-095, CV-AUDIT-096, CV-AUDIT-097, CV-AUDIT-098` |
 
-部分已关闭子范围不得回退：`057` OnnxPatch cache、`071` 原时间 TTL 诉求、`086` replay fail-soft P0、`102` Studio formal/realtime/node preview admission。剩余动作仍按对应源 ID 独立验收；`021` 已在 Wave 2B 连同 stale RMW/revision 子范围整体关闭。
+部分已关闭子范围不得回退：`057` 的 OnnxPatch cache、`060` direct-acquire idle、`081` U08 读取授权与 `086` replay fail-soft P0。Wave 2D 已关闭 U10 全部 ID 及 U11 的 057/058/059/060/063/071/081；余项仍按对应源 ID 独立验收。
 
-### 5.3 已关闭（34）
+### 5.3 已关闭（53）
 
 | ID | 关闭证据 |
 | --- | --- |
@@ -323,6 +326,25 @@ Wave 2A 关闭 Project authority/create，Wave 2B 关闭 AppConfig mutation/appl
 | `CV-AUDIT-099` | 同上；三 PLC polling allowlist 与 FINS 匹配/超时/取消 focused acceptance 已通过。 |
 | `CV-AUDIT-100` | 同上；S7/FINS 非法 Operation 与 MC 回归均证明零 device I/O。 |
 | `CV-AUDIT-101` | 同上；非法 Serial 枚举/HEX 均证明零 open/zero bytes dispatch。 |
+| `CV-AUDIT-032` | Wave 2D implementation/integration evidence SHA `f06c95212fff33b53297c8a3157cd5b736cda3f6`；无正式消费者的 `/autotune/operator` 与 `/autotune/flow-node` 已删除，保留 AutoTune 均经 admission/capability、硬 iteration/deadline/concurrency 与 RequestAborted，Draft 无外部副作用。 |
+| `CV-AUDIT-048` | Wave 2D evidence SHA 同上；inline/Draft 不能借正式检测读取 raw 本机文件，文件输入仅为 approved-root canonical binding，missing/deleted/stale/forged project fail closed；拒绝路径 filesystem handler 为 0。 |
+| `CV-AUDIT-049` | Wave 2D evidence SHA 同上；Draft/preview 的 TextSave/ImageSave 等写盘副作用在 dispatch 前拒绝，合法正式 StoredProject/RuntimePackage 仍可经资源绑定执行，拒绝路径 filesystem handler 为 0。 |
+| `CV-AUDIT-050` | Wave 2D evidence SHA 同上；HTTP 仅经服务端 broker 和 profile/binding，逐次校验 scheme/host/port/CIDR、DNS 与 redirect，限制响应大小；raw URL/Draft 失败且 network handler 为 0。 |
+| `CV-AUDIT-051` | Wave 2D evidence SHA 同上；标定读取/写入不能接收客户端目录或输出路径，正式写入 project calibration asset，Draft 外部文件副作用 fail closed。 |
+| `CV-AUDIT-052` | Wave 2D evidence SHA 同上；DatabaseWrite 只引用服务端 profile/binding，客户端 connection string、DbType、table/raw parameters 不成为 authority；拒绝路径 database handler 为 0。 |
+| `CV-AUDIT-053` | Wave 2D evidence SHA 同上；PLC/TCP/serial/camera 目标只能由服务端 profile/binding 解析，Admin 也不能提交 raw device target；fake device 矩阵的拒绝路径 dispatch 为 0。 |
+| `CV-AUDIT-055` | Wave 2D evidence SHA 同上；Statistics/Timer state 按 project/session/flow/run/operator 复合作用域隔离，Draft 无法以 formal operatorId 污染正式运行。 |
+| `CV-AUDIT-056` | Wave 2D evidence SHA 同上；FrameAveraging/FrameChangeTrigger 状态按完整 execution scope 隔离，Draft 与正式 flow 的同 operatorId 不共享帧窗口或基线。 |
+| `CV-AUDIT-065` | Wave 2D evidence SHA 同上；TriggerModule 状态按完整 execution scope 隔离，Draft 复用 operatorId 不再改变正式 trigger count/time。 |
+| `CV-AUDIT-072` | Wave 2D evidence SHA 同上；GenerateFlow registry 精确绑定 owner+session+request，并 compare-and-remove；无 ID/错误 ID 不再 latest fallback 取消他人任务，dispatch journal 记录 indeterminate 而不伪称回滚。 |
+| `CV-AUDIT-102` | Wave 2D evidence SHA 同上；正式、实时、Station package-load、node preview、single-op preview 与 AutoTune 均在任意副作用前 validation/admission，architecture guard 阻止新增外部入口绕过 governed boundary。 |
+| `CV-AUDIT-057` | Wave 2D evidence SHA 同上；DeepLearning/SemanticSegmentation cache key 为 canonical path+content hash，热替换后新 lease 使用新 session，旧 lease 归还后才 dispose；OnnxPatch 仅回归。 |
+| `CV-AUDIT-058` | Wave 2D evidence SHA 同上；TextSave 使用 bounded striped lock，10k unique paths 不再单调增长且同路径写入仍串行。 |
+| `CV-AUDIT-059` | Wave 2D evidence SHA 同上；CameraId 先经 binding authority，failed detect/Close/reopen/并发 lease 后 keyed lock 可回收，不 double-open、不提前 dispose。 |
+| `CV-AUDIT-060` | Wave 2D evidence SHA 同上；owner/session-bound preview heartbeat+TTL 用虚拟时钟回收 abandoned preview，active preview 不误回收；direct-acquire idle 仅回归。 |
+| `CV-AUDIT-063` | Wave 2D evidence SHA 同上；PLC pool 有 capacity、idle/断线 eviction、lease-safe dispose 和可观察计数；eviction 不关闭仍被 lease 的 profile connection。 |
+| `CV-AUDIT-071` | Wave 2D evidence SHA 同上；桌面进程期 session 增 opportunistic expiry、per-user/global capacity、最旧 token 淘汰及密码/权限/安全事件撤销，不记录 token 原文。 |
+| `CV-AUDIT-081` | Wave 2D evidence SHA 同上；upload/result image cache namespace 和预算彼此隔离，upload pressure 不驱逐正式 InspectionResult 图；U08 Project+Result read authority 与 legacy GUID 404 未改变。 |
 
 ## 6. 全面提升主题映射
 
@@ -340,8 +362,8 @@ Wave 2A 关闭 Project authority/create，Wave 2B 关闭 AppConfig mutation/appl
 ## 7. 执行顺序与归档门禁
 
 1. **Wave 0：事实与产品决定** — 本轮已完成 U09 模板 authority、U05 owner disposition、U04 SDK policy 及对应 canonical 文档同步；U04/U05/U09 的后续 release/authority 子项不因此整体关闭。
-2. **Wave 1：安全与不可逆副作用** — Wave 1A 已完成 `CV-AUDIT-092/099/100/101` 与 `CV-AUDIT-086` replay fail-soft P0；Wave 1B1 已完成 `CV-AUDIT-011/014/015/018/028/034/091`；Wave 1B2 已完成 `CV-AUDIT-023/024/025`；Wave 1B3 已完成 `CV-AUDIT-036/064/077` 并关闭 U08。U10 Draft capability escalation 未开始。
-3. **Wave 2：一致性与长进程稳定性** — Wave 2A 已关闭 Project authority/create 的 `CV-AUDIT-006/012/089`；Wave 2B 已关闭 AppConfig/相机一致性的 `CV-AUDIT-009/021/029/042/083/084`；Wave 2C 已关闭 Station 双配置、AI persistence、database maintenance 与 workspace CAS 的 `CV-AUDIT-040/041/069/070/079/080/082`，U09 已全部关闭。继续执行 U02、U10、U11 其余项与 U12。
+2. **Wave 1：安全与不可逆副作用** — Wave 1A 已完成 `CV-AUDIT-092/099/100/101` 与 `CV-AUDIT-086` replay fail-soft P0；Wave 1B1 已完成 `CV-AUDIT-011/014/015/018/028/034/091`；Wave 1B2 已完成 `CV-AUDIT-023/024/025`；Wave 1B3 已完成 `CV-AUDIT-036/064/077` 并关闭 U08。U10 Draft capability escalation 当时未开始，已由 Wave 2D 完成。
+3. **Wave 2：一致性与长进程稳定性** — Wave 2A 已关闭 Project authority/create 的 `CV-AUDIT-006/012/089`；Wave 2B 已关闭 AppConfig/相机一致性的 `CV-AUDIT-009/021/029/042/083/084`；Wave 2C 已关闭全部 U09（Station 双配置、AI persistence、database maintenance 与 workspace CAS），不再将 `040/079` 单列为未关项；Wave 2D 已关闭 U10 全部及 U11 的 `057/058/059/060/063/071/081`。继续执行 U02、U11 余项与 U12。
 4. **Wave 3：质量、发布和当前 UI 证据** — U01、U03、U04、U05、U06。
 5. **Wave 4：目标 SKU 外部验收与归档** — U07、U14。
 
@@ -472,5 +494,18 @@ Wave 2A 关闭 Project authority/create，Wave 2B 关闭 AppConfig mutation/appl
 - 完整非视觉 lane：`npx playwright test --project=chromium --workers=1 --grep-invert "visual baseline" --reporter=list` 共 188 项，`166 passed / 21 failed / 1 skipped`，耗时 9.9 分钟；失败精确保持 AI 12、flow-editor-port 1、flow-layout 5、Station high-frequency 1、Quiet Precision 2。相对给定基线无数量或签名变化，不称 full Playwright PASS，也未更新 visual baseline。
 - 静态/残余/清理：changed JS/MJS `node --check` `1/1`；changed PowerShell/JSON 均 0 文件且对应 AST/parse error 为 0；`git diff --check` PASS。production 精确旧 `/api/ai/agent-plan` route/fallback、锁外 model/prompt/flow 整文件 RMW、固定共享 temp、无版本 PlanRun workspace mutation 与吞掉权威 Save/commit 异常扫描均为 0；仅唯一 non-authoritative candidate/completed residue cleanup 允许 best-effort。`.tmp/test_results`、Playwright `test-results`/`playwright-report`、临时 DB/config/secret/recovery 及仓库关联测试进程均已清理。
 - 范围与 disposition：未 push，未执行 visual baseline 更新、clean clone、真实 WebView2/目标机、真实 LLM/PLC/相机或同 SHA GitHub CI；未进入 U10/U11/G16、FrontendV2 或 Wave 3。`CV-AUDIT-040/041/069/070/079/080/082 = CLOSED`；102 个源 ID 重算为 31 个 `IMPLEMENTED_SYNC_PENDING`、37 个仍开放、34 个已关闭，U09=`CLOSED`。U11 与 `CV-AUDIT-086`、U10、G16 状态不变。
+
+### 7.10 Wave 2D Execution Authority + Live Resource Safety 验证证据（2026-08-31）
+
+- 用户给定代码基线为 `4b2af7e4ec7ace45360f9fa71364311916a94e11`；先行独立 U14 doc-only 纠正 SHA 为 `dccc41f257d245ea36f4d5477f16920155cb4f32`。Wave 2D 最终纯 implementation/integration evidence SHA 为 `f06c95212fff33b53297c8a3157cd5b736cda3f6`（`feat: enforce execution authority and live resource safety`）；该实现提交不含 canonical 文档。
+- Execution authority：immutable snapshot 将 Source、RunMode、principal、project/package revision、flow hash、capability manifest 与 ResourceBindings 一次绑定；Operator 只能执行 authoritative StoredProject/RuntimePackage，Draft 对 project/revision/capability/confirmation/audit 逐项 fail closed。正式、实时、Station package-load、node preview、single-op preview、AutoTune 均在任意副作用前完成 validation/admission；Preview/Debug 的有界输入与隔离状态不获得文件、网络、数据库或设备副作用。
+- Resource matrix：文件为 approved root + canonical path + traversal/reparse/symlink 防护；HTTP broker 每次 DNS/redirect 校验 scheme/host/port/CIDR 且限制响应；DB、PLC、TCP、串口、相机只读服务端 profile/binding，标定写 project calibration asset。Admin 不能以角色直接提交 raw path/URL/connection string/CameraId/PLC/TCP/serial target；合法 authoritative industrial I/O 仍保留。
+- State/cancellation：Statistics、Timer、Frame、Trigger 采用 project/session/flow/run/operator 复合作用域；GenerateFlow registry 为 owner+session+request compare-and-remove，删除 latest fallback。取消前 zero dispatch；已 dispatch 结果未知时 FileOperatorDispatchJournal 持久 correlation/outcome=`indeterminate`，不声称回滚。无消费者的 `/autotune/operator`、`/autotune/flow-node` 已删除，保留 AutoTune 面有 capability、iteration、deadline、concurrency 和 RequestAborted gate。
+- Live resource matrix：DeepLearning/SemanticSegmentation 以 canonical path+SHA-256 热替换且 lease-safe；TextSave 使用 bounded striped lock；Camera lock/lease 可回收；preview 仅增加 owner/session heartbeat+TTL；PLC pool 具 capacity、idle/断线 eviction 与 lease-safe dispose；Auth session 具 expiry/capacity/revocation；upload/result image cache namespace/budget 独立。`057` 的 OnnxPatch、`060` direct-acquire idle、`081` U08 读取授权仅做回归，未重做或改 disposition。
+- Deterministic fake/barrier：覆盖 role×source×mode×resource、path/reparse、HTTP redirect/DNS、raw device target、state pollution、cancel race、model hot swap、10k locks、camera lease、preview TTL、PLC eviction、token capacity/revocation 与 image-cache pressure；所有拒绝路径均断言 filesystem/network/database/device handler 调用为 0。只使用 fake broker/device，未访问真实 PLC、相机、数据库或外网。
+- .NET focused：Product `390/390` PASS，Desktop `224/224` PASS。回归为 Phase 4.2 `143/143`、PLC fake-only `135/135`、Desktop endpoints `453/453`；完整 UI unit 为 49 files、`1023/1023` PASS。Chromium 只跑 nonvisual 单 worker targeted subset，`22/22` PASS；保留既有完整 nonvisual 基线 `166 passed / 21 failed / 1 skipped`，未更新视觉 baseline，也不称 full Playwright PASS。
+- Services regression 为 `727 passed / 2 failed / 729 total`，不是 full PASS：`GeneratedCatalogsCardsAndKnowledgeGraph_ShouldMatchRuntimeMetadata` 与 `OperatorIdentitySnapshot_ShouldRemainStable` 均因 calibration asset metadata 已改变而等待 U14 源文档同步。相较此前 `596/1/597` 的既有 Engineer capability 期望差异，测试人口与失败集合均已变化，故只如实记录差异，不将其包装为同签名 PASS。
+- 静态 residual 为 0：governed boundary 外 raw flow-engine、governed adapter 外 authority scope、latest/session cancel fallback、永久 FileLocks、不可回收 camera locks、operatorId-only state dictionary、共享 upload/result eviction 均为 0；PLC capacity/eviction 与 Auth per-user/global capacity 均有 production markers。
+- 范围与 disposition：未 push；未进入 U12/U13/G16、Wave 3、visual baseline、clean clone 或外部设备验证。`CV-AUDIT-032/048/049/050/051/052/053/055/056/065/072/102/057/058/059/060/063/071/081 = CLOSED`；账本为 31 个 `IMPLEMENTED_SYNC_PENDING`、18 个 open、53 个 closed，U10=`CLOSED`，U11=`OPEN_RESCOPED`，仅余 `066/067/068/086-P1/087/090/093`。
 
 Wave 可以拆成小提交，但每个源 ID 必须保留独立验收行。只有在 required profiles、最终 Release SHA 和源文档回填全部关闭后，才归档本文及用户指定的七组文档。
