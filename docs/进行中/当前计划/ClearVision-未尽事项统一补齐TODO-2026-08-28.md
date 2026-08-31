@@ -30,6 +30,8 @@ review_input_revision: "78d693fb4"
 > Wave 2C 的 AI model/secret、prompt/flow-version/metrics persistence 与 workspace PlanRun CAS 先行 implementation SHA 为 `7ad57cc2adebbe04dcc735f53d0fdc205ad1cac3`；Station 双配置、database maintenance、AI/PlanRun 补强及最终纯 implementation/integration evidence SHA 为 `431ab324afbe081f50c6738e749b6de9a10436a2`。`CV-AUDIT-040/041/069/070/079/080/082` 已按 generation transaction/recovery、完整串行 RMW、metrics fail-soft health、maintenance rollback/fence、stale/duplicate mutation 与长请求零覆盖矩阵全部关闭；U09 改为 `CLOSED`，U10/U11/G16 未改动。
 >
 > Wave 2D Execution Authority + Live Resource Safety 的实现/集成证据 SHA 为 `f06c95212fff33b53297c8a3157cd5b736cda3f6`；其运行时 operator metadata governance hygiene 已由独立 implementation/artifact SHA `1dc20977b3a5d166b572f087b2c9c1d4dd104d92` 关闭。该提交明确 version-bump 24 个受影响算子、更新 identity snapshot，并通过正式 OperatorDocGenerator、OperatorKnowledgeGraphRunner 和第二次生成 `0 diff`。历史 services `727/2/729` 保留为 Wave 2D 当时的结果；其中两项失败仅属 U14 生成文档同步，不能表述为 Wave 2D implementation 或产品回归失败。
+>
+> Wave 2E Engineering Audit Closure 的最终纯 implementation/integration evidence SHA 为 `dd5c066764b3f2e7b7d73fcc0b379e57dae1d857`（`feat: close wave 2e engineering audit findings`），不含两份 canonical 账本。该 SHA 关闭 U11/U12/U13 的余下 18 个工程 ID；正式 OperatorDocGenerator → OperatorKnowledgeGraphRunner 在实现后再次运行，1,061 个生成资产第二次生成 `0 diff`，identity snapshot 仍为 `EF6426A519C056D0240839C469295DC7FC5FAC02BA65F98EEF75E2E976DFBCF2`。显式版本递增为 Comparator `1.0.0→1.0.1`、DualModalVoting `1.0.0→1.0.1`、ModbusCommunication `1.1.0→1.1.1`、ResultOutput `1.0.1→1.0.2`、TextSave `1.0.1→1.0.2`；生成后复跑无额外 metadata 漂移。完整 Chromium 非视觉 lane 已在该 SHA 实跑，结果与遗留失败签名见 7.11，不能表述为 full Playwright PASS。
 
 ## 1. 状态与证据口径
 
@@ -75,7 +77,7 @@ review_input_revision: "78d693fb4"
 | [全面提升 TODO](./ClearVision-全面提升TODO-2026-05-09.md) | 按 46 个主题：35 个 `IMPLEMENTED_SYNC_PENDING`、10 个 `OPEN_RESCOPED`、P2-2 被本次前端架构决定取代。按 147 个 checkbox：原勾 3、实现待同步 106、实质残项 33、总关闭条件 5。 | U01-U06、U14 |
 | [T01 测试与覆盖率治理总体计划](./测试治理/ClearVision_T01_测试与覆盖率治理总体计划_PROPOSED_AUDITED.md) | G01 阶段证据已归档，G01B-R3/G02 仍需当前 SHA；G03-G06 原方案有重复建设，G07 引用了非当前分支架构，G08 仍应 report-only，G09 按 SKU 外部验收。 | U05-U07 |
 | [Studio2](../Studio2/README.md) | G00-G15 Goal 卡已完成或历史回填，但 G16 不能通过直接打开不具产品 parity 的 `/v2` 关闭；当前 release root 决定改为 legacy root + capability owners。 | U05 |
-| [持续问题排查记录](../待复核/持续问题排查记录-2026-07-06.md) | 102 个源 ID：31 个 `IMPLEMENTED_SYNC_PENDING`、18 个 engineering open、53 个已关闭；Wave 2D 关闭 `032/048/049/050/051/052/053/055/056/065/072/102/057/058/059/060/063/071/081`，其 metadata hygiene 绑定 `1dc20977b3a5d166b572f087b2c9c1d4dd104d92`。U11 仅余 `066/067/068/086-P1/087/090/093`，`CV-AUDIT-086` 保持 `OPEN_RESCOPED / P0_SUBRANGE_CLOSED`。 | U09-U14 |
+| [持续问题排查记录](../待复核/持续问题排查记录-2026-07-06.md) | 102 个源 ID：31 个 `IMPLEMENTED_SYNC_PENDING`、0 个 engineering open、71 个已关闭；Wave 2E SHA `dd5c066764b3f2e7b7d73fcc0b379e57dae1d857` 关闭 `001/003/066/067/068/074/075/076/078/086/087/088/090/093/095/096/097/098`，U11/U12/U13 和 `CV-AUDIT-086` 均为 `CLOSED`。31 个待证据回填项、U14、G16 与发布/外部验证不因此关闭。 | U01-U07、U14 |
 | [0407 Qwen 排查](../未闭环事项/0407-Qwen排查未闭环.md) | #1-#26 已由当前实现、文件移除或等价契约覆盖，原状态未同步。 | U14 回填 |
 | [0418 临时问题记录](../未闭环事项/0418-临时问题记录.md) | 主体实现已落地；工业证据尾项去重并入 U01/U03/U13。 | U01、U03、U13、U14 |
 | [深度学习算子问题](../未闭环事项/深度学习算子问题.md) | 灰度/16-bit、NMS、异步加载和工程化契约已改造；旧 tensor-copy 阻断是死代码误判。真实残项是证据声明、模型身份、交付 profile 性能和现场签核。 | U01、U07、U14 |
@@ -209,7 +211,7 @@ Wave 2D 已独立关闭 `CV-AUDIT-032/048/049/050/051/052/053/055/056/065/072/10
 
 ### U11 长进程资源、缓存、连接池与保留策略
 
-优先级：P1；replay 阻断正式结果为 P0。状态：`OPEN_RESCOPED`，仅余 `066/067/068/086-P1/087/090/093`。Owner：Runtime/Station/资源治理。
+优先级：P1；replay 阻断正式结果为 P0。状态：`CLOSED`（2026-08-31 Wave 2E）。Owner：Runtime/Station/资源治理。证据 SHA：`dd5c066764b3f2e7b7d73fcc0b379e57dae1d857`。
 
 | ID | 精确剩余动作与验收 |
 | --- | --- |
@@ -218,44 +220,44 @@ Wave 2D 已独立关闭 `CV-AUDIT-032/048/049/050/051/052/053/055/056/065/072/10
 | 059 | [x] CameraId 先经 U10 binding authority；失败探测、Close、重复打开和并发 lease 后均安全回收 per-camera lock，不 double-open、不 dispose 使用中的 camera。 |
 | 060 | [x] 仅 abandoned preview 使用 owner/session heartbeat+TTL 与虚拟时钟回收；活跃 preview 不误回收，direct acquisition 既有 idle 机制只回归。 |
 | 063 | [x] PLC pool 已有 capacity、idle eviction、断线移除、lease-safe dispose 与可观察计数；目标仅来自 U10 profile，逐出不关闭仍有 lease 的连接。 |
-| 066 | `_runs` 改为 bounded hot cache，逐出终态时 dispose CTS 但保留持久 replay；stream token 清过期并设硬容量，验证逐出后可恢复。 |
-| 067 | 一次 cleanup 一致裁剪持久 store 与 sessions/events/reports 全部内存索引；同进程查询被裁剪 ID 必须不存在。 |
-| 068 | ResultOutput 的合法正式输出和 Draft 路径都受 bytes/days/count quota、清理与 health 约束；不得只阻断未授权 Draft 而放任正式流程在临时目录长期单调累积。 |
+| 066 | [x] `_runs` 为 bounded hot cache，仅逐出终态并 dispose CTS；durable replay 可恢复。stream token 有 TTL、硬容量和 owner binding，过期/逐出后不越权恢复。 |
+| 067 | [x] 同一 serialized cleanup 同时裁剪 persistent store 与 session/event/report 内存索引；并发 query/write 不会复活已裁剪 ID。 |
+| 068 | [x] 合法正式 ResultOutput 与允许 Draft 输出均经 governed root、records/bytes/days quota、trim 与 health；不再写入客户端可控 raw temp path。 |
 | 071 | [x] 保持桌面进程期 session 策略；增加 opportunistic expiry cleanup、每用户/全局硬容量、最旧 token 淘汰，以及密码、权限与安全事件撤销相关 token；不记录 token 原文。 |
 | 081 | [x] 上传图与正式 InspectionResult 图片使用独立 namespace/预算，上传压力不能淘汰正式结果图；Project+Result metadata 与 U08 读取授权保持不变，未恢复旧 `/api/images/{guid}` authority。 |
 | 084 | [x] Wave 2B：绑定删除/换 SerialNumber 先检查活动 preview/acquisition，persist 后停止 idle stream 并 close/dispose 不再引用的 provider；共享 SerialNumber 不误关，apply/rollback/fence 归同一 AppConfig authority。该源 ID 已关闭；U11 其它资源项仍开放。 |
-| 086 | [x] P0：replay recorder/factory 可注入；初始化/写入失败 fail-soft，当前及后续正式结果与事件继续发布，记录 `replaySkipped`、`CONTINUOUS_REPLAY_WRITE_FAILED` 和公开摘要；subscriber 异常逐个隔离并进入日志/计数。[ ] P1：按 bytes/days/tracks trim 并暴露完整 health。状态：`OPEN_RESCOPED / P0_SUBRANGE_CLOSED`。 |
-| 087 | spool JSONL 不嵌大图；spool/deadletter 各有 records/bytes/days 上限、trim/gap/health，行大小与图像大小解耦。 |
-| 090 | command-result spool 独立 records/bytes/days 上限；trim 记录 gap，health 暴露 pending/bytes/oldest/trimmed，覆盖长断网恢复。 |
-| 093 | 实现图片 RetentionDays 与 MinFreeSpaceGb 告警/生产启动保护，或删除/禁用字段和承诺；Runtime Preview cleanup 不能替代。 |
+| 086 | [x] P0 fail-soft 保持；P1 continuous replay 按 tracks/bytes/days trim，暴露 health/gap，replay 写失败仍不阻断正式结果。 |
+| 087 | [x] spool/deadletter JSONL 仅保存受限 blob/reference，不嵌 OutputImage；各自 records/bytes/days 上限、trim/gap/health，重启恢复无悬空引用。 |
+| 090 | [x] command-result spool 独立 records/bytes/days、trim/gap/health，暴露 pending/bytes/oldest/trimmed；断网恢复稳定且不重复提交。 |
+| 093 | [x] 图片治理兑现 RetentionDays 和 MinFreeSpaceGb：仅 ownership manifest 批准目录可清理，低空间 health warning，生产启动前稳定 fail closed。 |
 
-Wave 2D 已关闭 `CV-AUDIT-057/058/059/060/063/071/081`；U11 保持 `OPEN_RESCOPED`，不把 `066/067/068/086-P1/087/090/093` 的独立保留治理一并关闭。
+Wave 2D 已关闭 `CV-AUDIT-057/058/059/060/063/071/081`；Wave 2E 已以 fake clock、故障注入和隔离目录关闭 `066/067/068/086/087/090/093`，U11=`CLOSED`。
 
 ### U12 端口恢复、发布洁净度、查询和导出边界
 
-优先级：P1。状态：`OPEN_RESCOPED`。Owner：Desktop/数据查询/发布。
+优先级：P1。状态：`CLOSED`（2026-08-31 Wave 2E）。Owner：Desktop/数据查询/发布。证据 SHA：`dd5c066764b3f2e7b7d73fcc0b379e57dae1d857`。
 
 | ID | 精确剩余动作与验收 |
 | --- | --- |
-| 001 | 抽共享 request recovery helper；首次失败后，只要 discovery base 与失败 base 不同就重试一次，包括错误 saved port→默认 5000；覆盖全部 verb 且无重复 retry。 |
-| 003 | 删除三个 `patch_*.ps1`；publish denylist 断言无开发补丁 `.ps1/.bat/.cmd` 资产。 |
-| 074 | 合并 report/statistics/distribution/trend 查询预算；DB 聚合或有界流式处理，禁止无界 materialization，并限制查询次数/响应点数；不强制每个聚合都 SQL 下推。 |
-| 075 | 并入 074 实现但独立验收 `start<=end`、最大跨度/points、DateTime 极值不溢出，复杂度不随 `records × buckets` 增长。 |
-| 076 | Station results/statistics 在 DB 侧 where/order/page/group；设置时间窗和跨度；大数据集下内存/SQL 行数受预算约束。 |
-| 078 | command update 进入 replay 或 initial snapshot；断线期间变化后带 Last-Event-ID 重连，最终状态恢复且不重复/倒退。 |
-| 088 | 共享 CSV sanitizer 识别前导空白/tab/CRLF 后的 `=,+,-,@`；伪 Excel 改名 CSV 或生成真 xlsx；全部可控字段做恶意样本 pure-helper 测试。 |
+| 001 | [x] 共享 request recovery 对 GET/POST/PUT/PATCH/DELETE 在证明 connection-refused、且 discovery base 不同后仅重放一次；保留 body/auth/headers/abort，timeout/响应后不作歧义重试。 |
+| 003 | [x] 删除三个 `patch_*.ps1`；Release publish hygiene denylist 拒绝 patch `.ps1/.bat/.cmd`、Node/node_modules、开发 manifest。 |
+| 074 | [x] report/statistics/distribution/trend 共用 query budget，采用 DB aggregate/有界流，限制 query count、scan rows、time range 和 response points。 |
+| 075 | [x] 独立覆盖 `start<=end`、最大跨度/points、DateTime 极值与线性 bucket 算法，不产生 `records × buckets` 扫描。 |
+| 076 | [x] Station results/statistics 在 DB 侧 where/order/page/group，限制窗口/跨度；大数据集 SQL 行数与内存受 budget 断言。 |
+| 078 | [x] `stationCommandUpdated` 进入 replay/initial snapshot；Last-Event-ID 重连后终态不丢失、不重复、不倒退，保留 U08 安全投影。 |
+| 088 | [x] 共享 pure CSV sanitizer 处理中间空白、tab、CR/LF 后的 `=,+,-,@`；Station 伪 Excel 改为 `.csv`，恶意与正常 Unicode 覆盖通过。 |
 
 ### U13 算子能力声明、结果适配与 fail-closed 参数
 
-优先级：P0 脚本/PLC 写保护，其余 P1。状态：`OPEN_RESCOPED`。Owner：算子平台/Runtime。
+优先级：P0 脚本/PLC 写保护，其余 P1。状态：`CLOSED`（2026-08-31 Wave 2E）。Owner：算子平台/Runtime。证据 SHA：`dd5c066764b3f2e7b7d73fcc0b379e57dae1d857`。
 
 | ID | 精确剩余动作与验收 |
 | --- | --- |
 | 092 | [x] 从 metadata/import/正式生成资产移除 `CSharpScript`，不引入 Roslyn；旧 flow 以 `SCRIPT_LANGUAGE_UNSUPPORTED` 失败；非法 CSharpExpression 返回稳定 failure，不再把源码字符串当成功结果。 |
-| 095 | 从 public metadata 移除/disabled RTU；旧 RTU flow 稳定 unsupported；alias public/internal 分类归 U03。 |
-| 096 | canonical detection adapter 下沉 Core/Application，统一正式、实时、worker 解析 DetectionList/typed/dictionary/JSON；真实 DeepLearning 输出持久化 Defects。 |
-| 097 | 复用 096 adapter；以真实 `DeepLearning.Defects -> DualModalVoting` 连线验收，不用手工 dictionary 替身。 |
-| 098 | Comparator Condition 在 validator/execute 双层 allowlist；未知值 fail-fast，不得成功返回 false。 |
+| 095 | [x] public metadata/UI/import/生成资产仅公开 Modbus TCP；旧 RTU flow 返回稳定 `MODBUS_RTU_UNSUPPORTED`，connection/device I/O 为 0。 |
+| 096 | [x] Core/Application canonical detection adapter 统一正式、实时和 worker 对 DetectionList/typed/dictionary/JSON 的解析；malformed fail closed，真实 DeepLearning Defects 持久化。 |
+| 097 | [x] DualModalVoting 复用同一 adapter；真实 `DeepLearning.Defects -> DualModalVoting` 连线验收通过，未用手工 dictionary 替身。 |
+| 098 | [x] Comparator `Condition` 在 validator 和 execute 使用同一精确 allowlist；未知值在执行前稳定失败，绝不成功返回 false。 |
 | 099 | [x] FINS 实现与 S7/MC 一致的 WaitForValue；三类 PLC 在 validator/direct execute 共用六值精确条件 allowlist，非法值在连接/读取/帧发送前失败。 |
 | 100 | [x] S7/FINS Operation 仅接受精确 `Read|Write`，非法值在连接、write-value 解析或帧发送前失败；MC 既有双层保护由回归矩阵锁定。 |
 | 101 | [x] StopBits/Parity/Encoding/HEX payload 在 validator/execute 双层 fail-fast；非法枚举或 HEX 不打开串口、不发送 bytes。 |
@@ -267,11 +269,11 @@ Wave 2D 已关闭 `CV-AUDIT-057/058/059/060/063/071/081`；U11 保持 `OPEN_RESC
 优先级：随项。状态：`OPEN_CONFIRMED`。Owner：文档治理。
 
 - [ ] 每个源 ID 建 ledger：disposition、精确剩余动作、acceptance、evidence SHA、Owner、依赖；合并实现不等于合并验收或丢失 ID。
-- [ ] 31 个 `IMPLEMENTED_SYNC_PENDING` 逐项回填实现/测试依据后才标 `CLOSED`；已关闭的 53 个 ID 保留独立证据，余下 18 个开放 ID 按本计划实际关闭，不能按治理线整体勾选。`CV-AUDIT-086` 的 P0 子范围完成不等于整体关闭。
+- [ ] 31 个 `IMPLEMENTED_SYNC_PENDING` 逐项回填实现/测试依据后才标 `CLOSED`；当前 71 个 closed ID 均保留独立证据。Wave 2E 的 18 个工程项已按逐 ID acceptance 关闭，不能被误解为 31 个文档待回填项或 U14 已关闭。
 - [x] Wave 2D metadata governance：独立 hygiene SHA `1dc20977b3a5d166b572f087b2c9c1d4dd104d92` 已审查 identity 的旧/新 hash、24 个受影响 operator、显式版本递增、正式 catalog/cards/version history/knowledge graph 和二次确定性生成；这只关闭该 generated-artifact hygiene，不关闭 U03 catalog governance 或 U14 的其余回填。
 - [ ] 全面提升 TODO 回填 35 个已实现主题（106 checkbox），10 个窄化主题随 U01-U06 关闭，P2-2 标记由前端架构决定取代；5 个总关闭条件最后验收。
 - [ ] 0407、0418、深度学习文档继续保留为历史快照；Studio2 仅在 G16 当前 release 验收关闭后整批归档 Goal 卡。
-- [ ] U01-U13 与 U14 的逐 ID ledger、源文档回填、关闭核对全部完成后，才关闭 U14、将本文改为 `closed` 并生成归档说明；任一 required release profile 仍外部阻断时不得宣称全项目闭环。
+- [ ] U01-U07 与 U14 的逐 ID ledger、源文档回填、关闭核对全部完成后，才关闭 U14、将本文改为 `closed` 并生成归档说明；任一 required release profile 仍外部阻断时不得宣称全项目闭环。U11/U12/U13 的 engineering closure 不替代该门禁。
 
 ## 5. 持续问题池 102 项覆盖映射
 
@@ -281,20 +283,34 @@ Wave 2D 已关闭 `CV-AUDIT-057/058/059/060/063/071/081`；U11 保持 `OPEN_RESC
 
 这些 ID 只能在源文档补齐当前事实和证据后转 `CLOSED`。其中 `CV-AUDIT-094` 的关闭依据是全局 Profile/TcpDeviceManager 已实现真实 TCP Server；node-local UX 是派生项，不占用该 ID。
 
-### 5.2 仍开放（18）
+### 5.2 工程开放（0）
 
-| 唯一治理线 | ID |
-| --- | --- |
-| U11 长进程资源/保留 | `CV-AUDIT-066, CV-AUDIT-067, CV-AUDIT-068, CV-AUDIT-086 (P1), CV-AUDIT-087, CV-AUDIT-090, CV-AUDIT-093` |
-| U12 查询/发布/导出 | `CV-AUDIT-001, CV-AUDIT-003, CV-AUDIT-074, CV-AUDIT-075, CV-AUDIT-076, CV-AUDIT-078, CV-AUDIT-088` |
-| U13 算子契约 | `CV-AUDIT-095, CV-AUDIT-096, CV-AUDIT-097, CV-AUDIT-098` |
+无。Wave 2E 已逐项关闭 U11 的 `066/067/068/086/087/090/093`、U12 的 `001/003/074/075/076/078/088` 和 U13 的 `095/096/097/098`。`IMPLEMENTED_SYNC_PENDING`、U14、发布/G16、外部设备和同 SHA CI 是独立的证据/发布门禁，不计为 102 项审计池的 engineering open。
 
-部分已关闭子范围不得回退：`057` 的 OnnxPatch cache、`060` direct-acquire idle、`081` U08 读取授权与 `086` replay fail-soft P0。Wave 2D 已关闭 U10 全部 ID 及 U11 的 057/058/059/060/063/071/081；余项仍按对应源 ID 独立验收。
+部分已关闭子范围不得回退：`057` 的 OnnxPatch cache、`060` direct-acquire idle、`081` U08 读取授权与 `086` replay fail-soft P0；Wave 2E 为 `086` 补齐 P1 retention/health，故其整体也已关闭。
 
-### 5.3 已关闭（53）
+### 5.3 已关闭（71）
 
 | ID | 关闭证据 |
 | --- | --- |
+| `CV-AUDIT-001` | Wave 2E SHA `dd5c066764b3f2e7b7d73fcc0b379e57dae1d857`；共享 request recovery 对全部 HTTP verb 和 saved-port→5000 只在可证明未送达时重放一次；定向 Chromium 端口恢复通过。 |
+| `CV-AUDIT-003` | Wave 2E evidence SHA 同上；三个 patch 脚本已移除，Studio/Station framework-dependent publish 各通过 denylist hygiene（382/230 files），无 Node、node_modules、patch 或开发 manifest。 |
+| `CV-AUDIT-066` | Wave 2E evidence SHA 同上；AgentRun terminal-only bounded hot cache、CTS dispose、durable replay、TTL/capacity/owner-bound stream token 的 fake-clock/recovery 矩阵通过。 |
+| `CV-AUDIT-067` | Wave 2E evidence SHA 同上；serialized Runtime Preview cleanup 对 durable 与 sessions/events/reports 内存索引一致裁剪，race 不复活已删 ID。 |
+| `CV-AUDIT-068` | Wave 2E evidence SHA 同上；ResultOutput governed storage 的 records/bytes/days quota、trim/health 统一覆盖 formal 与允许 Draft。 |
+| `CV-AUDIT-074` | Wave 2E evidence SHA 同上；分析 report/statistics/distribution/trend 共用有界 query budget，拒绝超预算查询。 |
+| `CV-AUDIT-075` | Wave 2E evidence SHA 同上；trend 时间顺序、最大跨度/points 和 DateTime 极值及非乘积复杂度均有独立 acceptance。 |
+| `CV-AUDIT-076` | Wave 2E evidence SHA 同上；Station result/statistics 为 DB-side filter/order/page/group，窗口与读取行数/内存/SQL 次数受预算。 |
+| `CV-AUDIT-078` | Wave 2E evidence SHA 同上；command SSE replay/initial snapshot、Last-Event-ID reconnect 和终态单调性通过。 |
+| `CV-AUDIT-086` | Wave 2E evidence SHA 同上；保留 P0 fail-soft 并完成 replay tracks/bytes/days trim、gap/health 与恢复矩阵。 |
+| `CV-AUDIT-087` | Wave 2E evidence SHA 同上；spool/deadletter blob reference、独立 quota/trim/gap/health 和重启引用一致性通过。 |
+| `CV-AUDIT-088` | Wave 2E evidence SHA 同上；纯 CSV sanitizer 统一保护用户/Station 可控字段，伪 Excel 导出为 CSV；恶意 Unicode acceptance 通过。 |
+| `CV-AUDIT-090` | Wave 2E evidence SHA 同上；command-result spool quota/trim/gap/health、离线恢复有序且无重复提交。 |
+| `CV-AUDIT-093` | Wave 2E evidence SHA 同上；manifest-owned storage cleanup、RetentionDays、MinFreeSpaceGb health warning 与生产启动 fail-closed 通过。 |
+| `CV-AUDIT-095` | Wave 2E evidence SHA 同上；RTU 由 public contract 移除，legacy RTU 为 `MODBUS_RTU_UNSUPPORTED` 且零 I/O。 |
+| `CV-AUDIT-096` | Wave 2E evidence SHA 同上；canonical detection adapter 解析所有正式形态并将真实 DeepLearning defects 持久化。 |
+| `CV-AUDIT-097` | Wave 2E evidence SHA 同上；DualModalVoting 复用 adapter，真实 DeepLearning port connection acceptance 通过。 |
+| `CV-AUDIT-098` | Wave 2E evidence SHA 同上；Comparator 双层 allowlist 使未知 Condition 在执行前稳定失败。 |
 | `CV-AUDIT-006` | Project authority SHA `c4e51619ced47572e5530c303ae1935b1c3a6871`；Wave 2A integration/evidence SHA `57aef33aa3f11db158ca1858a26ceccb31a092ee`；metadata-only flow bytes/metadata 不变、实际 flow diff 的运行态 lease、no-op revision 与 stale CAS focused acceptance 通过。 |
 | `CV-AUDIT-012` | revisioned patch SHA `6892d84c69d6087814bb6f05092312519009d963`；integration/evidence SHA 同上；专用 schema patch、同 revision 竞争最多一成功、404/409/422/200、冲突刷新并保留草稿，以及 metadata/flow 不丢更新矩阵通过。 |
 | `CV-AUDIT-089` | staged create implementation/integration/evidence SHA `57aef33aa3f11db158ca1858a26ceccb31a092ee`；DB/flow body+metadata/manifest/commit marker/rollback interruption fault injection、同名并发、API 失败即时与重启后不可见矩阵通过。 |
@@ -366,7 +382,7 @@ Wave 2D 已关闭 `CV-AUDIT-057/058/059/060/063/071/081`；U11 保持 `OPEN_RESC
 
 1. **Wave 0：事实与产品决定** — 本轮已完成 U09 模板 authority、U05 owner disposition、U04 SDK policy 及对应 canonical 文档同步；U04/U05/U09 的后续 release/authority 子项不因此整体关闭。
 2. **Wave 1：安全与不可逆副作用** — Wave 1A 已完成 `CV-AUDIT-092/099/100/101` 与 `CV-AUDIT-086` replay fail-soft P0；Wave 1B1 已完成 `CV-AUDIT-011/014/015/018/028/034/091`；Wave 1B2 已完成 `CV-AUDIT-023/024/025`；Wave 1B3 已完成 `CV-AUDIT-036/064/077` 并关闭 U08。U10 Draft capability escalation 当时未开始，已由 Wave 2D 完成。
-3. **Wave 2：一致性与长进程稳定性** — Wave 2A 已关闭 Project authority/create 的 `CV-AUDIT-006/012/089`；Wave 2B 已关闭 AppConfig/相机一致性的 `CV-AUDIT-009/021/029/042/083/084`；Wave 2C 已关闭全部 U09（Station 双配置、AI persistence、database maintenance 与 workspace CAS），不再将 `040/079` 单列为未关项；Wave 2D 已关闭 U10 全部及 U11 的 `057/058/059/060/063/071/081`。继续执行 U02、U11 余项与 U12。
+3. **Wave 2：一致性与长进程稳定性** — Wave 2A 已关闭 Project authority/create 的 `CV-AUDIT-006/012/089`；Wave 2B 已关闭 AppConfig/相机一致性的 `CV-AUDIT-009/021/029/042/083/084`；Wave 2C 已关闭全部 U09（Station 双配置、AI persistence、database maintenance 与 workspace CAS），不再将 `040/079` 单列为未关项；Wave 2D 已关闭 U10 全部及 U11 的 `057/058/059/060/063/071/081`；Wave 2E 已关闭余下 U11/U12/U13 的 18 个工程 ID。因此 102 项审计池 engineering open 为 0；继续执行的是 U01-U07/U14 的证据、发布与外部验收门禁。
 4. **Wave 3：质量、发布和当前 UI 证据** — U01、U03、U04、U05、U06。
 5. **Wave 4：目标 SKU 外部验收与归档** — U07、U14。
 
@@ -510,5 +526,31 @@ Wave 2D 已关闭 `CV-AUDIT-057/058/059/060/063/071/081`；U11 保持 `OPEN_RESC
 - Services regression 为 `727 passed / 2 failed / 729 total`，不是 full PASS：`GeneratedCatalogsCardsAndKnowledgeGraph_ShouldMatchRuntimeMetadata` 与 `OperatorIdentitySnapshot_ShouldRemainStable` 均因 calibration asset metadata 已改变而等待 U14 源文档同步。相较此前 `596/1/597` 的既有 Engineer capability 期望差异，测试人口与失败集合均已变化，故只如实记录差异，不将其包装为同签名 PASS。
 - 静态 residual 为 0：governed boundary 外 raw flow-engine、governed adapter 外 authority scope、latest/session cancel fallback、永久 FileLocks、不可回收 camera locks、operatorId-only state dictionary、共享 upload/result eviction 均为 0；PLC capacity/eviction 与 Auth per-user/global capacity 均有 production markers。
 - 范围与 disposition：未 push；未进入 U12/U13/G16、Wave 3、visual baseline、clean clone 或外部设备验证。`CV-AUDIT-032/048/049/050/051/052/053/055/056/065/072/102/057/058/059/060/063/071/081 = CLOSED`；账本为 31 个 `IMPLEMENTED_SYNC_PENDING`、18 个 open、53 个 closed，U10=`CLOSED`，U11=`OPEN_RESCOPED`，仅余 `066/067/068/086-P1/087/090/093`。
+
+### 7.11 Wave 2E Engineering Audit Closure 验证证据（2026-08-31）
+
+- Code baseline：Wave 2D doc-only SHA `426f2c35cf20f188d9e833c0b144effa363fb3fa` 之后的最终纯 implementation/integration evidence SHA 为 `dd5c066764b3f2e7b7d73fcc0b379e57dae1d857`（`feat: close wave 2e engineering audit findings`）。该实现提交包含正式生成资产，但不含本文件或持续问题记录；本节所在的后续 docs-only 提交仅引用该 SHA。
+- Metadata gate：先审查 Wave 2D approved identity 从 `8A40F224C5FC16FE04225B4C0DE457DB4DAFD7DC4F6DD85DC622D40FA1DAE44D` 到 `EF6426A519C056D0240839C469295DC7FC5FAC02BA65F98EEF75E2E976DFBCF2` 的精确 snapshot 差异（24 个 Wave 2D operator version bump），再运行正式 OperatorDocGenerator → OperatorKnowledgeGraphRunner。Wave 2E 的 U13 改动只造成 Comparator、DualModalVoting、ModbusCommunication、ResultOutput、TextSave 五张正式卡的显式 version/fingerprint 更新；post-implementation identity snapshot 仍为后者，未发生未审查的 public contract 漂移。两项 metadata focused `2/2` PASS，1,061 个生成资产连续第二次生成 `0 diff`。
+
+| 域 | 闭合 ID | 稳定契约/故障矩阵 |
+| --- | --- | --- |
+| U11 retention | `066/067/068/086/087/090/093` | AgentRun hot cache/token、Preview serialized cleanup、ResultOutput governed storage、replay/spool/deadletter/command spool quota+gap+health、ownership manifest 及 low-space fail-closed；fake clock、fault injection、restart/concurrency/isolated directory。 |
+| U12 query/export | `001/003/074/075/076/078/088` | 一次可证明未送达的 cross-base retry、publish denylist、analysis/Station DB query budget、trend bounds、command SSE replay/monotonicity、共享 CSV sanitizer。 |
+| U13 contract | `095/096/097/098` | RTU public removal + legacy zero-I/O unsupported、canonical detection adapter、real DeepLearning→DualModalVoting line、Comparator validator/execute shared allowlist。 |
+
+- .NET：Product focused `645/645`、Desktop focused `55/55`、services `735/735`、Phase 4.2 `143/143`、PLC fake-only `135/135`、Desktop endpoints `460/460` 均 PASS；同一 csproj 始终串行。UI unit 为 `1029/1029` PASS；新增 Wave 2E Chromium acceptance `4/4` PASS（idempotent port recovery、analysis budget 400、Station command SSE reconnect/Last-Event-ID/terminal monotonicity、CSV 下载和公式中和）。
+- Publish/静态：Studio framework-dependent publish `382` files、Station `230` files，`Test-ReleasePublishHygiene.ps1` 均 PASS；9 份 RID lock file 以 `win-x64 --locked-mode` 对 Desktop/Station 复验可重现。changed JS/MJS `node --check` `9/9`、PowerShell AST `3/3`、JSON parse 与 `git diff --check` PASS；`.tmp/publish-check/wave2e`、外部 UI logs、TRX、Playwright `test-results`/report 均已清理。
+- 完整 Chromium 非视觉 lane：在 `dd5c0667` 实际执行 `npx playwright test --project=chromium --workers=1 --grep-invert "visual baseline" --reporter=list`，得到 `137 passed / 54 failed / 1 skipped`（192 项，23.1m）。四个新增 Wave 2E 用例均通过；跳过项是 `AI panel uses WebView2 postMessage contract for generation turns`。这是非零失败的真实结果，不更新 visual baseline，也不宣称 full Playwright PASS。
+- 相对历史 `166/21/1`：历史 21 个失败族在此次仍可观察；本次额外观察到 Flow layout 9 项、continuous-run 1 项和 ROI 23 项，共增加 33 个失败条目。它们是完整 lane 的质量/环境债务，不改变已通过的 Wave 2E targeted acceptance 或 18 个工程 ID 的 disposition。
+- Chromium 失败签名（54，逐项）：
+  - AI agent responsive（4）：`Plan pending recommendation records defer without becoming an effective answer`（`locator.check` 30s）；`AI agent workbench default Plan view hides raw semantic trace until diagnostics expand`（clarification question 缺失）；`AI agent Plan to Build exposes visible Apply button and applies through real click path`、`AI agent Apply button keeps dimensions on narrow viewport after Build ready`（`#ai-btn-start-build` 保持 disabled / build-gate validation failed）。
+  - AI build workspace（5）：`resource workspace reuses the existing binding action and updates canonical result data`（resource input 30s 缺失）；`mixed ordinary and resource parameters stay partitioned through confirmation and binding`（resource input count=0）；`Applied remains inside Build and preserves the engineering history`（`build-applied-light-1366` 10777-pixel screenshot diff）；`Build remains reachable without horizontal overflow at 1024x768`、`...at 390x844`（resource input 缺失）。
+  - AI plan clarification（3）：`manual supplement uses explicit_user_text and does not copy the main Composer`；`keyboard path reaches options and keeps the current action unique`；`confirmed clarification collapses into a low-emphasis light summary`。
+  - Flow editor port（1）：`preview workbench prompts to configure the acquisition source (no console errors)`。
+  - Flow layout（14）：`supports global operator search, scoped category search, drag-add, and rail scroll retention`；`adds an operator from flyout and switches inspector and preview workbench`；`resizes the preview workbench wider with a real splitter drag and keeps core controls first-screen`；`shows output image summary and debug image operations in the right workbench`；`routes a real retargeted pointermove through the image stage`；`keeps the pixel probe live across hover, lock, ROI, and preview changes`；`marks old preview stale after parameter edit and clears stale after manual preview`；`prevents duplicate manual preview while loading and exposes cancel state`；`syncs dependency-controlled fields for template matching`；`shows missing camera prerequisite for camera acquisition without CameraId`；`captures one camera frame into the preview workbench and reuses it in the ROI editor at 1920x1080`；`shows blank, no-image and preview-failure states`；`clears current preview state for connection, blank selection and deleted selected node`；`shows layered Chinese diagnostics for missing resources and failed operator metadata`。
+  - High frequency（2）：`continuous run regression: protection guidance is visible before and after continuous run`；`station result filter regression: server-paged filters refresh monitor results`。后者的 fixture 尝试选择过时值 `Ng`，而实际 option value 是既有 `ng`，因此不是 Wave 2E DB budget regression。
+  - Quiet Precision（2）：`initial 1920 desktop layout audit (light)`、`initial 1920 desktop layout audit (dark)`，均为 30s layout audit timeout。
+  - ROI editor（23）：`shows ROI editor for rectangle circle and valid polygon shapes`；`image editing headers remain readable in the narrow inspector`；`drawing a new rectangle updates XYWH and triggers one extra preview`；`dragging and resizing the ROI updates parameters`；`circle ROI move and radius handle update CenterX CenterY and Radius`；`circle ROI blank drag creates a circle from the selection box`；`CircleMeasurement CaliperFitV2 groups parameters and mounts circle search geometry`；`CircleMeasurement circle search center drag commits explicit geometry once`；`PolarUnwrap arc editing updates annulus radii and angle params`；`polygon ROI vertex drag insert delete undo redo updates PolygonPoints only on commit`；`polygon ROI stays editable with empty PolygonPoints and blank drag writes valid points`；`polygon ROI drag clamps at image bounds instead of freezing`；`NPoint draft workbench edits samples while ROI editor stays unmounted`；`pointer movement stays local draft until mouseup commit`；`pointer capture commits once when released outside the ROI canvas`；`unreleased pointer drag is canceled when the preview input image switches`；`...when the preview input image disappears`；`...when switching to another node`；`...when ROI editor is destroyed`；`delayed older preview image cannot replace newer preview during unreleased drag`；`pointer cancel and ROI editor destroy roll back active drafts without commit`；`keyboard nudge undo redo and escape cancel remain local to the ROI draft session`；`manual parameter edits sync overlay and right-button pan does not mutate ROI`。共同失败点为 `waitForRoiEditorReady` 的 `currentImageSource && imageCanvas.image` 在 30s 内未成立。
+- 范围与 disposition：未 push，未执行 visual baseline、clean clone、真实 WebView2/目标机、真实 LLM/PLC/相机/外部数据库或同 SHA GitHub CI。`CV-AUDIT-001/003/066/067/068/074/075/076/078/086/087/088/090/093/095/096/097/098 = CLOSED`；102 项账本为 `31 IMPLEMENTED_SYNC_PENDING / 0 engineering open / 71 closed`，U11=`CLOSED`，U12=`CLOSED`，U13=`CLOSED`，`CV-AUDIT-086=CLOSED`。U14、G16、发布和外部证据仍开放。
 
 Wave 可以拆成小提交，但每个源 ID 必须保留独立验收行。只有在 required profiles、最终 Release SHA 和源文档回填全部关闭后，才归档本文及用户指定的七组文档。
