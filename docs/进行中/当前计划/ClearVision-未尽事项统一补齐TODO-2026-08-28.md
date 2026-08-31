@@ -28,6 +28,8 @@ review_input_revision: "78d693fb4"
 > Wave 2B 的 AppConfig mutation authority、相机 persist/apply/lifecycle 及最终 implementation/integration evidence SHA 为 `5372fd011694b51a6e31fdeb323030efe67f0b3b`。`CV-AUDIT-009/021/029/042/083/084` 已按 degraded/last-good、revision CAS、candidate replace、persist/apply rollback/fence、reset 同步与 provider retirement 故障矩阵关闭；U09 与 U11 仍为 `OPEN_RESCOPED`，Station 双配置、AI persistence、database maintenance、legacy AI plan CAS 及其它资源治理未进入本轮。
 >
 > Wave 2C 的 AI model/secret、prompt/flow-version/metrics persistence 与 workspace PlanRun CAS 先行 implementation SHA 为 `7ad57cc2adebbe04dcc735f53d0fdc205ad1cac3`；Station 双配置、database maintenance、AI/PlanRun 补强及最终纯 implementation/integration evidence SHA 为 `431ab324afbe081f50c6738e749b6de9a10436a2`。`CV-AUDIT-040/041/069/070/079/080/082` 已按 generation transaction/recovery、完整串行 RMW、metrics fail-soft health、maintenance rollback/fence、stale/duplicate mutation 与长请求零覆盖矩阵全部关闭；U09 改为 `CLOSED`，U10/U11/G16 未改动。
+>
+> Wave 2D Execution Authority + Live Resource Safety 的实现/集成证据 SHA 为 `f06c95212fff33b53297c8a3157cd5b736cda3f6`；其运行时 operator metadata governance hygiene 已由独立 implementation/artifact SHA `1dc20977b3a5d166b572f087b2c9c1d4dd104d92` 关闭。该提交明确 version-bump 24 个受影响算子、更新 identity snapshot，并通过正式 OperatorDocGenerator、OperatorKnowledgeGraphRunner 和第二次生成 `0 diff`。历史 services `727/2/729` 保留为 Wave 2D 当时的结果；其中两项失败仅属 U14 生成文档同步，不能表述为 Wave 2D implementation 或产品回归失败。
 
 ## 1. 状态与证据口径
 
@@ -73,7 +75,7 @@ review_input_revision: "78d693fb4"
 | [全面提升 TODO](./ClearVision-全面提升TODO-2026-05-09.md) | 按 46 个主题：35 个 `IMPLEMENTED_SYNC_PENDING`、10 个 `OPEN_RESCOPED`、P2-2 被本次前端架构决定取代。按 147 个 checkbox：原勾 3、实现待同步 106、实质残项 33、总关闭条件 5。 | U01-U06、U14 |
 | [T01 测试与覆盖率治理总体计划](./测试治理/ClearVision_T01_测试与覆盖率治理总体计划_PROPOSED_AUDITED.md) | G01 阶段证据已归档，G01B-R3/G02 仍需当前 SHA；G03-G06 原方案有重复建设，G07 引用了非当前分支架构，G08 仍应 report-only，G09 按 SKU 外部验收。 | U05-U07 |
 | [Studio2](../Studio2/README.md) | G00-G15 Goal 卡已完成或历史回填，但 G16 不能通过直接打开不具产品 parity 的 `/v2` 关闭；当前 release root 决定改为 legacy root + capability owners。 | U05 |
-| [持续问题排查记录](../待复核/持续问题排查记录-2026-07-06.md) | 102 个源 ID：31 个 `IMPLEMENTED_SYNC_PENDING`、37 个仍开放、34 个已关闭；Wave 2C 关闭 `CV-AUDIT-040/041/069/070/079/080/082`，U09 改为 `CLOSED`，U11 状态不变。`CV-AUDIT-086` 保持 `OPEN_RESCOPED / P0_SUBRANGE_CLOSED`。 | U09-U14 |
+| [持续问题排查记录](../待复核/持续问题排查记录-2026-07-06.md) | 102 个源 ID：31 个 `IMPLEMENTED_SYNC_PENDING`、18 个 engineering open、53 个已关闭；Wave 2D 关闭 `032/048/049/050/051/052/053/055/056/065/072/102/057/058/059/060/063/071/081`，其 metadata hygiene 绑定 `1dc20977b3a5d166b572f087b2c9c1d4dd104d92`。U11 仅余 `066/067/068/086-P1/087/090/093`，`CV-AUDIT-086` 保持 `OPEN_RESCOPED / P0_SUBRANGE_CLOSED`。 | U09-U14 |
 | [0407 Qwen 排查](../未闭环事项/0407-Qwen排查未闭环.md) | #1-#26 已由当前实现、文件移除或等价契约覆盖，原状态未同步。 | U14 回填 |
 | [0418 临时问题记录](../未闭环事项/0418-临时问题记录.md) | 主体实现已落地；工业证据尾项去重并入 U01/U03/U13。 | U01、U03、U13、U14 |
 | [深度学习算子问题](../未闭环事项/深度学习算子问题.md) | 灰度/16-bit、NMS、异步加载和工程化契约已改造；旧 tensor-copy 阻断是死代码误判。真实残项是证据声明、模型身份、交付 profile 性能和现场签核。 | U01、U07、U14 |
@@ -266,6 +268,7 @@ Wave 2D 已关闭 `CV-AUDIT-057/058/059/060/063/071/081`；U11 保持 `OPEN_RESC
 
 - [ ] 每个源 ID 建 ledger：disposition、精确剩余动作、acceptance、evidence SHA、Owner、依赖；合并实现不等于合并验收或丢失 ID。
 - [ ] 31 个 `IMPLEMENTED_SYNC_PENDING` 逐项回填实现/测试依据后才标 `CLOSED`；已关闭的 53 个 ID 保留独立证据，余下 18 个开放 ID 按本计划实际关闭，不能按治理线整体勾选。`CV-AUDIT-086` 的 P0 子范围完成不等于整体关闭。
+- [x] Wave 2D metadata governance：独立 hygiene SHA `1dc20977b3a5d166b572f087b2c9c1d4dd104d92` 已审查 identity 的旧/新 hash、24 个受影响 operator、显式版本递增、正式 catalog/cards/version history/knowledge graph 和二次确定性生成；这只关闭该 generated-artifact hygiene，不关闭 U03 catalog governance 或 U14 的其余回填。
 - [ ] 全面提升 TODO 回填 35 个已实现主题（106 checkbox），10 个窄化主题随 U01-U06 关闭，P2-2 标记由前端架构决定取代；5 个总关闭条件最后验收。
 - [ ] 0407、0418、深度学习文档继续保留为历史快照；Studio2 仅在 G16 当前 release 验收关闭后整批归档 Goal 卡。
 - [ ] U01-U13 与 U14 的逐 ID ledger、源文档回填、关闭核对全部完成后，才关闭 U14、将本文改为 `closed` 并生成归档说明；任一 required release profile 仍外部阻断时不得宣称全项目闭环。
