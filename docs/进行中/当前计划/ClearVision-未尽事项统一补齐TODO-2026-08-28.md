@@ -261,7 +261,7 @@ Wave 2A 关闭 Project authority/create，Wave 2B 关闭 AppConfig mutation/appl
 优先级：随项。状态：`OPEN_CONFIRMED`。Owner：文档治理。
 
 - [ ] 每个源 ID 建 ledger：disposition、精确剩余动作、acceptance、evidence SHA、Owner、依赖；合并实现不等于合并验收或丢失 ID。
-- [ ] 31 个 `IMPLEMENTED_SYNC_PENDING` 逐项回填实现/测试依据后才标 `CLOSED`；已关闭的 32 个 ID 保留独立证据，余下 39 个开放 ID 按本计划实际关闭，不能按治理线整体勾选。`CV-AUDIT-086` 的 P0 子范围完成不等于整体关闭。
+- [ ] 31 个 `IMPLEMENTED_SYNC_PENDING` 逐项回填实现/测试依据后才标 `CLOSED`；已关闭的 34 个 ID 保留独立证据，余下 37 个开放 ID 按本计划实际关闭，不能按治理线整体勾选。`CV-AUDIT-086` 的 P0 子范围完成不等于整体关闭。
 - [ ] 全面提升 TODO 回填 35 个已实现主题（106 checkbox），10 个窄化主题随 U01-U06 关闭，P2-2 标记由前端架构决定取代；5 个总关闭条件最后验收。
 - [ ] 0407、0418、深度学习文档继续保留为历史快照；Studio2 仅在 G16 当前 release 验收关闭后整批归档 Goal 卡。
 - [ ] U01-U13 与 U14 的逐 ID ledger、源文档回填、关闭核对全部完成后，才关闭 U14、将本文改为 `closed` 并生成归档说明；任一 required release profile 仍外部阻断时不得宣称全项目闭环。
@@ -341,7 +341,7 @@ Wave 2A 关闭 Project authority/create，Wave 2B 关闭 AppConfig mutation/appl
 
 1. **Wave 0：事实与产品决定** — 本轮已完成 U09 模板 authority、U05 owner disposition、U04 SDK policy 及对应 canonical 文档同步；U04/U05/U09 的后续 release/authority 子项不因此整体关闭。
 2. **Wave 1：安全与不可逆副作用** — Wave 1A 已完成 `CV-AUDIT-092/099/100/101` 与 `CV-AUDIT-086` replay fail-soft P0；Wave 1B1 已完成 `CV-AUDIT-011/014/015/018/028/034/091`；Wave 1B2 已完成 `CV-AUDIT-023/024/025`；Wave 1B3 已完成 `CV-AUDIT-036/064/077` 并关闭 U08。U10 Draft capability escalation 未开始。
-3. **Wave 2：一致性与长进程稳定性** — Wave 2A 已关闭 Project authority/create 的 `CV-AUDIT-006/012/089`；Wave 2B 已关闭 AppConfig/相机一致性的 `CV-AUDIT-009/021/029/042/083/084`；Wave 2C 已关闭 AI persistence/workspace CAS 的 `CV-AUDIT-041/069/070/080/082`。继续执行 U02、U09 的 `040/079`、U11 其余项与 U12。
+3. **Wave 2：一致性与长进程稳定性** — Wave 2A 已关闭 Project authority/create 的 `CV-AUDIT-006/012/089`；Wave 2B 已关闭 AppConfig/相机一致性的 `CV-AUDIT-009/021/029/042/083/084`；Wave 2C 已关闭 Station 双配置、AI persistence、database maintenance 与 workspace CAS 的 `CV-AUDIT-040/041/069/070/079/080/082`，U09 已全部关闭。继续执行 U02、U10、U11 其余项与 U12。
 4. **Wave 3：质量、发布和当前 UI 证据** — U01、U03、U04、U05、U06。
 5. **Wave 4：目标 SKU 外部验收与归档** — U07、U14。
 
