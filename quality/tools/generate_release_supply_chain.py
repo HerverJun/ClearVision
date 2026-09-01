@@ -496,7 +496,14 @@ def write_notices(
 
 
 def validate_no_local_paths(paths: Iterable[Path]) -> None:
-    patterns = [re.compile(r"(?i)[A-Z]:[\\/]+Users[\\/]+"), re.compile(r"(?i)/home/[^/]+/")]
+    # Keep the POSIX username segment deliberately narrow.  A generic
+    # ``/home/[^/]+/`` expression can span JSON fields and misclassify an
+    # authoritative URL such as ``.../Home/Licence?...`` when a later URL
+    # contributes the next slash.
+    patterns = [
+        re.compile(r"(?i)[A-Z]:[\\/]+Users[\\/]+"),
+        re.compile(r"(?i)/home/[A-Z0-9._-]+/"),
+    ]
     for path in paths:
         value = path.read_text(encoding="utf-8-sig", errors="replace")
         if any(pattern.search(value) for pattern in patterns):

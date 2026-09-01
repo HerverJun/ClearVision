@@ -225,6 +225,29 @@ class ReleaseSupplyChainTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "portable ZIP hash"):
             supply.attach_authoritative_provenance(components, provenance, "d" * 64, "b" * 64)
 
+    def test_local_path_validation_does_not_treat_authoritative_home_url_as_path(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            authoritative_url = root / "authoritative-url.json"
+            authoritative_url.write_text(
+                json.dumps(
+                    {
+                        "licenseUrl": "http://www.hsltechnology.cn/Home/Licence?area=HslCommunication",
+                        "projectUrl": "http://www.hsltechnology.cn/",
+                    }
+                ),
+                encoding="utf-8",
+            )
+            supply.validate_no_local_paths([authoritative_url])
+
+            leaked_path = root / "leaked-path.json"
+            leaked_path.write_text(
+                json.dumps({"path": "/home/release-agent/ClearVision/package.zip"}),
+                encoding="utf-8",
+            )
+            with self.assertRaisesRegex(ValueError, "local user path"):
+                supply.validate_no_local_paths([leaked_path])
+
     def test_vulnerability_exception_requires_exact_scope_package_version_and_advisory(self) -> None:
         now = datetime.now(timezone.utc)
         policy = {
