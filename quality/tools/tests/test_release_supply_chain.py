@@ -173,7 +173,7 @@ class ReleaseSupplyChainTests(unittest.TestCase):
             )
             s7 = next(row for row in report["components"] if row["name"] == "S7NetPlus")
             self.assertEqual("NOASSERTION", s7["license"])
-            self.assertEqual("blocked-noassertion", s7["policyDisposition"])
+            self.assertEqual("REVIEW_REQUIRED", s7["policyDisposition"])
             self.assertTrue(all("checksums" not in row for row in sbom["packages"]))
             self.assertEqual("1" * 40, report["evidenceBinding"]["gitSha"])
             self.assertIn("portablePackageSha256", report["evidenceBinding"]["inputChecksums"])
@@ -201,6 +201,29 @@ class ReleaseSupplyChainTests(unittest.TestCase):
             datetime.now(timezone.utc),
         )
         self.assertIn("VULNERABILITY_DATA_STALE", {row["code"] for row in blocks})
+
+    def test_authoritative_provenance_requires_exact_final_artifact_hashes(self) -> None:
+        components = [{"name": "Fixture.Package", "version": "1.0.0", "license": "NOASSERTION"}]
+        provenance = {
+            "finalArtifactBinding": {
+                "portableZipSha256": "a" * 64,
+                "operatorLibraryNupkgSha256": "b" * 64,
+            },
+            "packages": [
+                {
+                    "id": "Fixture.Package",
+                    "version": "1.0.0",
+                    "licenseExpression": "MIT",
+                    "identificationDisposition": "IDENTIFIED",
+                    "licenseEvidence": {"upstreamLicenseFileSha256": "c" * 64},
+                }
+            ],
+        }
+        supply.attach_authoritative_provenance(components, provenance, "a" * 64, "b" * 64)
+        self.assertEqual("MIT", components[0]["license"])
+        self.assertEqual("IDENTIFIED", components[0]["identificationDisposition"])
+        with self.assertRaisesRegex(ValueError, "portable ZIP hash"):
+            supply.attach_authoritative_provenance(components, provenance, "d" * 64, "b" * 64)
 
     def test_vulnerability_exception_requires_exact_scope_package_version_and_advisory(self) -> None:
         now = datetime.now(timezone.utc)

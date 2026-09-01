@@ -14,7 +14,7 @@ from urllib.parse import unquote
 from xml.etree import ElementTree
 
 
-TOOL_VERSION = "generate_release_supply_chain/2026-09-01.wave3c"
+TOOL_VERSION = "generate_release_supply_chain/2026-09-01.wave3d"
 SPDX_VERSION = "SPDX-2.3"
 SPDX_TOKEN = re.compile(r"[A-Za-z0-9][A-Za-z0-9.+-]*")
 
@@ -256,6 +256,44 @@ def attach_license(component: dict[str, Any], nuget_root: Path) -> None:
         component["projectUrl"] = project_url
 
 
+def attach_authoritative_provenance(
+    components: list[dict[str, Any]],
+    provenance: dict[str, Any] | None,
+    portable_sha: str,
+    nupkg_sha: str,
+) -> None:
+    if provenance is None:
+        return
+    binding = provenance.get("finalArtifactBinding", {})
+    if binding.get("portableZipSha256") != portable_sha:
+        raise ValueError("License provenance portable ZIP hash does not match the final artifact.")
+    if binding.get("operatorLibraryNupkgSha256") != nupkg_sha:
+        raise ValueError("License provenance OperatorLibrary nupkg hash does not match the final artifact.")
+    by_key = {
+        (str(row.get("id") or "").lower(), str(row.get("version") or "").lower()): row
+        for row in provenance.get("packages", [])
+    }
+    component_keys = {
+        (str(row["name"]).lower(), str(row["version"]).lower()) for row in components
+    }
+    missing = sorted(key for key in by_key if key not in component_keys)
+    if missing:
+        raise ValueError(f"License provenance contains packages absent from final artifacts: {missing}")
+    for component in components:
+        key = (component["name"].lower(), component["version"].lower())
+        row = by_key.get(key)
+        if row is None:
+            continue
+        component["license"] = str(row.get("licenseExpression") or "NOASSERTION")
+        component["licenseEvidence"] = "authoritative-provenance-chain"
+        component["identificationDisposition"] = row.get("identificationDisposition")
+        component["provenance"] = deepcopy(row)
+        evidence = row.get("licenseEvidence", {})
+        evidence_hash = evidence.get("packageLicenseFileSha256") or evidence.get("upstreamLicenseFileSha256")
+        if evidence_hash:
+            component["licenseTextSha256"] = evidence_hash
+
+
 def license_tokens(expression: str) -> set[str]:
     ignored = {"AND", "OR", "WITH"}
     return {token for token in SPDX_TOKEN.findall(expression) if token.upper() not in ignored}
@@ -304,25 +342,32 @@ def evaluate_policy(
         license_value = str(component.get("license") or "NOASSERTION")
         tokens = {value.upper() for value in license_tokens(license_value)}
         exception = approved_exception(component, policy, now, "license")
-        if exception:
-            component["policyDisposition"] = "approved-exception"
+        identification = str(component.get("identificationDisposition") or "")
+        if identification == "CONFLICTING_EVIDENCE":
+            component["policyDisposition"] = "REVIEW_REQUIRED"
+            blocks.append({"code": "LICENSE_CONFLICTING_EVIDENCE", "component": f"{component['name']}@{component['version']}"})
+        elif exception:
+            component["policyDisposition"] = "POLICY_ALLOWED"
+            component["policyBasis"] = "approved-exception"
             component["exception"] = exception
         elif license_value == "NOASSERTION" or not tokens:
-            component["policyDisposition"] = "blocked-noassertion"
+            component["policyDisposition"] = "REVIEW_REQUIRED"
             blocks.append({"code": "LICENSE_NOASSERTION", "component": f"{component['name']}@{component['version']}"})
         elif tokens & denied:
-            component["policyDisposition"] = "blocked-denied-license"
+            component["policyDisposition"] = "DENIED"
             blocks.append({"code": "LICENSE_DENIED", "component": f"{component['name']}@{component['version']}"})
         elif tokens <= allowed:
-            component["policyDisposition"] = "allowed"
+            component["policyDisposition"] = "POLICY_ALLOWED"
+            component["policyBasis"] = "explicit-policy-allow-list"
         else:
-            component["policyDisposition"] = "blocked-unapproved-license"
+            component["policyDisposition"] = "REVIEW_REQUIRED"
             blocks.append({"code": "LICENSE_UNAPPROVED", "component": f"{component['name']}@{component['version']}"})
 
     status = str(vulnerability.get("status") or "unavailable").lower()
     vulnerability_policy = policy.get("vulnerabilityPolicy", {})
     if status != "available":
-        blocks.append({"code": "VULNERABILITY_SCAN_UNAVAILABLE", "component": "release-candidate"})
+        code = "VULNERABILITY_DATA_STALE" if status == "stale" else "VULNERABILITY_SCAN_UNAVAILABLE"
+        blocks.append({"code": code, "component": "release-candidate"})
     else:
         data_as_of = vulnerability.get("dataAsOfUtc") or vulnerability.get("checkedAtUtc")
         try:
@@ -431,6 +476,8 @@ def write_notices(
                 f"Component: {component['name']}@{component['version']}",
                 f"License: {component['license']}",
                 f"Evidence: {component['licenseEvidence']}",
+                f"Identification disposition: {component.get('identificationDisposition') or 'not-collected'}",
+                f"Policy disposition: {component.get('policyDisposition')}",
                 f"Included by: {', '.join(component['scopes'])}",
             ]
         )
@@ -508,6 +555,7 @@ def main() -> int:
     parser.add_argument("--policy", required=True, type=Path)
     parser.add_argument("--nuget-packages-root", required=True, type=Path)
     parser.add_argument("--vulnerability-report", type=Path)
+    parser.add_argument("--license-provenance", type=Path)
     args = parser.parse_args()
 
     for input_path in (args.portable_zip, args.nupkg, args.identity_input, args.policy):
@@ -533,11 +581,19 @@ def main() -> int:
         }
     )
 
+    portable_sha = sha256(args.portable_zip)
+    nupkg_sha = sha256(args.nupkg)
+    license_provenance = (
+        read_json(args.license_provenance)
+        if args.license_provenance and args.license_provenance.is_file()
+        else None
+    )
     portable_components, portable_files, deps_name = read_portable_dependencies(args.portable_zip)
     nupkg_root, nupkg_dependencies, nupkg_files = read_nupkg(args.nupkg)
     components = merge_components(portable_components, nupkg_dependencies)
     for component in components:
         attach_license(component, args.nuget_packages_root)
+    attach_authoritative_provenance(components, license_provenance, portable_sha, nupkg_sha)
 
     source_identity_schema = source_identity.pop("schemaVersion", None)
     policy_sha = sha256(args.policy)
@@ -547,8 +603,11 @@ def main() -> int:
         if args.vulnerability_report and args.vulnerability_report.is_file()
         else None
     )
-    portable_sha = sha256(args.portable_zip)
-    nupkg_sha = sha256(args.nupkg)
+    license_provenance_sha = (
+        sha256(args.license_provenance)
+        if args.license_provenance and args.license_provenance.is_file()
+        else None
+    )
     identity = {
         "schemaVersion": "clearvision.release-identity/v1",
         "generatedAtUtc": generated_at,
@@ -576,6 +635,7 @@ def main() -> int:
             "policySha256": policy_sha,
             "identityInputSha256": identity_input_sha,
             "vulnerabilityReportSha256": vulnerability_sha,
+            "licenseProvenanceSha256": license_provenance_sha,
         },
     }
 
@@ -640,6 +700,11 @@ def main() -> int:
             "warnings": warnings,
             "releaseEligible": release_eligible,
         },
+        "licenseProvenance": {
+            "fileName": args.license_provenance.name if args.license_provenance else None,
+            "sha256": license_provenance_sha,
+            "provided": license_provenance is not None,
+        },
     }
     validation = {
         "schemaVersion": "clearvision.supply-chain-validation/v1",
@@ -653,7 +718,7 @@ def main() -> int:
         "warnings": warnings,
         "claims": {
             "vulnerabilityCount": (
-                len(vulnerability.get("vulnerabilities", []))
+                vulnerability.get("vulnerabilityCount", len(vulnerability.get("vulnerabilities", [])))
                 if str(vulnerability.get("status")).lower() == "available"
                 else None
             ),
@@ -714,6 +779,8 @@ def main() -> int:
     checksum_inputs = [args.portable_zip, args.nupkg, *generated]
     if args.vulnerability_report and args.vulnerability_report.is_file():
         checksum_inputs.append(args.vulnerability_report)
+    if args.license_provenance and args.license_provenance.is_file():
+        checksum_inputs.append(args.license_provenance)
     checksum_path.write_text(
         "\n".join(
             [

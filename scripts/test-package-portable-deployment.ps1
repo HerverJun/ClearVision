@@ -97,6 +97,8 @@ $canonicalText = Get-Content -LiteralPath $canonical -Raw -Encoding UTF8
 foreach ($required in @(
     "-p:EnableHuaraySdk=false",
     "Normalize-Utf8LineEndings",
+    "collect_license_provenance.py",
+    "collect_vulnerability_provenance.py",
     'vendorCameraSdkPolicy = "not-bundled-site-prerequisite"'
 )) {
     if (-not $canonicalText.Contains($required, [StringComparison]::Ordinal)) {
@@ -109,6 +111,7 @@ foreach ($required in @(
     "-RuntimeIdentifier win-x64",
     '-SourceRevisionId "${{ github.sha }}"',
     "-EnforceReleasePolicy",
+    "-AttemptLicenseProvenance",
     "SBOM.spdx.json",
     "THIRD-PARTY-NOTICES.txt",
     "dependency-report.json",
@@ -213,17 +216,27 @@ if (-not [string]::IsNullOrWhiteSpace($PackageResultPath)) {
     $identity = Get-Content -LiteralPath (Join-Path $supplyRoot "identity-manifest.json") -Raw | ConvertFrom-Json
     $report = Get-Content -LiteralPath (Join-Path $supplyRoot "dependency-report.json") -Raw | ConvertFrom-Json
     $sbom = Get-Content -LiteralPath (Join-Path $supplyRoot "SBOM.spdx.json") -Raw | ConvertFrom-Json
+    $licenseProvenancePath = Join-Path $supplyRoot "license-provenance.json"
+    if (-not (Test-Path -LiteralPath $licenseProvenancePath -PathType Leaf)) {
+        throw "Formal package verification requires license-provenance.json."
+    }
+    $licenseProvenance = Get-Content -LiteralPath $licenseProvenancePath -Raw | ConvertFrom-Json
     if (-not $validation.generationPassed -or -not $validation.artifactConsistencyPassed) {
         throw "Supply-chain validation did not pass structural consistency."
     }
     if ($identity.schemaVersion -ne "clearvision.release-identity/v1") { throw "Release identity schema is incorrect." }
     if ($identity.portablePackage.sha256 -ne $result.portableZip.sha256) { throw "Supply identity ZIP hash mismatch." }
+    if ($licenseProvenance.finalArtifactBinding.portableZipSha256 -ne $result.portableZip.sha256 -or
+        $licenseProvenance.finalArtifactBinding.operatorLibraryNupkgSha256 -ne $result.operatorLibraryPackage.sha256) {
+        throw "License provenance is not bound to the final package bytes."
+    }
     $reportComponents = @($report.components | ForEach-Object { "$($_.name)@$($_.version)" } | Sort-Object)
     $sbomComponents = @($sbom.packages | ForEach-Object { "$($_.name)@$($_.versionInfo)" } | Sort-Object)
     if (($reportComponents -join "`n") -ne ($sbomComponents -join "`n")) { throw "SBOM/report component sets differ." }
     $s7 = @($report.components | Where-Object { $_.name -ieq "S7NetPlus" -and $_.version -eq "0.20.0" })
-    if ($s7.Count -gt 0 -and ($s7[0].license -ne "NOASSERTION" -or $s7[0].policyDisposition -ne "blocked-noassertion")) {
-        throw "S7NetPlus 0.20.0 was silently approved or assigned unsupported license evidence."
+    if ($s7.Count -gt 0 -and ($s7[0].license -ne "MIT" -or $s7[0].policyDisposition -ne "POLICY_ALLOWED" -or
+        $s7[0].identificationDisposition -ne "IDENTIFIED")) {
+        throw "S7NetPlus 0.20.0 is not bound to its versioned MIT provenance and explicit allow-list policy."
     }
 }
 

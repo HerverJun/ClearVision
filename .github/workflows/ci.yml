@@ -1046,6 +1046,7 @@ jobs:
             -NoRestore `
             -RunOperatorSmoke `
             -AttemptVulnerabilityScan `
+            -AttemptLicenseProvenance `
             -EnforceReleasePolicy
 
       - name: Verify Governed Tag Release Bundle
@@ -1101,7 +1102,9 @@ jobs:
             ${{ env.PUBLISH_DIR }}/release/supply-chain/dependency-report.md
             ${{ env.PUBLISH_DIR }}/release/supply-chain/identity-manifest.json
             ${{ env.PUBLISH_DIR }}/release/supply-chain/validation-summary.json
+            ${{ env.PUBLISH_DIR }}/release/supply-chain/license-provenance.json
             ${{ env.PUBLISH_DIR }}/release/supply-chain/vulnerability-scan.json
+            ${{ env.PUBLISH_DIR }}/release/supply-chain/nuget-audit-source.json
             ${{ env.PUBLISH_DIR }}/release/package-result.json
           retention-days: 30
 

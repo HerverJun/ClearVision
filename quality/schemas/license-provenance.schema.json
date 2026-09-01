@@ -1,0 +1,40 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://clearvision.local/schemas/license-provenance.v1.json",
+  "title": "ClearVision release license provenance",
+  "type": "object",
+  "required": ["schemaVersion", "generatedAtUtc", "finalArtifactBinding", "packages"],
+  "properties": {
+    "schemaVersion": { "const": "clearvision.license-provenance/v1" },
+    "generatedAtUtc": { "type": "string", "format": "date-time" },
+    "finalArtifactBinding": {
+      "type": "object",
+      "required": ["portableZipSha256", "operatorLibraryNupkgSha256"],
+      "properties": {
+        "portableZipSha256": { "$ref": "#/$defs/sha256" },
+        "operatorLibraryNupkgSha256": { "$ref": "#/$defs/sha256" }
+      },
+      "additionalProperties": true
+    },
+    "packages": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "version", "packageSha256", "licenseExpression", "identificationDisposition", "authorityChain"],
+        "properties": {
+          "id": { "type": "string", "minLength": 1 },
+          "version": { "type": "string", "minLength": 1 },
+          "packageSha256": { "$ref": "#/$defs/sha256" },
+          "licenseExpression": { "type": "string", "minLength": 1 },
+          "identificationDisposition": { "enum": ["IDENTIFIED", "CONFLICTING_EVIDENCE"] },
+          "authorityChain": { "type": "array", "minItems": 3 }
+        },
+        "additionalProperties": true
+      }
+    }
+  },
+  "$defs": {
+    "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+  },
+  "additionalProperties": true
+}

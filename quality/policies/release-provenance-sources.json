@@ -1,0 +1,55 @@
+{
+  "schemaVersion": "clearvision.release-provenance-sources/v1",
+  "packages": [
+    {
+      "id": "AutoMapper",
+      "version": "15.1.3",
+      "repositoryUrl": "https://github.com/LuckyPennySoftware/AutoMapper",
+      "tag": "v15.1.3",
+      "licensePath": "LICENSE.md",
+      "expectedLicenseExpression": "RPL-1.5 OR LicenseRef-LuckyPenny-Commercial",
+      "versionBindingRequired": true
+    },
+    {
+      "id": "Microsoft.Data.SqlClient.SNI.runtime",
+      "version": "5.2.0",
+      "repositoryUrl": "https://github.com/dotnet/SqlClient",
+      "tag": "V5.2.0",
+      "licensePath": "LICENSE",
+      "expectedLicenseExpression": "LicenseRef-Microsoft-Data-SqlClient-SNI",
+      "versionBindingRequired": true,
+      "packageLicenseTakesPrecedence": true,
+      "note": "The nupkg LICENSE.txt governs the packaged SNI binaries; the repository MIT license is recorded as scoped upstream evidence and does not replace it."
+    },
+    {
+      "id": "BCrypt.Net-Next",
+      "version": "4.0.3",
+      "repositoryUrl": "https://github.com/BcryptNet/bcrypt.net",
+      "tag": "4.0.3",
+      "licensePath": "licence.txt",
+      "expectedLicenseExpression": "MIT",
+      "versionBindingRequired": true
+    },
+    {
+      "id": "HslCommunication",
+      "version": "12.7.0",
+      "repositoryUrl": "https://github.com/dathlin/HslCommunication",
+      "tag": null,
+      "licensePath": null,
+      "authoritativeLicenseUrl": "http://www.hsltechnology.cn/Home/Licence?area=HslCommunication",
+      "expectedLicenseExpression": "LicenseRef-HslCommunication-Commercial",
+      "versionBindingRequired": true,
+      "forceConflictingEvidence": true,
+      "note": "The nupkg has no SPDX expression or license file, identifies a paid plug-in, and warns that commercial use without a contract infringes copyright. The vendor license page describes trial and paid profiles, while the linked GitHub repository is a demo without a 12.7.0 tag."
+    },
+    {
+      "id": "S7netplus",
+      "version": "0.20.0",
+      "repositoryUrl": "https://github.com/S7NetPlus/s7netplus",
+      "tag": "v0.20.0",
+      "licensePath": "License.txt",
+      "expectedLicenseExpression": "MIT",
+      "versionBindingRequired": true
+    }
+  ]
+}

@@ -15,6 +15,7 @@ param(
     [switch]$NoRestore,
     [switch]$RunOperatorSmoke,
     [switch]$AttemptVulnerabilityScan,
+    [switch]$AttemptLicenseProvenance,
     [switch]$SkipOperatorPackage,
     [switch]$SkipSupplyChain,
     [switch]$EnforceReleasePolicy,
@@ -414,35 +415,61 @@ if (-not $SkipOperatorPackage) {
 $validationPath = $null
 if (-not $SkipSupplyChain) {
     if ($null -eq $nupkgPath) { throw "Supply-chain generation requires the final OperatorLibrary nupkg." }
+    $pythonCommand = Get-Command python -ErrorAction SilentlyContinue
+    if ($null -eq $pythonCommand) { throw "Python is required for final-artifact supply-chain generation." }
     $resolvedVulnerabilityReport = $VulnerabilityReportPath
     if ([string]::IsNullOrWhiteSpace($resolvedVulnerabilityReport)) {
         $resolvedVulnerabilityReport = Join-Path $supplyDir "vulnerability-scan.json"
         if ($AttemptVulnerabilityScan) {
-            Invoke-VulnerabilityAudit -DotNetPath $dotnetPath -ProjectPath $projectPath -TargetPath $resolvedVulnerabilityReport
+            $nugetAuditPath = Join-Path $supplyDir "nuget-audit-source.json"
+            Invoke-VulnerabilityAudit -DotNetPath $dotnetPath -ProjectPath $projectPath -TargetPath $nugetAuditPath
+            & $pythonCommand.Source (Join-Path $repoRoot "quality\tools\collect_vulnerability_provenance.py") `
+                --portable-zip $zipPath `
+                --nupkg $nupkgPath `
+                --nuget-audit-json $nugetAuditPath `
+                --maximum-age-hours 24 `
+                --output $resolvedVulnerabilityReport
+            if ($LASTEXITCODE -ne 0) { throw "Vulnerability provenance collection failed with exit code $LASTEXITCODE." }
         } else {
             Write-JsonFile -Path $resolvedVulnerabilityReport -Value ([ordered]@{
-                schemaVersion = "clearvision.vulnerability-scan/v1"
+                schemaVersion = "clearvision.vulnerability-provenance/v1"
                 status = "unavailable"
+                scanStatus = "unavailable"
                 checkedAtUtc = [DateTimeOffset]::UtcNow.ToString("o")
                 dataAsOfUtc = $null
-                source = "NuGet audit advisory sources"
                 reason = "Network vulnerability scan was not requested for this run; this is not a zero-vulnerability result."
+                vulnerabilityCount = $null
+                packageIdentities = @()
+                sources = @()
                 vulnerabilities = @()
             })
         }
     } else {
         $resolvedVulnerabilityReport = Resolve-OutputPath -RepoRoot $repoRoot -Value $resolvedVulnerabilityReport
     }
-    $pythonCommand = Get-Command python -ErrorAction SilentlyContinue
-    if ($null -eq $pythonCommand) { throw "Python is required for final-artifact supply-chain generation." }
-    & $pythonCommand.Source (Join-Path $repoRoot "quality\tools\generate_release_supply_chain.py") `
-        --portable-zip $zipPath `
-        --nupkg $nupkgPath `
-        --output-dir $supplyDir `
-        --identity-input $sourceIdentityPath `
-        --policy (Join-Path $repoRoot "quality\policies\release-supply-chain-policy.json") `
-        --nuget-packages-root (Get-NugetPackagesRoot -RepoRoot $repoRoot) `
-        --vulnerability-report $resolvedVulnerabilityReport
+    $licenseProvenancePath = $null
+    if ($AttemptLicenseProvenance) {
+        $licenseProvenancePath = Join-Path $supplyDir "license-provenance.json"
+        & $pythonCommand.Source (Join-Path $repoRoot "quality\tools\collect_license_provenance.py") `
+            --portable-zip $zipPath `
+            --nupkg $nupkgPath `
+            --nuget-packages-root (Get-NugetPackagesRoot -RepoRoot $repoRoot) `
+            --sources (Join-Path $repoRoot "quality\policies\release-provenance-sources.json") `
+            --output $licenseProvenancePath
+        if ($LASTEXITCODE -ne 0) { throw "License provenance collection failed with exit code $LASTEXITCODE." }
+    }
+    $supplyArguments = @(
+        (Join-Path $repoRoot "quality\tools\generate_release_supply_chain.py"),
+        "--portable-zip", $zipPath,
+        "--nupkg", $nupkgPath,
+        "--output-dir", $supplyDir,
+        "--identity-input", $sourceIdentityPath,
+        "--policy", (Join-Path $repoRoot "quality\policies\release-supply-chain-policy.json"),
+        "--nuget-packages-root", (Get-NugetPackagesRoot -RepoRoot $repoRoot),
+        "--vulnerability-report", $resolvedVulnerabilityReport
+    )
+    if ($licenseProvenancePath) { $supplyArguments += @("--license-provenance", $licenseProvenancePath) }
+    & $pythonCommand.Source @supplyArguments
     if ($LASTEXITCODE -ne 0) { throw "Supply-chain generation failed with exit code $LASTEXITCODE." }
     $validationPath = Join-Path $supplyDir "validation-summary.json"
     $validation = Get-Content -LiteralPath $validationPath -Raw -Encoding UTF8 | ConvertFrom-Json

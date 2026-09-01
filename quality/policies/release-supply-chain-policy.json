@@ -27,19 +27,7 @@
     "SSPL-1.0"
   ],
   "approvedExceptions": [],
-  "pendingExceptions": [
-    {
-      "scope": "license",
-      "package": "S7netplus",
-      "version": "0.20.0",
-      "license": "NOASSERTION",
-      "reason": "NuGet package 0.20.0 declares repository commit f1ae0ea084e712b59e414de6aaee7d196244a239 but its nuspec has no license field and the package has no license file. Upstream evidence could not be retrieved during this local run.",
-      "owner": null,
-      "approvalReference": null,
-      "expiry": null,
-      "status": "pending-human-review-not-approved"
-    }
-  ],
+  "pendingExceptions": [],
   "vulnerabilityPolicy": {
     "source": "NuGet audit advisory sources",
     "maximumDataAgeHours": 24,
