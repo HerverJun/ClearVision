@@ -1,7 +1,24 @@
 {
-  "generatedAt": "2026-08-31T21:08:42.6383451+08:00",
-  "generationFingerprint": "A4649A6D8A2E117E1F6784A4940A4C25C6C16B2839FE4632CEA0A893AC36FFCD",
+  "generatedAt": "2026-09-01T13:02:46.2283692+08:00",
+  "generationFingerprint": "0A9685B5A8E6CADE4D2E8B16473732B7A80EFEAE6E541FD25190AE9724C848BA",
   "totalCount": 158,
+  "population": {
+    "enumTotal": 162,
+    "formalTotal": 158,
+    "packagePublic": 156,
+    "packageInternal": 1,
+    "legacyAlias": 4,
+    "disabled": 1,
+    "fingerprint": "sha256:4cd53973dd918e3669dc06e2ae1e901b440810e9021ac974fcce1038b719896a"
+  },
+  "populationDelta": {
+    "baselinePath": "quality/evals/baselines/operator-exposure-approved-baseline.json",
+    "baselineFingerprint": "sha256:4cd53973dd918e3669dc06e2ae1e901b440810e9021ac974fcce1038b719896a",
+    "added": [],
+    "removed": [],
+    "reclassified": [],
+    "evidenceDelta": []
+  },
   "categories": {
     "采集": {
       "categoryId": "Acquisition",
@@ -278,6 +295,8 @@
     {
       "id": "ImageAcquisition",
       "type": 0,
+      "exposureClassification": "package-public",
+      "exposureReason": "Supported package-public operator.",
       "displayName": "图像采集",
       "description": "从文件或相机采集图像",
       "categoryId": "Acquisition",
@@ -867,6 +886,8 @@
     {
       "id": "AffineTransform",
       "type": 173,
+      "exposureClassification": "package-public",
+      "exposureReason": "Supported package-public operator.",
       "displayName": "仿射变换",
       "description": "使用三点或旋转-缩放-平移模式执行二维仿射变换。",
       "categoryId": "ImagePreprocessing",
@@ -1121,6 +1142,8 @@
     {
       "id": "BilateralFilter",
       "type": 14,
+      "exposureClassification": "package-public",
+      "exposureReason": "Supported package-public operator.",
       "displayName": "双边滤波",
       "description": "边缘保留的平滑滤波",
       "categoryId": "ImagePreprocessing",
@@ -1314,6 +1337,8 @@
     {
       "id": "ClaheEnhancement",
       "type": 71,
+      "exposureClassification": "package-public",
+      "exposureReason": "Supported package-public operator.",
       "displayName": "CLAHE增强",
       "description": "使用自适应直方图均衡提升局部对比度，适合低对比或光照不均的图像。",
       "categoryId": "ImagePreprocessing",
@@ -1541,6 +1566,8 @@
     {
       "id": "ColorConversion",
       "type": 38,
+      "exposureClassification": "package-public",
+      "exposureReason": "Supported package-public operator.",
       "displayName": "颜色空间转换",
       "description": "BGR/GRAY/HSV/Lab/YUV等颜色空间转换",
       "categoryId": "ImagePreprocessing",
@@ -1732,6 +1759,8 @@
     {
       "id": "CopyMakeBorder",
       "type": 204,
+      "exposureClassification": "package-public",
+      "exposureReason": "Supported package-public operator.",
       "displayName": "边界填充",
       "description": "使用 OpenCV 边界策略填充图像边缘。",
       "categoryId": "ImagePreprocessing",
@@ -1953,6 +1982,8 @@
     {
       "id": "FFT1D",
       "type": 251,
+      "exposureClassification": "package-public",
+      "exposureReason": "Supported package-public operator.",
       "displayName": "信号/图像傅里叶变换（FFT）",
       "description": "对一维数值信号执行 FFT；图像输入执行完整二维 DFT，并输出复数频谱、幅度和相位。",
       "categoryId": "ImagePreprocessing",
@@ -2046,6 +2077,8 @@
     {
       "id": "Filtering",
       "type": 2,
+      "exposureClassification": "package-public",
+      "exposureReason": "Supported package-public operator.",
       "displayName": "滤波",
       "description": "统一空间平滑滤波入口，支持高斯、均值/Box、中值和双边滤波；默认保持历史高斯滤波行为。",
       "categoryId": "ImagePreprocessing",
@@ -2919,6 +2952,8 @@
     {
       "id": "FrameAveraging",
       "type": 172,
+      "exposureClassification": "package-public",
+      "exposureReason": "Supported package-public operator.",
       "displayName": "帧平均",
       "description": "对多帧输入取平均以降低时域噪声。",
       "categoryId": "ImagePreprocessing",
@@ -3095,6 +3130,8 @@
     {
       "id": "FrequencyFilter",
       "type": 252,
+      "exposureClassification": "package-public",
+      "exposureReason": "Supported package-public operator.",
       "displayName": "频域滤波",
       "description": "对一维或二维复数频谱执行频域滤波，用于保留或抑制指定频率成分。",
       "categoryId": "ImagePreprocessing",
@@ -3199,6 +3236,8 @@
     {
       "id": "HistogramEqualization",
       "type": 40,
+      "exposureClassification": "package-public",
+      "exposureReason": "Supported package-public operator.",
       "displayName": "直方图均衡化",
       "description": "支持全局直方图均衡与 CLAHE，用于增强图像对比度。",
       "categoryId": "ImagePreprocessing",
@@ -3391,6 +3430,8 @@
     {
       "id": "ImageAdd",
       "type": 76,
+      "exposureClassification": "package-public",
+      "exposureReason": "Supported package-public operator.",
       "displayName": "图像加法",
       "description": "两幅图像叠加/合并",
       "categoryId": "ImagePreprocessing",
@@ -3688,6 +3729,8 @@
     {
       "id": "ImageBlend",
       "type": 78,
+      "exposureClassification": "package-public",
+      "exposureReason": "Supported package-public operator.",
       "displayName": "图像融合",
       "description": "加权混合/透明叠加",
       "categoryId": "ImagePreprocessing",
@@ -3932,6 +3975,8 @@
     {
       "id": "ImageCompose",
       "type": 203,
+      "exposureClassification": "package-public",
+      "exposureReason": "Supported package-public operator.",
       "displayName": "图像组合",
       "description": "通过拼接、网格或通道合并方式组合多张图像。",
       "categoryId": "ImagePreprocessing",
@@ -4353,6 +4398,8 @@
     {
       "id": "ImageCrop",
       "type": 16,
+      "exposureClassification": "package-public",
+      "exposureReason": "Supported package-public operator.",
       "displayName": "图像裁剪",
       "description": "ROI区域提取",
       "categoryId": "ImagePreprocessing",
@@ -4538,6 +4585,8 @@
     {
       "id": "ImageNormalize",
       "type": 202,
+      "exposureClassification": "package-public",
+      "exposureReason": "Supported package-public operator.",
       "displayName": "图像归一化",
       "description": "MinMax 映射像素范围；ZScore 返回均值约 0、总体标准差约 1 的浮点标准分。",
       "categoryId": "ImagePreprocessing",
@@ -5204,6 +5253,8 @@
     {
       "id": "ImageResize",
       "type": 15,
+      "exposureClassification": "package-public",
+      "exposureReason": "Supported package-public operator.",
       "displayName": "图像缩放",
       "description": "调整图像尺寸",
       "categoryId": "ImagePreprocessing",
@@ -5418,6 +5469,8 @@
     {
       "id": "ImageRotate",
       "type": 17,
+      "exposureClassification": "package-public",
+      "exposureReason": "Supported package-public operator.",
       "displayName": "图像旋转",
       "description": "任意角度旋转",
       "categoryId": "ImagePreprocessing",
@@ -5615,6 +5668,8 @@
     {
       "id": "ImageStitching",
       "type": 200,
+      "exposureClassification": "package-public",
+      "exposureReason": "Supported package-public operator.",
       "displayName": "图像拼接",
       "description": "将两张图像拼接成更大的全景式输出。",
       "categoryId": "ImagePreprocessing",
@@ -5887,6 +5942,8 @@
     {
       "id": "ImageSubtract",
       "type": 77,
+      "exposureClassification": "package-public",
+      "exposureReason": "Supported package-public operator.",
       "displayName": "图像减法",
       "description": "计算两张图像的相减结果或绝对差值。",
       "categoryId": "ImagePreprocessing",
@@ -6127,6 +6184,8 @@
     {
       "id": "ImageTiling",
       "type": 201,
+      "exposureClassification": "package-public",
+      "exposureReason": "Supported package-public operator.",
       "displayName": "图像切片",
       "description": "将图像切分为可选重叠的分块区域。",
       "categoryId": "ImagePreprocessing",
@@ -6330,6 +6389,8 @@
     {
       "id": "InverseFFT1D",
       "type": 253,
+      "exposureClassification": "package-public",
+      "exposureReason": "Supported package-public operator.",
       "displayName": "信号/图像逆傅里叶变换（IFFT）",
       "description": "对一维复数频谱执行逆 FFT；二维复数频谱输入执行逆 DFT 并重建图像信号。",
       "categoryId": "ImagePreprocessing",
@@ -6423,6 +6484,8 @@
     {
       "id": "LaplacianSharpen",
       "type": 74,
+      "exposureClassification": "package-public",
+      "exposureReason": "Supported package-public operator.",
       "displayName": "拉普拉斯锐化",
       "description": "在浮点域保留拉普拉斯响应符号，并按 dst = src - strength × laplacian 锐化。",
       "categoryId": "ImagePreprocessing",
@@ -6732,6 +6795,8 @@
     {
       "id": "MeanFilter",
       "type": 215,
+      "exposureClassification": "package-public",
+      "exposureReason": "Supported package-public operator.",
       "displayName": "均值滤波",
       "description": "使用均值（方框）滤波平滑图像噪声。",
       "categoryId": "ImagePreprocessing",
@@ -6905,6 +6970,8 @@
     {
       "id": "MedianBlur",
       "type": 13,
+      "exposureClassification": "package-public",
+      "exposureReason": "Supported package-public operator.",
       "displayName": "中值滤波",
       "description": "有效去除椒盐噪声同时保留边缘",
       "categoryId": "ImagePreprocessing",
@@ -7148,6 +7215,8 @@
     {
       "id": "PerspectiveTransform",
       "type": 18,
+      "exposureClassification": "package-public",
+      "exposureReason": "Supported package-public operator.",
       "displayName": "透视变换",
       "description": "四边形透视校正",
       "categoryId": "ImagePreprocessing",
@@ -7523,6 +7592,8 @@
     {
       "id": "PolarUnwrap",
       "type": 170,
+      "exposureClassification": "package-public",
+      "exposureReason": "Supported package-public operator.",
       "displayName": "极坐标展开",
       "description": "将环形图像区域展开为矩形视图。",
       "categoryId": "ImagePreprocessing",
@@ -7756,6 +7827,8 @@
     {
       "id": "RoiManager",
       "type": 42,
+      "exposureClassification": "package-public",
+      "exposureReason": "Supported package-public operator.",
       "displayName": "ROI裁剪与掩膜",
       "description": "按矩形、圆形或多边形 ROI 裁剪图像或应用掩膜，并输出空间上下文。",
       "categoryId": "ImagePreprocessing",
@@ -8046,6 +8119,8 @@
     {
       "id": "ShadingCorrection",
       "type": 171,
+      "exposureClassification": "package-public",
+      "exposureReason": "Supported package-public operator.",
       "displayName": "光照校正",
       "description": "通过背景法或模型法校正光照不均。",
       "categoryId": "ImagePreprocessing",
@@ -8737,6 +8812,8 @@
     {
       "id": "AdaptiveThreshold",
       "type": 39,
+      "exposureClassification": "package-public",
+      "exposureReason": "Supported package-public operator.",
       "displayName": "自适应阈值",
       "description": "根据局部均值或高斯加权均值进行自适应阈值分割，适合光照不均场景。",
       "categoryId": "SegmentationAndRegion",
@@ -8950,6 +9027,8 @@
     {
       "id": "BinaryImageToRegion",
       "type": 238,
+      "exposureClassification": "package-public",
+      "exposureReason": "Supported package-public operator.",
       "displayName": "二值图转区域",
       "description": "将二值图、掩膜或灰度阈值结果转换为像素区域 Region，供区域形态学和区域布尔算子使用。",
       "categoryId": "SegmentationAndRegion",
@@ -9147,6 +9226,8 @@
     {
       "id": "BlobAnalysis",
       "type": 6,
+      "exposureClassification": "package-public",
+      "exposureReason": "Supported package-public operator.",
       "displayName": "Blob分析",
       "description": "连通区域分析",
       "categoryId": "SegmentationAndRegion",
@@ -9864,6 +9945,8 @@
     {
       "id": "DistanceTransform",
       "type": 235,
+      "exposureClassification": "package-public",
+      "exposureReason": "Supported package-public operator.",
       "displayName": "距离变换",
       "description": "计算每个像素到最近零像素的距离，支持多种距离度量和有符号距离。",
       "categoryId": "SegmentationAndRegion",
@@ -10121,6 +10204,8 @@
     {
       "id": "MorphologicalOperation",
       "type": 72,
+      "exposureClassification": "package-public",
+      "exposureReason": "Supported package-public operator.",
       "displayName": "形态学操作",
       "description": "支持腐蚀、膨胀、开运算、闭运算、梯度、顶帽、黑帽等形态学操作。",
       "categoryId": "SegmentationAndRegion",
@@ -10374,6 +10459,8 @@
     {
       "id": "Morphology",
       "type": 5,
+      "exposureClassification": "package-public",
+      "exposureReason": "Supported package-public operator.",
       "displayName": "形态学（旧版）",
       "description": "旧版图像形态学节点；新建图像流程请使用“形态学操作”，区域流程请使用 Region* 系列算子。",
       "categoryId": "SegmentationAndRegion",
@@ -10587,6 +10674,8 @@
     {
       "id": "RectangleRegion",
       "type": 237,
+      "exposureClassification": "package-public",
+      "exposureReason": "Supported package-public operator.",
       "displayName": "矩形框定义",
       "description": "根据 X、Y、宽度和高度参数生成 Rectangle 矩形框，供需要 Rectangle 输入的算子使用。",
       "categoryId": "SegmentationAndRegion",
@@ -10692,6 +10781,8 @@
     {
       "id": "RegionClosing",
       "type": 243,
+      "exposureClassification": "package-public",
+      "exposureReason": "Supported package-public operator.",
       "displayName": "区域闭运算",
       "description": "执行闭运算（先膨胀后腐蚀），用于填补小孔洞并连接相近区域。",
       "categoryId": "SegmentationAndRegion",
@@ -10896,6 +10987,8 @@
     {
       "id": "RegionComplement",
       "type": 248,
+      "exposureClassification": "package-public",
+      "exposureReason": "Supported package-public operator.",
       "displayName": "区域补集",
       "description": "相对于图像尺寸计算区域补集。",
       "categoryId": "SegmentationAndRegion",
@@ -11064,6 +11157,8 @@
     {
       "id": "RegionDifference",
       "type": 247,
+      "exposureClassification": "package-public",
+      "exposureReason": "Supported package-public operator.",
       "displayName": "区域差集",
       "description": "计算两个区域的差集（A - B）。",
       "categoryId": "SegmentationAndRegion",
@@ -11148,6 +11243,8 @@
     {
       "id": "RegionDilation",
       "type": 241,
+      "exposureClassification": "package-public",
+      "exposureReason": "Supported package-public operator.",
       "displayName": "区域膨胀",
       "description": "使用指定结构元素对区域执行膨胀（基于区域的形态学）。",
       "categoryId": "SegmentationAndRegion",
@@ -11364,6 +11461,8 @@
     {
       "id": "RegionErosion",
       "type": 240,
+      "exposureClassification": "package-public",
+      "exposureReason": "Supported package-public operator.",
       "displayName": "区域腐蚀",
       "description": "使用指定结构元素对区域执行腐蚀（基于区域的形态学）。",
       "categoryId": "SegmentationAndRegion",
@@ -11579,6 +11678,8 @@
     {
       "id": "RegionIntersection",
       "type": 246,
+      "exposureClassification": "package-public",
+      "exposureReason": "Supported package-public operator.",
       "displayName": "区域交集",
       "description": "计算两个区域的交集（A ∩ B）。",
       "categoryId": "SegmentationAndRegion",
@@ -11663,6 +11764,8 @@
     {
       "id": "RegionOpening",
       "type": 242,
+      "exposureClassification": "package-public",
+      "exposureReason": "Supported package-public operator.",
       "displayName": "区域开运算",
       "description": "执行开运算（先腐蚀后膨胀），用于去噪并平滑区域边界。",
       "categoryId": "SegmentationAndRegion",
@@ -11867,6 +11970,8 @@
     {
       "id": "RegionSkeleton",
       "type": 244,
+      "exposureClassification": "package-public",
+      "exposureReason": "Supported package-public operator.",
       "displayName": "区域骨架化",
       "description": "使用 Zhang-Suen 细化算法提取骨架，并保持拓扑与连通性。",
       "categoryId": "SegmentationAndRegion",
@@ -12059,6 +12164,8 @@
     {
       "id": "RegionUnion",
       "type": 245,
+      "exposureClassification": "package-public",
+      "exposureReason": "Supported package-public operator.",
       "displayName": "区域并集",
       "description": "计算两个区域的并集（A ∪ B）。",
       "categoryId": "SegmentationAndRegion",
@@ -12144,6 +12251,8 @@
     {
       "id": "Thresholding",
       "type": 4,
+      "exposureClassification": "package-public",
+      "exposureReason": "Supported package-public operator.",
       "displayName": "全局阈值处理",
       "description": "执行全局阈值处理，支持二值、反二值、截断、ToZero 以及 Otsu/Triangle 自动阈值。",
       "categoryId": "SegmentationAndRegion",
@@ -12523,6 +12632,8 @@
     {
       "id": "BlobLabeling",
       "type": 212,
+      "exposureClassification": "package-public",
+      "exposureReason": "Supported package-public operator.",
       "displayName": "Blob分类标注",
       "description": "按面积、圆度、宽高比或位置对 Blob/连通区域分类，输出标签列表并可绘制标签。",
       "categoryId": "FeatureExtraction",
@@ -12730,6 +12841,8 @@
     {
       "id": "CodeRecognition",
       "type": 9,
+      "exposureClassification": "package-public",
+      "exposureReason": "Supported package-public operator.",
       "displayName": "条码识别",
       "description": "一维码/二维码识别，支持 QR、Code128、DataMatrix 等多种码制",
       "categoryId": "FeatureExtraction",
@@ -12939,6 +13052,8 @@
     {
       "id": "ColorDetection",
       "type": 45,
+      "exposureClassification": "package-public",
+      "exposureReason": "Supported package-public operator.",
       "displayName": "颜色分析",
       "description": "对图像执行平均色、主色和范围分析，并支持 HSV 区间检查与 Lab DeltaE 色差分析。",
       "categoryId": "FeatureExtraction",
@@ -13357,6 +13472,8 @@
     {
       "id": "ContourDetection",
       "type": 12,
+      "exposureClassification": "package-public",
+      "exposureReason": "Supported package-public operator.",
       "displayName": "轮廓检测",
       "description": "查找图像轮廓，提取边缘点集和层次关系，供后续测量和拟合使用",
       "categoryId": "FeatureExtraction",
@@ -13685,6 +13802,8 @@
     {
       "id": "CornerDetection",
       "type": 190,
+      "exposureClassification": "package-public",
+      "exposureReason": "Supported package-public operator.",
       "displayName": "角点检测",
       "description": "使用 Harris 或 Shi-Tomasi 检测角点。",
       "categoryId": "FeatureExtraction",
@@ -13900,6 +14019,8 @@
     {
       "id": "EdgeDetection",
       "type": 3,
+      "exposureClassification": "package-public",
+      "exposureReason": "Supported package-public operator.",
       "displayName": "边缘检测",
       "description": "使用 Canny 进行边缘检测，并可选自动阈值。",
       "categoryId": "FeatureExtraction",
@@ -14461,6 +14582,8 @@
     {
       "id": "GlcmTexture",
       "type": 224,
+      "exposureClassification": "package-public",
+      "exposureReason": "Supported package-public operator.",
       "displayName": "GLCM纹理特征",
       "description": "计算灰度共生矩阵（GLCM）纹理特征。",
       "categoryId": "FeatureExtraction",
@@ -14728,6 +14851,8 @@
     {
       "id": "HistogramAnalysis",
       "type": 213,
+      "exposureClassification": "package-public",
+      "exposureReason": "Supported package-public operator.",
       "displayName": "直方图分析",
       "description": "统计指定通道的直方图及灰度/强度分布指标。",
       "categoryId": "FeatureExtraction",
@@ -15184,6 +15309,8 @@
     {
       "id": "ImageDiff",
       "type": 118,
+      "exposureClassification": "package-public",
+      "exposureReason": "Supported package-public operator.",
       "displayName": "图像差异率分析",
       "description": "计算两幅同尺寸图像的绝对差异图，并输出非零差异像素占比。",
       "categoryId": "FeatureExtraction",
@@ -15405,6 +15532,8 @@
     {
       "id": "LawsTextureFilter",
       "type": 223,
+      "exposureClassification": "package-public",
+      "exposureReason": "Supported package-public operator.",
       "displayName": "Laws纹理滤波",
       "description": "应用 5x5 Laws 纹理滤波并计算局部能量。",
       "categoryId": "FeatureExtraction",
@@ -15625,6 +15754,8 @@
     {
       "id": "PixelStatistics",
       "type": 214,
+      "exposureClassification": "package-public",
+      "exposureReason": "Supported package-public operator.",
       "displayName": "像素统计",
       "description": "计算 ROI 或掩码区域内的像素级统计信息。",
       "categoryId": "FeatureExtraction",
@@ -16014,6 +16145,8 @@
     {
       "id": "SharpnessEvaluation",
       "type": 142,
+      "exposureClassification": "package-public",
+      "exposureReason": "Supported package-public operator.",
       "displayName": "清晰度评估",
       "description": "评估图像的对焦清晰度。",
       "categoryId": "FeatureExtraction",
@@ -17702,6 +17835,8 @@
     {
       "id": "SubpixelEdgeDetection",
       "type": 44,
+      "exposureClassification": "package-public",
+      "exposureReason": "Supported package-public operator.",
       "displayName": "亚像素边缘",
       "description": "Non-industrial reference / 非工业定型的亚像素边缘参考实现；用于计量前必须完成应用级验证。",
       "categoryId": "FeatureExtraction",
@@ -17913,6 +18048,8 @@
     {
       "id": "AkazeFeatureMatch",
       "type": 90,
+      "exposureClassification": "package-public",
+      "exposureReason": "Supported package-public operator.",
       "displayName": "AKAZE特征匹配",
       "description": "使用 AKAZE 局部特征与单应性校验进行模板定位，适合纹理目标的稳健匹配。",
       "categoryId": "MatchingAndLocalization",
@@ -18372,6 +18509,8 @@
     {
       "id": "ContourExtrema",
       "type": 250,
+      "exposureClassification": "package-public",
+      "exposureReason": "Supported package-public operator.",
       "displayName": "轮廓极值",
       "description": "在指定方向上查找轮廓极值点。",
       "categoryId": "MatchingAndLocalization",
@@ -18481,6 +18620,8 @@
     {
       "id": "EdgeIntersection",
       "type": 191,
+      "exposureClassification": "package-public",
+      "exposureReason": "Supported package-public operator.",
       "displayName": "边线交点",
       "description": "计算两条直线的交点和夹角。",
       "categoryId": "MatchingAndLocalization",
@@ -18591,6 +18732,8 @@
     {
       "id": "GradientShapeMatch",
       "type": 92,
+      "exposureClassification": "package-public",
+      "exposureReason": "Supported package-public operator.",
       "displayName": "梯度形状匹配",
       "description": "基于梯度方向特征的形状匹配，支持可选 ROI 搜索。",
       "categoryId": "MatchingAndLocalization",
@@ -18964,6 +19107,8 @@
     {
       "id": "LocalDeformableMatching",
       "type": 234,
+      "exposureClassification": "package-public",
+      "exposureReason": "Supported package-public operator.",
       "displayName": "局部可变形匹配",
       "description": "实验性局部可变形匹配，基于移动最小二乘形变估计，并提供刚性匹配校验回退。",
       "categoryId": "MatchingAndLocalization",
@@ -19360,6 +19505,8 @@
     {
       "id": "OrbFeatureMatch",
       "type": 91,
+      "exposureClassification": "package-public",
+      "exposureReason": "Supported package-public operator.",
       "displayName": "ORB特征匹配",
       "description": "使用 ORB 特征和单应性校验进行快速模板定位。",
       "categoryId": "MatchingAndLocalization",
@@ -19852,6 +19999,8 @@
     {
       "id": "ParallelLineFind",
       "type": 192,
+      "exposureClassification": "package-public",
+      "exposureReason": "Supported package-public operator.",
       "displayName": "平行线查找",
       "description": "在图像中查找最佳近似平行线对。",
       "categoryId": "MatchingAndLocalization",
@@ -20064,6 +20213,8 @@
     {
       "id": "PlanarMatching",
       "type": 233,
+      "exposureClassification": "package-public",
+      "exposureReason": "Supported package-public operator.",
       "displayName": "平面特征匹配",
       "description": "基于局部特征匹配和单应性验证定位纹理平面目标，输出投影角点、评分与诊断。",
       "categoryId": "MatchingAndLocalization",
@@ -20626,6 +20777,8 @@
     {
       "id": "PointAlignment",
       "type": 162,
+      "exposureClassification": "package-public",
+      "exposureReason": "Supported package-public operator.",
       "displayName": "点位偏差计算",
       "description": "计算当前点相对参考点的 X/Y 偏差与距离；属于像素空间偏差工具，按 PixelSize 换算 mm 前需确认标定尺度。",
       "categoryId": "MatchingAndLocalization",
@@ -20743,6 +20896,8 @@
     {
       "id": "PointCorrection",
       "type": 163,
+      "exposureClassification": "package-public",
+      "exposureReason": "Supported package-public operator.",
       "displayName": "点位刚性补偿",
       "description": "根据检测点/角度与参考点/角度计算像素空间二维刚性补偿量和变换矩阵；按 PixelSize 输出 mm 前需确认标定尺度。",
       "categoryId": "MatchingAndLocalization",
@@ -20915,6 +21070,8 @@
     {
       "id": "PositionCorrection",
       "type": 143,
+      "exposureClassification": "package-public",
+      "exposureReason": "Supported package-public operator.",
       "displayName": "ROI位姿补偿（像素）",
       "description": "根据参考点与基准点的像素偏差，对 ROI 坐标执行平移或平移旋转补偿并输出变换信息；作为物理世界补偿使用前需先完成标定。",
       "categoryId": "MatchingAndLocalization",
@@ -21097,6 +21254,8 @@
     {
       "id": "PyramidShapeMatch",
       "type": 93,
+      "exposureClassification": "package-public",
+      "exposureReason": "Supported package-public operator.",
       "displayName": "金字塔形状匹配",
       "description": "基于 LINEMOD 的金字塔模板匹配。",
       "categoryId": "MatchingAndLocalization",
@@ -21519,6 +21678,8 @@
     {
       "id": "QuadrilateralFind",
       "type": 193,
+      "exposureClassification": "package-public",
+      "exposureReason": "Supported package-public operator.",
       "displayName": "四边形查找",
       "description": "查找不受直角约束的四边形轮廓。",
       "categoryId": "MatchingAndLocalization",
@@ -21731,6 +21892,8 @@
     {
       "id": "RectangleDetection",
       "type": 182,
+      "exposureClassification": "package-public",
+      "exposureReason": "Supported package-public operator.",
       "displayName": "矩形检测",
       "description": "根据轮廓检测矩形/四边形目标。",
       "categoryId": "MatchingAndLocalization",
@@ -21968,6 +22131,8 @@
     {
       "id": "RoiTransform",
       "type": 216,
+      "exposureClassification": "package-public",
+      "exposureReason": "Supported package-public operator.",
       "displayName": "ROI位姿变换",
       "description": "根据匹配位姿（中心、角度、尺度）变换基础 ROI，并输出矩形 SearchRegion。",
       "categoryId": "MatchingAndLocalization",
@@ -22055,6 +22220,8 @@
     {
       "id": "ShapeMatching",
       "type": 43,
+      "exposureClassification": "package-public",
+      "exposureReason": "Supported package-public operator.",
       "displayName": "旋转尺度模板匹配",
       "description": "基于金字塔粗到细搜索的旋转/尺度模板匹配；不是通用轮廓描述子匹配。",
       "categoryId": "MatchingAndLocalization",
@@ -22430,6 +22597,8 @@
     {
       "id": "TemplateMatching",
       "type": 7,
+      "exposureClassification": "package-public",
+      "exposureReason": "Supported package-public operator.",
       "displayName": "模板匹配",
       "description": "执行经典模板匹配，可限制旋转和尺度搜索范围；多目标结果通过基于 IoU 的 NMS 去重。",
       "categoryId": "MatchingAndLocalization",
@@ -23723,6 +23892,8 @@
     {
       "id": "DetectionSequenceJudge",
       "type": 61,
+      "exposureClassification": "package-public",
+      "exposureReason": "Supported package-public operator.",
       "displayName": "检测顺序判定",
       "description": "对检测结果排序，并与期望标签序列进行比对。",
       "categoryId": "DefectDetection",
@@ -24100,6 +24271,8 @@
     {
       "id": "DualModalVoting",
       "type": 94,
+      "exposureClassification": "package-public",
+      "exposureReason": "Supported package-public operator.",
       "displayName": "双模态投票",
       "description": "融合深度学习与传统视觉检测结果，输出最终判定。",
       "categoryId": "DefectDetection",
@@ -24267,6 +24440,8 @@
     {
       "id": "EdgePairDefect",
       "type": 181,
+      "exposureClassification": "package-public",
+      "exposureReason": "Supported package-public operator.",
       "displayName": "边缘间距缺陷检测",
       "description": "沿边缘对采样间距，按期望宽度与容差判定偏差点并输出缺陷数量和最大偏差。",
       "categoryId": "DefectDetection",
@@ -24490,6 +24665,8 @@
     {
       "id": "SurfaceDefectDetection",
       "type": 180,
+      "exposureClassification": "package-public",
+      "exposureReason": "Supported package-public operator.",
       "displayName": "表面缺陷检测",
       "description": "使用梯度、配准后的参考差分或局部对比度检测表面缺陷。",
       "categoryId": "DefectDetection",
@@ -25102,6 +25279,8 @@
     {
       "id": "AngleMeasurement",
       "type": 22,
+      "exposureClassification": "package-public",
+      "exposureReason": "Supported package-public operator.",
       "displayName": "角度测量",
       "description": "通过三点或两线计算角度，兼容亚像素级输入。",
       "categoryId": "Measurement",
@@ -25370,6 +25549,8 @@
     {
       "id": "ArcCaliper",
       "type": 249,
+      "exposureClassification": "package-public",
+      "exposureReason": "Supported package-public operator.",
       "displayName": "圆弧卡尺",
       "description": "沿圆弧路径检测边缘，支持亚像素精度。",
       "categoryId": "Measurement",
@@ -25551,6 +25732,8 @@
     {
       "id": "CaliperTool",
       "type": 130,
+      "exposureClassification": "package-public",
+      "exposureReason": "Supported package-public operator.",
       "displayName": "卡尺工具",
       "description": "沿扫描线检测边缘对并输出宽度。",
       "categoryId": "Measurement",
@@ -25929,6 +26112,8 @@
     {
       "id": "CircleMeasurement",
       "type": 19,
+      "exposureClassification": "package-public",
+      "exposureReason": "Supported package-public operator.",
       "displayName": "圆测量",
       "description": "霍夫变换检测圆形并测量半径与圆心坐标，适用于孔径检测和圆形定位",
       "categoryId": "Measurement",
@@ -26529,6 +26714,8 @@
     {
       "id": "ColorMeasurement",
       "type": 174,
+      "exposureClassification": "package-public",
+      "exposureReason": "Supported package-public operator.",
       "displayName": "颜色测量",
       "description": "在选定 ROI 内统计 Lab 色差或 HSV 颜色特征。",
       "categoryId": "Measurement",
@@ -26833,6 +27020,8 @@
     {
       "id": "ContourMeasurement",
       "type": 21,
+      "exposureClassification": "package-public",
+      "exposureReason": "Supported package-public operator.",
       "displayName": "轮廓测量",
       "description": "计算轮廓面积、周长和质心，并支持按灰度权重估算面积。",
       "categoryId": "Measurement",
@@ -27044,6 +27233,8 @@
     {
       "id": "GapMeasurement",
       "type": 164,
+      "exposureClassification": "package-public",
+      "exposureReason": "Supported package-public operator.",
       "displayName": "间隙测量",
       "description": "通过点或图像投影方式测量间距。",
       "categoryId": "Measurement",
@@ -27338,6 +27529,8 @@
     {
       "id": "GeoMeasurement",
       "type": 194,
+      "exposureClassification": "package-public",
+      "exposureReason": "Supported package-public operator.",
       "displayName": "几何测量",
       "description": "对点、线、圆等几何元素进行通用几何测量。",
       "categoryId": "Measurement",
@@ -27512,6 +27705,8 @@
     {
       "id": "GeometricFitting",
       "type": 41,
+      "exposureClassification": "package-public",
+      "exposureReason": "Supported package-public operator.",
       "displayName": "几何拟合",
       "description": "根据轮廓点拟合直线、圆或椭圆。",
       "categoryId": "Measurement",
@@ -27777,6 +27972,8 @@
     {
       "id": "GeometricTolerance",
       "type": 23,
+      "exposureClassification": "package-public",
+      "exposureReason": "Supported package-public operator.",
       "displayName": "二维几何公差判定",
       "description": "基于特征与基准评估平行度、垂直度、位置度、同心度等受限二维公差带并输出判定。",
       "categoryId": "Measurement",
@@ -28066,6 +28263,8 @@
     {
       "id": "LineLineDistance",
       "type": 133,
+      "exposureClassification": "package-public",
+      "exposureReason": "Supported package-public operator.",
       "displayName": "线线距离",
       "description": "计算两条直线或线段之间的距离与夹角。",
       "categoryId": "Measurement",
@@ -28210,6 +28409,8 @@
     {
       "id": "LineMeasurement",
       "type": 20,
+      "exposureClassification": "package-public",
+      "exposureReason": "Supported package-public operator.",
       "displayName": "直线测量",
       "description": "检测直线特征，输出方向、跨度和拟合质量诊断。",
       "categoryId": "Measurement",
@@ -28492,6 +28693,8 @@
     {
       "id": "Measurement",
       "type": 8,
+      "exposureClassification": "package-public",
+      "exposureReason": "Supported package-public operator.",
       "displayName": "测量",
       "description": "统一基础二维几何测量入口，支持点点距离、点线距离、线线距离/夹角和三点角度；默认保持旧版点点测量行为。",
       "categoryId": "Measurement",
@@ -29570,6 +29773,8 @@
     {
       "id": "MinEnclosingGeometry",
       "type": 236,
+      "exposureClassification": "package-public",
+      "exposureReason": "Supported package-public operator.",
       "displayName": "最小外接几何体",
       "description": "计算最小包围几何（圆、矩形、三角形），并支持基于 RANSAC 的鲁棒圆弧拟合。",
       "categoryId": "Measurement",
@@ -29869,6 +30074,8 @@
     {
       "id": "PhaseClosure",
       "type": 254,
+      "exposureClassification": "package-public",
+      "exposureReason": "Supported package-public operator.",
       "displayName": "相位解缠绕",
       "description": "对二维包裹相位图执行 Itoh、质量引导或洪泛式解缠绕，并输出解缠相位与不连续区域。",
       "categoryId": "Measurement",
@@ -30151,6 +30358,8 @@
     {
       "id": "PointLineDistance",
       "type": 132,
+      "exposureClassification": "package-public",
+      "exposureReason": "Supported package-public operator.",
       "displayName": "点线距离",
       "description": "计算点到直线或线段的最短距离。",
       "categoryId": "Measurement",
@@ -30267,6 +30476,8 @@
     {
       "id": "WidthMeasurement",
       "type": 131,
+      "exposureClassification": "package-public",
+      "exposureReason": "Supported package-public operator.",
       "displayName": "宽度测量",
       "description": "测量平行边缘或直线之间的宽度。",
       "categoryId": "Measurement",
@@ -30566,6 +30777,8 @@
     {
       "id": "CalibrationLoader",
       "type": 151,
+      "exposureClassification": "package-public",
+      "exposureReason": "Supported package-public operator.",
       "displayName": "标定加载",
       "description": "从 CalibrationBundleV2 JSON 文件加载标定数据并输出强类型结果。",
       "categoryId": "CalibrationAndCoordinates",
@@ -30649,6 +30862,8 @@
     {
       "id": "CameraCalibration",
       "type": 24,
+      "exposureClassification": "package-public",
+      "exposureReason": "Supported package-public operator.",
       "displayName": "相机标定",
       "description": "根据棋盘格或圆点阵图像标定相机内参。",
       "categoryId": "CalibrationAndCoordinates",
@@ -30907,6 +31122,8 @@
     {
       "id": "CoordinateTransform",
       "type": 26,
+      "exposureClassification": "package-public",
+      "exposureReason": "Supported package-public operator.",
       "displayName": "像素到物理坐标（单点）",
       "description": "使用 CalibrationBundleV2 的二维标定变换，将单个像素坐标转换为物理坐标。",
       "categoryId": "CalibrationAndCoordinates",
@@ -31101,6 +31318,8 @@
     {
       "id": "FisheyeCalibration",
       "type": 229,
+      "exposureClassification": "package-public",
+      "exposureReason": "Supported package-public operator.",
       "displayName": "鱼眼标定",
       "description": "使用棋盘格或圆点阵图案标定鱼眼相机内参和畸变参数。",
       "categoryId": "CalibrationAndCoordinates",
@@ -31381,6 +31600,8 @@
     {
       "id": "FisheyeUndistort",
       "type": 230,
+      "exposureClassification": "package-public",
+      "exposureReason": "Supported package-public operator.",
       "displayName": "鱼眼去畸变",
       "description": "使用标定数据校正鱼眼镜头畸变，并支持 LUT 加速。",
       "categoryId": "CalibrationAndCoordinates",
@@ -31577,6 +31798,8 @@
     {
       "id": "HandEyeCalibration",
       "type": 227,
+      "exposureClassification": "package-public",
+      "exposureReason": "Supported package-public operator.",
       "displayName": "手眼标定",
       "description": "根据机器人位姿和标定板位姿求解手眼或简化眼在手外标定。",
       "categoryId": "CalibrationAndCoordinates",
@@ -31789,6 +32012,8 @@
     {
       "id": "HandEyeCalibrationValidator",
       "type": 228,
+      "exposureClassification": "package-public",
+      "exposureReason": "Supported package-public operator.",
       "displayName": "手眼标定验证",
       "description": "验证手眼标定 CalibrationBundleV2 并生成质量指标、HTML 报告和位姿建议。",
       "categoryId": "CalibrationAndCoordinates",
@@ -31929,6 +32154,8 @@
     {
       "id": "NPointCalibration",
       "type": 150,
+      "exposureClassification": "package-public",
+      "exposureReason": "Supported package-public operator.",
       "displayName": "N点标定",
       "description": "基于全部点对鲁棒估计仿射或单应性标定模型。",
       "categoryId": "CalibrationAndCoordinates",
@@ -32254,6 +32481,8 @@
     {
       "id": "PixelToWorldTransform",
       "type": 232,
+      "exposureClassification": "package-public",
+      "exposureReason": "Supported package-public operator.",
       "displayName": "像素世界映射",
       "description": "通过 CalibrationBundleV2 执行坐标转换，可使用 Transform2D 或相机射线与平面求交。",
       "categoryId": "CalibrationAndCoordinates",
@@ -32591,6 +32820,8 @@
     {
       "id": "StereoCalibration",
       "type": 231,
+      "exposureClassification": "package-public",
+      "exposureReason": "Supported package-public operator.",
       "displayName": "双目标定",
       "description": "标定双目相机并生成极线校正映射。",
       "categoryId": "CalibrationAndCoordinates",
@@ -32995,6 +33226,8 @@
     {
       "id": "TranslationRotationCalibration",
       "type": 183,
+      "exposureClassification": "package-public",
+      "exposureReason": "Supported package-public operator.",
       "displayName": "平移旋转标定",
       "description": "从图像/机器人点对拟合二维刚性或相似变换，支持可选的 RANSAC 与 Huber 稳健模式。",
       "categoryId": "CalibrationAndCoordinates",
@@ -33355,6 +33588,8 @@
     {
       "id": "Undistort",
       "type": 25,
+      "exposureClassification": "package-public",
+      "exposureReason": "Supported package-public operator.",
       "displayName": "畸变校正",
       "description": "使用标定数据校正镜头畸变。",
       "categoryId": "CalibrationAndCoordinates",
@@ -33498,6 +33733,8 @@
     {
       "id": "AnomalyDetection",
       "type": 226,
+      "exposureClassification": "package-public",
+      "exposureReason": "Supported package-public operator.",
       "displayName": "异常检测",
       "description": "运行简化版 PatchCore 异常检测器，支持训练/推理模式和特征库持久化。",
       "categoryId": "AiInference",
@@ -34317,6 +34554,8 @@
     {
       "id": "DeepLearning",
       "type": 10,
+      "exposureClassification": "package-public",
+      "exposureReason": "Supported package-public operator.",
       "displayName": "深度学习",
       "description": "统一 ONNX 深度学习推理入口，支持目标检测、图像分类和语义分割；默认保持历史 YOLO 目标检测行为。",
       "categoryId": "AiInference",
@@ -36626,6 +36865,8 @@
     {
       "id": "OcrRecognition",
       "type": 117,
+      "exposureClassification": "package-public",
+      "exposureReason": "Supported package-public operator.",
       "displayName": "OCR 识别",
       "description": "识别图像中的文本内容",
       "categoryId": "AiInference",
@@ -36765,6 +37006,8 @@
     {
       "id": "SemanticSegmentation",
       "type": 225,
+      "exposureClassification": "package-public",
+      "exposureReason": "Supported package-public operator.",
       "displayName": "语义分割",
       "description": "运行 ONNX 语义分割模型，输出类别图、着色可视化结果和各类别掩码。",
       "categoryId": "AiInference",
@@ -37212,6 +37455,8 @@
     {
       "id": "EuclideanClusterExtraction",
       "type": 220,
+      "exposureClassification": "package-public",
+      "exposureReason": "Supported package-public operator.",
       "displayName": "欧氏聚类分割",
       "description": "对点云执行欧式聚类提取（按距离划分三维连通分量）。",
       "categoryId": "PointCloud3D",
@@ -37335,6 +37580,8 @@
     {
       "id": "PPFEstimation",
       "type": 221,
+      "exposureClassification": "package-public",
+      "exposureReason": "Supported package-public operator.",
       "displayName": "PPF点对特征",
       "description": "为点云计算点对特征（PPF）并构建逐点特征图。",
       "categoryId": "PointCloud3D",
@@ -37447,6 +37694,8 @@
     {
       "id": "PPFMatch",
       "type": 222,
+      "exposureClassification": "package-public",
+      "exposureReason": "Supported package-public operator.",
       "displayName": "PPF点云粗匹配",
       "description": "基于 PPF 对模型点云与场景点云执行三维粗匹配，输出候选位姿、内点与稳定性诊断。",
       "categoryId": "PointCloud3D",
@@ -37722,6 +37971,8 @@
     {
       "id": "RansacPlaneSegmentation",
       "type": 219,
+      "exposureClassification": "package-public",
+      "exposureReason": "Supported package-public operator.",
       "displayName": "RANSAC平面分割",
       "description": "对点云执行 RANSAC 平面分割，输出平面系数和内点。",
       "categoryId": "PointCloud3D",
@@ -37876,6 +38127,8 @@
     {
       "id": "StatisticalOutlierRemoval",
       "type": 218,
+      "exposureClassification": "package-public",
+      "exposureReason": "Supported package-public operator.",
       "displayName": "点云统计离群点去除（SOR）",
       "description": "对点云执行统计离群点去除（SOR），输出过滤点云、保留点数和移除点数。",
       "categoryId": "PointCloud3D",
@@ -37979,6 +38232,8 @@
     {
       "id": "VoxelDownsample",
       "type": 217,
+      "exposureClassification": "package-public",
+      "exposureReason": "Supported package-public operator.",
       "displayName": "体素下采样",
       "description": "对点云执行体素网格下采样（每个体素取质心）。",
       "categoryId": "PointCloud3D",
@@ -38063,6 +38318,8 @@
     {
       "id": "Aggregator",
       "type": 120,
+      "exposureClassification": "package-public",
+      "exposureReason": "Supported package-public operator.",
       "displayName": "数据聚合",
       "description": "将多路输入数据合并为列表，并提取极值与均值",
       "categoryId": "DataProcessing",
@@ -38208,6 +38465,8 @@
     {
       "id": "ArrayIndexer",
       "type": 101,
+      "exposureClassification": "package-public",
+      "exposureReason": "Supported package-public operator.",
       "displayName": "数组索引器",
       "description": "从列表中按索引或条件提取元素",
       "categoryId": "DataProcessing",
@@ -38342,6 +38601,8 @@
     {
       "id": "BoxFilter",
       "type": 141,
+      "exposureClassification": "package-public",
+      "exposureReason": "Supported package-public operator.",
       "displayName": "候选框筛选",
       "description": "按面积、类别、区域或分数过滤检测结果。",
       "categoryId": "DataProcessing",
@@ -38616,6 +38877,8 @@
     {
       "id": "BoxNms",
       "type": 140,
+      "exposureClassification": "package-public",
+      "exposureReason": "Supported package-public operator.",
       "displayName": "候选框抑制",
       "description": "对检测框执行非极大值抑制。",
       "categoryId": "DataProcessing",
@@ -38918,6 +39181,8 @@
     {
       "id": "Comparator",
       "type": 122,
+      "exposureClassification": "package-public",
+      "exposureReason": "Supported package-public operator.",
       "displayName": "数值比较",
       "description": "比较两个数值的大小关系，输出布尔判定结果与差值",
       "categoryId": "DataProcessing",
@@ -39089,6 +39354,8 @@
     {
       "id": "JsonExtractor",
       "type": 102,
+      "exposureClassification": "package-public",
+      "exposureReason": "Supported package-public operator.",
       "displayName": "JSON 提取器",
       "description": "按 JSONPath 从字符串中提取字段",
       "categoryId": "DataProcessing",
@@ -39203,6 +39470,8 @@
     {
       "id": "LogicGate",
       "type": 111,
+      "exposureClassification": "package-public",
+      "exposureReason": "Supported package-public operator.",
       "displayName": "逻辑门",
       "description": "布尔逻辑运算 (AND, OR, NOT, XOR, NAND, NOR)",
       "categoryId": "DataProcessing",
@@ -39307,6 +39576,8 @@
     {
       "id": "MathOperation",
       "type": 110,
+      "exposureClassification": "package-public",
+      "exposureReason": "Supported package-public operator.",
       "displayName": "数值计算",
       "description": "支持加减乘除、取绝对值、开方等常用运算",
       "categoryId": "DataProcessing",
@@ -39451,6 +39722,8 @@
     {
       "id": "PointSetTool",
       "type": 211,
+      "exposureClassification": "package-public",
+      "exposureReason": "Supported package-public operator.",
       "displayName": "点集工具",
       "description": "合并、排序、过滤点列表并计算集合属性。",
       "categoryId": "DataProcessing",
@@ -39642,6 +39915,8 @@
     {
       "id": "ScriptOperator",
       "type": 160,
+      "exposureClassification": "package-public",
+      "exposureReason": "Supported package-public operator.",
       "displayName": "脚本算子",
       "description": "运行用户自定义 C# 表达式。",
       "categoryId": "DataProcessing",
@@ -39773,6 +40048,8 @@
     {
       "id": "Statistics",
       "type": 119,
+      "exposureClassification": "package-public",
+      "exposureReason": "Supported package-public operator.",
       "displayName": "统计分析",
       "description": "基于滚动历史计算均值、标准差和 Cpk 统计结果。",
       "categoryId": "DataProcessing",
@@ -39926,6 +40203,8 @@
     {
       "id": "StringFormat",
       "type": 115,
+      "exposureClassification": "package-public",
+      "exposureReason": "Supported package-public operator.",
       "displayName": "字符串格式化",
       "description": "按模板生成字符串",
       "categoryId": "DataProcessing",
@@ -40196,6 +40475,8 @@
     {
       "id": "TimerStatistics",
       "type": 153,
+      "exposureClassification": "package-public",
+      "exposureReason": "Supported package-public operator.",
       "displayName": "计时统计",
       "description": "统计耗时和周期时间。",
       "categoryId": "DataProcessing",
@@ -40335,6 +40616,8 @@
     {
       "id": "TypeConvert",
       "type": 112,
+      "exposureClassification": "package-public",
+      "exposureReason": "Supported package-public operator.",
       "displayName": "类型转换",
       "description": "在字符串、浮点、整数、布尔等类型之间转换输入数据。",
       "categoryId": "DataProcessing",
@@ -40466,6 +40749,8 @@
     {
       "id": "UnitConvert",
       "type": 152,
+      "exposureClassification": "package-public",
+      "exposureReason": "Supported package-public operator.",
       "displayName": "单位换算",
       "description": "在像素、mm、um 和英寸之间进行数值换算。",
       "categoryId": "DataProcessing",
@@ -40624,6 +40909,8 @@
     {
       "id": "VariableIncrement",
       "type": 82,
+      "exposureClassification": "package-public",
+      "exposureReason": "Supported package-public operator.",
       "displayName": "变量递增",
       "description": "递增单次运行变量或项目全局 Int64 变量",
       "categoryId": "DataProcessing",
@@ -40806,6 +41093,8 @@
     {
       "id": "VariableRead",
       "type": 80,
+      "exposureClassification": "package-public",
+      "exposureReason": "Supported package-public operator.",
       "displayName": "变量读取",
       "description": "从单次运行变量或项目全局变量读取值",
       "categoryId": "DataProcessing",
@@ -41088,6 +41377,8 @@
     {
       "id": "VariableWrite",
       "type": 81,
+      "exposureClassification": "package-public",
+      "exposureReason": "Supported package-public operator.",
       "displayName": "变量写入",
       "description": "写入单次运行变量或项目全局变量",
       "categoryId": "DataProcessing",
@@ -41393,6 +41684,8 @@
     {
       "id": "ConditionalBranch",
       "type": 30,
+      "exposureClassification": "package-public",
+      "exposureReason": "Supported package-public operator.",
       "displayName": "条件分支",
       "description": "根据数值/字符串/布尔条件执行 True/False 两路分支，常用于 OK/NG 判定路由",
       "categoryId": "FlowControl",
@@ -41704,6 +41997,8 @@
     {
       "id": "CycleCounter",
       "type": 84,
+      "exposureClassification": "package-public",
+      "exposureReason": "Supported package-public operator.",
       "displayName": "循环计数器",
       "description": "获取当前循环次数和统计信息",
       "categoryId": "FlowControl",
@@ -41818,6 +42113,8 @@
     {
       "id": "Delay",
       "type": 123,
+      "exposureClassification": "package-public",
+      "exposureReason": "Supported package-public operator.",
       "displayName": "延时",
       "description": "等待指定时间后继续执行，常用于通信前等待下位机就绪",
       "categoryId": "FlowControl",
@@ -41907,6 +42204,8 @@
     {
       "id": "ForEach",
       "type": 100,
+      "exposureClassification": "package-public",
+      "exposureReason": "Supported package-public operator.",
       "displayName": "ForEach 循环",
       "description": "对集合中的每个元素执行子图",
       "categoryId": "FlowControl",
@@ -42024,6 +42323,8 @@
     {
       "id": "FrameChangeTrigger",
       "type": 1620,
+      "exposureClassification": "package-internal",
+      "exposureReason": "Runtime trigger stays product-internal and outside the package-public projection.",
       "displayName": "帧变化触发",
       "description": "通过连续帧 ROI 变化判断端子是否到达；未到料时短路当前检测周期，避免空帧进入深度学习。",
       "categoryId": "FlowControl",
@@ -42485,6 +42786,8 @@
     {
       "id": "ResultJudgment",
       "type": 60,
+      "exposureClassification": "package-public",
+      "exposureReason": "Supported package-public operator.",
       "displayName": "结果判定",
       "description": "对数值、字符串等结果执行业务判定，输出条件检查结果。",
       "categoryId": "FlowControl",
@@ -42701,6 +43004,8 @@
     {
       "id": "TriggerModule",
       "type": 161,
+      "exposureClassification": "package-public",
+      "exposureReason": "Supported package-public operator.",
       "displayName": "触发模块",
       "description": "生成软件、定时或外部触发信号。",
       "categoryId": "FlowControl",
@@ -42826,6 +43131,8 @@
     {
       "id": "TryCatch",
       "type": 83,
+      "exposureClassification": "package-public",
+      "exposureReason": "Supported package-public operator.",
       "displayName": "Try分支透传",
       "description": "将输入透传到 Try 分支并输出空 Catch/无错误状态；本算子不捕获下游异常。",
       "categoryId": "FlowControl",
@@ -42946,6 +43253,8 @@
     {
       "id": "HttpRequest",
       "type": 113,
+      "exposureClassification": "package-public",
+      "exposureReason": "Supported package-public operator.",
       "displayName": "HTTP 请求",
       "description": "调用外部 REST API",
       "categoryId": "Communication",
@@ -43112,6 +43421,8 @@
     {
       "id": "MitsubishiMcCommunication",
       "type": 51,
+      "exposureClassification": "package-public",
+      "exposureReason": "Supported package-public operator.",
       "displayName": "三菱MC通信",
       "description": "三菱 MC 协议 PLC 读写通信。",
       "categoryId": "Communication",
@@ -43776,6 +44087,8 @@
     {
       "id": "ModbusCommunication",
       "type": 27,
+      "exposureClassification": "package-public",
+      "exposureReason": "Supported package-public operator.",
       "displayName": "Modbus TCP通信",
       "description": "通过受服务器 PLC 配置约束的 Modbus TCP 读写线圈和保持寄存器。",
       "categoryId": "Communication",
@@ -44137,6 +44450,8 @@
     {
       "id": "MqttPublish",
       "type": 114,
+      "exposureClassification": "disabled",
+      "exposureReason": "Placeholder executor retained only for historical flow fail-closed execution (MQTT_PUBLISH_DISABLED).",
       "displayName": "MQTT 发布",
       "description": "在启用可选 MQTT 集成时发布检测数据。",
       "categoryId": "Communication",
@@ -44281,6 +44596,8 @@
     {
       "id": "OmronFinsCommunication",
       "type": 52,
+      "exposureClassification": "package-public",
+      "exposureReason": "Supported package-public operator.",
       "displayName": "欧姆龙FINS通信",
       "description": "欧姆龙FINS/TCP协议PLC读写通信（CP1H/CJ2M/NJ/NX）",
       "categoryId": "Communication",
@@ -44939,6 +45256,8 @@
     {
       "id": "SerialCommunication",
       "type": 46,
+      "exposureClassification": "package-public",
+      "exposureReason": "Supported package-public operator.",
       "displayName": "串口通信",
       "description": "RS-232/485 串口数据收发",
       "categoryId": "Communication",
@@ -45171,6 +45490,8 @@
     {
       "id": "SiemensS7Communication",
       "type": 50,
+      "exposureClassification": "package-public",
+      "exposureReason": "Supported package-public operator.",
       "displayName": "西门子S7通信",
       "description": "西门子S7系列PLC读写通信（S7-200/300/400/1200/1500）",
       "categoryId": "Communication",
@@ -45776,6 +46097,8 @@
     {
       "id": "TcpCommunication",
       "type": 28,
+      "exposureClassification": "package-public",
+      "exposureReason": "Supported package-public operator.",
       "displayName": "TCP通信",
       "description": "TCP/IP网络通信",
       "categoryId": "Communication",
@@ -47249,6 +47572,8 @@
     {
       "id": "Comment",
       "type": 121,
+      "exposureClassification": "package-public",
+      "exposureReason": "Supported package-public operator.",
       "displayName": "注释",
       "description": "在工作流中添加说明文本，不影响数据流，仅用于标注设计意图",
       "categoryId": "OutputAndAuxiliary",
@@ -47337,6 +47662,8 @@
     {
       "id": "DatabaseWrite",
       "type": 29,
+      "exposureClassification": "package-public",
+      "exposureReason": "Supported package-public operator.",
       "displayName": "数据库写入",
       "description": "将输入数据写入 SQLite / SQL Server / MySQL 表。",
       "categoryId": "OutputAndAuxiliary",
@@ -47477,6 +47804,8 @@
     {
       "id": "ImageSave",
       "type": 116,
+      "exposureClassification": "package-public",
+      "exposureReason": "Supported package-public operator.",
       "displayName": "图像保存",
       "description": "保存检测图像到本地硬盘",
       "categoryId": "OutputAndAuxiliary",
@@ -47770,6 +48099,8 @@
     {
       "id": "ResultOutput",
       "type": 11,
+      "exposureClassification": "package-public",
+      "exposureReason": "Supported package-public operator.",
       "displayName": "结果输出",
       "description": "汇总检测结果并输出，支持 JSON/CSV/Text 格式，可选保存到文件",
       "categoryId": "OutputAndAuxiliary",
@@ -48035,6 +48366,8 @@
     {
       "id": "TextSave",
       "type": 210,
+      "exposureClassification": "package-public",
+      "exposureReason": "Supported package-public operator.",
       "displayName": "文本保存",
       "description": "将文本或结构化数据保存为 text/csv/json 文件。",
       "categoryId": "OutputAndAuxiliary",

@@ -5,6 +5,8 @@
 |------|------|
 | 类名 (Class) | `PointCorrectionOperator` |
 | 枚举值 (Enum) | `OperatorType.PointCorrection` |
+| 暴露分类 (Exposure) | `package-public` |
+| 暴露原因 (Exposure Reason) | Supported package-public operator. |
 | 分类 ID (CategoryId) | `MatchingAndLocalization` |
 | 分类 (Category) | 匹配与定位 |
 | 分类顺序 (CategoryOrder) | 5 |

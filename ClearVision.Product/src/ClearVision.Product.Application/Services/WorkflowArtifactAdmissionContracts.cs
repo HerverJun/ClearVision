@@ -66,6 +66,12 @@ public sealed record WorkflowArtifactAdmissionContext
     public string TaskType { get; init; } = string.Empty;
     public bool? RouteSemanticsSatisfied { get; init; }
     public string ArtifactFingerprint { get; init; } = string.Empty;
+
+    /// <summary>
+    /// Historical persisted flows may be materialized for fail-closed execution of a disabled
+    /// compatibility executor. Creation, import, persistence, export and AI admission never set this.
+    /// </summary>
+    public bool AllowHistoricalDisabledOperators { get; init; }
 }
 
 public static class WorkflowArtifactAdmissionClassifier

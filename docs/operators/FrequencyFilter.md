@@ -5,6 +5,8 @@
 |------|------|
 | 类名 (Class) | `FrequencyFilterOperator` |
 | 枚举值 (Enum) | `OperatorType.FrequencyFilter` |
+| 暴露分类 (Exposure) | `package-public` |
+| 暴露原因 (Exposure Reason) | Supported package-public operator. |
 | 分类 ID (CategoryId) | `ImagePreprocessing` |
 | 分类 (Category) | 图像预处理 |
 | 分类顺序 (CategoryOrder) | 2 |

@@ -13,11 +13,11 @@
   "evidenceKind": "public-benchmark-proof",
   "sourceSchemaVersion": "2026-04-29.public-benchmark-proof.v1",
   "sourceGeneratedAtUtc": "2026-04-29T00:00:00Z",
-  "accepted": true,
+  "accepted": false,
   "summary": {
     "operatorCount": 10,
-    "acceptedCount": 10,
-    "failedCount": 0,
+    "acceptedCount": 9,
+    "failedCount": 1,
     "publicBenchmarkCount": 7,
     "goldenBridgeCount": 3,
     "realIndustrialValidationComplete": 0,
@@ -355,11 +355,11 @@
     {
       "operator": "DeepLearning",
       "datasetId": "coco2017",
-      "proofLevel": "public-benchmark",
-      "evidenceClaim": "COCO 2017 real-model inference proof (real-model postprocess pipeline; synthetic label tensors are not used)",
+      "proofLevel": "inference-smoke-only",
+      "evidenceClaim": "Inference smoke only until an approved delivery model, dataset manifest and nonzero precision gate are present.",
       "industrialStatus": "real field sign-off pending; industrial validation not complete",
       "sourceBaseline": "quality/evals/reports/DeepLearning_coco_real_model_baseline.json",
-      "sourceBaselineSha256": "fc4b314c3e8b6e1c6c2fbff863254d0b42c98d254e78235dd2e4118d1a0e8628",
+      "sourceBaselineSha256": "a2266486d79ffc46c5283daf1fa1e6c9d0f35933dcfa9787405e2d4fde987fd1",
       "manifestPath": "quality/datasets/coco2017_index.json",
       "manifestSha256": "79a914cd475c7beb0e600b44412382c202e708a5c6c746d892ac1aab67e1a072",
       "splitSummary": {
@@ -393,9 +393,9 @@
         "SessionCreateMs": 10.457
       },
       "thresholds": {
-        "AP50": 0,
-        "PrecisionAt50": 0,
-        "RecallAt50": 0
+        "AP50": 0.45,
+        "PrecisionAt50": 0.45,
+        "RecallAt50": 0.35
       },
       "failureTaxonomy": {
         "FP=1, FN=1, detections=1, gt=1": 5,
@@ -412,7 +412,16 @@
       },
       "privacyLeakCount": 0,
       "missingCaseResults": false,
-      "accepted": true,
+      "accepted": false,
+      "precisionDisposition": "FAIL",
+      "precisionBlockingReasons": [
+        "INFERENCE_SMOKE_ONLY",
+        "ALL_PRECISION_METRICS_ZERO",
+        "MODEL_CHECKSUM_MISMATCH",
+        "MODEL_MANIFEST_HASH_MISSING",
+        "DATASET_MANIFEST_MISSING",
+        "APPROVAL_MISSING"
+      ],
       "thresholdResultCount": 3,
       "perCaseResultCount": 20,
       "replayCaseCount": 20,
@@ -420,23 +429,23 @@
         {
           "metric": "AP50",
           "value": 0,
-          "threshold": 0,
+          "threshold": 0.45,
           "comparator": ">=",
-          "passed": true
+          "passed": false
         },
         {
           "metric": "PrecisionAt50",
           "value": 0,
-          "threshold": 0,
+          "threshold": 0.45,
           "comparator": ">=",
-          "passed": true
+          "passed": false
         },
         {
           "metric": "RecallAt50",
           "value": 0,
-          "threshold": 0,
+          "threshold": 0.35,
           "comparator": ">=",
-          "passed": true
+          "passed": false
         }
       ]
     },

@@ -713,6 +713,19 @@ public class ProjectService
 
     private OperatorFlowDto AdmitFlowForPersistence(OperatorFlowDto flow, string source)
     {
+        var disabledOperators = flow.Operators
+            .Where(operatorDto => OperatorExposureCatalog.IsDisabled(
+                OperatorTypeAliasResolver.Resolve(operatorDto.Type)))
+            .Select(operatorDto => OperatorTypeAliasResolver.Resolve(operatorDto.Type))
+            .Distinct()
+            .ToArray();
+        if (disabledOperators.Length > 0)
+        {
+            throw new InvalidOperationException(
+                "OPERATOR_EXPOSURE_DENIED: Disabled operators cannot be created, imported or persisted: " +
+                string.Join(", ", disabledOperators));
+        }
+
         // The admission gate is an AI-artifact boundary. Existing hand-authored
         // project flows continue through the established persistence validators;
         // AI-produced flows must never bypass the gate or run without it.

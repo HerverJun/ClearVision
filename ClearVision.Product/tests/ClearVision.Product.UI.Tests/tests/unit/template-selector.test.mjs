@@ -170,11 +170,15 @@ test('TemplateSelector shares in-flight template data loading', async (t) => {
   assert.deepEqual(calls.sort(), ['/operators/library', '/templates']);
 
   resolveTemplates([{ id: 'template-1', flowJson: { operators: [{ tempId: 'op-1' }] } }]);
-  resolveOperators([{ type: 'ImageAcquisition', parameters: [] }]);
+  resolveOperators([
+    { type: 'ImageAcquisition', parameters: [] },
+    { type: 'MqttPublish', exposureClassification: 'disabled', parameters: [] }
+  ]);
   await Promise.all([firstLoad, secondLoad]);
 
   assert.equal(selector.templates.length, 1);
   assert.equal(selector.operatorMetadata.size, 1);
+  assert.equal(selector.operatorMetadata.has('mqttpublish'), false);
   assert.equal(selector.isLoading, false);
 });
 

@@ -1272,7 +1272,13 @@ public class InspectionService : IInspectionService
             return flow;
         }
 
-        var admission = _workflowArtifactAdmissionGate.Inspect(flow, source);
+        var admission = _workflowArtifactAdmissionGate.Inspect(
+            flow,
+            source,
+            context: new WorkflowArtifactAdmissionContext
+            {
+                AllowHistoricalDisabledOperators = true
+            });
         if (!admission.AllowedToRun || admission.Entity == null)
         {
             throw new WorkflowArtifactAdmissionException(admission.Report);

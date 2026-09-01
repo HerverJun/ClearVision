@@ -141,6 +141,13 @@ public class OperatorService : IOperatorService
 
     public Task<OperatorDto> CreateAsync(CreateOperatorRequest request)
     {
+        if (!OperatorExposureCatalog.IsProductVisible(request.Type))
+        {
+            throw new InvalidOperationException(
+                $"OPERATOR_EXPOSURE_DENIED: Operator type '{request.Type}' is classified as " +
+                $"'{OperatorExposureCatalog.GetSlug(request.Type)}' and cannot be created.");
+        }
+
         // 使用工厂创建算子实例，确保端口和参数正确初始化
         var operatorEntity = _operatorFactory.CreateOperator(
             request.Type,

@@ -238,6 +238,31 @@ public sealed class WorkflowArtifactAdmissionGateTests
     }
 
     [Fact]
+    public void Inspect_DisabledMqttPublishImport_ShouldQuarantine()
+    {
+        var result = CreateGate().Inspect(CreateFlow(OperatorType.MqttPublish), "test.import");
+
+        AssertQuarantined(result, "disabled_operator");
+    }
+
+    [Fact]
+    public void Inspect_DisabledMqttPublishHistoricalExecution_ShouldRemainMaterializable()
+    {
+        var result = CreateGate().Inspect(
+            CreateFlow(OperatorType.MqttPublish),
+            "inspection.persisted",
+            context: new WorkflowArtifactAdmissionContext
+            {
+                AllowHistoricalDisabledOperators = true
+            });
+
+        result.Disposition.Should().Be(WorkflowArtifactAdmissionDisposition.Canonical);
+        result.Entity.Should().BeNull();
+        result.Flow.Should().NotBeNull();
+        result.Report.Diagnostics.Should().BeEmpty();
+    }
+
+    [Fact]
     public void Inspect_UnknownPortsAndParameter_ShouldQuarantineWithoutDynamicSchema()
     {
         var flow = CreateFlow(OperatorType.ImageAcquisition);

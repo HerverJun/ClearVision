@@ -5,6 +5,8 @@
 |------|------|
 | 类名 (Class) | `VoxelDownsampleOperator` |
 | 枚举值 (Enum) | `OperatorType.VoxelDownsample` |
+| 暴露分类 (Exposure) | `package-public` |
+| 暴露原因 (Exposure Reason) | Supported package-public operator. |
 | 分类 ID (CategoryId) | `PointCloud3D` |
 | 分类 (Category) | 3D点云 |
 | 分类顺序 (CategoryOrder) | 10 |

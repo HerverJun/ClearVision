@@ -1,7 +1,18 @@
 {
   "SchemaVersion": "2026-04-30.deep-learning-coco-real-model.v1",
   "EvidenceKind": "public-benchmark-real-model",
-  "Accepted": true,
+  "EvidencePurpose": "InferenceSmokeOnly",
+  "Accepted": false,
+  "EvidenceIdentity": {
+    "GitSha": "376174d830621d284c0d5da0b40a9b6c219a9150",
+    "RepositoryDirty": true,
+    "ToolVersion": "DeepLearningCocoRealModelRunner/2026-09-01.wave3b-classification",
+    "Environment": "Historical smoke report reclassified in Wave 3B; source dataset payload is not present for replay in this checkout.",
+    "ModelContentSha256": "4c80a803ef8e2a3b931dfcfe77b0ef91a7f95b1735680e5a700b52cc488f3cbd",
+    "DatasetChecksumSha256": "79a914cd475c7beb0e600b44412382c202e708a5c6c746d892ac1aab67e1a072",
+    "ActualProvider": "CPUExecutionProvider",
+    "FallbackReason": ""
+  },
   "Summary": {
     "GeneratedAtUtc": "2026-04-30T01:18:36.0094256+00:00",
     "DatasetName": "COCO 2017 real validation images",
@@ -21,6 +32,9 @@
     "PrecisionAt50": 0,
     "RecallAt50": 0,
     "AP50": 0,
+    "MinPrecisionAt50": 0,
+    "MinRecallAt50": 0,
+    "MinAP50": 0,
     "MeanMatchedIoU": 0,
     "ConfidenceThreshold": 0.25,
     "NmsIouThreshold": 0.45,

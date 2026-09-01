@@ -39,6 +39,7 @@ public sealed class OperatorKnowledgeCard
 {
     public string SchemaVersion { get; set; } = "2026-07.operator-knowledge-card.v2";
     public string OperatorType { get; set; } = string.Empty;
+    public string ExposureClassification { get; set; } = string.Empty;
     public string DisplayName { get; set; } = string.Empty;
     public string CategoryId { get; set; } = string.Empty;
     public int CategoryOrder { get; set; }

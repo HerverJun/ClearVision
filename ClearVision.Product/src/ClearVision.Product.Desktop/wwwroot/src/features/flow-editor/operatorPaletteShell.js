@@ -113,9 +113,16 @@ function getLifecycleLabel(lifecycle) {
 
 export { buildOperatorSearchText };
 
+function isPaletteOperatorAllowed(operator) {
+    const type = normalizeText(operator?.type || operator?.Type).toLowerCase();
+    const exposure = normalizeText(
+        operator?.exposureClassification || operator?.ExposureClassification).toLowerCase();
+    return type !== 'mqttpublish' && exposure !== 'disabled';
+}
+
 export function buildOperatorGroups(operators = []) {
     const buckets = new Map();
-    for (const operator of operators) {
+    for (const operator of operators.filter(isPaletteOperatorAllowed)) {
         const category = getOperatorCategory(operator);
         if (!buckets.has(category)) {
             buckets.set(category, {
@@ -142,7 +149,7 @@ export function buildOperatorGroups(operators = []) {
 }
 
 export function filterOperatorsForFlyout(operators = [], keyword = '') {
-    return searchOperators(operators, keyword);
+    return searchOperators(operators.filter(isPaletteOperatorAllowed), keyword);
 }
 
 export function buildPaletteGroupsFromCategories(categoryGroups = []) {

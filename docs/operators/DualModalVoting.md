@@ -5,6 +5,8 @@
 |------|------|
 | 类名 (Class) | `DualModalVotingOperator` |
 | 枚举值 (Enum) | `OperatorType.DualModalVoting` |
+| 暴露分类 (Exposure) | `package-public` |
+| 暴露原因 (Exposure Reason) | Supported package-public operator. |
 | 分类 ID (CategoryId) | `DefectDetection` |
 | 分类 (Category) | 缺陷检测 |
 | 分类顺序 (CategoryOrder) | 6 |

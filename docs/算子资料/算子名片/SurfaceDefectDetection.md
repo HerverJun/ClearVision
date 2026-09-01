@@ -5,6 +5,8 @@
 |------|------|
 | 类名 (Class) | `SurfaceDefectDetectionOperator` |
 | 枚举值 (Enum) | `OperatorType.SurfaceDefectDetection` |
+| 暴露分类 (Exposure) | `package-public` |
+| 暴露原因 (Exposure Reason) | Supported package-public operator. |
 | 分类 ID (CategoryId) | `DefectDetection` |
 | 分类 (Category) | 缺陷检测 |
 | 分类顺序 (CategoryOrder) | 6 |
@@ -177,4 +179,4 @@
 ## 变更记录 / Changelog
 | 版本 (Version) | 日期 (Date) | 变更内容 (Changes) |
 |------|------|----------|
-| 2.0.1 | 2026-08-31 | 按当前最终运行时元数据、条件契约和显式依赖口径重生成 / Regenerated from effective runtime metadata and declared dependencies |
+| 2.0.1 | 2026-09-01 | 按当前最终运行时元数据、条件契约和显式依赖口径重生成 / Regenerated from effective runtime metadata and declared dependencies |

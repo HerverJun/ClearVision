@@ -106,6 +106,7 @@ public sealed class OperatorKnowledgeGraphService : IOperatorKnowledgeGraphServi
             cards.Add(new OperatorKnowledgeCard
             {
                 OperatorType = operatorType,
+                ExposureClassification = OperatorExposureCatalog.GetSlug(item.Type),
                 DisplayName = item.DisplayName,
                 CategoryId = item.CategoryId.ToString(),
                 CategoryOrder = OperatorCategoryCatalog.GetOrder(item.CategoryId),

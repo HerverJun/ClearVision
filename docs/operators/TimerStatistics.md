@@ -5,6 +5,8 @@
 |------|------|
 | 类名 (Class) | `TimerStatisticsOperator` |
 | 枚举值 (Enum) | `OperatorType.TimerStatistics` |
+| 暴露分类 (Exposure) | `package-public` |
+| 暴露原因 (Exposure Reason) | Supported package-public operator. |
 | 分类 ID (CategoryId) | `DataProcessing` |
 | 分类 (Category) | 数据处理 |
 | 分类顺序 (CategoryOrder) | 11 |

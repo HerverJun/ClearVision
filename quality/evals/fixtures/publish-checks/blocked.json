@@ -1,0 +1,25 @@
+{
+  "candidateId": "publish-checks-fixture-blocked",
+  "evidenceClass": "fixture",
+  "expectedDisposition": "blocked",
+  "sourceChain": {
+    "portablePackagingReport": "quality/evals/reports/runtime_package_manifest_dry_run_final.json",
+    "visionAgentReadinessReport": "quality/evals/reports/runtime_preview_package_readiness_final.json",
+    "releaseReviewReport": "quality/evals/reports/runtime_preview_deploy_readiness_report.sample.json"
+  },
+  "assets": [
+    {
+      "path": "quality/evals/schemas/delivery-model-manifest.schema.json",
+      "sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+    }
+  ],
+  "externalModels": [],
+  "flows": [
+    {
+      "id": "fixture-disabled-flow",
+      "operatorTypes": ["ImageAcquisition", "MqttPublish", "UnknownOperator", "DeepLearning"],
+      "parametersNeedingReview": ["DeepLearning.ModelPath"],
+      "roi": { "x": 0, "y": 0, "width": 0, "height": 480 }
+    }
+  ]
+}

@@ -8,6 +8,8 @@ GeneratedAtUtc: `2026-04-29T00:00:00Z`
 - Legacy baselines marked: 20
 - Field datasets blocked: 20
 - Field replay samples tracked: 400
+- Human evidence reviewed/unreviewed/stale: 0/20/0
+- Human evidence release ready: False
 - Industrial validation complete: 0
 
 ## Operators

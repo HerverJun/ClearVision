@@ -1,0 +1,86 @@
+{
+  "schemaVersion": "clearvision.critical-contract-governance/v1",
+  "populationFingerprint": "sha256:4cd53973dd918e3669dc06e2ae1e901b440810e9021ac974fcce1038b719896a",
+  "criticalContracts": [
+    {
+      "id": "CV-AUDIT-004",
+      "owner": "product",
+      "domain": "Core",
+      "purpose": "Regression",
+      "lane": "Pr",
+      "evidence": "Contract",
+      "oracle": "Contract",
+      "resource": "None",
+      "baseline": "quality/evals/baselines/operator-exposure-approved-baseline.json",
+      "tolerance": "Every OperatorType has exactly one explicit classification; missing, duplicate and unknown values fail closed; disabled is never product-visible."
+    },
+    {
+      "id": "operator-dynamic-population",
+      "owner": "operator-quality",
+      "domain": "Quality",
+      "purpose": "Determinism",
+      "lane": "Pr",
+      "evidence": "Contract",
+      "oracle": "GoldenFile",
+      "resource": "RepositoryAsset",
+      "baseline": "quality/evals/baselines/operator-exposure-approved-baseline.json",
+      "tolerance": "No fixed active-completeness count; population and added/removed/reclassified/evidence deltas must derive from the governed catalog fingerprint."
+    },
+    {
+      "id": "deep-learning-smoke-precision-isolation",
+      "owner": "operator-quality",
+      "domain": "Ai",
+      "purpose": "Regression",
+      "lane": "Pr",
+      "evidence": "Contract",
+      "oracle": "Contract",
+      "resource": "None",
+      "baseline": "quality/evals/reports/DeepLearning_delivery_model_evidence_evaluation.json",
+      "tolerance": "InferenceSmokeOnly, all-zero metrics, checksum mismatch, missing manifests, zero thresholds or missing approval can never yield precision PASS."
+    },
+    {
+      "id": "delivery-manifest-identity",
+      "owner": "operator-quality",
+      "domain": "Ai",
+      "purpose": "Regression",
+      "lane": "Pr",
+      "evidence": "Contract",
+      "oracle": "Contract",
+      "resource": "None",
+      "baseline": "quality/evals/schemas/delivery-model-manifest.schema.json",
+      "tolerance": "Model and dataset content hashes must match; CPU, CUDA and TensorRT dispositions are independent and unverified profiles remain unsupported or unvalidated."
+    },
+    {
+      "id": "core20-sidecar-stale-fingerprint",
+      "owner": "operator-quality",
+      "domain": "Quality",
+      "purpose": "Regression",
+      "lane": "Pr",
+      "evidence": "Contract",
+      "oracle": "GoldenFile",
+      "resource": "RepositoryAsset",
+      "baseline": "quality/evals/baselines/core20-human-evidence-ledger.json",
+      "tolerance": "A reviewed verdict is invalid when its card fingerprint is stale; unreviewed entries remain release-not-ready and no reviewer/date/PASS is synthesized."
+    },
+    {
+      "id": "publish-checks-truthfulness",
+      "owner": "release-review",
+      "domain": "Quality",
+      "purpose": "Regression",
+      "lane": "Pr",
+      "evidence": "Contract",
+      "oracle": "Contract",
+      "resource": "RepositoryAsset",
+      "baseline": "quality/evals/reports/PublishChecks_fixture_evaluation.json",
+      "tolerance": "Asset/model hashes, review parameters, nonzero ROI and governed operators must pass; fixture verification never becomes delivery evidence."
+    }
+  ],
+  "releaseGovernance": {
+    "G02": "OPEN_BLOCKED_NOT_PUSHED",
+    "G08": "REPORT_ONLY",
+    "portableZip": "OPEN",
+    "sbom": "OPEN",
+    "licenseReview": "OPEN",
+    "githubRelease": "OPEN"
+  }
+}

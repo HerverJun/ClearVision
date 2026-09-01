@@ -1,0 +1,1143 @@
+{
+  "schemaVersion": "2026-09-01.operator-exposure-baseline.v1",
+  "approvalStatus": "approved-as-code",
+  "approvalAuthority": "CV-AUDIT-004 acceptance contract",
+  "approvalDate": "2026-09-01",
+  "populationFingerprint": "sha256:4cd53973dd918e3669dc06e2ae1e901b440810e9021ac974fcce1038b719896a",
+  "entries": [
+    {
+      "operatorType": "ImageAcquisition",
+      "numericValue": 0,
+      "exposureClassification": "package-public",
+      "reason": "Supported package-public operator.",
+      "evidenceFingerprint": "6F92E2DFC35875A87558C06B2DD9D498460B5EA9FF8442560B233D566B8D9E98"
+    },
+    {
+      "operatorType": "Preprocessing",
+      "numericValue": 1,
+      "exposureClassification": "legacy-alias",
+      "reason": "Compatibility alias; resolve to its canonical operator type.",
+      "evidenceFingerprint": ""
+    },
+    {
+      "operatorType": "Filtering",
+      "numericValue": 2,
+      "exposureClassification": "package-public",
+      "reason": "Supported package-public operator.",
+      "evidenceFingerprint": "D956D7CDABEF6B2435D5026C69B66AE9E69AEC78F9960B97BC0DB6F56F7A0CEE"
+    },
+    {
+      "operatorType": "EdgeDetection",
+      "numericValue": 3,
+      "exposureClassification": "package-public",
+      "reason": "Supported package-public operator.",
+      "evidenceFingerprint": "7E0C2BA77CA2CB51AFB92141AE3CDDA821418CB5C70039572357B41D5E5218C7"
+    },
+    {
+      "operatorType": "Thresholding",
+      "numericValue": 4,
+      "exposureClassification": "package-public",
+      "reason": "Supported package-public operator.",
+      "evidenceFingerprint": "467D2999038418BD09F5BDB6D12670AB0A1DAB33E123EA4F528ED04CB6C6EAFE"
+    },
+    {
+      "operatorType": "Morphology",
+      "numericValue": 5,
+      "exposureClassification": "package-public",
+      "reason": "Supported package-public operator.",
+      "evidenceFingerprint": "8BCC72D1E70D90D67E112547E44B347D1131F19A00B1D73A35AA461D6260F391"
+    },
+    {
+      "operatorType": "BlobAnalysis",
+      "numericValue": 6,
+      "exposureClassification": "package-public",
+      "reason": "Supported package-public operator.",
+      "evidenceFingerprint": "896918CF9B07260F53FF2B19704EB5445C688CD7682AA9F2BADAA9AD1010962D"
+    },
+    {
+      "operatorType": "TemplateMatching",
+      "numericValue": 7,
+      "exposureClassification": "package-public",
+      "reason": "Supported package-public operator.",
+      "evidenceFingerprint": "0D64DE48699914570EFCA22DF364504365782D74140DE4F2BA66C6E3CE20C4EE"
+    },
+    {
+      "operatorType": "Measurement",
+      "numericValue": 8,
+      "exposureClassification": "package-public",
+      "reason": "Supported package-public operator.",
+      "evidenceFingerprint": "636C65F419283A5408BC375DDDA88251AE3BF6185D8082F8ABD9392CC4BCE209"
+    },
+    {
+      "operatorType": "CodeRecognition",
+      "numericValue": 9,
+      "exposureClassification": "package-public",
+      "reason": "Supported package-public operator.",
+      "evidenceFingerprint": "7D711DD769875E54453FCE741A0F0A5BE153412FDBAE72613E0BFA9CE705B85C"
+    },
+    {
+      "operatorType": "DeepLearning",
+      "numericValue": 10,
+      "exposureClassification": "package-public",
+      "reason": "Supported package-public operator.",
+      "evidenceFingerprint": "67F1BFF6738317B1185CA6E184CBB94797B66ED517065BB005F151917EB58145"
+    },
+    {
+      "operatorType": "ResultOutput",
+      "numericValue": 11,
+      "exposureClassification": "package-public",
+      "reason": "Supported package-public operator.",
+      "evidenceFingerprint": "D090637C95E00274567686C42336670F2A13050660A511889E418B6E7E3716C6"
+    },
+    {
+      "operatorType": "ContourDetection",
+      "numericValue": 12,
+      "exposureClassification": "package-public",
+      "reason": "Supported package-public operator.",
+      "evidenceFingerprint": "8415835802F23A150C74ED407529EF52549071668BB602F6E5D93B10090EB1D0"
+    },
+    {
+      "operatorType": "MedianBlur",
+      "numericValue": 13,
+      "exposureClassification": "package-public",
+      "reason": "Supported package-public operator.",
+      "evidenceFingerprint": "466C4AA2FC57D22F9E4101BB985C7A1C1CAEC569BB4965A650A55DDEC92AA593"
+    },
+    {
+      "operatorType": "BilateralFilter",
+      "numericValue": 14,
+      "exposureClassification": "package-public",
+      "reason": "Supported package-public operator.",
+      "evidenceFingerprint": "2AC2FE2007E49C44D2538AE2D3D9E2BD37B757BE5B6835114148D147527CD539"
+    },
+    {
+      "operatorType": "ImageResize",
+      "numericValue": 15,
+      "exposureClassification": "package-public",
+      "reason": "Supported package-public operator.",
+      "evidenceFingerprint": "226A0498FC6B034DC78A8902B96020D0EE70F68C0E13C937FE518F62C8552B87"
+    },
+    {
+      "operatorType": "ImageCrop",
+      "numericValue": 16,
+      "exposureClassification": "package-public",
+      "reason": "Supported package-public operator.",
+      "evidenceFingerprint": "47402FEBCC97861438AC0CF53E7DCFB7EFEBE598C9CE593F8B2190F0098DE66E"
+    },
+    {
+      "operatorType": "ImageRotate",
+      "numericValue": 17,
+      "exposureClassification": "package-public",
+      "reason": "Supported package-public operator.",
+      "evidenceFingerprint": "C4AF5D397F39E5BBD3F767EC158F998AC429E20C8C9C03767EBD4BB87F28FC30"
+    },
+    {
+      "operatorType": "PerspectiveTransform",
+      "numericValue": 18,
+      "exposureClassification": "package-public",
+      "reason": "Supported package-public operator.",
+      "evidenceFingerprint": "2B877F2C6FDE1161F474CB72C67B8E96F4C6BC09369F2C2BD26B87D1EEB99738"
+    },
+    {
+      "operatorType": "CircleMeasurement",
+      "numericValue": 19,
+      "exposureClassification": "package-public",
+      "reason": "Supported package-public operator.",
+      "evidenceFingerprint": "BB568917FD41D9D4F3244B31FFD8AE2DBE2EB230588BCE8DFBCC97D7776CDA8B"
+    },
+    {
+      "operatorType": "LineMeasurement",
+      "numericValue": 20,
+      "exposureClassification": "package-public",
+      "reason": "Supported package-public operator.",
+      "evidenceFingerprint": "49DA9D751D7373D509AEAF26D49ABC295CAC0868AEE2332ACFA03D49D56C61BA"
+    },
+    {
+      "operatorType": "ContourMeasurement",
+      "numericValue": 21,
+      "exposureClassification": "package-public",
+      "reason": "Supported package-public operator.",
+      "evidenceFingerprint": "4936B3B59F92D316F6DBE9CB44367A35E2D0BDAEDED1B3A240F53F8B301AF03C"
+    },
+    {
+      "operatorType": "AngleMeasurement",
+      "numericValue": 22,
+      "exposureClassification": "package-public",
+      "reason": "Supported package-public operator.",
+      "evidenceFingerprint": "21FF978562E87C61B6B34C7F8BEDF33E9009A1F57A771EFAD853704130F5FA75"
+    },
+    {
+      "operatorType": "GeometricTolerance",
+      "numericValue": 23,
+      "exposureClassification": "package-public",
+      "reason": "Supported package-public operator.",
+      "evidenceFingerprint": "818495EA9C4B17CB17AD464C165AE16C68C8AC232AD87FDD59DED58FED591FA1"
+    },
+    {
+      "operatorType": "CameraCalibration",
+      "numericValue": 24,
+      "exposureClassification": "package-public",
+      "reason": "Supported package-public operator.",
+      "evidenceFingerprint": "E7B65D9393046CF5B79094998145B6D54DCE29C24C872035F85310D7BC10A859"
+    },
+    {
+      "operatorType": "Undistort",
+      "numericValue": 25,
+      "exposureClassification": "package-public",
+      "reason": "Supported package-public operator.",
+      "evidenceFingerprint": "ACE830793818CD03349655F0319C1CC12B43BC0F9254A06DB3C73BCDE813F273"
+    },
+    {
+      "operatorType": "CoordinateTransform",
+      "numericValue": 26,
+      "exposureClassification": "package-public",
+      "reason": "Supported package-public operator.",
+      "evidenceFingerprint": "A42A7A6B0B58C0793438F4673EF7B45959F62251804A7E9BE7D9DA86E24350BB"
+    },
+    {
+      "operatorType": "ModbusCommunication",
+      "numericValue": 27,
+      "exposureClassification": "package-public",
+      "reason": "Supported package-public operator.",
+      "evidenceFingerprint": "37F4F681C1B9B8979BE1E41902487D34087D64437FEB78DD4D1FDD94D4C5C738"
+    },
+    {
+      "operatorType": "TcpCommunication",
+      "numericValue": 28,
+      "exposureClassification": "package-public",
+      "reason": "Supported package-public operator.",
+      "evidenceFingerprint": "CE7463C76C444B6CE795423B70363D7F28892193998630221049D89F8217C698"
+    },
+    {
+      "operatorType": "DatabaseWrite",
+      "numericValue": 29,
+      "exposureClassification": "package-public",
+      "reason": "Supported package-public operator.",
+      "evidenceFingerprint": "B5AD0F86A0D57632A6CCD1C163A25AB9BB3A422F600E4126038E463E67DCA4D1"
+    },
+    {
+      "operatorType": "ConditionalBranch",
+      "numericValue": 30,
+      "exposureClassification": "package-public",
+      "reason": "Supported package-public operator.",
+      "evidenceFingerprint": "ACE45EF2B7687552341D4549780571B23D1032D1076FDF856369668F8C9ADFBE"
+    },
+    {
+      "operatorType": "ColorConversion",
+      "numericValue": 38,
+      "exposureClassification": "package-public",
+      "reason": "Supported package-public operator.",
+      "evidenceFingerprint": "2FE4E29B3E3B65FC35391517EB336AC39F29CE15F1593452BB9E81CBE717E9C4"
+    },
+    {
+      "operatorType": "AdaptiveThreshold",
+      "numericValue": 39,
+      "exposureClassification": "package-public",
+      "reason": "Supported package-public operator.",
+      "evidenceFingerprint": "FF75218065374CD71798E0BA8365EFB92B794220120812709C51CD87E98223B6"
+    },
+    {
+      "operatorType": "HistogramEqualization",
+      "numericValue": 40,
+      "exposureClassification": "package-public",
+      "reason": "Supported package-public operator.",
+      "evidenceFingerprint": "58C571870EA498C0AFD3E6600A38CD232B871A105FC81BBE5AE46C654D813954"
+    },
+    {
+      "operatorType": "GeometricFitting",
+      "numericValue": 41,
+      "exposureClassification": "package-public",
+      "reason": "Supported package-public operator.",
+      "evidenceFingerprint": "B460CD780BA28D006122CBEB9B5118DF1DEBFAF7AA1A0782F111113741E51D15"
+    },
+    {
+      "operatorType": "RoiManager",
+      "numericValue": 42,
+      "exposureClassification": "package-public",
+      "reason": "Supported package-public operator.",
+      "evidenceFingerprint": "1E5FEA43F5BB1B3AA48320BCA821ED90DD47399EA3D551A49043F450AD128693"
+    },
+    {
+      "operatorType": "RoiTransform",
+      "numericValue": 216,
+      "exposureClassification": "package-public",
+      "reason": "Supported package-public operator.",
+      "evidenceFingerprint": "23C60C75C7FBFB86D22BE9E2111918454D5622061DCC90DFEF972639CC5042FE"
+    },
+    {
+      "operatorType": "ShapeMatching",
+      "numericValue": 43,
+      "exposureClassification": "package-public",
+      "reason": "Supported package-public operator.",
+      "evidenceFingerprint": "2CA30374003AAB69D27E9A9A84B400767B38A88086321899701BA56D68618EB1"
+    },
+    {
+      "operatorType": "SubpixelEdgeDetection",
+      "numericValue": 44,
+      "exposureClassification": "package-public",
+      "reason": "Supported package-public operator.",
+      "evidenceFingerprint": "D5995266624DDCEBC584210D2437264B20F5364053B83411A0D0286E0237225E"
+    },
+    {
+      "operatorType": "ColorDetection",
+      "numericValue": 45,
+      "exposureClassification": "package-public",
+      "reason": "Supported package-public operator.",
+      "evidenceFingerprint": "7FC15AEA6072ED2E8E4B972492A39FA48688B2F8FC45DD2FF6A941FBBBC54EC7"
+    },
+    {
+      "operatorType": "SerialCommunication",
+      "numericValue": 46,
+      "exposureClassification": "package-public",
+      "reason": "Supported package-public operator.",
+      "evidenceFingerprint": "ADCC4C619D1E31EDEE1B5069B2E5D09F6E4249C34FB10AC0EE94DFCE2737B896"
+    },
+    {
+      "operatorType": "SiemensS7Communication",
+      "numericValue": 50,
+      "exposureClassification": "package-public",
+      "reason": "Supported package-public operator.",
+      "evidenceFingerprint": "64F3A29E33BD1139693B3102D9CCD072F348FC6529B20D7E2B3C7C14FE8DEF71"
+    },
+    {
+      "operatorType": "MitsubishiMcCommunication",
+      "numericValue": 51,
+      "exposureClassification": "package-public",
+      "reason": "Supported package-public operator.",
+      "evidenceFingerprint": "D9DAA52E3334A95828B46E9A466902AB7E19759BD18B4DA1A5396FC83CD484CC"
+    },
+    {
+      "operatorType": "OmronFinsCommunication",
+      "numericValue": 52,
+      "exposureClassification": "package-public",
+      "reason": "Supported package-public operator.",
+      "evidenceFingerprint": "119A6776F434026B281AD623CCC8026E35034DA5F5DF63426E13A85374AADF0E"
+    },
+    {
+      "operatorType": "ResultJudgment",
+      "numericValue": 60,
+      "exposureClassification": "package-public",
+      "reason": "Supported package-public operator.",
+      "evidenceFingerprint": "7333F779253445A60AE8E15A9A9E2A76D962FE2A568320FA96C2C102CC4CCDEF"
+    },
+    {
+      "operatorType": "DetectionSequenceJudge",
+      "numericValue": 61,
+      "exposureClassification": "package-public",
+      "reason": "Supported package-public operator.",
+      "evidenceFingerprint": "93D6CC25A3CD00BC6C56B7FBAB982BCBD08416750DD8B4AEFF91B8D15E1791B1"
+    },
+    {
+      "operatorType": "ModbusRtuCommunication",
+      "numericValue": 70,
+      "exposureClassification": "legacy-alias",
+      "reason": "Compatibility alias; resolve to its canonical operator type.",
+      "evidenceFingerprint": ""
+    },
+    {
+      "operatorType": "ClaheEnhancement",
+      "numericValue": 71,
+      "exposureClassification": "package-public",
+      "reason": "Supported package-public operator.",
+      "evidenceFingerprint": "8FE0EEE5EDF16DE9AF8F05EEBEEBCE29F91AEDA990E0718BD979E7F9FCEB151F"
+    },
+    {
+      "operatorType": "MorphologicalOperation",
+      "numericValue": 72,
+      "exposureClassification": "package-public",
+      "reason": "Supported package-public operator.",
+      "evidenceFingerprint": "749575BD09E18010C45912DD55DD9460DEEAC420F5A6A1F2C2C3B21D301D29FA"
+    },
+    {
+      "operatorType": "GaussianBlur",
+      "numericValue": 73,
+      "exposureClassification": "legacy-alias",
+      "reason": "Compatibility alias; resolve to its canonical operator type.",
+      "evidenceFingerprint": ""
+    },
+    {
+      "operatorType": "LaplacianSharpen",
+      "numericValue": 74,
+      "exposureClassification": "package-public",
+      "reason": "Supported package-public operator.",
+      "evidenceFingerprint": "5FEA5C648C6BBA2E5A2697EC32535C0C1911926620CA771CBEE53726A8AA2E71"
+    },
+    {
+      "operatorType": "OnnxInference",
+      "numericValue": 75,
+      "exposureClassification": "legacy-alias",
+      "reason": "Compatibility alias; resolve to its canonical operator type.",
+      "evidenceFingerprint": ""
+    },
+    {
+      "operatorType": "ImageAdd",
+      "numericValue": 76,
+      "exposureClassification": "package-public",
+      "reason": "Supported package-public operator.",
+      "evidenceFingerprint": "F5F9DF63BB57BA70C42AB64BEF9AA6D13B98E32557C3F0BB022F028498F0DBA9"
+    },
+    {
+      "operatorType": "ImageSubtract",
+      "numericValue": 77,
+      "exposureClassification": "package-public",
+      "reason": "Supported package-public operator.",
+      "evidenceFingerprint": "9794085B1D726C0D42FFC4C8E0324684A5E91667E67BF7AB26A7570E139D472F"
+    },
+    {
+      "operatorType": "ImageBlend",
+      "numericValue": 78,
+      "exposureClassification": "package-public",
+      "reason": "Supported package-public operator.",
+      "evidenceFingerprint": "64DC1EE1FA525BD856FE3047B5B35149695D04100529A15205D2E48FBB89C9EA"
+    },
+    {
+      "operatorType": "VariableRead",
+      "numericValue": 80,
+      "exposureClassification": "package-public",
+      "reason": "Supported package-public operator.",
+      "evidenceFingerprint": "32855968C1EF71D2B1ADCE8D2C365358C9FEAB3280F308B1E227FADC4780C7E1"
+    },
+    {
+      "operatorType": "VariableWrite",
+      "numericValue": 81,
+      "exposureClassification": "package-public",
+      "reason": "Supported package-public operator.",
+      "evidenceFingerprint": "803372859ACF95235385DDA48BF85759FE419E6150FC3E0CC2BEF862134AFE2F"
+    },
+    {
+      "operatorType": "VariableIncrement",
+      "numericValue": 82,
+      "exposureClassification": "package-public",
+      "reason": "Supported package-public operator.",
+      "evidenceFingerprint": "E926ED16A6C9F3AD18C977B9D8A7E213AE087D64785B01D273B8F072221BAC6A"
+    },
+    {
+      "operatorType": "TryCatch",
+      "numericValue": 83,
+      "exposureClassification": "package-public",
+      "reason": "Supported package-public operator.",
+      "evidenceFingerprint": "DFF8F58801CC6A5CB155F6BA06FE27657FF06E5120D406FFBBC0D173FBC2DAD4"
+    },
+    {
+      "operatorType": "CycleCounter",
+      "numericValue": 84,
+      "exposureClassification": "package-public",
+      "reason": "Supported package-public operator.",
+      "evidenceFingerprint": "A2754CE732F531508FBFA22FE61DC2AA7EC6396ADEDF0BC70412AE83981B5001"
+    },
+    {
+      "operatorType": "AkazeFeatureMatch",
+      "numericValue": 90,
+      "exposureClassification": "package-public",
+      "reason": "Supported package-public operator.",
+      "evidenceFingerprint": "81A958291FEA9DF861AC2F4562C8D920DD581A73D79D500735080ED9CD49F561"
+    },
+    {
+      "operatorType": "OrbFeatureMatch",
+      "numericValue": 91,
+      "exposureClassification": "package-public",
+      "reason": "Supported package-public operator.",
+      "evidenceFingerprint": "7DE1535831EAC487A960D464749A37D5945DA5C2BC1BED1C66FFACFA13F073B1"
+    },
+    {
+      "operatorType": "GradientShapeMatch",
+      "numericValue": 92,
+      "exposureClassification": "package-public",
+      "reason": "Supported package-public operator.",
+      "evidenceFingerprint": "1733B12CC72F5E7C7F3A0B3E64410D147542DF1D85A5776483CACCC1EE36B08B"
+    },
+    {
+      "operatorType": "PyramidShapeMatch",
+      "numericValue": 93,
+      "exposureClassification": "package-public",
+      "reason": "Supported package-public operator.",
+      "evidenceFingerprint": "E45766A3B443EEF67F850EF888D9DAB04D242E15BC03B668EC0C20B7DCB082B1"
+    },
+    {
+      "operatorType": "DualModalVoting",
+      "numericValue": 94,
+      "exposureClassification": "package-public",
+      "reason": "Supported package-public operator.",
+      "evidenceFingerprint": "9B2DDB4B238765CCDF75DCFD5F38F6C8A34404D98BF26EDD6CCDC81EB3C8DA53"
+    },
+    {
+      "operatorType": "OcrRecognition",
+      "numericValue": 117,
+      "exposureClassification": "package-public",
+      "reason": "Supported package-public operator.",
+      "evidenceFingerprint": "53D8EEF9DD4323AF3D845E1630C251935717551869BFE175D949BC6E368C9940"
+    },
+    {
+      "operatorType": "ImageDiff",
+      "numericValue": 118,
+      "exposureClassification": "package-public",
+      "reason": "Supported package-public operator.",
+      "evidenceFingerprint": "33FBFBD54D70A4F042F43324E4A070DBE8812D8AEE24C2D1999F7AFD858BC0A2"
+    },
+    {
+      "operatorType": "Statistics",
+      "numericValue": 119,
+      "exposureClassification": "package-public",
+      "reason": "Supported package-public operator.",
+      "evidenceFingerprint": "710F28CB4814E73B1059B1212C77D40EC4F1581D3EFCE546EAD06B260EEE6293"
+    },
+    {
+      "operatorType": "ForEach",
+      "numericValue": 100,
+      "exposureClassification": "package-public",
+      "reason": "Supported package-public operator.",
+      "evidenceFingerprint": "83A7A11063850361A29610D63D166BC3E4F890934B59F8DB61E0EDDA23C48401"
+    },
+    {
+      "operatorType": "ArrayIndexer",
+      "numericValue": 101,
+      "exposureClassification": "package-public",
+      "reason": "Supported package-public operator.",
+      "evidenceFingerprint": "B3BB274D288EDAB76422A67205BB5423BF82E65840BFC4B982A1DF65FA696DA1"
+    },
+    {
+      "operatorType": "JsonExtractor",
+      "numericValue": 102,
+      "exposureClassification": "package-public",
+      "reason": "Supported package-public operator.",
+      "evidenceFingerprint": "88265F6416E4EFF2E6326B7E38B9F8D05AC9D7E4789F360E0DABD1580671FDCB"
+    },
+    {
+      "operatorType": "MathOperation",
+      "numericValue": 110,
+      "exposureClassification": "package-public",
+      "reason": "Supported package-public operator.",
+      "evidenceFingerprint": "7199E66A395CF785F5E0436AC7CEA2D67F2A132FA18B4F02AFB85DD11FE03460"
+    },
+    {
+      "operatorType": "LogicGate",
+      "numericValue": 111,
+      "exposureClassification": "package-public",
+      "reason": "Supported package-public operator.",
+      "evidenceFingerprint": "EBC0DC57AB5412071675B744364B49216EAC6AD4385FB04FCE8FD9A55FFAD693"
+    },
+    {
+      "operatorType": "TypeConvert",
+      "numericValue": 112,
+      "exposureClassification": "package-public",
+      "reason": "Supported package-public operator.",
+      "evidenceFingerprint": "DD7EB17C6F3198EE12DE6FAC84FECC6F0867A351E61E61A2E6D626F0B50E2AE7"
+    },
+    {
+      "operatorType": "HttpRequest",
+      "numericValue": 113,
+      "exposureClassification": "package-public",
+      "reason": "Supported package-public operator.",
+      "evidenceFingerprint": "A89C8CE5EECD82CFA258DFBBAA6A6CBF6E3C29F2F013F3E51761F260FAECA017"
+    },
+    {
+      "operatorType": "MqttPublish",
+      "numericValue": 114,
+      "exposureClassification": "disabled",
+      "reason": "Placeholder executor retained only for historical flow fail-closed execution (MQTT_PUBLISH_DISABLED).",
+      "evidenceFingerprint": "4F56C778A447E277256FA20DD36262B3AFFEFB829B8116D892D0A5F2E5590B61"
+    },
+    {
+      "operatorType": "StringFormat",
+      "numericValue": 115,
+      "exposureClassification": "package-public",
+      "reason": "Supported package-public operator.",
+      "evidenceFingerprint": "8A52E735E09CD061D94CEBFA756218F1DFCF3ABCAFA9D1C5000D2C990BCDC9C1"
+    },
+    {
+      "operatorType": "ImageSave",
+      "numericValue": 116,
+      "exposureClassification": "package-public",
+      "reason": "Supported package-public operator.",
+      "evidenceFingerprint": "1AC3405B713EF371C26CA697D3AB83C84503B103488B92331F0E327F0BAB1DE5"
+    },
+    {
+      "operatorType": "Aggregator",
+      "numericValue": 120,
+      "exposureClassification": "package-public",
+      "reason": "Supported package-public operator.",
+      "evidenceFingerprint": "FF854B092E0E4E0DB05BA6DC33F5727E234606D5B2FDC97183E5D8364FC61188"
+    },
+    {
+      "operatorType": "Comment",
+      "numericValue": 121,
+      "exposureClassification": "package-public",
+      "reason": "Supported package-public operator.",
+      "evidenceFingerprint": "AB1512D967592A6EE1F73AF0A922C101A0279577D0F18CF4AB0FEA1684D32957"
+    },
+    {
+      "operatorType": "Comparator",
+      "numericValue": 122,
+      "exposureClassification": "package-public",
+      "reason": "Supported package-public operator.",
+      "evidenceFingerprint": "3FD4BD6BB94D70D1198AE4C0CD8D9857CF4B2547E86CD19B35B1903366363303"
+    },
+    {
+      "operatorType": "Delay",
+      "numericValue": 123,
+      "exposureClassification": "package-public",
+      "reason": "Supported package-public operator.",
+      "evidenceFingerprint": "58DF057665DDF148A95AA26CC489D24DC94204AD2CE6DC95ADD46B3CB2494CF2"
+    },
+    {
+      "operatorType": "CaliperTool",
+      "numericValue": 130,
+      "exposureClassification": "package-public",
+      "reason": "Supported package-public operator.",
+      "evidenceFingerprint": "A85552FEF127ADFAAB69D0F3E1222CD6061474CD11195B14FCEDFAA66D61E0F5"
+    },
+    {
+      "operatorType": "WidthMeasurement",
+      "numericValue": 131,
+      "exposureClassification": "package-public",
+      "reason": "Supported package-public operator.",
+      "evidenceFingerprint": "0A08E53EE19114735FAFDFFE3DD8C8B6223F4EB1FA447D757C09508B6063C9AD"
+    },
+    {
+      "operatorType": "PointLineDistance",
+      "numericValue": 132,
+      "exposureClassification": "package-public",
+      "reason": "Supported package-public operator.",
+      "evidenceFingerprint": "76C29D87909B72963FD9AD3D9FE9F11C6DDAF7C4625FE8315643C619CF5B02D9"
+    },
+    {
+      "operatorType": "LineLineDistance",
+      "numericValue": 133,
+      "exposureClassification": "package-public",
+      "reason": "Supported package-public operator.",
+      "evidenceFingerprint": "249BEE4DFDAC818F78A786773C8AF120FDA6AD9141B23BE2742F0B2A63755CFB"
+    },
+    {
+      "operatorType": "BoxNms",
+      "numericValue": 140,
+      "exposureClassification": "package-public",
+      "reason": "Supported package-public operator.",
+      "evidenceFingerprint": "79F956B20D31992C433603B495614A76B7039DD2348EB97CCC3AEF1AE26E6585"
+    },
+    {
+      "operatorType": "BoxFilter",
+      "numericValue": 141,
+      "exposureClassification": "package-public",
+      "reason": "Supported package-public operator.",
+      "evidenceFingerprint": "94FB73CD440D15E6F80FF67AED0138DCBDD5A4DAEA30068143942F54AF75CF91"
+    },
+    {
+      "operatorType": "SharpnessEvaluation",
+      "numericValue": 142,
+      "exposureClassification": "package-public",
+      "reason": "Supported package-public operator.",
+      "evidenceFingerprint": "0FE236CADF8A6072A6617596CB03CB84BB56BDA1C3496F87EB73B69E19757F19"
+    },
+    {
+      "operatorType": "PositionCorrection",
+      "numericValue": 143,
+      "exposureClassification": "package-public",
+      "reason": "Supported package-public operator.",
+      "evidenceFingerprint": "0EE01A4E9F45107787DC5A363FE8D500F44AE93BD4D4FDFBC5AA878A03245347"
+    },
+    {
+      "operatorType": "NPointCalibration",
+      "numericValue": 150,
+      "exposureClassification": "package-public",
+      "reason": "Supported package-public operator.",
+      "evidenceFingerprint": "835131B8B9B606FF8A4E12AEFF186918AC7E686D6998EA70023ADE48835E1932"
+    },
+    {
+      "operatorType": "CalibrationLoader",
+      "numericValue": 151,
+      "exposureClassification": "package-public",
+      "reason": "Supported package-public operator.",
+      "evidenceFingerprint": "E8896936329EC1949E20FF0C5B1710BD985499979FE30B977369B86558313306"
+    },
+    {
+      "operatorType": "UnitConvert",
+      "numericValue": 152,
+      "exposureClassification": "package-public",
+      "reason": "Supported package-public operator.",
+      "evidenceFingerprint": "DEAF0E82CACF51A84A3136C3141B1388C687C73368AE852BFD794A9666A27095"
+    },
+    {
+      "operatorType": "TimerStatistics",
+      "numericValue": 153,
+      "exposureClassification": "package-public",
+      "reason": "Supported package-public operator.",
+      "evidenceFingerprint": "011A234C94717879D9B27D4760C33BB856A11DDE2B704713C4739507CD018CE3"
+    },
+    {
+      "operatorType": "ScriptOperator",
+      "numericValue": 160,
+      "exposureClassification": "package-public",
+      "reason": "Supported package-public operator.",
+      "evidenceFingerprint": "3429501138E27DF79E2497B5B3056F929E72B7D9D9D5349A1C62F37484DF6F4E"
+    },
+    {
+      "operatorType": "TriggerModule",
+      "numericValue": 161,
+      "exposureClassification": "package-public",
+      "reason": "Supported package-public operator.",
+      "evidenceFingerprint": "44C0E9BD54DE0AD7AB6BD0023CE4932346A89A76C42043D7BEB74E674192A667"
+    },
+    {
+      "operatorType": "FrameChangeTrigger",
+      "numericValue": 1620,
+      "exposureClassification": "package-internal",
+      "reason": "Runtime trigger stays product-internal and outside the package-public projection.",
+      "evidenceFingerprint": "CA564F99501677A069956B97308A3FCE5A595903D91E92EEDB6941DF5CCDAF0D"
+    },
+    {
+      "operatorType": "PointAlignment",
+      "numericValue": 162,
+      "exposureClassification": "package-public",
+      "reason": "Supported package-public operator.",
+      "evidenceFingerprint": "82EAB47A9674C349C9FCD49686035B85D16A088C34F4AA0696E766D22E7F9880"
+    },
+    {
+      "operatorType": "PointCorrection",
+      "numericValue": 163,
+      "exposureClassification": "package-public",
+      "reason": "Supported package-public operator.",
+      "evidenceFingerprint": "6D2D29704E5A0F25542D595814E8BB0BAF66FA8DCFC82F90DF5E9ED306F1DE50"
+    },
+    {
+      "operatorType": "GapMeasurement",
+      "numericValue": 164,
+      "exposureClassification": "package-public",
+      "reason": "Supported package-public operator.",
+      "evidenceFingerprint": "DF0DA993EE66D2A4C67723EAD4F9403C8DC601FC82A8ED867716D3096AA16710"
+    },
+    {
+      "operatorType": "PolarUnwrap",
+      "numericValue": 170,
+      "exposureClassification": "package-public",
+      "reason": "Supported package-public operator.",
+      "evidenceFingerprint": "B98C6401D387A581654B801671EE114CABF9E9CE20D4BB2491947F2EF631E9AF"
+    },
+    {
+      "operatorType": "ShadingCorrection",
+      "numericValue": 171,
+      "exposureClassification": "package-public",
+      "reason": "Supported package-public operator.",
+      "evidenceFingerprint": "5011419F487D053A8ADF0A5E858AA8B2F6F271432D7853270C6BF6BBBF341C38"
+    },
+    {
+      "operatorType": "FrameAveraging",
+      "numericValue": 172,
+      "exposureClassification": "package-public",
+      "reason": "Supported package-public operator.",
+      "evidenceFingerprint": "A2CBB33A0A428C7AA03CFF18EACE50BB52D83ACF6B57C0BF6404A2C412AEAA75"
+    },
+    {
+      "operatorType": "AffineTransform",
+      "numericValue": 173,
+      "exposureClassification": "package-public",
+      "reason": "Supported package-public operator.",
+      "evidenceFingerprint": "4888FB5B00DE5FF2EA7146C273BD31C545C4434B052D8FD011D73D7F5B701E05"
+    },
+    {
+      "operatorType": "ColorMeasurement",
+      "numericValue": 174,
+      "exposureClassification": "package-public",
+      "reason": "Supported package-public operator.",
+      "evidenceFingerprint": "C2E255FDE8642355411954D20AA3024D103FA13175B2885C9747E971C828C162"
+    },
+    {
+      "operatorType": "SurfaceDefectDetection",
+      "numericValue": 180,
+      "exposureClassification": "package-public",
+      "reason": "Supported package-public operator.",
+      "evidenceFingerprint": "35AA01E44E55FFC253C89DBC8E40761F74DB34CD0253020344316A7044F617B5"
+    },
+    {
+      "operatorType": "EdgePairDefect",
+      "numericValue": 181,
+      "exposureClassification": "package-public",
+      "reason": "Supported package-public operator.",
+      "evidenceFingerprint": "F562034673B407D01639433C946E3D6D45139A5CBC6074553567811FD913DFC5"
+    },
+    {
+      "operatorType": "RectangleDetection",
+      "numericValue": 182,
+      "exposureClassification": "package-public",
+      "reason": "Supported package-public operator.",
+      "evidenceFingerprint": "5D312E5A2967045BFEC131A6A8267B8EB180EC7D5157D544477A8D54CE72A537"
+    },
+    {
+      "operatorType": "TranslationRotationCalibration",
+      "numericValue": 183,
+      "exposureClassification": "package-public",
+      "reason": "Supported package-public operator.",
+      "evidenceFingerprint": "D39AC819B2036A4CDC205F7C689F18533B4A72B1F0C5CD428A145534E3C91983"
+    },
+    {
+      "operatorType": "CornerDetection",
+      "numericValue": 190,
+      "exposureClassification": "package-public",
+      "reason": "Supported package-public operator.",
+      "evidenceFingerprint": "186EBA4B1F5E58E54A1FF3301DDF725AA843B55642C575FA6B8BDED3A041A924"
+    },
+    {
+      "operatorType": "EdgeIntersection",
+      "numericValue": 191,
+      "exposureClassification": "package-public",
+      "reason": "Supported package-public operator.",
+      "evidenceFingerprint": "9CCBC23B4EF47D98AD518D6D7AFFA3B1096B285DE1497AA0D06A8F6B60431B41"
+    },
+    {
+      "operatorType": "ParallelLineFind",
+      "numericValue": 192,
+      "exposureClassification": "package-public",
+      "reason": "Supported package-public operator.",
+      "evidenceFingerprint": "A1AD663C8E00D926A5A48051BB0C91BFEEE9D65075FF9CC518E4AC885786A97D"
+    },
+    {
+      "operatorType": "QuadrilateralFind",
+      "numericValue": 193,
+      "exposureClassification": "package-public",
+      "reason": "Supported package-public operator.",
+      "evidenceFingerprint": "086E5FB139C6DFA7DA205E778CC8698C894CDD6672AB7FA5CF8B09CC80DAB029"
+    },
+    {
+      "operatorType": "GeoMeasurement",
+      "numericValue": 194,
+      "exposureClassification": "package-public",
+      "reason": "Supported package-public operator.",
+      "evidenceFingerprint": "1C5CC7256DC5B9118139E6D2D17CFC0BDD9C3E49CF4F2D637AC6609F3611953C"
+    },
+    {
+      "operatorType": "ImageStitching",
+      "numericValue": 200,
+      "exposureClassification": "package-public",
+      "reason": "Supported package-public operator.",
+      "evidenceFingerprint": "A51B1D1AD26FA79086E4F714B938AEC82CACA68A9B5D7323757D56EE36F92D8F"
+    },
+    {
+      "operatorType": "ImageTiling",
+      "numericValue": 201,
+      "exposureClassification": "package-public",
+      "reason": "Supported package-public operator.",
+      "evidenceFingerprint": "D96F87D16F84EB69B93D652ACBBC8766B2743F912F95249442C707B35DDF49A7"
+    },
+    {
+      "operatorType": "ImageNormalize",
+      "numericValue": 202,
+      "exposureClassification": "package-public",
+      "reason": "Supported package-public operator.",
+      "evidenceFingerprint": "D635DBB61BF6852AA83436EA8D1AD28DE790F8370A3204CFF8C60B329365CCBE"
+    },
+    {
+      "operatorType": "ImageCompose",
+      "numericValue": 203,
+      "exposureClassification": "package-public",
+      "reason": "Supported package-public operator.",
+      "evidenceFingerprint": "1FDE0B669EC38092A0B5BCA4161456EBA280AEA94CE86A3A52DBE401ECA7757A"
+    },
+    {
+      "operatorType": "CopyMakeBorder",
+      "numericValue": 204,
+      "exposureClassification": "package-public",
+      "reason": "Supported package-public operator.",
+      "evidenceFingerprint": "9E8042AFC582813F25B669C102AE9B88E11D3059B7D004271788499779EC0F84"
+    },
+    {
+      "operatorType": "TextSave",
+      "numericValue": 210,
+      "exposureClassification": "package-public",
+      "reason": "Supported package-public operator.",
+      "evidenceFingerprint": "889EAA9585719A5A277CC1B651B0E8C56BCF8103C29297D48A181EAA43A36FE6"
+    },
+    {
+      "operatorType": "PointSetTool",
+      "numericValue": 211,
+      "exposureClassification": "package-public",
+      "reason": "Supported package-public operator.",
+      "evidenceFingerprint": "FF674FDFC6384E3F53EC9ACACF9178E3CB9425140AC33A4F97C47F72B0CBFDE4"
+    },
+    {
+      "operatorType": "BlobLabeling",
+      "numericValue": 212,
+      "exposureClassification": "package-public",
+      "reason": "Supported package-public operator.",
+      "evidenceFingerprint": "FE849935D52A45C263D03B072708204D98C225C948B01BAC06AB9D5D17B35156"
+    },
+    {
+      "operatorType": "HistogramAnalysis",
+      "numericValue": 213,
+      "exposureClassification": "package-public",
+      "reason": "Supported package-public operator.",
+      "evidenceFingerprint": "CBB6DAABA04DEC1E9BF6C86F9E539EF2E8A4DC0DE4C7FE045E5087E0E2DBBA21"
+    },
+    {
+      "operatorType": "PixelStatistics",
+      "numericValue": 214,
+      "exposureClassification": "package-public",
+      "reason": "Supported package-public operator.",
+      "evidenceFingerprint": "7D84BF747A71B517E404E47917B5A51877365C79DA3C86A297784C89A557FBCD"
+    },
+    {
+      "operatorType": "MeanFilter",
+      "numericValue": 215,
+      "exposureClassification": "package-public",
+      "reason": "Supported package-public operator.",
+      "evidenceFingerprint": "AD6FC35D40C922B26CB444F5FDDAC8092252C33D2DAA1D12ED1A4C59CDC278B1"
+    },
+    {
+      "operatorType": "VoxelDownsample",
+      "numericValue": 217,
+      "exposureClassification": "package-public",
+      "reason": "Supported package-public operator.",
+      "evidenceFingerprint": "43713255CDABA388E6034872BAA0C2A828C9D44F8A953DB11EA8306ABD748830"
+    },
+    {
+      "operatorType": "StatisticalOutlierRemoval",
+      "numericValue": 218,
+      "exposureClassification": "package-public",
+      "reason": "Supported package-public operator.",
+      "evidenceFingerprint": "B24ACC6EB806DF26585DBDD20D1BB7EABBA06E63A54E2E60FF8ACA16E0171762"
+    },
+    {
+      "operatorType": "RansacPlaneSegmentation",
+      "numericValue": 219,
+      "exposureClassification": "package-public",
+      "reason": "Supported package-public operator.",
+      "evidenceFingerprint": "A6A453B4C35AA01B6F604335E86E83F15011DDBD9EC601FDDB082D8B0FDDF039"
+    },
+    {
+      "operatorType": "EuclideanClusterExtraction",
+      "numericValue": 220,
+      "exposureClassification": "package-public",
+      "reason": "Supported package-public operator.",
+      "evidenceFingerprint": "75C259C936486339F724ECE3031DE4F91001D28E17FBC20EEC921D3B337DB0FA"
+    },
+    {
+      "operatorType": "PPFEstimation",
+      "numericValue": 221,
+      "exposureClassification": "package-public",
+      "reason": "Supported package-public operator.",
+      "evidenceFingerprint": "8C2698E9B4243DB8A26645E60337DB20BE83350A1A4BC60A8A8DF1A102F21BE1"
+    },
+    {
+      "operatorType": "PPFMatch",
+      "numericValue": 222,
+      "exposureClassification": "package-public",
+      "reason": "Supported package-public operator.",
+      "evidenceFingerprint": "4E2D8AF6A1CC8A0E0A1F3583671AEEF59FBE5A0674DE3049A8CD236D2AD461B5"
+    },
+    {
+      "operatorType": "LawsTextureFilter",
+      "numericValue": 223,
+      "exposureClassification": "package-public",
+      "reason": "Supported package-public operator.",
+      "evidenceFingerprint": "F78650EEAF36226DEE42966C37D74A14308AD622BE4F9258142D02A1600BD1DC"
+    },
+    {
+      "operatorType": "GlcmTexture",
+      "numericValue": 224,
+      "exposureClassification": "package-public",
+      "reason": "Supported package-public operator.",
+      "evidenceFingerprint": "BB1DD1681A4A91CA18CC57A46C3CF25B2891F9A612481FDCF242B56D363CDFA9"
+    },
+    {
+      "operatorType": "SemanticSegmentation",
+      "numericValue": 225,
+      "exposureClassification": "package-public",
+      "reason": "Supported package-public operator.",
+      "evidenceFingerprint": "EB8F533E2CFED3436FEAC5AB89A058C905396968EB3363521DDF2901FAB007F1"
+    },
+    {
+      "operatorType": "AnomalyDetection",
+      "numericValue": 226,
+      "exposureClassification": "package-public",
+      "reason": "Supported package-public operator.",
+      "evidenceFingerprint": "4FE4975A26FAF14BF71530409CA4EDC4B80E234DD682E7BDD36139A19A32B00E"
+    },
+    {
+      "operatorType": "HandEyeCalibration",
+      "numericValue": 227,
+      "exposureClassification": "package-public",
+      "reason": "Supported package-public operator.",
+      "evidenceFingerprint": "1743E8C565F80D17AA03E2675B211A5EB851C598C11FDEBCF3F6B70FDE5465FA"
+    },
+    {
+      "operatorType": "HandEyeCalibrationValidator",
+      "numericValue": 228,
+      "exposureClassification": "package-public",
+      "reason": "Supported package-public operator.",
+      "evidenceFingerprint": "5C8B734D7A25AEBAB6CAAB3516CE397184BC828B39A119844EFC805A4AB305C4"
+    },
+    {
+      "operatorType": "FisheyeCalibration",
+      "numericValue": 229,
+      "exposureClassification": "package-public",
+      "reason": "Supported package-public operator.",
+      "evidenceFingerprint": "80E3091CCD190574B459B8EB72A087FC0B2089C48AA2245DF7A72A1F4612061C"
+    },
+    {
+      "operatorType": "FisheyeUndistort",
+      "numericValue": 230,
+      "exposureClassification": "package-public",
+      "reason": "Supported package-public operator.",
+      "evidenceFingerprint": "C1CD23B2ABC0ADC9E4583CAE66243585CA12AC92053A1414325ABFCC2BDAF9CF"
+    },
+    {
+      "operatorType": "StereoCalibration",
+      "numericValue": 231,
+      "exposureClassification": "package-public",
+      "reason": "Supported package-public operator.",
+      "evidenceFingerprint": "946D7D637D7C3EE331ABE945E026288B1DE07224EB8F650CF2667A1DC59CFB2C"
+    },
+    {
+      "operatorType": "PixelToWorldTransform",
+      "numericValue": 232,
+      "exposureClassification": "package-public",
+      "reason": "Supported package-public operator.",
+      "evidenceFingerprint": "33D735CF78CAAF7B3DDE04EBC87924D518AC52A7D10A540D2BA0D07946E0D9C0"
+    },
+    {
+      "operatorType": "PlanarMatching",
+      "numericValue": 233,
+      "exposureClassification": "package-public",
+      "reason": "Supported package-public operator.",
+      "evidenceFingerprint": "3C07D1FA48076A0F74C25FC655BECFAE5341A9E47AA407C04B45F2D074B0BDC8"
+    },
+    {
+      "operatorType": "LocalDeformableMatching",
+      "numericValue": 234,
+      "exposureClassification": "package-public",
+      "reason": "Supported package-public operator.",
+      "evidenceFingerprint": "70B3157E202F7B7CA0CC97B0EF8BE03F6005BDF9ED1E4BAEA8CAA03012994F8A"
+    },
+    {
+      "operatorType": "DistanceTransform",
+      "numericValue": 235,
+      "exposureClassification": "package-public",
+      "reason": "Supported package-public operator.",
+      "evidenceFingerprint": "3F1534F8BA3D43425CAC37B4D5CEC54FF0E7EDF2028BDF1FDEEEA6D19A90CBE3"
+    },
+    {
+      "operatorType": "MinEnclosingGeometry",
+      "numericValue": 236,
+      "exposureClassification": "package-public",
+      "reason": "Supported package-public operator.",
+      "evidenceFingerprint": "5B1D43A4379040CE39667F5AD29137B4432AF2B34E6A0E8C2F9CBBEDB59C92A4"
+    },
+    {
+      "operatorType": "RectangleRegion",
+      "numericValue": 237,
+      "exposureClassification": "package-public",
+      "reason": "Supported package-public operator.",
+      "evidenceFingerprint": "B0C81EEEAFB8BB1178453115CD4975BFFC33AD4FADFBC08F6588D2EF16BB220E"
+    },
+    {
+      "operatorType": "BinaryImageToRegion",
+      "numericValue": 238,
+      "exposureClassification": "package-public",
+      "reason": "Supported package-public operator.",
+      "evidenceFingerprint": "8E9649AADED7F9F1505E43DF410BC2E88E01DE365C4A11055FCB8B8B1A946BE2"
+    },
+    {
+      "operatorType": "RegionErosion",
+      "numericValue": 240,
+      "exposureClassification": "package-public",
+      "reason": "Supported package-public operator.",
+      "evidenceFingerprint": "22190DF1942BBE6A61B9B17F8A39A885C3FA7CD1038ED52AB17128454C35B61F"
+    },
+    {
+      "operatorType": "RegionDilation",
+      "numericValue": 241,
+      "exposureClassification": "package-public",
+      "reason": "Supported package-public operator.",
+      "evidenceFingerprint": "F31025EB47D0D5491DED93D5784F2391AD415CCDCA8C24F1BD62A0630BDD735E"
+    },
+    {
+      "operatorType": "RegionOpening",
+      "numericValue": 242,
+      "exposureClassification": "package-public",
+      "reason": "Supported package-public operator.",
+      "evidenceFingerprint": "64768EB2EC896243B77D089B743B14F09E259B25D2FA7984936A03379E1C9879"
+    },
+    {
+      "operatorType": "RegionClosing",
+      "numericValue": 243,
+      "exposureClassification": "package-public",
+      "reason": "Supported package-public operator.",
+      "evidenceFingerprint": "E66B115CC6468DE86DCB617A9809FB6F86B6A6CB02827956584DC87AEE5974E1"
+    },
+    {
+      "operatorType": "RegionSkeleton",
+      "numericValue": 244,
+      "exposureClassification": "package-public",
+      "reason": "Supported package-public operator.",
+      "evidenceFingerprint": "DBAE8FC2DA3DAFA502712695198B187C62CBD4C51EE0AB096C62D1735A48CAD2"
+    },
+    {
+      "operatorType": "RegionUnion",
+      "numericValue": 245,
+      "exposureClassification": "package-public",
+      "reason": "Supported package-public operator.",
+      "evidenceFingerprint": "CB26C72974A46A08B536BDE170B9DC76D27768FCD7E4F26A463E177F0F1E8F93"
+    },
+    {
+      "operatorType": "RegionIntersection",
+      "numericValue": 246,
+      "exposureClassification": "package-public",
+      "reason": "Supported package-public operator.",
+      "evidenceFingerprint": "C63D9895C11A5DDFB2B720D62831F6F0CA9A537192AE3E620BEDB687CC93EE18"
+    },
+    {
+      "operatorType": "RegionDifference",
+      "numericValue": 247,
+      "exposureClassification": "package-public",
+      "reason": "Supported package-public operator.",
+      "evidenceFingerprint": "718BCA61798413DD47C76F7771289D3877241567D51ABF5BB47B8F7C299084D8"
+    },
+    {
+      "operatorType": "RegionComplement",
+      "numericValue": 248,
+      "exposureClassification": "package-public",
+      "reason": "Supported package-public operator.",
+      "evidenceFingerprint": "ED7BA8434610266C5FA8278802918F5CA7B7BEFDF07F172E3600079ECCBDF309"
+    },
+    {
+      "operatorType": "ArcCaliper",
+      "numericValue": 249,
+      "exposureClassification": "package-public",
+      "reason": "Supported package-public operator.",
+      "evidenceFingerprint": "AFD3C81A2B7C6DC0E4F9B7EB581A9B99142236861AB43BECFBF4545E8B8B86FE"
+    },
+    {
+      "operatorType": "ContourExtrema",
+      "numericValue": 250,
+      "exposureClassification": "package-public",
+      "reason": "Supported package-public operator.",
+      "evidenceFingerprint": "13CE457707AC16CEF5A760A37358AE198FC95CBB7115154DD93BCB7090A6F23D"
+    },
+    {
+      "operatorType": "FFT1D",
+      "numericValue": 251,
+      "exposureClassification": "package-public",
+      "reason": "Supported package-public operator.",
+      "evidenceFingerprint": "72F7D0AAA92F526190649B11DF913816724D0711E7CA88104FC0D95FE72B2519"
+    },
+    {
+      "operatorType": "FrequencyFilter",
+      "numericValue": 252,
+      "exposureClassification": "package-public",
+      "reason": "Supported package-public operator.",
+      "evidenceFingerprint": "52A0030491EE19452768E854D58336B68736D1DCFAD56D2ADC50CAFA8FCA716D"
+    },
+    {
+      "operatorType": "InverseFFT1D",
+      "numericValue": 253,
+      "exposureClassification": "package-public",
+      "reason": "Supported package-public operator.",
+      "evidenceFingerprint": "D51743C9C49BC4413E50CFC65644AD3AE7BC0D65698DE5CD7D0FCB232E6E8D68"
+    },
+    {
+      "operatorType": "PhaseClosure",
+      "numericValue": 254,
+      "exposureClassification": "package-public",
+      "reason": "Supported package-public operator.",
+      "evidenceFingerprint": "6B0C1E1A6E8FFB406254D2271721CCEF80C19F90854A16FED0A2FF8599608521"
+    }
+  ]
+}

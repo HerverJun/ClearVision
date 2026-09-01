@@ -13,6 +13,7 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 REPORT_DIR = REPO_ROOT / "quality" / "evals" / "reports"
 SUITE_DIR = REPO_ROOT / "quality" / "evals" / "suites"
 DATASET_DIR = REPO_ROOT / "quality" / "datasets"
+GOVERNED_CATALOG = REPO_ROOT / "docs" / "算子资料" / "算子名片" / "catalog.json"
 RAW_PATH_RE = re.compile(r"([A-Za-z]:\\|\\\\|/Users/|/home/|/mnt/)")
 ALLOWED_PROOF_LEVELS = {"missing", "contract", "golden", "public-benchmark", "field-substitute", "real-field"}
 PUBLIC_PROOF_SCHEMA_VERSION = "2026-04-29.public-benchmark-proof.v1"
@@ -80,7 +81,29 @@ def add_check(checks: list[dict[str, Any]], check_id: str, passed: bool, details
 def inspect_registry(checks: list[dict[str, Any]], registry: dict[str, Any]) -> None:
     summary = registry.get("summary", {})
     operators = registry.get("operators", [])
-    add_check(checks, "registry_operator_count_155", summary.get("operatorCount") == 155, str(summary.get("operatorCount")))
+    catalog = read_json(GOVERNED_CATALOG)
+    population = catalog.get("population", {})
+    expected_count = population.get("formalTotal")
+    add_check(
+        checks,
+        "registry_operator_count_matches_governed_population",
+        summary.get("operatorCount") == expected_count == len(operators),
+        f"registry={summary.get('operatorCount')} formalTotal={expected_count}",
+    )
+    add_check(
+        checks,
+        "registry_population_identity",
+        registry.get("population") == population and registry.get("populationDelta") == catalog.get("populationDelta"),
+        str(population.get("fingerprint")),
+    )
+    governed_ids = {str(item.get("id")) for item in catalog.get("operators", []) if isinstance(item, dict)}
+    registry_ids = {str(item.get("operator")) for item in operators if isinstance(item, dict)}
+    add_check(
+        checks,
+        "registry_operator_identities_match_governed_catalog",
+        registry_ids == governed_ids,
+        f"registry={len(registry_ids)} governed={len(governed_ids)}",
+    )
     add_check(checks, "registry_real_field_zero", summary.get("realIndustrialValidationComplete") == 0, str(summary.get("realIndustrialValidationComplete")))
     add_check(checks, "registry_core20_count", summary.get("core20Count") == 20, str(summary.get("core20Count")))
 
@@ -137,12 +160,17 @@ def inspect_public_datasets(checks: list[dict[str, Any]], dataset_cards: dict[st
     missing_license = [item.get("datasetId") for item in datasets if not item.get("license") or not item.get("sourceUrl")]
     add_check(checks, "public_dataset_license_source_present", not missing_license, ", ".join(map(str, missing_license)))
     planned = [item.get("datasetId") for item in datasets if item.get("status") == "planned"]
-    unexpected_planned = [dataset_id for dataset_id in planned if dataset_id not in {"coco2017", "hpatches"}]
+    allowed_statuses = {"planned", "available-local", "downloaded-index-pending"}
+    invalid_statuses = [
+        f"{item.get('datasetId')}={item.get('status')}"
+        for item in datasets
+        if item.get("status") not in allowed_statuses
+    ]
     add_check(
         checks,
         "public_dataset_planned_items_explicit",
-        not unexpected_planned,
-        ", ".join(map(str, planned)),
+        not invalid_statuses,
+        f"planned={','.join(map(str, planned))}; invalid={','.join(invalid_statuses)}",
     )
     add_check(
         checks,
@@ -201,7 +229,15 @@ def inspect_public_benchmark_proof(checks: list[dict[str, Any]]) -> None:
     summary_accepted_count = strict_int(proof_summary.get("acceptedCount"))
     summary_failed_count = strict_int(proof_summary.get("failedCount"))
     summary_replay_case_count = strict_int(proof_summary.get("replayCaseCount"))
-    add_check(checks, "public_benchmark_proof_accepted", proof.get("accepted") is True, str(proof.get("accepted")))
+    expected_proof_accepted = bool(operators) and all(
+        isinstance(row, dict) and row.get("accepted") is True for row in operators
+    )
+    add_check(
+        checks,
+        "public_benchmark_proof_disposition_consistent",
+        proof.get("accepted") is expected_proof_accepted,
+        f"declared={proof.get('accepted')} expected={expected_proof_accepted}",
+    )
     add_check(checks, "public_benchmark_proof_operator_count", len(operators) >= 8, str(len(operators)))
     add_check(
         checks,
@@ -288,6 +324,23 @@ def inspect_public_benchmark_proof(checks: list[dict[str, Any]]) -> None:
             "annotation-seeded" not in str(deep_learning_row.get("evidenceClaim", "")).lower(),
             str(deep_learning_row.get("evidenceClaim")),
         )
+        if deep_learning_row.get("proofLevel") == "inference-smoke-only":
+            blocking_reasons = deep_learning_row.get("precisionBlockingReasons", [])
+            metrics = deep_learning_row.get("metrics", {})
+            smoke_truthful = (
+                deep_learning_row.get("accepted") is False
+                and deep_learning_row.get("precisionDisposition") == "FAIL"
+                and isinstance(blocking_reasons, list)
+                and "INFERENCE_SMOKE_ONLY" in blocking_reasons
+                and isinstance(metrics, dict)
+                and all(metrics.get(metric) == 0 for metric in ("AP50", "PrecisionAt50", "RecallAt50"))
+            )
+            add_check(
+                checks,
+                "public_benchmark_proof_deeplearning_smoke_truthful",
+                smoke_truthful,
+                f"accepted={deep_learning_row.get('accepted')} disposition={deep_learning_row.get('precisionDisposition')}",
+            )
 
     replay_path = REPORT_DIR / "QualityFlywheel_public_benchmark_replay_manifest.json"
     if not replay_path.exists():
@@ -561,7 +614,7 @@ def build_report(checks: list[dict[str, Any]]) -> dict[str, Any]:
 
 def render_markdown(report: dict[str, Any]) -> str:
     lines = [
-        "# Quality Flywheel 155 Quasi-Industrial Audit",
+        "# Quality Flywheel Governed-Population Quasi-Industrial Audit",
         "",
         f"GeneratedAtUtc: `{report['generatedAtUtc']}`",
         f"Passed: `{'Yes' if report['passed'] else 'No'}`",

@@ -138,6 +138,21 @@ public class OperatorServiceTests
     }
 
     [Fact]
+    public async Task CreateAsync_MqttPublish_ShouldFailClosed()
+    {
+        var sut = CreateSut();
+
+        var action = () => sut.CreateAsync(new CreateOperatorRequest
+        {
+            Type = OperatorType.MqttPublish,
+            Name = "disabled mqtt"
+        });
+
+        await action.Should().ThrowAsync<InvalidOperationException>()
+            .WithMessage("OPERATOR_EXPOSURE_DENIED*");
+    }
+
+    [Fact]
     public async Task UpdateAsync_WhenParameterValueCannotSerialize_ShouldLogWarningAndContinue()
     {
         var id = Guid.NewGuid();

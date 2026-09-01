@@ -78,7 +78,6 @@ public sealed class OperatorNamingSemanticContractTests
             [OperatorType.ArrayIndexer] = ["数组索引"],
             [OperatorType.JsonExtractor] = ["JSON提取"],
             [OperatorType.MathOperation] = ["数学运算"],
-            [OperatorType.MqttPublish] = ["MQTT Publish", "MQTT发布"],
             [OperatorType.SiemensS7Communication] = ["西门子S7"]
         };
 
@@ -114,7 +113,8 @@ public sealed class OperatorNamingSemanticContractTests
         var runtimeFactory = new OperatorFactory();
         var aiCatalog = new VisionAgentOperatorContractCatalog(runtimeFactory);
 
-        scanned.Should().HaveCount(158);
+        scanned.Should().HaveCount(
+            OperatorExposureCatalog.Entries.Count(entry => entry.Exposure != OperatorExposure.LegacyAlias));
 
         foreach (var contract in Contracts)
         {
@@ -184,7 +184,9 @@ public sealed class OperatorNamingSemanticContractTests
         var runtimeNames = new OperatorFactory()
             .GetAllMetadata()
             .ToDictionary(item => item.Type, item => item.DisplayName);
-        runtimeNames.Should().HaveCount(158);
+        runtimeNames.Should().HaveCount(
+            OperatorExposureCatalog.Entries.Count(entry =>
+                entry.Exposure is OperatorExposure.PackagePublic or OperatorExposure.PackageInternal));
 
         var catalogPaths = new[]
         {
@@ -199,12 +201,15 @@ public sealed class OperatorNamingSemanticContractTests
         {
             File.Exists(catalogPath).Should().BeTrue(catalogPath);
             using var document = JsonDocument.Parse(File.ReadAllText(catalogPath));
-            document.RootElement.GetProperty("totalCount").GetInt32().Should().Be(158);
+            document.RootElement.GetProperty("totalCount").GetInt32().Should().Be(
+                OperatorExposureCatalog.Entries.Count(entry => entry.Exposure != OperatorExposure.LegacyAlias));
             var operators = document.RootElement.GetProperty("operators")
                 .EnumerateArray()
                 .ToDictionary(item => item.GetProperty("id").GetString()!, StringComparer.Ordinal);
 
-            operators.Should().HaveCount(runtimeNames.Count, catalogPath);
+            operators.Should().HaveCount(
+                OperatorExposureCatalog.Entries.Count(entry => entry.Exposure != OperatorExposure.LegacyAlias),
+                catalogPath);
             foreach (var (operatorType, displayName) in runtimeNames)
             {
                 operators[operatorType.ToString()]
@@ -460,7 +465,10 @@ public sealed class OperatorNamingSemanticContractTests
         File.Exists(path).Should().BeTrue(path);
         using var document = JsonDocument.Parse(File.ReadAllText(path));
         var cardsElement = selectCards(document.RootElement);
-        cardsElement.GetArrayLength().Should().Be(158, path);
+        cardsElement.GetArrayLength().Should().Be(
+            OperatorExposureCatalog.Entries.Count(entry =>
+                entry.Exposure is OperatorExposure.PackagePublic or OperatorExposure.PackageInternal),
+            path);
         var cards = cardsElement
             .EnumerateArray()
             .ToDictionary(item => item.GetProperty("OperatorType").GetString()!, StringComparer.Ordinal);

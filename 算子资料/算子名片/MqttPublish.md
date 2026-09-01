@@ -5,6 +5,8 @@
 |------|------|
 | 类名 (Class) | `MqttPublishOperator` |
 | 枚举值 (Enum) | `OperatorType.MqttPublish` |
+| 暴露分类 (Exposure) | `disabled` |
+| 暴露原因 (Exposure Reason) | Placeholder executor retained only for historical flow fail-closed execution (MQTT_PUBLISH_DISABLED). |
 | 分类 ID (CategoryId) | `Communication` |
 | 分类 (Category) | 通信 |
 | 分类顺序 (CategoryOrder) | 13 |

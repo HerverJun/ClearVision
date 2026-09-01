@@ -4063,6 +4063,13 @@ public class AiFlowGenerationService : IAiFlowGenerationService
 
         flow.Operators = dto.Operators.Select(o =>
         {
+            if (!OperatorExposureCatalog.IsProductVisible(o.Type))
+            {
+                throw new InvalidOperationException(
+                    $"OPERATOR_EXPOSURE_DENIED: AI generated operator '{o.Type}' is classified as " +
+                    $"'{OperatorExposureCatalog.GetSlug(o.Type)}'.");
+            }
+
             var op = _operatorFactory.CreateOperator(o.Type, o.Name, o.X, o.Y);
             typeof(Operator).GetProperty("Id")?.SetValue(op, o.Id);
             op.Metadata = o.Metadata == null

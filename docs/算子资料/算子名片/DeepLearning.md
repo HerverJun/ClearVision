@@ -5,6 +5,8 @@
 |------|------|
 | 类名 (Class) | `DeepLearningOperator` |
 | 枚举值 (Enum) | `OperatorType.DeepLearning` |
+| 暴露分类 (Exposure) | `package-public` |
+| 暴露原因 (Exposure Reason) | Supported package-public operator. |
 | 分类 ID (CategoryId) | `AiInference` |
 | 分类 (Category) | AI推理 |
 | 分类顺序 (CategoryOrder) | 9 |
@@ -248,4 +250,4 @@
 ## 变更记录 / Changelog
 | 版本 (Version) | 日期 (Date) | 变更内容 (Changes) |
 |------|------|----------|
-| 1.1.1 | 2026-08-31 | 按当前最终运行时元数据、条件契约和显式依赖口径重生成 / Regenerated from effective runtime metadata and declared dependencies |
+| 1.1.1 | 2026-09-01 | 按当前最终运行时元数据、条件契约和显式依赖口径重生成 / Regenerated from effective runtime metadata and declared dependencies |

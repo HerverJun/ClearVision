@@ -60,6 +60,11 @@ public class OperatorMetadata
     public OperatorType Type { get; set; }
 
     /// <summary>
+    /// Governed exposure classification. This is derived from the single fail-closed catalog.
+    /// </summary>
+    public string ExposureClassification => OperatorExposureCatalog.GetSlug(Type);
+
+    /// <summary>
     /// 显示名称
     /// </summary>
     public string DisplayName { get; set; } = string.Empty;

@@ -13,7 +13,7 @@
       "localRoot": "quality/public_datasets/kolektorsdd2",
       "indexPath": "quality/datasets/kolektorsdd2_index.json",
       "recordCount": 3335,
-      "status": "available-local"
+      "status": "planned"
     },
     {
       "datasetId": "mvtec_ad_lite",
@@ -44,7 +44,7 @@
       "localRoot": "quality/public_datasets/bsds500",
       "indexPath": "quality/datasets/bsds500_index.json",
       "recordCount": 500,
-      "status": "available-local"
+      "status": "planned"
     },
     {
       "datasetId": "opencv_calibration_samples",
@@ -61,7 +61,7 @@
       "localRoot": "quality/public_datasets/opencv_calibration_samples",
       "indexPath": "quality/datasets/opencv_calibration_samples_index.json",
       "recordCount": 13,
-      "status": "available-local"
+      "status": "planned"
     },
     {
       "datasetId": "coco2017",
@@ -75,7 +75,7 @@
       "localRoot": "quality/public_datasets/coco2017",
       "indexPath": "quality/datasets/coco2017_index.json",
       "recordCount": 5000,
-      "status": "available-local"
+      "status": "planned"
     },
     {
       "datasetId": "hpatches",
@@ -91,7 +91,7 @@
       "localRoot": "quality/public_datasets/hpatches",
       "indexPath": "quality/datasets/hpatches_index.json",
       "recordCount": 116,
-      "status": "available-local"
+      "status": "planned"
     }
   ]
 }

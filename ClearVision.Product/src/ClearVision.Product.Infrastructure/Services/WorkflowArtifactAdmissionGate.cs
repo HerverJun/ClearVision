@@ -31,7 +31,10 @@ public sealed class WorkflowLegacyScanner
         _operatorFactory = operatorFactory;
     }
 
-    public ScanResult Scan(OperatorFlowDto flow, string? originalSnapshot)
+    public ScanResult Scan(
+        OperatorFlowDto flow,
+        string? originalSnapshot,
+        bool allowHistoricalDisabledOperators = false)
     {
         var diagnostics = new List<WorkflowArtifactDiagnostic>();
         var repairs = new List<WorkflowArtifactRepair>();
@@ -75,6 +78,16 @@ public sealed class WorkflowLegacyScanner
                     op.Type.ToString()));
             }
 
+            if (!Enum.IsDefined(op.Type))
+            {
+                diagnostics.Add(new(
+                    "unknown_operator",
+                    $"Operator type '{op.Type}' is not in the governed exposure catalog.",
+                    op.Id.ToString("D"),
+                    op.Type.ToString()));
+                continue;
+            }
+
             var canonicalType = OperatorTypeAliasResolver.Resolve(op.Type);
             if (canonicalType != op.Type)
             {
@@ -84,6 +97,16 @@ public sealed class WorkflowLegacyScanner
                     op.Id.ToString("D"),
                     op.Type.ToString(),
                     canonicalType.ToString()));
+            }
+
+            if (OperatorExposureCatalog.IsDisabled(canonicalType) && !allowHistoricalDisabledOperators)
+            {
+                diagnostics.Add(new(
+                    "disabled_operator",
+                    $"Operator type '{canonicalType}' is disabled and cannot be created, imported or admitted.",
+                    op.Id.ToString("D"),
+                    canonicalType.ToString()));
+                continue;
             }
 
             var metadata = _operatorFactory.GetMetadata(canonicalType);
@@ -174,7 +197,9 @@ public sealed class WorkflowLegacyScanner
         return new ScanResult(diagnostics, repairs);
     }
 
-    public RawScanResult ScanRawJson(string originalSnapshot)
+    public RawScanResult ScanRawJson(
+        string originalSnapshot,
+        bool allowHistoricalDisabledOperators = false)
     {
         if (string.IsNullOrWhiteSpace(originalSnapshot))
         {
@@ -221,13 +246,26 @@ public sealed class WorkflowLegacyScanner
                     continue;
                 }
 
-                if (!Enum.TryParse<OperatorType>(type, true, out _))
+                if (!Enum.TryParse<OperatorType>(type, true, out var parsedType) ||
+                    !Enum.IsDefined(parsedType))
                 {
                     diagnostics.Add(new(
                         "ambiguous_or_unknown_operator_alias",
                         $"Operator type '{type}' is not an exact catalog type or an unambiguous alias.",
                         ToId(node),
                         type));
+                }
+                else
+                {
+                    var canonicalType = OperatorTypeAliasResolver.Resolve(parsedType);
+                    if (OperatorExposureCatalog.IsDisabled(canonicalType) && !allowHistoricalDisabledOperators)
+                    {
+                        diagnostics.Add(new(
+                            "disabled_operator",
+                            $"Operator type '{canonicalType}' is disabled and cannot be created, imported or admitted.",
+                            ToId(node),
+                            canonicalType.ToString()));
+                    }
                 }
             }
         }
@@ -677,7 +715,10 @@ public sealed class WorkflowArtifactAdmissionGate : IWorkflowArtifactAdmissionGa
             ? JsonSerializer.Serialize(flow, JsonOptions)
             : originalSnapshot;
         var originalHash = ComputeHash(original);
-        var scan = _scanner.Scan(flow, original);
+        var scan = _scanner.Scan(
+            flow,
+            original,
+            context?.AllowHistoricalDisabledOperators == true);
         if (scan.Diagnostics.Count > 0)
         {
             return Quarantine(source, original, originalHash, scan.Diagnostics, scan.Repairs);
@@ -762,7 +803,9 @@ public sealed class WorkflowArtifactAdmissionGate : IWorkflowArtifactAdmissionGa
         string source,
         WorkflowArtifactAdmissionContext? context)
     {
-        var raw = _scanner.ScanRawJson(originalSnapshot);
+        var raw = _scanner.ScanRawJson(
+            originalSnapshot,
+            context?.AllowHistoricalDisabledOperators == true);
         if (raw.Diagnostics.Count > 0)
         {
             return Quarantine(source, originalSnapshot, ComputeHash(originalSnapshot), raw.Diagnostics, raw.Repairs);
@@ -867,7 +910,9 @@ public sealed class WorkflowArtifactAdmissionGate : IWorkflowArtifactAdmissionGa
                 .Select(op => ReadMetadataString(op.Metadata, "agentTaskType", "taskType"))
                 .FirstOrDefault(value => !string.IsNullOrWhiteSpace(value)));
         taskType = VisionTaskRouteContractRegistry.NormalizeTaskType(taskType);
-        var hasArtifactEvidence = context != null ||
+        var hasArtifactEvidence = !string.IsNullOrWhiteSpace(context?.TaskType) ||
+                                  !string.IsNullOrWhiteSpace(context?.ArtifactFingerprint) ||
+                                  context?.RouteSemanticsSatisfied.HasValue == true ||
                                   !string.IsNullOrWhiteSpace(taskType) ||
                                   flow.Operators.Any(op =>
                                       !string.IsNullOrWhiteSpace(ReadMetadataString(

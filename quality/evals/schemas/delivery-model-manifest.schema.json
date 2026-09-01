@@ -1,0 +1,158 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://clearvision.local/schemas/delivery-model-manifest.schema.json",
+  "title": "ClearVision delivery model evidence manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "model",
+    "inputContract",
+    "outputContract",
+    "dataset",
+    "acceptanceThresholds",
+    "providerPolicy",
+    "failureBoundaries",
+    "approval"
+  ],
+  "properties": {
+    "$schema": { "type": "string" },
+    "schemaVersion": { "const": "clearvision.delivery-model-manifest/v1" },
+    "model": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "sha256", "artifactPath", "labels"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "sha256": {
+          "oneOf": [
+            { "type": "string", "pattern": "^[0-9a-fA-F]{64}$" },
+            { "type": "null" }
+          ]
+        },
+        "artifactPath": { "type": "string", "minLength": 1 },
+        "labels": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "inputContract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["tensorName", "shape", "dataType", "colorOrder", "normalization"],
+      "properties": {
+        "tensorName": { "type": "string", "minLength": 1 },
+        "shape": { "type": "array", "minItems": 1, "items": { "type": "integer" } },
+        "dataType": { "type": "string", "minLength": 1 },
+        "colorOrder": { "type": "string", "minLength": 1 },
+        "normalization": { "type": "string", "minLength": 1 }
+      }
+    },
+    "outputContract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["tensorNames", "schema", "postprocess"],
+      "properties": {
+        "tensorNames": { "type": "array", "minItems": 1, "items": { "type": "string", "minLength": 1 } },
+        "schema": { "type": "string", "minLength": 1 },
+        "postprocess": { "type": "string", "minLength": 1 }
+      }
+    },
+    "dataset": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["manifestPath", "version", "sha256"],
+      "properties": {
+        "manifestPath": { "type": "string", "minLength": 1 },
+        "version": { "type": "string", "minLength": 1 },
+        "sha256": {
+          "oneOf": [
+            { "type": "string", "pattern": "^[0-9a-fA-F]{64}$" },
+            { "type": "null" }
+          ]
+        }
+      }
+    },
+    "acceptanceThresholds": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["precisionAt50", "recallAt50", "ap50"],
+      "properties": {
+        "precisionAt50": { "type": "number", "exclusiveMinimum": 0, "maximum": 1 },
+        "recallAt50": { "type": "number", "exclusiveMinimum": 0, "maximum": 1 },
+        "ap50": { "type": "number", "exclusiveMinimum": 0, "maximum": 1 }
+      }
+    },
+    "providerPolicy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["profiles", "fallbackPolicy"],
+      "properties": {
+        "profiles": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["CPU", "CUDA", "TensorRT"],
+          "properties": {
+            "CPU": { "$ref": "#/$defs/profilePolicy" },
+            "CUDA": { "$ref": "#/$defs/profilePolicy" },
+            "TensorRT": { "$ref": "#/$defs/profilePolicy" }
+          }
+        },
+        "fallbackPolicy": { "type": "string", "minLength": 1 }
+      }
+    },
+    "failureBoundaries": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "approval": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "reviewer", "approvedAtUtc"],
+      "properties": {
+        "status": { "enum": ["unreviewed", "approved", "rejected"] },
+        "reviewer": { "type": ["string", "null"] },
+        "approvedAtUtc": { "type": ["string", "null"], "format": "date-time" }
+      }
+    }
+  },
+  "$defs": {
+    "profilePolicy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["policy", "requiredHardware"],
+      "properties": {
+        "policy": { "enum": ["required", "optional", "unsupported"] },
+        "requiredHardware": { "type": "string" }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "approval": {
+            "properties": { "status": { "const": "approved" } },
+            "required": ["status"]
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "model": { "properties": { "sha256": { "type": "string", "pattern": "^[0-9a-fA-F]{64}$" } } },
+          "dataset": { "properties": { "sha256": { "type": "string", "pattern": "^[0-9a-fA-F]{64}$" } } },
+          "approval": {
+            "properties": {
+              "reviewer": { "type": "string", "minLength": 1 },
+              "approvedAtUtc": { "type": "string", "format": "date-time" }
+            }
+          }
+        }
+      }
+    }
+  ]
+}

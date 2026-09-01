@@ -5,6 +5,8 @@
 |------|------|
 | 类名 (Class) | `RegionIntersectionOperator` |
 | 枚举值 (Enum) | `OperatorType.RegionIntersection` |
+| 暴露分类 (Exposure) | `package-public` |
+| 暴露原因 (Exposure Reason) | Supported package-public operator. |
 | 分类 ID (CategoryId) | `SegmentationAndRegion` |
 | 分类 (Category) | 分割与区域 |
 | 分类顺序 (CategoryOrder) | 3 |

@@ -5,6 +5,8 @@
 |------|------|
 | 类名 (Class) | `TextSaveOperator` |
 | 枚举值 (Enum) | `OperatorType.TextSave` |
+| 暴露分类 (Exposure) | `package-public` |
+| 暴露原因 (Exposure Reason) | Supported package-public operator. |
 | 分类 ID (CategoryId) | `OutputAndAuxiliary` |
 | 分类 (Category) | 输出与辅助 |
 | 分类顺序 (CategoryOrder) | 14 |

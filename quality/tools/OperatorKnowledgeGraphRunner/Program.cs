@@ -123,6 +123,12 @@ static async Task ApplyGenerationFingerprintsAsync(OperatorKnowledgeGraph graph,
     foreach (var item in root.GetProperty("operators").EnumerateArray())
     {
         var operatorType = item.GetProperty("id").GetString();
+        var exposureClassification = item.GetProperty("exposureClassification").GetString();
+        if (string.Equals(exposureClassification, "disabled", StringComparison.Ordinal))
+        {
+            continue;
+        }
+
         var fingerprint = item.GetProperty("generationFingerprint").GetString();
         if (string.IsNullOrWhiteSpace(operatorType) || string.IsNullOrWhiteSpace(fingerprint))
         {

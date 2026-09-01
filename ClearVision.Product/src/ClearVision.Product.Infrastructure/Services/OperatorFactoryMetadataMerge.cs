@@ -115,7 +115,9 @@ internal static class OperatorFactoryMetadataMerge
 
     private static void ApplyLegacyAliases(Dictionary<OperatorType, OperatorMetadata> metadata)
     {
-        foreach (var legacyType in Enum.GetValues<OperatorType>().Where(OperatorTypeAliasResolver.IsLegacyAlias))
+        foreach (var legacyType in OperatorExposureCatalog.Entries
+                     .Where(entry => entry.Exposure == OperatorExposure.LegacyAlias)
+                     .Select(entry => entry.OperatorType))
         {
             var mappedType = OperatorTypeAliasResolver.Resolve(legacyType);
             if (metadata.ContainsKey(legacyType))

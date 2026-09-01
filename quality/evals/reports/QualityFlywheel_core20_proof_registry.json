@@ -8,6 +8,14 @@
     "legacyBaselineMeaning": "Existing G3 public/semi-synthetic evidence is regression evidence only and must not be described as industrial proof.",
     "industrialClaimBoundary": "No operator is real industrial validation complete until approved field data and site/line sign-off are attached."
   },
+  "humanEvidence": {
+    "ledgerPath": "quality/evals/baselines/core20-human-evidence-ledger.json",
+    "reviewedCount": 0,
+    "unreviewedCount": 20,
+    "staleCount": 0,
+    "passCount": 0,
+    "releaseReady": false
+  },
   "summary": {
     "operatorCount": 20,
     "legacyBaselineCount": 20,

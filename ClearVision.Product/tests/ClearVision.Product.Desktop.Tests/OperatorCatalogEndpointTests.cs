@@ -20,6 +20,9 @@ public sealed class OperatorCatalogEndpointTests
         defaultItems.Should().OnlyContain(item => !item.DefaultHidden);
         defaultItems.Select(item => item.Type).Should().NotContain(OperatorType.Morphology);
         compatibilityItems.Select(item => item.Type).Should().Contain(OperatorType.Morphology);
+        defaultItems.Select(item => item.Type).Should().NotContain(OperatorType.MqttPublish);
+        compatibilityItems.Select(item => item.Type).Should().NotContain(OperatorType.MqttPublish);
+        compatibilityItems.Should().OnlyContain(item => item.ExposureClassification != "disabled");
         compatibilityItems.Should().HaveCount(allMetadata.Count);
 
         var expectedOrder = compatibilityItems

@@ -5,6 +5,8 @@
 |------|------|
 | 类名 (Class) | `SiemensS7CommunicationOperator` |
 | 枚举值 (Enum) | `OperatorType.SiemensS7Communication` |
+| 暴露分类 (Exposure) | `package-public` |
+| 暴露原因 (Exposure Reason) | Supported package-public operator. |
 | 分类 ID (CategoryId) | `Communication` |
 | 分类 (Category) | 通信 |
 | 分类顺序 (CategoryOrder) | 13 |

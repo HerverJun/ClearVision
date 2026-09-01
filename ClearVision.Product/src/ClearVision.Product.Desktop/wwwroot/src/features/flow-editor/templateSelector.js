@@ -100,6 +100,13 @@ export class TemplateSelector {
                 continue;
             }
 
+            const exposure = String(operator.exposureClassification || operator.ExposureClassification || '')
+                .trim()
+                .toLowerCase();
+            if (exposure === 'disabled' || String(operator.type).toLowerCase() === 'mqttpublish') {
+                continue;
+            }
+
             const typeKey = String(operator.type).toLowerCase();
             this.operatorMetadata.set(typeKey, operator);
         }

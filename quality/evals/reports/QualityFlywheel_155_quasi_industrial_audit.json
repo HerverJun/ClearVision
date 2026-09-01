@@ -1,10 +1,10 @@
 {
   "schemaVersion": "2026-04-29.quasi-industrial-audit.v1",
-  "generatedAtUtc": "2026-07-05T06:15:50+00:00",
+  "generatedAtUtc": "2026-09-01T05:30:59+00:00",
   "passed": true,
   "summary": {
-    "checkCount": 64,
-    "passedCount": 64,
+    "checkCount": 67,
+    "passedCount": 67,
     "failedCount": 0,
     "realIndustrialValidationComplete": 0
   },
@@ -15,9 +15,19 @@
       "details": "quality/evals/reports/QualityFlywheel_155_quasi_industrial_registry.json"
     },
     {
-      "id": "registry_operator_count_155",
+      "id": "registry_operator_count_matches_governed_population",
       "passed": true,
-      "details": "155"
+      "details": "registry=158 formalTotal=158"
+    },
+    {
+      "id": "registry_population_identity",
+      "passed": true,
+      "details": "sha256:4cd53973dd918e3669dc06e2ae1e901b440810e9021ac974fcce1038b719896a"
+    },
+    {
+      "id": "registry_operator_identities_match_governed_catalog",
+      "passed": true,
+      "details": "registry=158 governed=158"
     },
     {
       "id": "registry_real_field_zero",
@@ -77,7 +87,7 @@
     {
       "id": "public_dataset_planned_items_explicit",
       "passed": true,
-      "details": ""
+      "details": "planned=kolektorsdd2,bsds500,opencv_calibration_samples,coco2017,hpatches; invalid="
     },
     {
       "id": "public_dataset_cards_no_raw_path",
@@ -95,9 +105,9 @@
       "details": "raw-json-removed-from-git"
     },
     {
-      "id": "public_benchmark_proof_accepted",
+      "id": "public_benchmark_proof_disposition_consistent",
       "passed": true,
-      "details": "True"
+      "details": "declared=False expected=False"
     },
     {
       "id": "public_benchmark_proof_operator_count",
@@ -107,7 +117,7 @@
     {
       "id": "public_benchmark_proof_summary_counts_consistent",
       "passed": true,
-      "details": "operators=10/10 accepted=10 failed=0"
+      "details": "operators=10/10 accepted=9 failed=1"
     },
     {
       "id": "public_benchmark_proof_schema_complete",
@@ -142,7 +152,12 @@
     {
       "id": "public_benchmark_proof_deeplearning_no_annotation_seeded_claim",
       "passed": true,
-      "details": "COCO 2017 real-model inference proof (real-model postprocess pipeline; synthetic label tensors are not used)"
+      "details": "Inference smoke only until an approved delivery model, dataset manifest and nonzero precision gate are present."
+    },
+    {
+      "id": "public_benchmark_proof_deeplearning_smoke_truthful",
+      "passed": true,
+      "details": "accepted=False disposition=FAIL"
     },
     {
       "id": "public_benchmark_replay_manifest_exists",

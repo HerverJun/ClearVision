@@ -101,8 +101,9 @@ public class ModuleNamespaceIndexTests
         var indexedTypes = ModuleNamespaceIndexes
             .SelectMany(item => item.Types)
             .ToArray();
-        var packagePublicTypes = Enum.GetValues<OperatorType>()
-            .Where(OperatorModuleCatalog.IsPackagePublicType)
+        var packagePublicTypes = OperatorExposureCatalog.Entries
+            .Where(entry => entry.Exposure == OperatorExposure.PackagePublic)
+            .Select(entry => entry.OperatorType)
             .OrderBy(type => (int)type)
             .ToArray();
         var duplicateTypes = indexedTypes
@@ -114,6 +115,7 @@ public class ModuleNamespaceIndexTests
         Assert.Empty(duplicateTypes);
         Assert.Equal(packagePublicTypes, indexedTypes.OrderBy(type => (int)type));
         Assert.DoesNotContain(OperatorType.FrameChangeTrigger, indexedTypes);
+        Assert.DoesNotContain(OperatorType.MqttPublish, indexedTypes);
         Assert.DoesNotContain(OperatorType.OnnxInference, indexedTypes);
 
         foreach (var module in Enum.GetValues<OperatorModule>())

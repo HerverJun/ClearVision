@@ -24,7 +24,7 @@ namespace ClearVision.Product.Tests.Services;
 [TestClassification(TestDomain.General, TestPurpose.Regression, TestLane.Pr, TestEvidenceType.Contract, TestOracleType.Contract, TestResourceRequirement.None, TestExpectedDuration.Fast, TestFlakyPolicy.Blocking, "product", Suites = "ServicesRegression")]
 public sealed class OperatorProductMetadataGovernanceTests
 {
-    private const string ExpectedIdentityHash = "EF6426A519C056D0240839C469295DC7FC5FAC02BA65F98EEF75E2E976DFBCF2";
+    private const string ExpectedIdentityHash = "C48A34D716C33CBF7E3BBC5D72B8702DCDB0FD254E77F7771A276023B6AD9902";
     private static readonly string RepoRoot = ResolveRepoRoot();
 
     private static readonly IReadOnlyDictionary<OperatorCategoryId, int> ExpectedCategoryCounts =
@@ -42,7 +42,7 @@ public sealed class OperatorProductMetadataGovernanceTests
             [OperatorCategoryId.PointCloud3D] = 6,
             [OperatorCategoryId.DataProcessing] = 18,
             [OperatorCategoryId.FlowControl] = 8,
-            [OperatorCategoryId.Communication] = 8,
+            [OperatorCategoryId.Communication] = 7,
             [OperatorCategoryId.OutputAndAuxiliary] = 5
         };
 
@@ -64,7 +64,9 @@ public sealed class OperatorProductMetadataGovernanceTests
     {
         var metadata = new OperatorFactory().GetAllMetadata().OrderBy(item => item.Type).ToList();
 
-        metadata.Should().HaveCount(158);
+        metadata.Should().HaveCount(
+            OperatorExposureCatalog.Entries.Count(entry =>
+                entry.Exposure is OperatorExposure.PackagePublic or OperatorExposure.PackageInternal));
         OperatorCategoryCatalog.All.Should().HaveCount(14);
         OperatorCategoryCatalog.All.Select(item => item.Id).Should().OnlyHaveUniqueItems();
         OperatorCategoryCatalog.All.Select(item => item.DisplayName).Should().OnlyHaveUniqueItems();
@@ -109,7 +111,9 @@ public sealed class OperatorProductMetadataGovernanceTests
     {
         var factory = new OperatorFactory();
         var runtime = factory.GetAllMetadata().ToDictionary(item => item.Type);
-        var scanned = new OperatorMetadataScanner().Scan().ToDictionary(item => item.Type);
+        var scanned = new OperatorMetadataScanner().Scan()
+            .Where(item => OperatorExposureCatalog.IsProductVisible(item.Type))
+            .ToDictionary(item => item.Type);
         var service = new OperatorService(Substitute.For<IOperatorRepository>(), factory);
         var application = (await service.GetLibraryAsync())
             .ToDictionary(item => Enum.Parse<OperatorType>(item.Type));
@@ -747,7 +751,11 @@ public sealed class OperatorProductMetadataGovernanceTests
         {
             using var document = JsonDocument.Parse(File.ReadAllText(path));
             var root = document.RootElement;
-            root.GetProperty("totalCount").GetInt32().Should().Be(158, path);
+            root.GetProperty("totalCount").GetInt32().Should().Be(
+                OperatorExposureCatalog.Entries.Count(entry => entry.Exposure != OperatorExposure.LegacyAlias),
+                path);
+            root.GetProperty("population").GetProperty("fingerprint").GetString()
+                .Should().Be(OperatorExposureCatalog.PopulationFingerprint, path);
             var catalogFingerprint = root.GetProperty("generationFingerprint").GetString();
             catalogFingerprint.Should().NotBeNullOrWhiteSpace(path);
             if (expectedCatalogFingerprint is null)
@@ -761,7 +769,11 @@ public sealed class OperatorProductMetadataGovernanceTests
             root.GetProperty("categories").EnumerateObject().Should().HaveCount(14, path);
             var operators = root.GetProperty("operators").EnumerateArray()
                 .ToDictionary(item => item.GetProperty("id").GetString()!, StringComparer.Ordinal);
-            operators.Should().HaveCount(runtime.Count, path);
+            operators.Should().HaveCount(
+                OperatorExposureCatalog.Entries.Count(entry => entry.Exposure != OperatorExposure.LegacyAlias),
+                path);
+            operators[nameof(OperatorType.MqttPublish)].GetProperty("exposureClassification").GetString()
+                .Should().Be("disabled", path);
             var fingerprints = operators.ToDictionary(
                 item => item.Key,
                 item => item.Value.GetProperty("generationFingerprint").GetString()!,

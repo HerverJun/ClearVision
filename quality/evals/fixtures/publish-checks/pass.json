@@ -1,0 +1,25 @@
+{
+  "candidateId": "publish-checks-fixture-pass",
+  "evidenceClass": "fixture",
+  "expectedDisposition": "pass",
+  "sourceChain": {
+    "portablePackagingReport": "quality/evals/reports/runtime_package_manifest_dry_run_final.json",
+    "visionAgentReadinessReport": "quality/evals/reports/runtime_preview_package_readiness_final.json",
+    "releaseReviewReport": "quality/evals/reports/runtime_preview_deploy_readiness_report.sample.json"
+  },
+  "assets": [
+    {
+      "path": "quality/evals/schemas/delivery-model-manifest.schema.json",
+      "sha256": "69719e8eb617eec313110460cd7f2f9cd2947e655a743735b1b06aa1dd2313a2"
+    }
+  ],
+  "externalModels": [],
+  "flows": [
+    {
+      "id": "fixture-public-flow",
+      "operatorTypes": ["ImageAcquisition", "TemplateMatching", "ResultOutput"],
+      "parametersNeedingReview": [],
+      "roi": { "x": 0, "y": 0, "width": 640, "height": 480 }
+    }
+  ]
+}

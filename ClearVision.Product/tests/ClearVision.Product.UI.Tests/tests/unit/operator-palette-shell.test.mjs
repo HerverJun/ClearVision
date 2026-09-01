@@ -73,6 +73,23 @@ test('OperatorPaletteShell groups operators by category for the rail', () => {
   assert.equal(groups[2].operators[1].displayName, '全局阈值处理');
 });
 
+test('OperatorPaletteShell fail-closes disabled MqttPublish metadata', () => {
+  const polluted = [
+    ...operators,
+    {
+      type: 'MqttPublish',
+      displayName: 'MQTT 发布',
+      category: '通信',
+      exposureClassification: 'disabled'
+    }
+  ];
+
+  const groups = buildOperatorGroups(polluted);
+  const visible = groups.flatMap(group => group.operators.map(operator => operator.type));
+  assert.equal(visible.includes('MqttPublish'), false);
+  assert.equal(filterOperatorsForFlyout(polluted, 'mqtt').length, 0);
+});
+
 test('OperatorPaletteShell search keeps name, type, description, port, parameter and keyword matches', () => {
   assert.match(buildOperatorSearchText(operators[0]), /thresholding/);
   assert.match(buildOperatorSearchText(operators[0]), /mask/);

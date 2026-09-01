@@ -23,14 +23,10 @@ public enum OperatorModule
 
 public static class OperatorModuleCatalog
 {
-    private static readonly HashSet<OperatorType> InternalOnlyTypes =
-    [
-        OperatorType.FrameChangeTrigger
-    ];
-
     private static readonly IReadOnlyDictionary<OperatorType, OperatorModule> _moduleByType =
-        System.Enum.GetValues<OperatorType>()
-            .Where(IsPackagePublicType)
+        OperatorExposureCatalog.Entries
+            .Where(entry => entry.Exposure == OperatorExposure.PackagePublic)
+            .Select(entry => entry.OperatorType)
             .ToDictionary(type => type, Classify, System.Collections.Generic.EqualityComparer<OperatorType>.Default);
 
     private static readonly IReadOnlyDictionary<OperatorModule, IReadOnlyList<OperatorType>> _typesByModule =
@@ -50,11 +46,14 @@ public static class OperatorModuleCatalog
 
     public static bool IsPackagePublicType(OperatorType type)
     {
-        return !OperatorTypeAliasResolver.IsLegacyAlias(type) &&
-               !InternalOnlyTypes.Contains(type);
+        return OperatorExposureCatalog.IsPackagePublic(type);
     }
 
-    public static IReadOnlyList<OperatorType> InternalOnlyOperatorTypes => InternalOnlyTypes.OrderBy(type => (int)type).ToArray();
+    public static IReadOnlyList<OperatorType> InternalOnlyOperatorTypes => OperatorExposureCatalog.Entries
+        .Where(entry => entry.Exposure == OperatorExposure.PackageInternal)
+        .Select(entry => entry.OperatorType)
+        .OrderBy(type => (int)type)
+        .ToArray();
 
     public static IReadOnlyList<OperatorType> GetTypes(OperatorModule module)
     {

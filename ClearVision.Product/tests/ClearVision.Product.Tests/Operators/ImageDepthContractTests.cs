@@ -19,7 +19,9 @@ public sealed class ImageDepthContractTests
             .Where(item => item.OutputPorts.Any(port => port.DataType == PortDataType.Image))
             .ToList();
 
-        metadata.Should().HaveCount(158);
+        metadata.Should().HaveCount(
+            OperatorExposureCatalog.Entries.Count(entry =>
+                entry.Exposure is OperatorExposure.PackagePublic or OperatorExposure.PackageInternal));
         imageInputs.Should().HaveCount(97);
         imageOutputs.Should().HaveCount(98);
 

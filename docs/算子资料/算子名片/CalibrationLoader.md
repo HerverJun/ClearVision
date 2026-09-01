@@ -5,6 +5,8 @@
 |------|------|
 | 类名 (Class) | `CalibrationLoaderOperator` |
 | 枚举值 (Enum) | `OperatorType.CalibrationLoader` |
+| 暴露分类 (Exposure) | `package-public` |
+| 暴露原因 (Exposure Reason) | Supported package-public operator. |
 | 分类 ID (CategoryId) | `CalibrationAndCoordinates` |
 | 分类 (Category) | 标定与坐标 |
 | 分类顺序 (CategoryOrder) | 8 |

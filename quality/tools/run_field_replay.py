@@ -68,7 +68,13 @@ def validate_manifest(manifest: dict[str, Any]) -> list[str]:
     return errors
 
 
-def build_result(manifest_path: Path, manifest: dict[str, Any], drill_id: str) -> dict[str, Any]:
+def build_result(
+    manifest_path: Path,
+    manifest: dict[str, Any],
+    drill_id: str,
+    *,
+    generated_at_utc: str | None = None,
+) -> dict[str, Any]:
     policy = manifest["drillPolicy"]
     operators = []
     total_samples = 0
@@ -110,7 +116,7 @@ def build_result(manifest_path: Path, manifest: dict[str, Any], drill_id: str) -
     return {
         "EvidenceKind": "field",
         "Summary": {
-            "GeneratedAtUtc": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+            "GeneratedAtUtc": generated_at_utc or datetime.now(timezone.utc).isoformat(timespec="seconds"),
             "DrillId": drill_id,
             "Manifest": repo(manifest_path),
             "ManifestId": manifest["manifestId"],

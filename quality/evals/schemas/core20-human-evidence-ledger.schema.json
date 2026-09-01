@@ -1,0 +1,45 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://clearvision.local/schemas/core20-human-evidence-ledger.schema.json",
+  "title": "Core20 Human Evidence Ledger",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "claimBoundary", "entries"],
+  "properties": {
+    "schemaVersion": { "const": "2026-09-01.core20-human-evidence-ledger.v1" },
+    "claimBoundary": { "type": "string", "minLength": 1 },
+    "entries": {
+      "type": "array",
+      "minItems": 20,
+      "maxItems": 20,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "operatorType",
+          "cardFingerprint",
+          "verdict",
+          "algorithmBoundary",
+          "failureModes",
+          "typicalInputs",
+          "typicalOutputs",
+          "unavailableScenarios",
+          "reviewer",
+          "reviewedAt"
+        ],
+        "properties": {
+          "operatorType": { "type": "string", "minLength": 1 },
+          "cardFingerprint": { "type": "string", "pattern": "^[0-9A-Fa-f]{64}$" },
+          "verdict": { "enum": ["unreviewed", "pass", "fail", "conditional"] },
+          "algorithmBoundary": { "type": "string" },
+          "failureModes": { "type": "array", "items": { "type": "string" } },
+          "typicalInputs": { "type": "array", "items": { "type": "string" } },
+          "typicalOutputs": { "type": "array", "items": { "type": "string" } },
+          "unavailableScenarios": { "type": "array", "items": { "type": "string" } },
+          "reviewer": { "type": ["string", "null"] },
+          "reviewedAt": { "type": ["string", "null"], "format": "date" }
+        }
+      }
+    }
+  }
+}

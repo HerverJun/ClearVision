@@ -18,7 +18,9 @@ public sealed class GeneralizedOperatorCapabilityContractTests
     public void MetadataAndAiCatalog_ShouldExposeTheSameGeneralizedCapabilityFamilies()
     {
         var factory = new OperatorFactory();
-        factory.GetAllMetadata().Should().HaveCount(158);
+        factory.GetAllMetadata().Should().HaveCount(
+            OperatorExposureCatalog.Entries.Count(entry =>
+                entry.Exposure is OperatorExposure.PackagePublic or OperatorExposure.PackageInternal));
 
         ((int)OperatorType.Filtering).Should().Be(2);
         ((int)OperatorType.Measurement).Should().Be(8);

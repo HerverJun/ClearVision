@@ -161,6 +161,24 @@ public class Sprint5_AIWorkflowServiceTests
         result.IsSuccessful.Should().BeFalse();
     }
 
+    [Fact(DisplayName = "Legacy Compatibility - FlowParser 必须拒绝 disabled MQTT 算子")]
+    public void AIGeneratedFlowParser_Parse_MqttPublish_ShouldFailClosed()
+    {
+        var parser = new AIGeneratedFlowParser(_linter);
+        var json = @"{
+            ""flowName"": ""disabled mqtt"",
+            ""operators"": [
+                { ""id"": ""00000000-0000-0000-0000-000000000001"", ""name"": ""MQTT"", ""type"": ""MqttPublish"", ""outputPorts"": [] }
+            ],
+            ""connections"": []
+        }";
+
+        var result = parser.Parse(json);
+
+        result.IsSuccessful.Should().BeFalse();
+        result.ErrorMessage.Should().Contain("未知的算子类型");
+    }
+
     [Fact(DisplayName = "Legacy Compatibility - FlowParser 解析完整流程应正确映射端口类型")]
     public void AIGeneratedFlowParser_Parse_FullFlow_ShouldMapPortTypes()
     {

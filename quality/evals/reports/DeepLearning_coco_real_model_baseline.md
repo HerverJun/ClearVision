@@ -1,7 +1,9 @@
 # DeepLearning COCO Real Model Baseline
 
 EvidenceKind: `public-benchmark-real-model`
-Accepted: `True`
+EvidencePurpose: `InferenceSmokeOnly`
+Accepted: `False`
+Precision disposition: `FAIL` (smoke-only, zero AP50/precision/recall, checksum mismatch, zero thresholds, no approved delivery manifest)
 GeneratedAtUtc: `2026-04-30T01:18:36.0094256+00:00`
 Dataset: `COCO 2017 real validation images`
 DatasetKind: `COCO real-image inference with ONNX Runtime model outputs; annotation-seeded tensors are not used.`
@@ -22,6 +24,9 @@ DatasetKind: `COCO real-image inference with ONNX Runtime model outputs; annotat
 | Precision@0.50 | 0 |
 | Recall@0.50 | 0 |
 | AP50 | 0 |
+| Min Precision@0.50 | 0 |
+| Min Recall@0.50 | 0 |
+| Min AP50 | 0 |
 | Mean matched IoU | 0 |
 | Runtime ms | 435.848 |
 | Session create ms | 10.457 |
@@ -40,6 +45,9 @@ DatasetKind: `COCO real-image inference with ONNX Runtime model outputs; annotat
 | Provider | `CPUExecutionProvider` |
 | CandidateVersion | `baseline` |
 | Profile | `real_model_hard_nms_045` |
+| Git SHA / dirty | `376174d830621d284c0d5da0b40a9b6c219a9150` / `True` |
+| Dataset index checksum | `79a914cd475c7beb0e600b44412382c202e708a5c6c746d892ac1aab67e1a072` |
+| Replay status | `unavailable: COCO annotation/image payload is absent from this checkout` |
 
 ## Claim Boundary
 

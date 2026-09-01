@@ -11,7 +11,8 @@ public static class OperatorTypeAliasResolver
             [OperatorType.ModbusRtuCommunication] = OperatorType.ModbusCommunication
         };
 
-    public static bool IsLegacyAlias(OperatorType type) => LegacyAliasMap.ContainsKey(type);
+    public static bool IsLegacyAlias(OperatorType type) =>
+        OperatorExposureCatalog.IsLegacyAlias(type) && LegacyAliasMap.ContainsKey(type);
 
     public static OperatorType Resolve(OperatorType type)
     {

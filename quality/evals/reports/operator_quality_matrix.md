@@ -33,6 +33,17 @@ EvidenceSources: `quality/evals/reports/*_baseline.json`
 | DeepLearning | 100 | A | 0 | 6 | Yes | Partial | Partial | Yes | 212 | Yes | P2 | Maintain regression baseline |
 | GradientShapeMatch | 100 | A | 0 | 7 | No | Yes | Yes | Yes | 117 | Yes | P2 | Maintain regression baseline |
 
+<!-- CORE20_PROOF_SUMMARY_START -->
+## Core20 Proof Summary
+
+- Core20 proof registry: `quality/evals/reports/QualityFlywheel_core20_proof_registry.json`
+- Frozen core operators: 20
+- Legacy evidence marked as `legacy-baseline`: 20
+- Field dataset proof status: `blocked-missing-field-data` = 20
+- Field replay substitute evidence: 20 operators / 400 samples
+- Industrial status: real industrial validation complete = 0; field-substitute replay is not site/line sign-off.
+
+<!-- CORE20_PROOF_SUMMARY_END -->
 ## Full Matrix
 
 | OperatorType | DisplayName | Category | QScore | Level | Version | Maturity | Inputs | Outputs | Params | AlgorithmSummary | KnownLimitationsCount | CardTodoCount | HasContractTest | ContractCases | HasGoldenTest | GoldenCases | HasDatasetEvidence | DatasetCases | HasFieldReplay | FieldReplayCases | HasBenchmark | Priority | OwnerAgent | NextAction |

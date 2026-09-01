@@ -1,6 +1,7 @@
 using System.Collections;
 using System.Diagnostics;
 using System.Reflection;
+using System.Runtime.InteropServices;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
@@ -126,7 +127,17 @@ internal static class CocoRealModelRunner
         var processingFailed = results.Count(item => item.ProcessingError);
         var matchedCases = results.Count(item => item.Passed);
         var failedCases = results.Count - matchedCases;
-        var accepted = processingFailed == 0
+        var inferenceSmokeOnly = options.GenerateSmokeModel ||
+                                 manifest.Source.Equals("generated-smoke-fixture", StringComparison.OrdinalIgnoreCase);
+        var thresholdsApprovedForPrecision = options.MinPrecisionAt50 > 0 &&
+                                             options.MinRecallAt50 > 0 &&
+                                             options.MinAP50 > 0;
+        var nonZeroPrecisionEvidence = precision > 0 || recall > 0 || ap50 > 0;
+        var accepted = !inferenceSmokeOnly
+            && modelSha256Matched
+            && thresholdsApprovedForPrecision
+            && nonZeroPrecisionEvidence
+            && processingFailed == 0
             && precision >= options.MinPrecisionAt50
             && recall >= options.MinRecallAt50
             && ap50 >= options.MinAP50;
@@ -175,7 +186,14 @@ internal static class CocoRealModelRunner
         return new RealModelResult(
             "2026-04-30.deep-learning-coco-real-model.v1",
             EvidenceKind,
+            inferenceSmokeOnly ? "InferenceSmokeOnly" : "DeliveryPrecisionCandidate",
             accepted,
+            EvidenceIdentity.Capture(
+                repoRoot,
+                modelSha256,
+                ComputeSha256(RepoPaths.ResolveRepoPath(repoRoot, options.IndexPath)),
+                provider,
+                string.Empty),
             summary,
             manifest.ToProvenancePayload(expectedSha256, modelSha256, modelSha256Matched),
             [
@@ -1188,7 +1206,9 @@ internal sealed record InferenceOutput(DenseTensor<float> Tensor, string OutputN
 internal sealed record RealModelResult(
     string SchemaVersion,
     string EvidenceKind,
+    string EvidencePurpose,
     bool Accepted,
+    EvidenceIdentity EvidenceIdentity,
     RealModelSummary Summary,
     Dictionary<string, object> ModelProvenance,
     IReadOnlyList<OperatorSummary> Operators,
@@ -1264,6 +1284,62 @@ internal sealed record CaseResult(
     string? Failure);
 internal sealed record ClaimBoundary(string RealModelRule, string FieldSignoffRule, string AccuracyComparisonRule);
 
+internal sealed record EvidenceIdentity(
+    string GitSha,
+    bool RepositoryDirty,
+    string ToolVersion,
+    string Environment,
+    string ModelContentSha256,
+    string DatasetChecksumSha256,
+    string ActualProvider,
+    string FallbackReason)
+{
+    public static EvidenceIdentity Capture(
+        string repoRoot,
+        string modelContentSha256,
+        string datasetChecksumSha256,
+        string actualProvider,
+        string fallbackReason)
+    {
+        return new EvidenceIdentity(
+            RunGit(repoRoot, "rev-parse HEAD"),
+            !string.IsNullOrWhiteSpace(RunGit(repoRoot, "status --porcelain")),
+            "DeepLearningCocoRealModelRunner/2026-09-01.wave3b",
+            $"{RuntimeInformation.OSDescription}; {RuntimeInformation.ProcessArchitecture}; .NET {System.Environment.Version}",
+            modelContentSha256,
+            datasetChecksumSha256,
+            actualProvider,
+            fallbackReason);
+    }
+
+    private static string RunGit(string repoRoot, string arguments)
+    {
+        try
+        {
+            using var process = Process.Start(new ProcessStartInfo("git", arguments)
+            {
+                WorkingDirectory = repoRoot,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                UseShellExecute = false,
+                CreateNoWindow = true
+            });
+            if (process is null)
+            {
+                return string.Empty;
+            }
+
+            var output = process.StandardOutput.ReadToEnd().Trim();
+            process.WaitForExit();
+            return process.ExitCode == 0 ? output : string.Empty;
+        }
+        catch
+        {
+            return string.Empty;
+        }
+    }
+}
+
 internal static class MarkdownReport
 {
     public static string Create(RealModelResult result)
@@ -1273,6 +1349,7 @@ internal static class MarkdownReport
             "# DeepLearning COCO Real Model Baseline",
             "",
             $"EvidenceKind: `{result.EvidenceKind}`",
+            $"EvidencePurpose: `{result.EvidencePurpose}`",
             $"Accepted: `{result.Accepted}`",
             $"GeneratedAtUtc: `{result.Summary.GeneratedAtUtc:O}`",
             $"Dataset: `{result.Summary.DatasetName}`",
@@ -1315,6 +1392,9 @@ internal static class MarkdownReport
             $"| Provider | `{result.Summary.InferenceProvider}` |",
             $"| CandidateVersion | `{result.Summary.CandidateVersion}` |",
             $"| Profile | `{result.Summary.Profile}` |",
+            $"| Git SHA / dirty | `{result.EvidenceIdentity.GitSha}` / `{result.EvidenceIdentity.RepositoryDirty}` |",
+            $"| Dataset checksum | `{result.EvidenceIdentity.DatasetChecksumSha256}` |",
+            $"| Tool / environment | `{result.EvidenceIdentity.ToolVersion}` / `{result.EvidenceIdentity.Environment}` |",
             "",
             "## Claim Boundary",
             "",
@@ -1379,9 +1459,9 @@ internal sealed record RunnerOptions(
             null,
             null,
             null,
-            0.0,
-            0.0,
-            0.0,
+            0.45,
+            0.35,
+            0.45,
             "Auto",
             "baseline",
             "hard_nms_045",

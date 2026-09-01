@@ -9,6 +9,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from evaluate_delivery_model_evidence import evaluate_delivery_evidence
+
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 REPORT_DIR = REPO_ROOT / "quality" / "evals" / "reports"
@@ -95,10 +97,12 @@ PROOF_SOURCES: tuple[dict[str, Any], ...] = (
         "sourceBaseline": "quality/evals/reports/DeepLearning_coco_real_model_baseline.json",
         "manifest": "quality/datasets/coco2017_index.json",
         "proofLevel": "public-benchmark",
-        "evidenceClaim": "COCO 2017 real-model inference proof (real-model postprocess pipeline; synthetic label tensors are not used)",
+        "evidenceClaim": "Inference smoke only until an approved delivery model, dataset manifest and nonzero precision gate are present.",
         "primaryMetrics": ("AP50", "PrecisionAt50", "RecallAt50"),
         "boundaryMetric": "BestMatchedIou",
-        "thresholds": {"AP50": 0.0, "PrecisionAt50": 0.0, "RecallAt50": 0.0},
+        "thresholds": {"AP50": 0.45, "PrecisionAt50": 0.45, "RecallAt50": 0.35},
+        "deliveryManifest": "quality/evals/baselines/deep-learning-delivery-model-manifest.json",
+        "providerReport": "quality/evals/reports/DeepLearning_provider_inference_baseline.json",
         "caseListKeys": ("Cases",),
     },
     {
@@ -452,7 +456,7 @@ def build_operator_result(config: dict[str, Any]) -> dict[str, Any]:
 
     replay_cases = select_replay_cases(config, per_case)
 
-    return {
+    result = {
         "operator": config["operator"],
         "datasetId": config["datasetId"],
         "proofLevel": config["proofLevel"],
@@ -474,6 +478,22 @@ def build_operator_result(config: dict[str, Any]) -> dict[str, Any]:
         "missingCaseResults": missing_case_results,
         "accepted": accepted,
     }
+    if config["operator"] == "DeepLearning":
+        delivery_manifest_path = repo_path(config["deliveryManifest"])
+        provider_report_path = repo_path(config["providerReport"])
+        delivery_evaluation = evaluate_delivery_evidence(
+            document,
+            read_json(delivery_manifest_path) if delivery_manifest_path.exists() else None,
+            read_json(provider_report_path) if provider_report_path.exists() else None,
+        )
+        result["proofLevel"] = (
+            "delivery-precision" if delivery_evaluation["releaseReady"] else "inference-smoke-only"
+        )
+        result["precisionDisposition"] = delivery_evaluation["precisionDisposition"]
+        result["precisionBlockingReasons"] = delivery_evaluation["blockingReasons"]
+        result["providerProfiles"] = delivery_evaluation["providerProfiles"]
+        result["accepted"] = accepted and delivery_evaluation["releaseReady"]
+    return result
 
 
 def build_document() -> dict[str, Any]:
@@ -528,8 +548,12 @@ def validate_document(document: dict[str, Any]) -> list[str]:
     errors: list[str] = []
     if document.get("schemaVersion") != PROOF_SCHEMA_VERSION:
         errors.append(f"public benchmark proof schemaVersion must be {PROOF_SCHEMA_VERSION}")
-    if document.get("accepted") is not True:
-        errors.append("public benchmark proof accepted must be true")
+    expected_document_accepted = all(
+        isinstance(row, dict) and row.get("accepted") is True
+        for row in document.get("operators", [])
+    )
+    if document.get("accepted") is not expected_document_accepted:
+        errors.append("public benchmark proof accepted must equal all operator dispositions")
     operators = document.get("operators")
     if not isinstance(operators, list) or not operators:
         return ["public benchmark proof must contain operator results"]
@@ -553,11 +577,14 @@ def validate_document(document: dict[str, Any]) -> list[str]:
                 errors.append("DeepLearning row sourceBaseline must be DeepLearning_coco_real_model_baseline.json")
             if "annotation-seeded" in str(row.get("evidenceClaim", "")).lower():
                 errors.append("DeepLearning row evidenceClaim must not describe annotation-seeded results")
+            if row.get("proofLevel") == "inference-smoke-only":
+                if row.get("precisionDisposition") != "FAIL":
+                    errors.append("DeepLearning inference smoke must have precisionDisposition=FAIL")
+                if row.get("accepted") is True:
+                    errors.append("DeepLearning inference smoke must not be accepted as precision evidence")
         failed_thresholds = [item.get("metric") for item in row.get("thresholdResults", []) if not item.get("passed")]
-        if failed_thresholds:
+        if failed_thresholds and row.get("accepted") is True:
             errors.append(f"{operator} failed thresholds: {', '.join(map(str, failed_thresholds))}")
-        if row.get("accepted") is not True:
-            errors.append(f"{operator} accepted must be true")
         case_ids = [case.get("caseId") for case in row.get("perCaseResults", [])]
         if len(case_ids) != len(set(case_ids)):
             errors.append(f"{operator} perCaseResults contain duplicate caseId")
@@ -611,9 +638,6 @@ def validate_retained_summary(document: dict[str, Any]) -> list[str]:
     if original_size is None or original_size <= 0:
         errors.append("retained summary originalSizeBytes must be a positive integer")
 
-    if document.get("accepted") is not True:
-        errors.append("retained summary accepted must be true")
-
     summary = document.get("summary")
     if not isinstance(summary, dict):
         errors.append("retained summary missing summary")
@@ -624,10 +648,8 @@ def validate_retained_summary(document: dict[str, Any]) -> list[str]:
     replay_case_count = strict_int(summary.get("replayCaseCount"))
     if operator_count is None or operator_count < 8:
         errors.append("retained summary operatorCount must be at least 8")
-    if accepted_count != operator_count:
-        errors.append("retained summary acceptedCount must equal operatorCount")
-    if failed_count != 0:
-        errors.append("retained summary failedCount must be 0")
+    if accepted_count is None or failed_count is None or accepted_count + failed_count != operator_count:
+        errors.append("retained summary acceptedCount + failedCount must equal operatorCount")
     if replay_case_count is None or replay_case_count <= 0:
         errors.append("retained summary replayCaseCount must be positive")
     if summary.get("realIndustrialValidationComplete") != 0:
@@ -673,8 +695,13 @@ def validate_retained_summary(document: dict[str, Any]) -> list[str]:
             errors.append(f"{operator} privacyLeakCount must be 0")
         if row.get("missingCaseResults") is True:
             errors.append(f"{operator} source CaseCount does not match perCaseResults")
-        if row.get("accepted") is not True:
-            errors.append(f"{operator} accepted must be true")
+        if row.get("accepted") is not True and operator != "DeepLearning":
+            errors.append(f"{operator} non-DeepLearning retained evidence must remain accepted")
+        if operator == "DeepLearning" and row.get("proofLevel") == "inference-smoke-only":
+            if row.get("precisionDisposition") != "FAIL":
+                errors.append("DeepLearning retained inference smoke must have precisionDisposition=FAIL")
+            if row.get("accepted") is True:
+                errors.append("DeepLearning retained inference smoke must not be accepted as precision evidence")
         per_case_count = strict_int(row.get("perCaseResultCount"))
         threshold_count = strict_int(row.get("thresholdResultCount"))
         operator_replay_count = strict_int(row.get("replayCaseCount"))
@@ -691,6 +718,9 @@ def validate_retained_summary(document: dict[str, Any]) -> list[str]:
 
     if replay_case_count is not None and operator_replay_case_count != replay_case_count:
         errors.append("retained summary replayCaseCount must equal operator replayCaseCount sum")
+    expected_accepted = failed_count == 0
+    if document.get("accepted") is not expected_accepted:
+        errors.append("retained summary accepted must reflect failedCount")
 
     if RAW_PATH_RE.search(json.dumps(document, ensure_ascii=False)):
         errors.append("retained summary contains raw path pattern")

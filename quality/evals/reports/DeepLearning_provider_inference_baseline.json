@@ -1,8 +1,16 @@
 {
+  "EvidencePurpose": "InferenceSmokeOnly",
   "EvidenceKind": "contract",
+  "Identity": {
+    "GitSha": "376174d830621d284c0d5da0b40a9b6c219a9150",
+    "RepositoryDirty": true,
+    "ToolVersion": "DeepLearningProviderInferenceRunner/2026-09-01.wave3b",
+    "Environment": "Microsoft Windows 10.0.26200; X64; .NET 8.0.26",
+    "ModelContentSha256": "4013a532ea9eb05dd86508e56b3839f9e8f581f76d1e86bc6f61c2f42227343e"
+  },
   "Summary": {
-    "GeneratedAtUtc": "2026-04-28T16:05:32.8845552+00:00",
-    "CaseCount": 1,
+    "GeneratedAtUtc": "2026-09-01T05:11:27.7895243+00:00",
+    "CaseCount": 3,
     "Passed": 1,
     "Failed": 0,
     "AvailableProviders": [
@@ -12,7 +20,7 @@
   "Operators": [
     {
       "Operator": "DeepLearning",
-      "CaseCount": 1,
+      "CaseCount": 3,
       "Passed": 1,
       "Failed": 0,
       "HasBenchmark": true,
@@ -28,11 +36,51 @@
       "RealOnnxInference": true,
       "Passed": true,
       "Required": true,
-      "LatencyMs": 50.2555,
+      "ProfileStatus": "smoke-validated",
+      "ValidationScope": "Identity smoke only; no precision or delivery-hardware claim.",
+      "LatencyMs": 68.5577,
       "AvailableProviders": [
         "CPUExecutionProvider"
       ],
       "FallbackReason": "",
+      "ProviderFailureCode": "",
+      "ProviderFailureMessage": "",
+      "ProviderFailureExceptionType": ""
+    },
+    {
+      "CaseId": "cuda_smoke_identity_optional",
+      "RequestedProvider": "CUDAExecutionProvider",
+      "ActiveProvider": "NotRun",
+      "FallbackToCpu": false,
+      "RealOnnxInference": false,
+      "Passed": false,
+      "Required": false,
+      "ProfileStatus": "unvalidated",
+      "ValidationScope": "Profile was not requested; no support claim is made.",
+      "LatencyMs": 0,
+      "AvailableProviders": [
+        "CPUExecutionProvider"
+      ],
+      "FallbackReason": "Profile validation was not requested.",
+      "ProviderFailureCode": "",
+      "ProviderFailureMessage": "",
+      "ProviderFailureExceptionType": ""
+    },
+    {
+      "CaseId": "tensorrt_smoke_identity_optional",
+      "RequestedProvider": "TensorrtExecutionProvider",
+      "ActiveProvider": "NotRun",
+      "FallbackToCpu": false,
+      "RealOnnxInference": false,
+      "Passed": false,
+      "Required": false,
+      "ProfileStatus": "unvalidated",
+      "ValidationScope": "Profile was not requested; no support claim is made.",
+      "LatencyMs": 0,
+      "AvailableProviders": [
+        "CPUExecutionProvider"
+      ],
+      "FallbackReason": "Profile validation was not requested.",
       "ProviderFailureCode": "",
       "ProviderFailureMessage": "",
       "ProviderFailureExceptionType": ""

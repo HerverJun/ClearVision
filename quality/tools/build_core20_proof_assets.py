@@ -20,6 +20,8 @@ SPLIT_DIR = REPO_ROOT / "quality" / "datasets" / "splits" / "core20"
 REPORT_DIR = REPO_ROOT / "quality" / "evals" / "reports"
 SUITE_DIR = REPO_ROOT / "quality" / "evals" / "suites"
 FIELD_REPLAY_DIR = REPO_ROOT / "quality" / "field_replay" / "manifests"
+CORE20_HUMAN_LEDGER = REPO_ROOT / "quality" / "evals" / "baselines" / "core20-human-evidence-ledger.json"
+GOVERNED_CATALOG = REPO_ROOT / "docs" / "算子资料" / "算子名片" / "catalog.json"
 
 GENERATED_AT = "2026-04-29T00:00:00Z"
 DRILL_ID = "2026-04-core20-proof-v1"
@@ -94,6 +96,109 @@ def write_json(path: Path, value: dict[str, Any]) -> None:
 
 def sha256_file(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def evaluate_human_evidence_ledger() -> tuple[dict[str, Any], list[str]]:
+    errors: list[str] = []
+    empty_summary = {
+        "ledgerPath": repo(CORE20_HUMAN_LEDGER),
+        "reviewedCount": 0,
+        "unreviewedCount": len(CORE20_OPERATORS),
+        "staleCount": 0,
+        "passCount": 0,
+        "releaseReady": False,
+    }
+    if not CORE20_HUMAN_LEDGER.exists():
+        return empty_summary, [f"missing Core20 human evidence ledger: {repo(CORE20_HUMAN_LEDGER)}"]
+    if not GOVERNED_CATALOG.exists():
+        return empty_summary, [f"missing governed operator catalog: {repo(GOVERNED_CATALOG)}"]
+
+    ledger = read_json(CORE20_HUMAN_LEDGER)
+    catalog = read_json(GOVERNED_CATALOG)
+    if ledger.get("schemaVersion") != "2026-09-01.core20-human-evidence-ledger.v1":
+        errors.append("Core20 human evidence ledger schemaVersion mismatch")
+    rows = ledger.get("entries")
+    if not isinstance(rows, list):
+        return empty_summary, errors + ["Core20 human evidence ledger entries must be an array"]
+    by_operator: dict[str, dict[str, Any]] = {}
+    for row in rows:
+        if not isinstance(row, dict) or not row.get("operatorType"):
+            errors.append("Core20 human evidence ledger contains an invalid entry")
+            continue
+        operator = str(row["operatorType"])
+        if operator in by_operator:
+            errors.append(f"Core20 human evidence ledger duplicate operator: {operator}")
+        by_operator[operator] = row
+
+    expected = set(CORE20_OPERATORS)
+    if set(by_operator) != expected:
+        errors.append(
+            "Core20 human evidence ledger population mismatch: "
+            f"missing={sorted(expected - set(by_operator))} unknown={sorted(set(by_operator) - expected)}"
+        )
+    card_fingerprints = {
+        str(row.get("id")): str(row.get("generationFingerprint") or "")
+        for row in catalog.get("operators", [])
+        if isinstance(row, dict) and row.get("id")
+    }
+
+    reviewed = unreviewed = stale = passed = 0
+    for operator in CORE20_OPERATORS:
+        row = by_operator.get(operator)
+        if row is None:
+            continue
+        for key in (
+            "cardFingerprint",
+            "verdict",
+            "algorithmBoundary",
+            "failureModes",
+            "typicalInputs",
+            "typicalOutputs",
+            "unavailableScenarios",
+            "reviewer",
+            "reviewedAt",
+        ):
+            if key not in row:
+                errors.append(f"Core20 human evidence {operator} missing {key}")
+        verdict = str(row.get("verdict") or "").strip().lower()
+        if verdict not in {"unreviewed", "pass", "fail", "conditional"}:
+            errors.append(f"Core20 human evidence {operator} has invalid verdict={verdict}")
+            continue
+        actual_fingerprint = card_fingerprints.get(operator, "")
+        recorded_fingerprint = str(row.get("cardFingerprint") or "")
+        is_stale = not actual_fingerprint or recorded_fingerprint != actual_fingerprint
+        if verdict == "unreviewed":
+            unreviewed += 1
+            if row.get("reviewer") not in (None, "") or row.get("reviewedAt") not in (None, ""):
+                errors.append(f"Core20 human evidence {operator} is unreviewed but carries reviewer/date")
+            continue
+        if is_stale:
+            stale += 1
+            continue
+        reviewed += 1
+        if verdict == "pass":
+            passed += 1
+        if not str(row.get("reviewer") or "").strip() or not str(row.get("reviewedAt") or "").strip():
+            errors.append(f"Core20 reviewed evidence {operator} requires reviewer and reviewedAt")
+        for key in (
+            "algorithmBoundary",
+            "failureModes",
+            "typicalInputs",
+            "typicalOutputs",
+            "unavailableScenarios",
+        ):
+            if row.get(key) in (None, "", [], {}):
+                errors.append(f"Core20 reviewed evidence {operator}.{key} must not be empty")
+
+    summary = {
+        "ledgerPath": repo(CORE20_HUMAN_LEDGER),
+        "reviewedCount": reviewed,
+        "unreviewedCount": unreviewed,
+        "staleCount": stale,
+        "passCount": passed,
+        "releaseReady": reviewed == len(CORE20_OPERATORS) and stale == 0 and passed == len(CORE20_OPERATORS),
+    }
+    return summary, errors
 
 
 def proof_name(operator: str) -> str:
@@ -368,7 +473,7 @@ def build_field_replay_manifest(items: list[dict[str, Any]]) -> dict[str, Any]:
     }
 
 
-def build_registry(items: list[dict[str, Any]]) -> dict[str, Any]:
+def build_registry(items: list[dict[str, Any]], human_evidence: dict[str, Any]) -> dict[str, Any]:
     operators = []
     for item in items:
         operator = item["operator"]
@@ -399,6 +504,7 @@ def build_registry(items: list[dict[str, Any]]) -> dict[str, Any]:
             "legacyBaselineMeaning": "Existing G3 public/semi-synthetic evidence is regression evidence only and must not be described as industrial proof.",
             "industrialClaimBoundary": "No operator is real industrial validation complete until approved field data and site/line sign-off are attached.",
         },
+        "humanEvidence": human_evidence,
         "summary": {
             "operatorCount": len(operators),
             "legacyBaselineCount": len(operators),
@@ -647,6 +753,8 @@ def render_registry_markdown(registry: dict[str, Any]) -> str:
         f"- Legacy baselines marked: {registry['summary']['legacyBaselineCount']}",
         f"- Field datasets blocked: {registry['summary']['fieldDatasetBlockedCount']}",
         f"- Field replay samples tracked: {registry['summary']['fieldReplaySampleCount']}",
+        f"- Human evidence reviewed/unreviewed/stale: {registry['humanEvidence']['reviewedCount']}/{registry['humanEvidence']['unreviewedCount']}/{registry['humanEvidence']['staleCount']}",
+        f"- Human evidence release ready: {registry['humanEvidence']['releaseReady']}",
         "- Industrial validation complete: 0",
         "",
         "## Operators",
@@ -760,7 +868,10 @@ def generate(items: list[dict[str, Any]]) -> None:
     replay_manifest_path = FIELD_REPLAY_DIR / "core20_field_replay_manifest.json"
     write_json(replay_manifest_path, replay_manifest)
 
-    registry = build_registry(items)
+    human_evidence, human_errors = evaluate_human_evidence_ledger()
+    if human_errors:
+        raise ValueError("; ".join(human_errors))
+    registry = build_registry(items, human_evidence)
     write_json(REPORT_DIR / "QualityFlywheel_core20_proof_registry.json", registry)
     (REPORT_DIR / "QualityFlywheel_core20_proof_registry.md").write_text(
         render_registry_markdown(registry), encoding="utf-8", newline="\n"
@@ -772,7 +883,12 @@ def generate(items: list[dict[str, Any]]) -> None:
         render_proof_report(baseline), encoding="utf-8", newline="\n"
     )
 
-    result = build_field_replay_result(replay_manifest_path, replay_manifest, DRILL_ID)
+    result = build_field_replay_result(
+        replay_manifest_path,
+        replay_manifest,
+        DRILL_ID,
+        generated_at_utc=GENERATED_AT,
+    )
     write_json(REPORT_DIR / "QualityFlywheel_core20_field_replay_baseline.json", result)
     (REPORT_DIR / "QualityFlywheel_core20_field_replay_baseline.md").write_text(
         render_field_replay_report(result), encoding="utf-8", newline="\n"
@@ -873,6 +989,8 @@ def validate_baseline(path: Path, items: list[dict[str, Any]], errors: list[str]
 
 def validate(items: list[dict[str, Any]], require_full: bool) -> list[str]:
     errors: list[str] = []
+    human_evidence, human_errors = evaluate_human_evidence_ledger()
+    errors.extend(human_errors)
     if require_full and len(items) != 20:
         errors.append("Core20 operator set must contain exactly 20 operators")
     if len(set(CORE20_OPERATORS)) != len(CORE20_OPERATORS):
@@ -900,6 +1018,8 @@ def validate(items: list[dict[str, Any]], require_full: bool) -> list[str]:
             errors.append("registry must show 20 blocked field datasets")
         if registry.get("summary", {}).get("realIndustrialValidationComplete") != 0:
             errors.append("registry must not claim real industrial validation complete")
+        if registry.get("humanEvidence") != human_evidence:
+            errors.append("registry Core20 human evidence summary is stale")
 
     baseline_path = REPORT_DIR / "QualityFlywheel_core20_proof_baseline.json"
     if not baseline_path.exists():

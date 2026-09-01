@@ -25,9 +25,15 @@ var qualityContext = BuildQualityContext(repoRoot, docsRoot);
 Directory.CreateDirectory(operatorDocsRoot);
 Directory.CreateDirectory(docsRoot);
 
-var runtimeMetadataByType = new OperatorFactory()
-    .GetAllMetadata()
-    .ToDictionary(metadata => metadata.Type);
+var operatorFactory = new OperatorFactory();
+var governedFormalTypes = OperatorExposureCatalog.Entries
+    .Where(entry => entry.Exposure != OperatorExposure.LegacyAlias)
+    .Select(entry => entry.OperatorType)
+    .ToHashSet();
+var runtimeMetadataByType = governedFormalTypes.ToDictionary(
+    type => type,
+    type => operatorFactory.GetMetadata(type)
+        ?? throw new InvalidOperationException($"Runtime metadata missing for governed OperatorType.{type}."));
 
 var candidates = typeof(OperatorBase).Assembly
     .GetTypes()
@@ -51,6 +57,19 @@ var candidates = typeof(OperatorBase).Assembly
     .ThenBy(x => x.OperatorType.ToString(), StringComparer.Ordinal)
     .ToList();
 
+var candidateTypes = candidates.Select(candidate => candidate.OperatorType).ToArray();
+var duplicates = candidateTypes.GroupBy(type => type).Where(group => group.Count() != 1).Select(group => group.Key).ToArray();
+var missingCandidates = governedFormalTypes.Except(candidateTypes).OrderBy(type => (int)type).ToArray();
+var unknownCandidates = candidateTypes.Except(governedFormalTypes).OrderBy(type => (int)type).ToArray();
+if (duplicates.Length > 0 || missingCandidates.Length > 0 || unknownCandidates.Length > 0)
+{
+    throw new InvalidOperationException(
+        "Governed operator implementation population mismatch. " +
+        $"Duplicate=[{string.Join(",", duplicates)}]; " +
+        $"Missing=[{string.Join(",", missingCandidates)}]; " +
+        $"Unknown=[{string.Join(",", unknownCandidates)}].");
+}
+
 var operators = candidates
     .Select(item => ToCatalogOperator(item, qualityContext))
     .OrderBy(item => item.CategoryOrder)
@@ -70,7 +89,7 @@ var (generated, skipped) = GenerateOperatorDocuments(
     qualityContext,
     operatorChangelogDates);
 
-GenerateCatalogJson(operators, docsRoot, generatedAt, catalogFingerprint);
+GenerateCatalogJson(operators, docsRoot, repoRoot, generatedAt, catalogFingerprint);
 GenerateCatalogMarkdown(operators, docsRoot, "./", generatedAt);
 var versionTracking = GenerateVersionTrackingArtifacts(operators, docsRoot, generatedAt);
 SyncRootCatalogArtifacts(operators, docsRoot, operatorDocsRoot, generatedAt);
@@ -166,6 +185,7 @@ static HashSet<string> ParseOnlyOperators(string[] args)
 static void GenerateCatalogJson(
     IReadOnlyList<CatalogOperator> operators,
     string docsRoot,
+    string repoRoot,
     DateTimeOffset generatedAt,
     string generationFingerprint)
 {
@@ -187,11 +207,14 @@ static void GenerateCatalogJson(
             },
             StringComparer.Ordinal);
 
+    var population = BuildPopulationGovernance(operators, repoRoot);
     var model = new CatalogDocument
     {
         GeneratedAt = generatedAt.ToString("o", CultureInfo.InvariantCulture),
         GenerationFingerprint = generationFingerprint,
         TotalCount = operators.Count,
+        Population = population.Snapshot,
+        PopulationDelta = population.Delta,
         Categories = categories,
         Operators = operators.ToList()
     };
@@ -205,6 +228,88 @@ static void GenerateCatalogJson(
 
     var json = JsonSerializer.Serialize(model, options);
     File.WriteAllText(Path.Combine(docsRoot, "catalog.json"), json + Environment.NewLine, new UTF8Encoding(false));
+}
+
+static PopulationGovernanceResult BuildPopulationGovernance(
+    IReadOnlyList<CatalogOperator> operators,
+    string repoRoot)
+{
+    var counts = OperatorExposureCatalog.Entries
+        .GroupBy(entry => OperatorExposureCatalog.GetSlug(entry.OperatorType))
+        .ToDictionary(group => group.Key, group => group.Count(), StringComparer.Ordinal);
+    var snapshot = new OperatorPopulationSnapshot
+    {
+        EnumTotal = OperatorExposureCatalog.Entries.Count,
+        FormalTotal = operators.Count,
+        PackagePublic = counts.GetValueOrDefault("package-public"),
+        PackageInternal = counts.GetValueOrDefault("package-internal"),
+        LegacyAlias = counts.GetValueOrDefault("legacy-alias"),
+        Disabled = counts.GetValueOrDefault("disabled"),
+        Fingerprint = OperatorExposureCatalog.PopulationFingerprint
+    };
+
+    var baselinePath = Path.Combine(
+        repoRoot,
+        "quality",
+        "evals",
+        "baselines",
+        "operator-exposure-approved-baseline.json");
+    if (!File.Exists(baselinePath))
+    {
+        throw new FileNotFoundException("Approved operator exposure baseline is required.", baselinePath);
+    }
+
+    using var baselineDocument = JsonDocument.Parse(File.ReadAllText(baselinePath));
+    var baselineRoot = baselineDocument.RootElement;
+    var baselineStatus = baselineRoot.GetProperty("approvalStatus").GetString();
+    if (!string.Equals(baselineStatus, "approved-as-code", StringComparison.Ordinal))
+    {
+        throw new InvalidDataException("Operator exposure baseline must have approvalStatus=approved-as-code.");
+    }
+
+    var baselineEntries = baselineRoot.GetProperty("entries")
+        .EnumerateArray()
+        .ToDictionary(
+            item => item.GetProperty("operatorType").GetString()
+                ?? throw new InvalidDataException("Exposure baseline operatorType is missing."),
+            item => new BaselinePopulationEntry(
+                item.GetProperty("exposureClassification").GetString()
+                    ?? throw new InvalidDataException("Exposure baseline classification is missing."),
+                item.TryGetProperty("evidenceFingerprint", out var fingerprint)
+                    ? fingerprint.GetString() ?? string.Empty
+                    : string.Empty),
+            StringComparer.Ordinal);
+    var currentEntries = OperatorExposureCatalog.Entries.ToDictionary(
+        entry => entry.OperatorType.ToString(),
+        entry => new BaselinePopulationEntry(
+            OperatorExposureCatalog.GetSlug(entry.OperatorType),
+            operators.FirstOrDefault(item => item.Id == entry.OperatorType.ToString())?.GenerationFingerprint ?? string.Empty),
+        StringComparer.Ordinal);
+
+    var added = currentEntries.Keys.Except(baselineEntries.Keys, StringComparer.Ordinal).OrderBy(value => value, StringComparer.Ordinal).ToList();
+    var removed = baselineEntries.Keys.Except(currentEntries.Keys, StringComparer.Ordinal).OrderBy(value => value, StringComparer.Ordinal).ToList();
+    var reclassified = currentEntries.Keys.Intersect(baselineEntries.Keys, StringComparer.Ordinal)
+        .Where(key => !string.Equals(currentEntries[key].ExposureClassification, baselineEntries[key].ExposureClassification, StringComparison.Ordinal))
+        .Select(key => $"{key}:{baselineEntries[key].ExposureClassification}->{currentEntries[key].ExposureClassification}")
+        .OrderBy(value => value, StringComparer.Ordinal)
+        .ToList();
+    var evidenceDelta = currentEntries.Keys.Intersect(baselineEntries.Keys, StringComparer.Ordinal)
+        .Where(key => !string.IsNullOrWhiteSpace(currentEntries[key].EvidenceFingerprint) &&
+                      !string.Equals(currentEntries[key].EvidenceFingerprint, baselineEntries[key].EvidenceFingerprint, StringComparison.Ordinal))
+        .OrderBy(value => value, StringComparer.Ordinal)
+        .ToList();
+
+    return new PopulationGovernanceResult(
+        snapshot,
+        new OperatorPopulationDelta
+        {
+            BaselinePath = "quality/evals/baselines/operator-exposure-approved-baseline.json",
+            BaselineFingerprint = baselineRoot.GetProperty("populationFingerprint").GetString() ?? string.Empty,
+            Added = added,
+            Removed = removed,
+            Reclassified = reclassified,
+            EvidenceDelta = evidenceDelta
+        });
 }
 
 static string ComputeCatalogFingerprint(IReadOnlyList<CatalogOperator> operators)
@@ -614,6 +719,8 @@ static string BuildDocument(
     sb.AppendLine("|------|------|");
     sb.AppendLine($"| 类名 (Class) | `{className}` |");
     sb.AppendLine($"| 枚举值 (Enum) | `OperatorType.{item.OperatorType}` |");
+    sb.AppendLine($"| 暴露分类 (Exposure) | `{OperatorExposureCatalog.GetSlug(item.OperatorType)}` |");
+    sb.AppendLine($"| 暴露原因 (Exposure Reason) | {EscapeCell(OperatorExposureCatalog.GetEntry(item.OperatorType).Reason)} |");
     sb.AppendLine($"| 分类 ID (CategoryId) | `{metadata.CategoryId}` |");
     sb.AppendLine($"| 分类 (Category) | {EscapeCell(category)} |");
     sb.AppendLine($"| 分类顺序 (CategoryOrder) | {OperatorCategoryCatalog.GetOrder(metadata.CategoryId)} |");
@@ -621,7 +728,7 @@ static string BuildDocument(
     sb.AppendLine($"| 生命周期 (Lifecycle) | {GetLifecycleDisplayName(metadata.Lifecycle)} `{metadata.Lifecycle}` |");
     sb.AppendLine($"| 生命周期说明 (Lifecycle Note) | {EscapeCell(Fallback(metadata.LifecycleNote, "-"))} |");
     sb.AppendLine($"| 默认隐藏 (Default Hidden) | {BoolToMark(metadata.DefaultHidden)} |");
-    sb.AppendLine($"| AI 默认推荐 (Default AI Recommendation) | {BoolToMark(ImageContractPresentationBuilder.IsDefaultAiRecommendation(metadata.Lifecycle, metadata.ImageInputContracts))} |");
+    sb.AppendLine($"| AI 默认推荐 (Default AI Recommendation) | {BoolToMark(!OperatorExposureCatalog.IsDisabled(item.OperatorType) && ImageContractPresentationBuilder.IsDefaultAiRecommendation(metadata.Lifecycle, metadata.ImageInputContracts))} |");
     sb.AppendLine($"| AI 必须披露状态 (Requires Disclosure) | {BoolToMark(ImageContractPresentationBuilder.RequiresAiDisclosure(metadata.Lifecycle, metadata.ImageInputContracts))} |");
     sb.AppendLine($"| Execution | `{metadata.QualityState.Execution}` |");
     sb.AppendLine($"| AlgorithmQuality | `{metadata.QualityState.AlgorithmQuality}` |");
@@ -1618,6 +1725,8 @@ static CatalogOperator ToCatalogOperator(OperatorDocModel item, QualityContext q
     {
         Id = id,
         Type = (int)item.OperatorType,
+        ExposureClassification = OperatorExposureCatalog.GetSlug(item.OperatorType),
+        ExposureReason = OperatorExposureCatalog.GetEntry(item.OperatorType).Reason,
         DisplayName = metadata.DisplayName,
         Description = metadata.Description,
         CategoryId = metadata.CategoryId.ToString(),
@@ -1626,7 +1735,7 @@ static CatalogOperator ToCatalogOperator(OperatorDocModel item, QualityContext q
         Lifecycle = metadata.Lifecycle.ToString(),
         LifecycleNote = metadata.LifecycleNote,
         DefaultHidden = metadata.DefaultHidden,
-        DefaultAiRecommendation = ImageContractPresentationBuilder.IsDefaultAiRecommendation(
+        DefaultAiRecommendation = !OperatorExposureCatalog.IsDisabled(item.OperatorType) && ImageContractPresentationBuilder.IsDefaultAiRecommendation(
             metadata.Lifecycle,
             metadata.ImageInputContracts),
         RequiresLifecycleDisclosure = ImageContractPresentationBuilder.RequiresAiDisclosure(
@@ -2326,6 +2435,10 @@ internal sealed class CatalogDocument
 
     public int TotalCount { get; set; }
 
+    public OperatorPopulationSnapshot Population { get; set; } = new();
+
+    public OperatorPopulationDelta PopulationDelta { get; set; } = new();
+
     public Dictionary<string, CatalogCategorySummary> Categories { get; set; } = new(StringComparer.Ordinal);
 
     public List<CatalogOperator> Operators { get; set; } = new();
@@ -2349,6 +2462,10 @@ internal sealed class CatalogOperator
     public string Id { get; set; } = string.Empty;
 
     public int Type { get; set; }
+
+    public string ExposureClassification { get; set; } = string.Empty;
+
+    public string ExposureReason { get; set; } = string.Empty;
 
     public string DisplayName { get; set; } = string.Empty;
 
@@ -2400,6 +2517,35 @@ internal sealed class CatalogOperator
 
     public string DocPath { get; set; } = string.Empty;
 }
+
+internal sealed class OperatorPopulationSnapshot
+{
+    public int EnumTotal { get; set; }
+    public int FormalTotal { get; set; }
+    public int PackagePublic { get; set; }
+    public int PackageInternal { get; set; }
+    public int LegacyAlias { get; set; }
+    public int Disabled { get; set; }
+    public string Fingerprint { get; set; } = string.Empty;
+}
+
+internal sealed class OperatorPopulationDelta
+{
+    public string BaselinePath { get; set; } = string.Empty;
+    public string BaselineFingerprint { get; set; } = string.Empty;
+    public List<string> Added { get; set; } = [];
+    public List<string> Removed { get; set; } = [];
+    public List<string> Reclassified { get; set; } = [];
+    public List<string> EvidenceDelta { get; set; } = [];
+}
+
+internal sealed record PopulationGovernanceResult(
+    OperatorPopulationSnapshot Snapshot,
+    OperatorPopulationDelta Delta);
+
+internal sealed record BaselinePopulationEntry(
+    string ExposureClassification,
+    string EvidenceFingerprint);
 
 internal sealed class CatalogPort
 {

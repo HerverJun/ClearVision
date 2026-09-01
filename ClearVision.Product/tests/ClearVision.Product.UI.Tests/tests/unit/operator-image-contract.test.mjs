@@ -6,6 +6,20 @@ import {
   OperatorLibraryPanel
 } from '../../../../src/ClearVision.Product.Desktop/wwwroot/src/features/operator-library/operatorLibrary.js';
 
+test('operator library fail-closes disabled MqttPublish metadata', () => {
+  const panel = Object.create(OperatorLibraryPanel.prototype);
+
+  assert.equal(panel.normalizeOperatorMetadata({
+    type: 'MqttPublish',
+    exposureClassification: 'disabled'
+  }), null);
+  assert.equal(panel.normalizeOperatorMetadata({ type: 'MqttPublish' }), null);
+  assert.equal(panel.normalizeOperatorMetadata({
+    type: 'ImageAcquisition',
+    exposureClassification: 'package-public'
+  }).type, 'ImageAcquisition');
+});
+
 test('operator library normalizes authoritative image contract presentation', () => {
   const contracts = normalizeImageInputContracts([
     {

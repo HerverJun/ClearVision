@@ -511,6 +511,12 @@ export class OperatorLibraryPanel {
             return null;
         }
 
+        const exposureClassification = String(
+            metadata.exposureClassification || metadata.ExposureClassification || '').trim().toLowerCase();
+        if (exposureClassification === 'disabled' || type.toLowerCase() === 'mqttpublish') {
+            return null;
+        }
+
         const category = metadata.category || metadata.Category || '其他';
         const categoryId = metadata.categoryId || metadata.CategoryId || '';
         const categoryOrder = Number(metadata.categoryOrder ?? metadata.CategoryOrder ?? Number.MAX_SAFE_INTEGER);
@@ -531,6 +537,7 @@ export class OperatorLibraryPanel {
         return {
             ...metadata,
             type,
+            exposureClassification,
             categoryId,
             categoryOrder,
             category,

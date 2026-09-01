@@ -41,7 +41,7 @@
           ],
           "baselineJson": "quality/evals/reports/QualityFlywheel_algorithm_ab_replay_report.json",
           "reportMarkdown": "quality/evals/reports/QualityFlywheel_algorithm_ab_replay_report.md",
-          "estimatedSeconds": 180
+          "estimatedSeconds": 30
         },
         {
           "id": "matching_replay_safe_profile_gate",
@@ -208,25 +208,6 @@
           "baselineJson": "quality/evals/reports/QualityFlywheel_detection_precision_v2.json",
           "reportMarkdown": "quality/evals/reports/QualityFlywheel_detection_precision_v2.md",
           "estimatedSeconds": 30
-        },
-        {
-          "id": "detection_precision_v3_build",
-          "status": "manual",
-          "evidenceKind": "detection-precision-v3",
-          "operators": [
-            "SurfaceDefectDetection",
-            "AnomalyDetection",
-            "DeepLearning",
-            "EdgeDetection"
-          ],
-          "command": [
-            "python",
-            "quality/tools/build_detection_precision_v3.py"
-          ],
-          "baselineJson": "quality/evals/reports/QualityFlywheel_detection_precision_v3.json",
-          "reportMarkdown": "quality/evals/reports/QualityFlywheel_detection_precision_v3.md",
-          "estimatedSeconds": 30,
-          "notes": "V3 aggregates the public-dataset backfill plan and explicitly keeps all candidate algorithms default-off. It does not represent real production-site sign-off."
         }
       ]
     },

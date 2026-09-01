@@ -1,0 +1,50 @@
+{
+  "$schema": "../schemas/delivery-model-manifest.schema.json",
+  "schemaVersion": "clearvision.delivery-model-manifest/v1",
+  "model": {
+    "id": "delivery-model-not-provided",
+    "sha256": null,
+    "artifactPath": "external://delivery-model-required",
+    "labels": ["delivery-labels-required"]
+  },
+  "inputContract": {
+    "tensorName": "images",
+    "shape": [1, 3, 640, 640],
+    "dataType": "float32",
+    "colorOrder": "RGB",
+    "normalization": "delivery-contract-required"
+  },
+  "outputContract": {
+    "tensorNames": ["delivery-output-contract-required"],
+    "schema": "delivery-output-contract-required",
+    "postprocess": "delivery-postprocess-contract-required"
+  },
+  "dataset": {
+    "manifestPath": "external://delivery-dataset-manifest-required",
+    "version": "unassigned",
+    "sha256": null
+  },
+  "acceptanceThresholds": {
+    "precisionAt50": 0.45,
+    "recallAt50": 0.35,
+    "ap50": 0.45
+  },
+  "providerPolicy": {
+    "profiles": {
+      "CPU": { "policy": "required", "requiredHardware": "target delivery CPU" },
+      "CUDA": { "policy": "optional", "requiredHardware": "target NVIDIA GPU and driver" },
+      "TensorRT": { "policy": "optional", "requiredHardware": "target NVIDIA GPU, CUDA and TensorRT runtime" }
+    },
+    "fallbackPolicy": "Fallback must be reported with requested provider, actual provider and reason; fallback is not validation of the requested profile."
+  },
+  "failureBoundaries": [
+    "No delivery model artifact or target hardware is available in this repository.",
+    "Public COCO smoke evidence is not customer-site or field acceptance evidence.",
+    "Generated constant/identity models validate inference plumbing only."
+  ],
+  "approval": {
+    "status": "unreviewed",
+    "reviewer": null,
+    "approvedAtUtc": null
+  }
+}

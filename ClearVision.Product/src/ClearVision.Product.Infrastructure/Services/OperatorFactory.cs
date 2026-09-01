@@ -75,12 +75,12 @@ public class OperatorFactory : IOperatorFactory
 
     public IEnumerable<OperatorMetadata> GetAllMetadata()
     {
-        return _metadata.Values.Where(metadata => !OperatorFactoryMetadataMerge.IsLegacyAlias(metadata.Type));
+        return _metadata.Values.Where(metadata => OperatorExposureCatalog.IsProductVisible(metadata.Type));
     }
 
     public IEnumerable<OperatorType> GetSupportedOperatorTypes()
     {
-        return _metadata.Keys;
+        return _metadata.Keys.Where(OperatorExposureCatalog.IsProductVisible);
     }
 
     public void RegisterOperator(OperatorMetadata metadata)

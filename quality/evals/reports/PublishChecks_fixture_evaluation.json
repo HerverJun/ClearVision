@@ -1,0 +1,66 @@
+{
+  "schemaVersion": "clearvision.publish-checks-report/v1",
+  "generatedAtUtc": "2026-09-01T05:33:46.647662+00:00",
+  "toolVersion": "run_publish_checks/2026-09-01.wave3b",
+  "gitSha": "376174d830621d284c0d5da0b40a9b6c219a9150",
+  "repositoryDirty": true,
+  "environment": "Python 3.13.5; Windows-11-10.0.26200-SP0",
+  "populationFingerprint": "sha256:4cd53973dd918e3669dc06e2ae1e901b440810e9021ac974fcce1038b719896a",
+  "evidenceClass": "fixture-only",
+  "deliveryEvidence": false,
+  "verificationPassed": true,
+  "claimBoundary": "Fixture pass/fail exercises validate PublishChecks logic only and are never delivery, release, portable zip, SBOM, license, or GitHub Release evidence.",
+  "summary": {
+    "caseCount": 2,
+    "checksPassedCount": 1,
+    "blockedCount": 1,
+    "deliveryEvidenceCount": 0
+  },
+  "cases": [
+    {
+      "candidateId": "publish-checks-fixture-pass",
+      "evidenceClass": "fixture",
+      "checksPassed": true,
+      "deliveryEvidence": false,
+      "releaseDisposition": "FIXTURE_PASS_ONLY",
+      "expectedDisposition": "pass",
+      "expectationMatched": true,
+      "findings": []
+    },
+    {
+      "candidateId": "publish-checks-fixture-blocked",
+      "evidenceClass": "fixture",
+      "checksPassed": false,
+      "deliveryEvidence": false,
+      "releaseDisposition": "BLOCKED",
+      "expectedDisposition": "blocked",
+      "expectationMatched": true,
+      "findings": [
+        {
+          "code": "ASSET_HASH_MISMATCH",
+          "message": "Asset hash mismatch: quality/evals/schemas/delivery-model-manifest.schema.json"
+        },
+        {
+          "code": "DISABLED_OPERATOR",
+          "message": "fixture-disabled-flow: disabled operator MqttPublish."
+        },
+        {
+          "code": "UNKNOWN_OPERATOR",
+          "message": "fixture-disabled-flow: unknown operator UnknownOperator."
+        },
+        {
+          "code": "PARAMETERS_NEEDING_REVIEW",
+          "message": "fixture-disabled-flow: parametersNeedingReview must be an empty list."
+        },
+        {
+          "code": "ZERO_ROI",
+          "message": "fixture-disabled-flow: ROI width and height must be positive."
+        },
+        {
+          "code": "EXTERNAL_MODEL_MANIFEST_MISSING",
+          "message": "DeepLearning flow requires an external delivery model manifest."
+        }
+      ]
+    }
+  ]
+}

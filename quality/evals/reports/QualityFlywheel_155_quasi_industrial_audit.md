@@ -1,12 +1,12 @@
-# Quality Flywheel 155 Quasi-Industrial Audit
+# Quality Flywheel Governed-Population Quasi-Industrial Audit
 
-GeneratedAtUtc: `2026-07-05T06:15:50+00:00`
+GeneratedAtUtc: `2026-09-01T05:30:59+00:00`
 Passed: `Yes`
 
 ## Summary
 
-- Checks: 64
-- Passed: 64
+- Checks: 67
+- Passed: 67
 - Failed: 0
 - Real industrial validation complete: 0
 
@@ -15,7 +15,9 @@ Passed: `Yes`
 | Check | Status | Details |
 |---|---|---|
 | registry_exists | Pass | quality/evals/reports/QualityFlywheel_155_quasi_industrial_registry.json |
-| registry_operator_count_155 | Pass | 155 |
+| registry_operator_count_matches_governed_population | Pass | registry=158 formalTotal=158 |
+| registry_population_identity | Pass | sha256:4cd53973dd918e3669dc06e2ae1e901b440810e9021ac974fcce1038b719896a |
+| registry_operator_identities_match_governed_catalog | Pass | registry=158 governed=158 |
 | registry_real_field_zero | Pass | 0 |
 | registry_core20_count | Pass | 20 |
 | registry_proof_levels_allowed | Pass |  |
@@ -27,20 +29,21 @@ Passed: `Yes`
 | public_dataset_cards_exists | Pass | quality/datasets/public_benchmark_dataset_cards.json |
 | public_dataset_cards_present | Pass | 6 |
 | public_dataset_license_source_present | Pass |  |
-| public_dataset_planned_items_explicit | Pass |  |
+| public_dataset_planned_items_explicit | Pass | planned=kolektorsdd2,bsds500,opencv_calibration_samples,coco2017,hpatches; invalid= |
 | public_dataset_cards_no_raw_path | Pass | dataset card raw path scan |
 | public_benchmark_proof_exists | Pass | quality/evals/reports/QualityFlywheel_public_benchmark_proof_baseline.summary.json |
 | public_benchmark_proof_retained_summary | Pass | raw-json-removed-from-git |
-| public_benchmark_proof_accepted | Pass | True |
+| public_benchmark_proof_disposition_consistent | Pass | declared=False expected=False |
 | public_benchmark_proof_operator_count | Pass | 10 |
-| public_benchmark_proof_summary_counts_consistent | Pass | operators=10/10 accepted=10 failed=0 |
+| public_benchmark_proof_summary_counts_consistent | Pass | operators=10/10 accepted=9 failed=1 |
 | public_benchmark_proof_schema_complete | Pass |  |
 | public_benchmark_proof_replay_count_consistent | Pass | 184/184 |
 | public_benchmark_proof_no_real_field_overclaim | Pass |  |
 | public_benchmark_proof_privacy_clean | Pass |  |
 | public_benchmark_proof_no_raw_path | Pass | public benchmark proof raw path scan |
 | public_benchmark_proof_deeplearning_baseline | Pass | quality/evals/reports/DeepLearning_coco_real_model_baseline.json |
-| public_benchmark_proof_deeplearning_no_annotation_seeded_claim | Pass | COCO 2017 real-model inference proof (real-model postprocess pipeline; synthetic label tensors are not used) |
+| public_benchmark_proof_deeplearning_no_annotation_seeded_claim | Pass | Inference smoke only until an approved delivery model, dataset manifest and nonzero precision gate are present. |
+| public_benchmark_proof_deeplearning_smoke_truthful | Pass | accepted=False disposition=FAIL |
 | public_benchmark_replay_manifest_exists | Pass | quality/evals/reports/QualityFlywheel_public_benchmark_replay_manifest.json |
 | public_benchmark_replay_schema_version | Pass | 2026-04-29.public-benchmark-replay.v1 |
 | public_benchmark_replay_source_baseline | Pass | quality/evals/reports/QualityFlywheel_public_benchmark_proof_baseline.json |

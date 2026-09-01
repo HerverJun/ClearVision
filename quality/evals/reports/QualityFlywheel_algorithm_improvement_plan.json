@@ -7,52 +7,13 @@
     "testRule": "Validation split freezes thresholds; test split is final proof only and requires a new proof version after retuning."
   },
   "summary": {
-    "focusOperatorCount": 84,
+    "focusOperatorCount": 82,
     "highValueOperatorCount": 18
   },
   "operators": [
     {
-      "operator": "PPFEstimation",
-      "family": "general-operator",
-      "currentProofLevel": "missing",
-      "targetMinimumProofLevel": "contract",
-      "recommendedDatasets": [
-        "semisynthetic-oracle"
-      ],
-      "nextAction": "Add contract suite coverage and protocol/error replay cases",
-      "requiredABOutputs": [
-        "oldBaseline",
-        "newBaseline",
-        "failedCaseReplay",
-        "thresholdDelta",
-        "runtimeDelta",
-        "memoryDelta",
-        "regressionRisk"
-      ]
-    },
-    {
-      "operator": "PPFMatch",
-      "family": "matching-localization",
-      "currentProofLevel": "contract",
-      "targetMinimumProofLevel": "public-benchmark",
-      "recommendedDatasets": [
-        "hpatches",
-        "semisynthetic-homography-oracle"
-      ],
-      "nextAction": "Attach hpatches, semisynthetic-homography-oracle manifest, split, runner, and threshold gate",
-      "requiredABOutputs": [
-        "oldBaseline",
-        "newBaseline",
-        "failedCaseReplay",
-        "thresholdDelta",
-        "runtimeDelta",
-        "memoryDelta",
-        "regressionRisk"
-      ]
-    },
-    {
-      "operator": "RansacPlaneSegmentation",
-      "family": "ai-vision",
+      "operator": "ImageAcquisition",
+      "family": "image-processing",
       "currentProofLevel": "contract",
       "targetMinimumProofLevel": "public-benchmark",
       "recommendedDatasets": [
@@ -70,133 +31,14 @@
       ]
     },
     {
-      "operator": "DualModalVoting",
-      "family": "ai-vision",
-      "currentProofLevel": "contract",
-      "targetMinimumProofLevel": "public-benchmark",
-      "recommendedDatasets": [
-        "semisynthetic-oracle"
-      ],
-      "nextAction": "Attach semisynthetic-oracle manifest, split, runner, and threshold gate",
-      "requiredABOutputs": [
-        "oldBaseline",
-        "newBaseline",
-        "failedCaseReplay",
-        "thresholdDelta",
-        "runtimeDelta",
-        "memoryDelta",
-        "regressionRisk"
-      ]
-    },
-    {
-      "operator": "AnomalyDetection",
-      "family": "ai-vision",
-      "currentProofLevel": "public-benchmark",
-      "targetMinimumProofLevel": "field-substitute",
-      "recommendedDatasets": [
-        "kolektorsdd2",
-        "mvtec_ad_lite"
-      ],
-      "nextAction": "Promote to public/semisynthetic proof, then add field-substitute replay and failure taxonomy",
-      "requiredABOutputs": [
-        "oldBaseline",
-        "newBaseline",
-        "failedCaseReplay",
-        "thresholdDelta",
-        "runtimeDelta",
-        "memoryDelta",
-        "regressionRisk"
-      ]
-    },
-    {
-      "operator": "DeepLearning",
-      "family": "ai-vision",
-      "currentProofLevel": "field-substitute",
-      "targetMinimumProofLevel": "field-substitute",
-      "recommendedDatasets": [
-        "coco2017"
-      ],
-      "nextAction": "Maintain evidence, add failure replay, and keep claim audit passing",
-      "requiredABOutputs": [
-        "oldBaseline",
-        "newBaseline",
-        "failedCaseReplay",
-        "thresholdDelta",
-        "runtimeDelta",
-        "memoryDelta",
-        "regressionRisk"
-      ]
-    },
-    {
-      "operator": "EdgePairDefect",
-      "family": "ai-vision",
-      "currentProofLevel": "contract",
-      "targetMinimumProofLevel": "public-benchmark",
-      "recommendedDatasets": [
-        "kolektorsdd2",
-        "mvtec_ad_lite"
-      ],
-      "nextAction": "Attach kolektorsdd2, mvtec_ad_lite manifest, split, runner, and threshold gate",
-      "requiredABOutputs": [
-        "oldBaseline",
-        "newBaseline",
-        "failedCaseReplay",
-        "thresholdDelta",
-        "runtimeDelta",
-        "memoryDelta",
-        "regressionRisk"
-      ]
-    },
-    {
-      "operator": "SemanticSegmentation",
-      "family": "ai-vision",
-      "currentProofLevel": "public-benchmark",
-      "targetMinimumProofLevel": "field-substitute",
-      "recommendedDatasets": [
-        "bsds500",
-        "semisynthetic-boundary-oracle"
-      ],
-      "nextAction": "Promote to public/semisynthetic proof, then add field-substitute replay and failure taxonomy",
-      "requiredABOutputs": [
-        "oldBaseline",
-        "newBaseline",
-        "failedCaseReplay",
-        "thresholdDelta",
-        "runtimeDelta",
-        "memoryDelta",
-        "regressionRisk"
-      ]
-    },
-    {
-      "operator": "SurfaceDefectDetection",
-      "family": "ai-vision",
-      "currentProofLevel": "field-substitute",
-      "targetMinimumProofLevel": "field-substitute",
-      "recommendedDatasets": [
-        "kolektorsdd2",
-        "mvtec_ad_lite"
-      ],
-      "nextAction": "Maintain evidence, add failure replay, and keep claim audit passing",
-      "requiredABOutputs": [
-        "oldBaseline",
-        "newBaseline",
-        "failedCaseReplay",
-        "thresholdDelta",
-        "runtimeDelta",
-        "memoryDelta",
-        "regressionRisk"
-      ]
-    },
-    {
-      "operator": "DistanceTransform",
-      "family": "measurement-geometry",
+      "operator": "AffineTransform",
+      "family": "image-processing",
       "currentProofLevel": "golden",
       "targetMinimumProofLevel": "public-benchmark",
       "recommendedDatasets": [
-        "semisynthetic-geometry-oracle",
-        "bsds500"
+        "semisynthetic-oracle"
       ],
-      "nextAction": "Attach semisynthetic-geometry-oracle, bsds500 manifest, split, runner, and threshold gate",
+      "nextAction": "Attach semisynthetic-oracle manifest, split, runner, and threshold gate",
       "requiredABOutputs": [
         "oldBaseline",
         "newBaseline",
@@ -208,35 +50,14 @@
       ]
     },
     {
-      "operator": "AngleMeasurement",
-      "family": "measurement-geometry",
+      "operator": "BilateralFilter",
+      "family": "image-processing",
       "currentProofLevel": "contract",
       "targetMinimumProofLevel": "public-benchmark",
       "recommendedDatasets": [
-        "semisynthetic-geometry-oracle",
-        "bsds500"
+        "semisynthetic-oracle"
       ],
-      "nextAction": "Attach semisynthetic-geometry-oracle, bsds500 manifest, split, runner, and threshold gate",
-      "requiredABOutputs": [
-        "oldBaseline",
-        "newBaseline",
-        "failedCaseReplay",
-        "thresholdDelta",
-        "runtimeDelta",
-        "memoryDelta",
-        "regressionRisk"
-      ]
-    },
-    {
-      "operator": "ContourMeasurement",
-      "family": "measurement-geometry",
-      "currentProofLevel": "contract",
-      "targetMinimumProofLevel": "public-benchmark",
-      "recommendedDatasets": [
-        "semisynthetic-geometry-oracle",
-        "bsds500"
-      ],
-      "nextAction": "Attach semisynthetic-geometry-oracle, bsds500 manifest, split, runner, and threshold gate",
+      "nextAction": "Attach semisynthetic-oracle manifest, split, runner, and threshold gate",
       "requiredABOutputs": [
         "oldBaseline",
         "newBaseline",
@@ -251,6 +72,25 @@
       "operator": "FFT1D",
       "family": "image-processing",
       "currentProofLevel": "golden",
+      "targetMinimumProofLevel": "public-benchmark",
+      "recommendedDatasets": [
+        "semisynthetic-oracle"
+      ],
+      "nextAction": "Attach semisynthetic-oracle manifest, split, runner, and threshold gate",
+      "requiredABOutputs": [
+        "oldBaseline",
+        "newBaseline",
+        "failedCaseReplay",
+        "thresholdDelta",
+        "runtimeDelta",
+        "memoryDelta",
+        "regressionRisk"
+      ]
+    },
+    {
+      "operator": "Filtering",
+      "family": "image-processing",
+      "currentProofLevel": "contract",
       "targetMinimumProofLevel": "public-benchmark",
       "recommendedDatasets": [
         "semisynthetic-oracle"
@@ -286,6 +126,196 @@
       ]
     },
     {
+      "operator": "ImageAdd",
+      "family": "image-processing",
+      "currentProofLevel": "contract",
+      "targetMinimumProofLevel": "public-benchmark",
+      "recommendedDatasets": [
+        "semisynthetic-oracle"
+      ],
+      "nextAction": "Attach semisynthetic-oracle manifest, split, runner, and threshold gate",
+      "requiredABOutputs": [
+        "oldBaseline",
+        "newBaseline",
+        "failedCaseReplay",
+        "thresholdDelta",
+        "runtimeDelta",
+        "memoryDelta",
+        "regressionRisk"
+      ]
+    },
+    {
+      "operator": "ImageBlend",
+      "family": "image-processing",
+      "currentProofLevel": "contract",
+      "targetMinimumProofLevel": "public-benchmark",
+      "recommendedDatasets": [
+        "semisynthetic-oracle"
+      ],
+      "nextAction": "Attach semisynthetic-oracle manifest, split, runner, and threshold gate",
+      "requiredABOutputs": [
+        "oldBaseline",
+        "newBaseline",
+        "failedCaseReplay",
+        "thresholdDelta",
+        "runtimeDelta",
+        "memoryDelta",
+        "regressionRisk"
+      ]
+    },
+    {
+      "operator": "ImageCompose",
+      "family": "image-processing",
+      "currentProofLevel": "contract",
+      "targetMinimumProofLevel": "public-benchmark",
+      "recommendedDatasets": [
+        "semisynthetic-oracle"
+      ],
+      "nextAction": "Attach semisynthetic-oracle manifest, split, runner, and threshold gate",
+      "requiredABOutputs": [
+        "oldBaseline",
+        "newBaseline",
+        "failedCaseReplay",
+        "thresholdDelta",
+        "runtimeDelta",
+        "memoryDelta",
+        "regressionRisk"
+      ]
+    },
+    {
+      "operator": "ImageCrop",
+      "family": "image-processing",
+      "currentProofLevel": "contract",
+      "targetMinimumProofLevel": "public-benchmark",
+      "recommendedDatasets": [
+        "semisynthetic-oracle"
+      ],
+      "nextAction": "Attach semisynthetic-oracle manifest, split, runner, and threshold gate",
+      "requiredABOutputs": [
+        "oldBaseline",
+        "newBaseline",
+        "failedCaseReplay",
+        "thresholdDelta",
+        "runtimeDelta",
+        "memoryDelta",
+        "regressionRisk"
+      ]
+    },
+    {
+      "operator": "ImageNormalize",
+      "family": "image-processing",
+      "currentProofLevel": "contract",
+      "targetMinimumProofLevel": "public-benchmark",
+      "recommendedDatasets": [
+        "semisynthetic-oracle"
+      ],
+      "nextAction": "Attach semisynthetic-oracle manifest, split, runner, and threshold gate",
+      "requiredABOutputs": [
+        "oldBaseline",
+        "newBaseline",
+        "failedCaseReplay",
+        "thresholdDelta",
+        "runtimeDelta",
+        "memoryDelta",
+        "regressionRisk"
+      ]
+    },
+    {
+      "operator": "ImageResize",
+      "family": "image-processing",
+      "currentProofLevel": "contract",
+      "targetMinimumProofLevel": "public-benchmark",
+      "recommendedDatasets": [
+        "semisynthetic-oracle"
+      ],
+      "nextAction": "Attach semisynthetic-oracle manifest, split, runner, and threshold gate",
+      "requiredABOutputs": [
+        "oldBaseline",
+        "newBaseline",
+        "failedCaseReplay",
+        "thresholdDelta",
+        "runtimeDelta",
+        "memoryDelta",
+        "regressionRisk"
+      ]
+    },
+    {
+      "operator": "ImageRotate",
+      "family": "image-processing",
+      "currentProofLevel": "contract",
+      "targetMinimumProofLevel": "public-benchmark",
+      "recommendedDatasets": [
+        "semisynthetic-oracle"
+      ],
+      "nextAction": "Attach semisynthetic-oracle manifest, split, runner, and threshold gate",
+      "requiredABOutputs": [
+        "oldBaseline",
+        "newBaseline",
+        "failedCaseReplay",
+        "thresholdDelta",
+        "runtimeDelta",
+        "memoryDelta",
+        "regressionRisk"
+      ]
+    },
+    {
+      "operator": "ImageStitching",
+      "family": "image-processing",
+      "currentProofLevel": "contract",
+      "targetMinimumProofLevel": "public-benchmark",
+      "recommendedDatasets": [
+        "semisynthetic-oracle"
+      ],
+      "nextAction": "Attach semisynthetic-oracle manifest, split, runner, and threshold gate",
+      "requiredABOutputs": [
+        "oldBaseline",
+        "newBaseline",
+        "failedCaseReplay",
+        "thresholdDelta",
+        "runtimeDelta",
+        "memoryDelta",
+        "regressionRisk"
+      ]
+    },
+    {
+      "operator": "ImageSubtract",
+      "family": "image-processing",
+      "currentProofLevel": "golden",
+      "targetMinimumProofLevel": "public-benchmark",
+      "recommendedDatasets": [
+        "semisynthetic-oracle"
+      ],
+      "nextAction": "Attach semisynthetic-oracle manifest, split, runner, and threshold gate",
+      "requiredABOutputs": [
+        "oldBaseline",
+        "newBaseline",
+        "failedCaseReplay",
+        "thresholdDelta",
+        "runtimeDelta",
+        "memoryDelta",
+        "regressionRisk"
+      ]
+    },
+    {
+      "operator": "ImageTiling",
+      "family": "image-processing",
+      "currentProofLevel": "contract",
+      "targetMinimumProofLevel": "public-benchmark",
+      "recommendedDatasets": [
+        "semisynthetic-oracle"
+      ],
+      "nextAction": "Attach semisynthetic-oracle manifest, split, runner, and threshold gate",
+      "requiredABOutputs": [
+        "oldBaseline",
+        "newBaseline",
+        "failedCaseReplay",
+        "thresholdDelta",
+        "runtimeDelta",
+        "memoryDelta",
+        "regressionRisk"
+      ]
+    },
+    {
       "operator": "InverseFFT1D",
       "family": "image-processing",
       "currentProofLevel": "golden",
@@ -305,83 +335,161 @@
       ]
     },
     {
+      "operator": "MeanFilter",
+      "family": "image-processing",
+      "currentProofLevel": "contract",
+      "targetMinimumProofLevel": "public-benchmark",
+      "recommendedDatasets": [
+        "semisynthetic-oracle"
+      ],
+      "nextAction": "Attach semisynthetic-oracle manifest, split, runner, and threshold gate",
+      "requiredABOutputs": [
+        "oldBaseline",
+        "newBaseline",
+        "failedCaseReplay",
+        "thresholdDelta",
+        "runtimeDelta",
+        "memoryDelta",
+        "regressionRisk"
+      ]
+    },
+    {
+      "operator": "PerspectiveTransform",
+      "family": "image-processing",
+      "currentProofLevel": "golden",
+      "targetMinimumProofLevel": "public-benchmark",
+      "recommendedDatasets": [
+        "semisynthetic-oracle"
+      ],
+      "nextAction": "Attach semisynthetic-oracle manifest, split, runner, and threshold gate",
+      "requiredABOutputs": [
+        "oldBaseline",
+        "newBaseline",
+        "failedCaseReplay",
+        "thresholdDelta",
+        "runtimeDelta",
+        "memoryDelta",
+        "regressionRisk"
+      ]
+    },
+    {
+      "operator": "AdaptiveThreshold",
+      "family": "image-processing",
+      "currentProofLevel": "golden",
+      "targetMinimumProofLevel": "public-benchmark",
+      "recommendedDatasets": [
+        "semisynthetic-oracle"
+      ],
+      "nextAction": "Attach semisynthetic-oracle manifest, split, runner, and threshold gate",
+      "requiredABOutputs": [
+        "oldBaseline",
+        "newBaseline",
+        "failedCaseReplay",
+        "thresholdDelta",
+        "runtimeDelta",
+        "memoryDelta",
+        "regressionRisk"
+      ]
+    },
+    {
+      "operator": "BinaryImageToRegion",
+      "family": "image-processing",
+      "currentProofLevel": "missing",
+      "targetMinimumProofLevel": "public-benchmark",
+      "recommendedDatasets": [
+        "semisynthetic-oracle"
+      ],
+      "nextAction": "Attach semisynthetic-oracle manifest, split, runner, and threshold gate",
+      "requiredABOutputs": [
+        "oldBaseline",
+        "newBaseline",
+        "failedCaseReplay",
+        "thresholdDelta",
+        "runtimeDelta",
+        "memoryDelta",
+        "regressionRisk"
+      ]
+    },
+    {
+      "operator": "BlobAnalysis",
+      "family": "measurement-geometry",
+      "currentProofLevel": "field-substitute",
+      "targetMinimumProofLevel": "field-substitute",
+      "recommendedDatasets": [
+        "semisynthetic-geometry-oracle",
+        "bsds500"
+      ],
+      "nextAction": "Maintain evidence, add failure replay, and keep claim audit passing",
+      "requiredABOutputs": [
+        "oldBaseline",
+        "newBaseline",
+        "failedCaseReplay",
+        "thresholdDelta",
+        "runtimeDelta",
+        "memoryDelta",
+        "regressionRisk"
+      ]
+    },
+    {
+      "operator": "DistanceTransform",
+      "family": "measurement-geometry",
+      "currentProofLevel": "golden",
+      "targetMinimumProofLevel": "public-benchmark",
+      "recommendedDatasets": [
+        "semisynthetic-geometry-oracle",
+        "bsds500"
+      ],
+      "nextAction": "Attach semisynthetic-geometry-oracle, bsds500 manifest, split, runner, and threshold gate",
+      "requiredABOutputs": [
+        "oldBaseline",
+        "newBaseline",
+        "failedCaseReplay",
+        "thresholdDelta",
+        "runtimeDelta",
+        "memoryDelta",
+        "regressionRisk"
+      ]
+    },
+    {
+      "operator": "Morphology",
+      "family": "image-processing",
+      "currentProofLevel": "contract",
+      "targetMinimumProofLevel": "public-benchmark",
+      "recommendedDatasets": [
+        "semisynthetic-oracle"
+      ],
+      "nextAction": "Attach semisynthetic-oracle manifest, split, runner, and threshold gate",
+      "requiredABOutputs": [
+        "oldBaseline",
+        "newBaseline",
+        "failedCaseReplay",
+        "thresholdDelta",
+        "runtimeDelta",
+        "memoryDelta",
+        "regressionRisk"
+      ]
+    },
+    {
+      "operator": "RectangleRegion",
+      "family": "image-processing",
+      "currentProofLevel": "missing",
+      "targetMinimumProofLevel": "public-benchmark",
+      "recommendedDatasets": [
+        "semisynthetic-oracle"
+      ],
+      "nextAction": "Attach semisynthetic-oracle manifest, split, runner, and threshold gate",
+      "requiredABOutputs": [
+        "oldBaseline",
+        "newBaseline",
+        "failedCaseReplay",
+        "thresholdDelta",
+        "runtimeDelta",
+        "memoryDelta",
+        "regressionRisk"
+      ]
+    },
+    {
       "operator": "RegionClosing",
-      "family": "image-processing",
-      "currentProofLevel": "golden",
-      "targetMinimumProofLevel": "public-benchmark",
-      "recommendedDatasets": [
-        "semisynthetic-oracle"
-      ],
-      "nextAction": "Attach semisynthetic-oracle manifest, split, runner, and threshold gate",
-      "requiredABOutputs": [
-        "oldBaseline",
-        "newBaseline",
-        "failedCaseReplay",
-        "thresholdDelta",
-        "runtimeDelta",
-        "memoryDelta",
-        "regressionRisk"
-      ]
-    },
-    {
-      "operator": "RegionDilation",
-      "family": "image-processing",
-      "currentProofLevel": "golden",
-      "targetMinimumProofLevel": "public-benchmark",
-      "recommendedDatasets": [
-        "semisynthetic-oracle"
-      ],
-      "nextAction": "Attach semisynthetic-oracle manifest, split, runner, and threshold gate",
-      "requiredABOutputs": [
-        "oldBaseline",
-        "newBaseline",
-        "failedCaseReplay",
-        "thresholdDelta",
-        "runtimeDelta",
-        "memoryDelta",
-        "regressionRisk"
-      ]
-    },
-    {
-      "operator": "RegionErosion",
-      "family": "image-processing",
-      "currentProofLevel": "golden",
-      "targetMinimumProofLevel": "public-benchmark",
-      "recommendedDatasets": [
-        "semisynthetic-oracle"
-      ],
-      "nextAction": "Attach semisynthetic-oracle manifest, split, runner, and threshold gate",
-      "requiredABOutputs": [
-        "oldBaseline",
-        "newBaseline",
-        "failedCaseReplay",
-        "thresholdDelta",
-        "runtimeDelta",
-        "memoryDelta",
-        "regressionRisk"
-      ]
-    },
-    {
-      "operator": "RegionOpening",
-      "family": "image-processing",
-      "currentProofLevel": "golden",
-      "targetMinimumProofLevel": "public-benchmark",
-      "recommendedDatasets": [
-        "semisynthetic-oracle"
-      ],
-      "nextAction": "Attach semisynthetic-oracle manifest, split, runner, and threshold gate",
-      "requiredABOutputs": [
-        "oldBaseline",
-        "newBaseline",
-        "failedCaseReplay",
-        "thresholdDelta",
-        "runtimeDelta",
-        "memoryDelta",
-        "regressionRisk"
-      ]
-    },
-    {
-      "operator": "RegionSkeleton",
       "family": "image-processing",
       "currentProofLevel": "golden",
       "targetMinimumProofLevel": "public-benchmark",
@@ -438,7 +546,83 @@
       ]
     },
     {
+      "operator": "RegionDilation",
+      "family": "image-processing",
+      "currentProofLevel": "golden",
+      "targetMinimumProofLevel": "public-benchmark",
+      "recommendedDatasets": [
+        "semisynthetic-oracle"
+      ],
+      "nextAction": "Attach semisynthetic-oracle manifest, split, runner, and threshold gate",
+      "requiredABOutputs": [
+        "oldBaseline",
+        "newBaseline",
+        "failedCaseReplay",
+        "thresholdDelta",
+        "runtimeDelta",
+        "memoryDelta",
+        "regressionRisk"
+      ]
+    },
+    {
+      "operator": "RegionErosion",
+      "family": "image-processing",
+      "currentProofLevel": "golden",
+      "targetMinimumProofLevel": "public-benchmark",
+      "recommendedDatasets": [
+        "semisynthetic-oracle"
+      ],
+      "nextAction": "Attach semisynthetic-oracle manifest, split, runner, and threshold gate",
+      "requiredABOutputs": [
+        "oldBaseline",
+        "newBaseline",
+        "failedCaseReplay",
+        "thresholdDelta",
+        "runtimeDelta",
+        "memoryDelta",
+        "regressionRisk"
+      ]
+    },
+    {
       "operator": "RegionIntersection",
+      "family": "image-processing",
+      "currentProofLevel": "golden",
+      "targetMinimumProofLevel": "public-benchmark",
+      "recommendedDatasets": [
+        "semisynthetic-oracle"
+      ],
+      "nextAction": "Attach semisynthetic-oracle manifest, split, runner, and threshold gate",
+      "requiredABOutputs": [
+        "oldBaseline",
+        "newBaseline",
+        "failedCaseReplay",
+        "thresholdDelta",
+        "runtimeDelta",
+        "memoryDelta",
+        "regressionRisk"
+      ]
+    },
+    {
+      "operator": "RegionOpening",
+      "family": "image-processing",
+      "currentProofLevel": "golden",
+      "targetMinimumProofLevel": "public-benchmark",
+      "recommendedDatasets": [
+        "semisynthetic-oracle"
+      ],
+      "nextAction": "Attach semisynthetic-oracle manifest, split, runner, and threshold gate",
+      "requiredABOutputs": [
+        "oldBaseline",
+        "newBaseline",
+        "failedCaseReplay",
+        "thresholdDelta",
+        "runtimeDelta",
+        "memoryDelta",
+        "regressionRisk"
+      ]
+    },
+    {
+      "operator": "RegionSkeleton",
       "family": "image-processing",
       "currentProofLevel": "golden",
       "targetMinimumProofLevel": "public-benchmark",
@@ -476,224 +660,7 @@
       ]
     },
     {
-      "operator": "GlcmTexture",
-      "family": "image-processing",
-      "currentProofLevel": "contract",
-      "targetMinimumProofLevel": "public-benchmark",
-      "recommendedDatasets": [
-        "semisynthetic-oracle"
-      ],
-      "nextAction": "Attach semisynthetic-oracle manifest, split, runner, and threshold gate",
-      "requiredABOutputs": [
-        "oldBaseline",
-        "newBaseline",
-        "failedCaseReplay",
-        "thresholdDelta",
-        "runtimeDelta",
-        "memoryDelta",
-        "regressionRisk"
-      ]
-    },
-    {
-      "operator": "LawsTextureFilter",
-      "family": "image-processing",
-      "currentProofLevel": "contract",
-      "targetMinimumProofLevel": "public-benchmark",
-      "recommendedDatasets": [
-        "semisynthetic-oracle"
-      ],
-      "nextAction": "Attach semisynthetic-oracle manifest, split, runner, and threshold gate",
-      "requiredABOutputs": [
-        "oldBaseline",
-        "newBaseline",
-        "failedCaseReplay",
-        "thresholdDelta",
-        "runtimeDelta",
-        "memoryDelta",
-        "regressionRisk"
-      ]
-    },
-    {
-      "operator": "AkazeFeatureMatch",
-      "family": "matching-localization",
-      "currentProofLevel": "public-benchmark",
-      "targetMinimumProofLevel": "field-substitute",
-      "recommendedDatasets": [
-        "hpatches",
-        "semisynthetic-homography-oracle"
-      ],
-      "nextAction": "Promote to public/semisynthetic proof, then add field-substitute replay and failure taxonomy",
-      "requiredABOutputs": [
-        "oldBaseline",
-        "newBaseline",
-        "failedCaseReplay",
-        "thresholdDelta",
-        "runtimeDelta",
-        "memoryDelta",
-        "regressionRisk"
-      ]
-    },
-    {
-      "operator": "GradientShapeMatch",
-      "family": "matching-localization",
-      "currentProofLevel": "public-benchmark",
-      "targetMinimumProofLevel": "field-substitute",
-      "recommendedDatasets": [
-        "hpatches",
-        "semisynthetic-homography-oracle"
-      ],
-      "nextAction": "Promote to public/semisynthetic proof, then add field-substitute replay and failure taxonomy",
-      "requiredABOutputs": [
-        "oldBaseline",
-        "newBaseline",
-        "failedCaseReplay",
-        "thresholdDelta",
-        "runtimeDelta",
-        "memoryDelta",
-        "regressionRisk"
-      ]
-    },
-    {
-      "operator": "LocalDeformableMatching",
-      "family": "matching-localization",
-      "currentProofLevel": "public-benchmark",
-      "targetMinimumProofLevel": "field-substitute",
-      "recommendedDatasets": [
-        "hpatches",
-        "semisynthetic-homography-oracle"
-      ],
-      "nextAction": "Promote to public/semisynthetic proof, then add field-substitute replay and failure taxonomy",
-      "requiredABOutputs": [
-        "oldBaseline",
-        "newBaseline",
-        "failedCaseReplay",
-        "thresholdDelta",
-        "runtimeDelta",
-        "memoryDelta",
-        "regressionRisk"
-      ]
-    },
-    {
-      "operator": "OrbFeatureMatch",
-      "family": "matching-localization",
-      "currentProofLevel": "public-benchmark",
-      "targetMinimumProofLevel": "field-substitute",
-      "recommendedDatasets": [
-        "hpatches",
-        "semisynthetic-homography-oracle"
-      ],
-      "nextAction": "Promote to public/semisynthetic proof, then add field-substitute replay and failure taxonomy",
-      "requiredABOutputs": [
-        "oldBaseline",
-        "newBaseline",
-        "failedCaseReplay",
-        "thresholdDelta",
-        "runtimeDelta",
-        "memoryDelta",
-        "regressionRisk"
-      ]
-    },
-    {
-      "operator": "PlanarMatching",
-      "family": "matching-localization",
-      "currentProofLevel": "public-benchmark",
-      "targetMinimumProofLevel": "field-substitute",
-      "recommendedDatasets": [
-        "hpatches",
-        "semisynthetic-homography-oracle"
-      ],
-      "nextAction": "Promote to public/semisynthetic proof, then add field-substitute replay and failure taxonomy",
-      "requiredABOutputs": [
-        "oldBaseline",
-        "newBaseline",
-        "failedCaseReplay",
-        "thresholdDelta",
-        "runtimeDelta",
-        "memoryDelta",
-        "regressionRisk"
-      ]
-    },
-    {
-      "operator": "PyramidShapeMatch",
-      "family": "matching-localization",
-      "currentProofLevel": "public-benchmark",
-      "targetMinimumProofLevel": "field-substitute",
-      "recommendedDatasets": [
-        "hpatches",
-        "semisynthetic-homography-oracle"
-      ],
-      "nextAction": "Promote to public/semisynthetic proof, then add field-substitute replay and failure taxonomy",
-      "requiredABOutputs": [
-        "oldBaseline",
-        "newBaseline",
-        "failedCaseReplay",
-        "thresholdDelta",
-        "runtimeDelta",
-        "memoryDelta",
-        "regressionRisk"
-      ]
-    },
-    {
-      "operator": "ShapeMatching",
-      "family": "matching-localization",
-      "currentProofLevel": "public-benchmark",
-      "targetMinimumProofLevel": "field-substitute",
-      "recommendedDatasets": [
-        "hpatches",
-        "semisynthetic-homography-oracle"
-      ],
-      "nextAction": "Promote to public/semisynthetic proof, then add field-substitute replay and failure taxonomy",
-      "requiredABOutputs": [
-        "oldBaseline",
-        "newBaseline",
-        "failedCaseReplay",
-        "thresholdDelta",
-        "runtimeDelta",
-        "memoryDelta",
-        "regressionRisk"
-      ]
-    },
-    {
-      "operator": "TemplateMatching",
-      "family": "matching-localization",
-      "currentProofLevel": "field-substitute",
-      "targetMinimumProofLevel": "field-substitute",
-      "recommendedDatasets": [
-        "hpatches",
-        "semisynthetic-homography-oracle"
-      ],
-      "nextAction": "Maintain evidence, add failure replay, and keep claim audit passing",
-      "requiredABOutputs": [
-        "oldBaseline",
-        "newBaseline",
-        "failedCaseReplay",
-        "thresholdDelta",
-        "runtimeDelta",
-        "memoryDelta",
-        "regressionRisk"
-      ]
-    },
-    {
-      "operator": "AffineTransform",
-      "family": "image-processing",
-      "currentProofLevel": "golden",
-      "targetMinimumProofLevel": "public-benchmark",
-      "recommendedDatasets": [
-        "semisynthetic-oracle"
-      ],
-      "nextAction": "Attach semisynthetic-oracle manifest, split, runner, and threshold gate",
-      "requiredABOutputs": [
-        "oldBaseline",
-        "newBaseline",
-        "failedCaseReplay",
-        "thresholdDelta",
-        "runtimeDelta",
-        "memoryDelta",
-        "regressionRisk"
-      ]
-    },
-    {
-      "operator": "ImageStitching",
+      "operator": "Thresholding",
       "family": "image-processing",
       "currentProofLevel": "contract",
       "targetMinimumProofLevel": "public-benchmark",
@@ -732,7 +699,46 @@
       ]
     },
     {
-      "operator": "ImageCompose",
+      "operator": "CodeRecognition",
+      "family": "ai-vision",
+      "currentProofLevel": "contract",
+      "targetMinimumProofLevel": "public-benchmark",
+      "recommendedDatasets": [
+        "semisynthetic-oracle"
+      ],
+      "nextAction": "Attach semisynthetic-oracle manifest, split, runner, and threshold gate",
+      "requiredABOutputs": [
+        "oldBaseline",
+        "newBaseline",
+        "failedCaseReplay",
+        "thresholdDelta",
+        "runtimeDelta",
+        "memoryDelta",
+        "regressionRisk"
+      ]
+    },
+    {
+      "operator": "ContourDetection",
+      "family": "measurement-geometry",
+      "currentProofLevel": "field-substitute",
+      "targetMinimumProofLevel": "field-substitute",
+      "recommendedDatasets": [
+        "bsds500",
+        "semisynthetic-boundary-oracle"
+      ],
+      "nextAction": "Maintain evidence, add failure replay, and keep claim audit passing",
+      "requiredABOutputs": [
+        "oldBaseline",
+        "newBaseline",
+        "failedCaseReplay",
+        "thresholdDelta",
+        "runtimeDelta",
+        "memoryDelta",
+        "regressionRisk"
+      ]
+    },
+    {
+      "operator": "GlcmTexture",
       "family": "image-processing",
       "currentProofLevel": "contract",
       "targetMinimumProofLevel": "public-benchmark",
@@ -751,7 +757,26 @@
       ]
     },
     {
-      "operator": "ImageTiling",
+      "operator": "ImageDiff",
+      "family": "image-processing",
+      "currentProofLevel": "golden",
+      "targetMinimumProofLevel": "public-benchmark",
+      "recommendedDatasets": [
+        "semisynthetic-oracle"
+      ],
+      "nextAction": "Attach semisynthetic-oracle manifest, split, runner, and threshold gate",
+      "requiredABOutputs": [
+        "oldBaseline",
+        "newBaseline",
+        "failedCaseReplay",
+        "thresholdDelta",
+        "runtimeDelta",
+        "memoryDelta",
+        "regressionRisk"
+      ]
+    },
+    {
+      "operator": "LawsTextureFilter",
       "family": "image-processing",
       "currentProofLevel": "contract",
       "targetMinimumProofLevel": "public-benchmark",
@@ -770,7 +795,147 @@
       ]
     },
     {
-      "operator": "BoxFilter",
+      "operator": "AkazeFeatureMatch",
+      "family": "matching-localization",
+      "currentProofLevel": "field-substitute",
+      "targetMinimumProofLevel": "field-substitute",
+      "recommendedDatasets": [
+        "hpatches",
+        "semisynthetic-homography-oracle"
+      ],
+      "nextAction": "Maintain evidence, add failure replay, and keep claim audit passing",
+      "requiredABOutputs": [
+        "oldBaseline",
+        "newBaseline",
+        "failedCaseReplay",
+        "thresholdDelta",
+        "runtimeDelta",
+        "memoryDelta",
+        "regressionRisk"
+      ]
+    },
+    {
+      "operator": "ContourExtrema",
+      "family": "measurement-geometry",
+      "currentProofLevel": "contract",
+      "targetMinimumProofLevel": "public-benchmark",
+      "recommendedDatasets": [
+        "semisynthetic-geometry-oracle",
+        "bsds500"
+      ],
+      "nextAction": "Attach semisynthetic-geometry-oracle, bsds500 manifest, split, runner, and threshold gate",
+      "requiredABOutputs": [
+        "oldBaseline",
+        "newBaseline",
+        "failedCaseReplay",
+        "thresholdDelta",
+        "runtimeDelta",
+        "memoryDelta",
+        "regressionRisk"
+      ]
+    },
+    {
+      "operator": "GradientShapeMatch",
+      "family": "matching-localization",
+      "currentProofLevel": "field-substitute",
+      "targetMinimumProofLevel": "field-substitute",
+      "recommendedDatasets": [
+        "hpatches",
+        "semisynthetic-homography-oracle"
+      ],
+      "nextAction": "Maintain evidence, add failure replay, and keep claim audit passing",
+      "requiredABOutputs": [
+        "oldBaseline",
+        "newBaseline",
+        "failedCaseReplay",
+        "thresholdDelta",
+        "runtimeDelta",
+        "memoryDelta",
+        "regressionRisk"
+      ]
+    },
+    {
+      "operator": "LocalDeformableMatching",
+      "family": "matching-localization",
+      "currentProofLevel": "field-substitute",
+      "targetMinimumProofLevel": "field-substitute",
+      "recommendedDatasets": [
+        "hpatches",
+        "semisynthetic-homography-oracle"
+      ],
+      "nextAction": "Maintain evidence, add failure replay, and keep claim audit passing",
+      "requiredABOutputs": [
+        "oldBaseline",
+        "newBaseline",
+        "failedCaseReplay",
+        "thresholdDelta",
+        "runtimeDelta",
+        "memoryDelta",
+        "regressionRisk"
+      ]
+    },
+    {
+      "operator": "OrbFeatureMatch",
+      "family": "matching-localization",
+      "currentProofLevel": "field-substitute",
+      "targetMinimumProofLevel": "field-substitute",
+      "recommendedDatasets": [
+        "hpatches",
+        "semisynthetic-homography-oracle"
+      ],
+      "nextAction": "Maintain evidence, add failure replay, and keep claim audit passing",
+      "requiredABOutputs": [
+        "oldBaseline",
+        "newBaseline",
+        "failedCaseReplay",
+        "thresholdDelta",
+        "runtimeDelta",
+        "memoryDelta",
+        "regressionRisk"
+      ]
+    },
+    {
+      "operator": "PlanarMatching",
+      "family": "matching-localization",
+      "currentProofLevel": "field-substitute",
+      "targetMinimumProofLevel": "field-substitute",
+      "recommendedDatasets": [
+        "hpatches",
+        "semisynthetic-homography-oracle"
+      ],
+      "nextAction": "Maintain evidence, add failure replay, and keep claim audit passing",
+      "requiredABOutputs": [
+        "oldBaseline",
+        "newBaseline",
+        "failedCaseReplay",
+        "thresholdDelta",
+        "runtimeDelta",
+        "memoryDelta",
+        "regressionRisk"
+      ]
+    },
+    {
+      "operator": "PyramidShapeMatch",
+      "family": "matching-localization",
+      "currentProofLevel": "field-substitute",
+      "targetMinimumProofLevel": "field-substitute",
+      "recommendedDatasets": [
+        "hpatches",
+        "semisynthetic-homography-oracle"
+      ],
+      "nextAction": "Maintain evidence, add failure replay, and keep claim audit passing",
+      "requiredABOutputs": [
+        "oldBaseline",
+        "newBaseline",
+        "failedCaseReplay",
+        "thresholdDelta",
+        "runtimeDelta",
+        "memoryDelta",
+        "regressionRisk"
+      ]
+    },
+    {
+      "operator": "RoiTransform",
       "family": "image-processing",
       "currentProofLevel": "contract",
       "targetMinimumProofLevel": "public-benchmark",
@@ -778,6 +943,365 @@
         "semisynthetic-oracle"
       ],
       "nextAction": "Attach semisynthetic-oracle manifest, split, runner, and threshold gate",
+      "requiredABOutputs": [
+        "oldBaseline",
+        "newBaseline",
+        "failedCaseReplay",
+        "thresholdDelta",
+        "runtimeDelta",
+        "memoryDelta",
+        "regressionRisk"
+      ]
+    },
+    {
+      "operator": "ShapeMatching",
+      "family": "matching-localization",
+      "currentProofLevel": "field-substitute",
+      "targetMinimumProofLevel": "field-substitute",
+      "recommendedDatasets": [
+        "hpatches",
+        "semisynthetic-homography-oracle"
+      ],
+      "nextAction": "Maintain evidence, add failure replay, and keep claim audit passing",
+      "requiredABOutputs": [
+        "oldBaseline",
+        "newBaseline",
+        "failedCaseReplay",
+        "thresholdDelta",
+        "runtimeDelta",
+        "memoryDelta",
+        "regressionRisk"
+      ]
+    },
+    {
+      "operator": "TemplateMatching",
+      "family": "matching-localization",
+      "currentProofLevel": "field-substitute",
+      "targetMinimumProofLevel": "field-substitute",
+      "recommendedDatasets": [
+        "hpatches",
+        "semisynthetic-homography-oracle"
+      ],
+      "nextAction": "Maintain evidence, add failure replay, and keep claim audit passing",
+      "requiredABOutputs": [
+        "oldBaseline",
+        "newBaseline",
+        "failedCaseReplay",
+        "thresholdDelta",
+        "runtimeDelta",
+        "memoryDelta",
+        "regressionRisk"
+      ]
+    },
+    {
+      "operator": "DualModalVoting",
+      "family": "ai-vision",
+      "currentProofLevel": "contract",
+      "targetMinimumProofLevel": "public-benchmark",
+      "recommendedDatasets": [
+        "semisynthetic-oracle"
+      ],
+      "nextAction": "Attach semisynthetic-oracle manifest, split, runner, and threshold gate",
+      "requiredABOutputs": [
+        "oldBaseline",
+        "newBaseline",
+        "failedCaseReplay",
+        "thresholdDelta",
+        "runtimeDelta",
+        "memoryDelta",
+        "regressionRisk"
+      ]
+    },
+    {
+      "operator": "EdgePairDefect",
+      "family": "ai-vision",
+      "currentProofLevel": "contract",
+      "targetMinimumProofLevel": "public-benchmark",
+      "recommendedDatasets": [
+        "kolektorsdd2",
+        "mvtec_ad_lite"
+      ],
+      "nextAction": "Attach kolektorsdd2, mvtec_ad_lite manifest, split, runner, and threshold gate",
+      "requiredABOutputs": [
+        "oldBaseline",
+        "newBaseline",
+        "failedCaseReplay",
+        "thresholdDelta",
+        "runtimeDelta",
+        "memoryDelta",
+        "regressionRisk"
+      ]
+    },
+    {
+      "operator": "SurfaceDefectDetection",
+      "family": "ai-vision",
+      "currentProofLevel": "field-substitute",
+      "targetMinimumProofLevel": "field-substitute",
+      "recommendedDatasets": [
+        "kolektorsdd2",
+        "mvtec_ad_lite"
+      ],
+      "nextAction": "Maintain evidence, add failure replay, and keep claim audit passing",
+      "requiredABOutputs": [
+        "oldBaseline",
+        "newBaseline",
+        "failedCaseReplay",
+        "thresholdDelta",
+        "runtimeDelta",
+        "memoryDelta",
+        "regressionRisk"
+      ]
+    },
+    {
+      "operator": "AngleMeasurement",
+      "family": "measurement-geometry",
+      "currentProofLevel": "contract",
+      "targetMinimumProofLevel": "public-benchmark",
+      "recommendedDatasets": [
+        "semisynthetic-geometry-oracle",
+        "bsds500"
+      ],
+      "nextAction": "Attach semisynthetic-geometry-oracle, bsds500 manifest, split, runner, and threshold gate",
+      "requiredABOutputs": [
+        "oldBaseline",
+        "newBaseline",
+        "failedCaseReplay",
+        "thresholdDelta",
+        "runtimeDelta",
+        "memoryDelta",
+        "regressionRisk"
+      ]
+    },
+    {
+      "operator": "ArcCaliper",
+      "family": "measurement-geometry",
+      "currentProofLevel": "field-substitute",
+      "targetMinimumProofLevel": "field-substitute",
+      "recommendedDatasets": [
+        "semisynthetic-geometry-oracle",
+        "bsds500"
+      ],
+      "nextAction": "Maintain evidence, add failure replay, and keep claim audit passing",
+      "requiredABOutputs": [
+        "oldBaseline",
+        "newBaseline",
+        "failedCaseReplay",
+        "thresholdDelta",
+        "runtimeDelta",
+        "memoryDelta",
+        "regressionRisk"
+      ]
+    },
+    {
+      "operator": "CaliperTool",
+      "family": "measurement-geometry",
+      "currentProofLevel": "field-substitute",
+      "targetMinimumProofLevel": "field-substitute",
+      "recommendedDatasets": [
+        "semisynthetic-geometry-oracle",
+        "bsds500"
+      ],
+      "nextAction": "Maintain evidence, add failure replay, and keep claim audit passing",
+      "requiredABOutputs": [
+        "oldBaseline",
+        "newBaseline",
+        "failedCaseReplay",
+        "thresholdDelta",
+        "runtimeDelta",
+        "memoryDelta",
+        "regressionRisk"
+      ]
+    },
+    {
+      "operator": "CircleMeasurement",
+      "family": "measurement-geometry",
+      "currentProofLevel": "field-substitute",
+      "targetMinimumProofLevel": "field-substitute",
+      "recommendedDatasets": [
+        "semisynthetic-geometry-oracle",
+        "bsds500"
+      ],
+      "nextAction": "Maintain evidence, add failure replay, and keep claim audit passing",
+      "requiredABOutputs": [
+        "oldBaseline",
+        "newBaseline",
+        "failedCaseReplay",
+        "thresholdDelta",
+        "runtimeDelta",
+        "memoryDelta",
+        "regressionRisk"
+      ]
+    },
+    {
+      "operator": "ColorMeasurement",
+      "family": "measurement-geometry",
+      "currentProofLevel": "contract",
+      "targetMinimumProofLevel": "public-benchmark",
+      "recommendedDatasets": [
+        "semisynthetic-geometry-oracle",
+        "bsds500"
+      ],
+      "nextAction": "Attach semisynthetic-geometry-oracle, bsds500 manifest, split, runner, and threshold gate",
+      "requiredABOutputs": [
+        "oldBaseline",
+        "newBaseline",
+        "failedCaseReplay",
+        "thresholdDelta",
+        "runtimeDelta",
+        "memoryDelta",
+        "regressionRisk"
+      ]
+    },
+    {
+      "operator": "ContourMeasurement",
+      "family": "measurement-geometry",
+      "currentProofLevel": "contract",
+      "targetMinimumProofLevel": "public-benchmark",
+      "recommendedDatasets": [
+        "semisynthetic-geometry-oracle",
+        "bsds500"
+      ],
+      "nextAction": "Attach semisynthetic-geometry-oracle, bsds500 manifest, split, runner, and threshold gate",
+      "requiredABOutputs": [
+        "oldBaseline",
+        "newBaseline",
+        "failedCaseReplay",
+        "thresholdDelta",
+        "runtimeDelta",
+        "memoryDelta",
+        "regressionRisk"
+      ]
+    },
+    {
+      "operator": "GapMeasurement",
+      "family": "measurement-geometry",
+      "currentProofLevel": "contract",
+      "targetMinimumProofLevel": "public-benchmark",
+      "recommendedDatasets": [
+        "semisynthetic-geometry-oracle",
+        "bsds500"
+      ],
+      "nextAction": "Attach semisynthetic-geometry-oracle, bsds500 manifest, split, runner, and threshold gate",
+      "requiredABOutputs": [
+        "oldBaseline",
+        "newBaseline",
+        "failedCaseReplay",
+        "thresholdDelta",
+        "runtimeDelta",
+        "memoryDelta",
+        "regressionRisk"
+      ]
+    },
+    {
+      "operator": "GeoMeasurement",
+      "family": "measurement-geometry",
+      "currentProofLevel": "contract",
+      "targetMinimumProofLevel": "public-benchmark",
+      "recommendedDatasets": [
+        "semisynthetic-geometry-oracle",
+        "bsds500"
+      ],
+      "nextAction": "Attach semisynthetic-geometry-oracle, bsds500 manifest, split, runner, and threshold gate",
+      "requiredABOutputs": [
+        "oldBaseline",
+        "newBaseline",
+        "failedCaseReplay",
+        "thresholdDelta",
+        "runtimeDelta",
+        "memoryDelta",
+        "regressionRisk"
+      ]
+    },
+    {
+      "operator": "GeometricFitting",
+      "family": "measurement-geometry",
+      "currentProofLevel": "field-substitute",
+      "targetMinimumProofLevel": "field-substitute",
+      "recommendedDatasets": [
+        "semisynthetic-geometry-oracle",
+        "bsds500"
+      ],
+      "nextAction": "Maintain evidence, add failure replay, and keep claim audit passing",
+      "requiredABOutputs": [
+        "oldBaseline",
+        "newBaseline",
+        "failedCaseReplay",
+        "thresholdDelta",
+        "runtimeDelta",
+        "memoryDelta",
+        "regressionRisk"
+      ]
+    },
+    {
+      "operator": "LineMeasurement",
+      "family": "measurement-geometry",
+      "currentProofLevel": "field-substitute",
+      "targetMinimumProofLevel": "field-substitute",
+      "recommendedDatasets": [
+        "semisynthetic-geometry-oracle",
+        "bsds500"
+      ],
+      "nextAction": "Maintain evidence, add failure replay, and keep claim audit passing",
+      "requiredABOutputs": [
+        "oldBaseline",
+        "newBaseline",
+        "failedCaseReplay",
+        "thresholdDelta",
+        "runtimeDelta",
+        "memoryDelta",
+        "regressionRisk"
+      ]
+    },
+    {
+      "operator": "Measurement",
+      "family": "measurement-geometry",
+      "currentProofLevel": "contract",
+      "targetMinimumProofLevel": "public-benchmark",
+      "recommendedDatasets": [
+        "semisynthetic-geometry-oracle",
+        "bsds500"
+      ],
+      "nextAction": "Attach semisynthetic-geometry-oracle, bsds500 manifest, split, runner, and threshold gate",
+      "requiredABOutputs": [
+        "oldBaseline",
+        "newBaseline",
+        "failedCaseReplay",
+        "thresholdDelta",
+        "runtimeDelta",
+        "memoryDelta",
+        "regressionRisk"
+      ]
+    },
+    {
+      "operator": "MinEnclosingGeometry",
+      "family": "measurement-geometry",
+      "currentProofLevel": "contract",
+      "targetMinimumProofLevel": "public-benchmark",
+      "recommendedDatasets": [
+        "semisynthetic-geometry-oracle",
+        "bsds500"
+      ],
+      "nextAction": "Attach semisynthetic-geometry-oracle, bsds500 manifest, split, runner, and threshold gate",
+      "requiredABOutputs": [
+        "oldBaseline",
+        "newBaseline",
+        "failedCaseReplay",
+        "thresholdDelta",
+        "runtimeDelta",
+        "memoryDelta",
+        "regressionRisk"
+      ]
+    },
+    {
+      "operator": "WidthMeasurement",
+      "family": "measurement-geometry",
+      "currentProofLevel": "golden",
+      "targetMinimumProofLevel": "public-benchmark",
+      "recommendedDatasets": [
+        "semisynthetic-geometry-oracle",
+        "bsds500"
+      ],
+      "nextAction": "Attach semisynthetic-geometry-oracle, bsds500 manifest, split, runner, and threshold gate",
       "requiredABOutputs": [
         "oldBaseline",
         "newBaseline",
@@ -928,26 +1452,6 @@
       ]
     },
     {
-      "operator": "StereoCalibration",
-      "family": "calibration",
-      "currentProofLevel": "golden",
-      "targetMinimumProofLevel": "public-benchmark",
-      "recommendedDatasets": [
-        "opencv_calibration_samples",
-        "semisynthetic-calibration-oracle"
-      ],
-      "nextAction": "Attach opencv_calibration_samples, semisynthetic-calibration-oracle manifest, split, runner, and threshold gate",
-      "requiredABOutputs": [
-        "oldBaseline",
-        "newBaseline",
-        "failedCaseReplay",
-        "thresholdDelta",
-        "runtimeDelta",
-        "memoryDelta",
-        "regressionRisk"
-      ]
-    },
-    {
       "operator": "TranslationRotationCalibration",
       "family": "calibration",
       "currentProofLevel": "contract",
@@ -988,33 +1492,13 @@
       ]
     },
     {
-      "operator": "ArcCaliper",
-      "family": "measurement-geometry",
-      "currentProofLevel": "public-benchmark",
-      "targetMinimumProofLevel": "field-substitute",
-      "recommendedDatasets": [
-        "semisynthetic-geometry-oracle",
-        "bsds500"
-      ],
-      "nextAction": "Promote to public/semisynthetic proof, then add field-substitute replay and failure taxonomy",
-      "requiredABOutputs": [
-        "oldBaseline",
-        "newBaseline",
-        "failedCaseReplay",
-        "thresholdDelta",
-        "runtimeDelta",
-        "memoryDelta",
-        "regressionRisk"
-      ]
-    },
-    {
-      "operator": "CaliperTool",
-      "family": "measurement-geometry",
+      "operator": "AnomalyDetection",
+      "family": "ai-vision",
       "currentProofLevel": "field-substitute",
       "targetMinimumProofLevel": "field-substitute",
       "recommendedDatasets": [
-        "semisynthetic-geometry-oracle",
-        "bsds500"
+        "kolektorsdd2",
+        "mvtec_ad_lite"
       ],
       "nextAction": "Maintain evidence, add failure replay, and keep claim audit passing",
       "requiredABOutputs": [
@@ -1028,254 +1512,14 @@
       ]
     },
     {
-      "operator": "CircleMeasurement",
-      "family": "measurement-geometry",
-      "currentProofLevel": "public-benchmark",
-      "targetMinimumProofLevel": "field-substitute",
-      "recommendedDatasets": [
-        "semisynthetic-geometry-oracle",
-        "bsds500"
-      ],
-      "nextAction": "Promote to public/semisynthetic proof, then add field-substitute replay and failure taxonomy",
-      "requiredABOutputs": [
-        "oldBaseline",
-        "newBaseline",
-        "failedCaseReplay",
-        "thresholdDelta",
-        "runtimeDelta",
-        "memoryDelta",
-        "regressionRisk"
-      ]
-    },
-    {
-      "operator": "ContourExtrema",
-      "family": "measurement-geometry",
-      "currentProofLevel": "contract",
-      "targetMinimumProofLevel": "public-benchmark",
-      "recommendedDatasets": [
-        "semisynthetic-geometry-oracle",
-        "bsds500"
-      ],
-      "nextAction": "Attach semisynthetic-geometry-oracle, bsds500 manifest, split, runner, and threshold gate",
-      "requiredABOutputs": [
-        "oldBaseline",
-        "newBaseline",
-        "failedCaseReplay",
-        "thresholdDelta",
-        "runtimeDelta",
-        "memoryDelta",
-        "regressionRisk"
-      ]
-    },
-    {
-      "operator": "GapMeasurement",
-      "family": "measurement-geometry",
-      "currentProofLevel": "contract",
-      "targetMinimumProofLevel": "public-benchmark",
-      "recommendedDatasets": [
-        "semisynthetic-geometry-oracle",
-        "bsds500"
-      ],
-      "nextAction": "Attach semisynthetic-geometry-oracle, bsds500 manifest, split, runner, and threshold gate",
-      "requiredABOutputs": [
-        "oldBaseline",
-        "newBaseline",
-        "failedCaseReplay",
-        "thresholdDelta",
-        "runtimeDelta",
-        "memoryDelta",
-        "regressionRisk"
-      ]
-    },
-    {
-      "operator": "GeoMeasurement",
-      "family": "measurement-geometry",
-      "currentProofLevel": "contract",
-      "targetMinimumProofLevel": "public-benchmark",
-      "recommendedDatasets": [
-        "semisynthetic-geometry-oracle",
-        "bsds500"
-      ],
-      "nextAction": "Attach semisynthetic-geometry-oracle, bsds500 manifest, split, runner, and threshold gate",
-      "requiredABOutputs": [
-        "oldBaseline",
-        "newBaseline",
-        "failedCaseReplay",
-        "thresholdDelta",
-        "runtimeDelta",
-        "memoryDelta",
-        "regressionRisk"
-      ]
-    },
-    {
-      "operator": "GeometricFitting",
-      "family": "measurement-geometry",
-      "currentProofLevel": "public-benchmark",
-      "targetMinimumProofLevel": "field-substitute",
-      "recommendedDatasets": [
-        "semisynthetic-geometry-oracle",
-        "bsds500"
-      ],
-      "nextAction": "Promote to public/semisynthetic proof, then add field-substitute replay and failure taxonomy",
-      "requiredABOutputs": [
-        "oldBaseline",
-        "newBaseline",
-        "failedCaseReplay",
-        "thresholdDelta",
-        "runtimeDelta",
-        "memoryDelta",
-        "regressionRisk"
-      ]
-    },
-    {
-      "operator": "LineMeasurement",
-      "family": "measurement-geometry",
-      "currentProofLevel": "public-benchmark",
-      "targetMinimumProofLevel": "field-substitute",
-      "recommendedDatasets": [
-        "semisynthetic-geometry-oracle",
-        "bsds500"
-      ],
-      "nextAction": "Promote to public/semisynthetic proof, then add field-substitute replay and failure taxonomy",
-      "requiredABOutputs": [
-        "oldBaseline",
-        "newBaseline",
-        "failedCaseReplay",
-        "thresholdDelta",
-        "runtimeDelta",
-        "memoryDelta",
-        "regressionRisk"
-      ]
-    },
-    {
-      "operator": "Measurement",
-      "family": "measurement-geometry",
-      "currentProofLevel": "contract",
-      "targetMinimumProofLevel": "public-benchmark",
-      "recommendedDatasets": [
-        "semisynthetic-geometry-oracle",
-        "bsds500"
-      ],
-      "nextAction": "Attach semisynthetic-geometry-oracle, bsds500 manifest, split, runner, and threshold gate",
-      "requiredABOutputs": [
-        "oldBaseline",
-        "newBaseline",
-        "failedCaseReplay",
-        "thresholdDelta",
-        "runtimeDelta",
-        "memoryDelta",
-        "regressionRisk"
-      ]
-    },
-    {
-      "operator": "MinEnclosingGeometry",
-      "family": "measurement-geometry",
-      "currentProofLevel": "contract",
-      "targetMinimumProofLevel": "public-benchmark",
-      "recommendedDatasets": [
-        "semisynthetic-geometry-oracle",
-        "bsds500"
-      ],
-      "nextAction": "Attach semisynthetic-geometry-oracle, bsds500 manifest, split, runner, and threshold gate",
-      "requiredABOutputs": [
-        "oldBaseline",
-        "newBaseline",
-        "failedCaseReplay",
-        "thresholdDelta",
-        "runtimeDelta",
-        "memoryDelta",
-        "regressionRisk"
-      ]
-    },
-    {
-      "operator": "WidthMeasurement",
-      "family": "measurement-geometry",
-      "currentProofLevel": "golden",
-      "targetMinimumProofLevel": "public-benchmark",
-      "recommendedDatasets": [
-        "semisynthetic-geometry-oracle",
-        "bsds500"
-      ],
-      "nextAction": "Attach semisynthetic-geometry-oracle, bsds500 manifest, split, runner, and threshold gate",
-      "requiredABOutputs": [
-        "oldBaseline",
-        "newBaseline",
-        "failedCaseReplay",
-        "thresholdDelta",
-        "runtimeDelta",
-        "memoryDelta",
-        "regressionRisk"
-      ]
-    },
-    {
-      "operator": "BlobAnalysis",
-      "family": "measurement-geometry",
-      "currentProofLevel": "public-benchmark",
-      "targetMinimumProofLevel": "field-substitute",
-      "recommendedDatasets": [
-        "semisynthetic-geometry-oracle",
-        "bsds500"
-      ],
-      "nextAction": "Promote to public/semisynthetic proof, then add field-substitute replay and failure taxonomy",
-      "requiredABOutputs": [
-        "oldBaseline",
-        "newBaseline",
-        "failedCaseReplay",
-        "thresholdDelta",
-        "runtimeDelta",
-        "memoryDelta",
-        "regressionRisk"
-      ]
-    },
-    {
-      "operator": "ContourDetection",
-      "family": "measurement-geometry",
-      "currentProofLevel": "public-benchmark",
-      "targetMinimumProofLevel": "field-substitute",
-      "recommendedDatasets": [
-        "bsds500",
-        "semisynthetic-boundary-oracle"
-      ],
-      "nextAction": "Promote to public/semisynthetic proof, then add field-substitute replay and failure taxonomy",
-      "requiredABOutputs": [
-        "oldBaseline",
-        "newBaseline",
-        "failedCaseReplay",
-        "thresholdDelta",
-        "runtimeDelta",
-        "memoryDelta",
-        "regressionRisk"
-      ]
-    },
-    {
-      "operator": "EdgeDetection",
-      "family": "general-operator",
-      "currentProofLevel": "public-benchmark",
-      "targetMinimumProofLevel": "field-substitute",
-      "recommendedDatasets": [
-        "bsds500",
-        "semisynthetic-boundary-oracle"
-      ],
-      "nextAction": "Promote to public/semisynthetic proof, then add field-substitute replay and failure taxonomy",
-      "requiredABOutputs": [
-        "oldBaseline",
-        "newBaseline",
-        "failedCaseReplay",
-        "thresholdDelta",
-        "runtimeDelta",
-        "memoryDelta",
-        "regressionRisk"
-      ]
-    },
-    {
-      "operator": "CodeRecognition",
+      "operator": "DeepLearning",
       "family": "ai-vision",
-      "currentProofLevel": "contract",
-      "targetMinimumProofLevel": "public-benchmark",
+      "currentProofLevel": "field-substitute",
+      "targetMinimumProofLevel": "field-substitute",
       "recommendedDatasets": [
-        "semisynthetic-oracle"
+        "coco2017"
       ],
-      "nextAction": "Attach semisynthetic-oracle manifest, split, runner, and threshold gate",
+      "nextAction": "Maintain evidence, add failure replay, and keep claim audit passing",
       "requiredABOutputs": [
         "oldBaseline",
         "newBaseline",
@@ -1306,8 +1550,28 @@
       ]
     },
     {
-      "operator": "RoiTransform",
-      "family": "image-processing",
+      "operator": "PPFMatch",
+      "family": "matching-localization",
+      "currentProofLevel": "contract",
+      "targetMinimumProofLevel": "public-benchmark",
+      "recommendedDatasets": [
+        "hpatches",
+        "semisynthetic-homography-oracle"
+      ],
+      "nextAction": "Attach hpatches, semisynthetic-homography-oracle manifest, split, runner, and threshold gate",
+      "requiredABOutputs": [
+        "oldBaseline",
+        "newBaseline",
+        "failedCaseReplay",
+        "thresholdDelta",
+        "runtimeDelta",
+        "memoryDelta",
+        "regressionRisk"
+      ]
+    },
+    {
+      "operator": "RansacPlaneSegmentation",
+      "family": "ai-vision",
       "currentProofLevel": "contract",
       "targetMinimumProofLevel": "public-benchmark",
       "recommendedDatasets": [
@@ -1325,7 +1589,7 @@
       ]
     },
     {
-      "operator": "ImageAcquisition",
+      "operator": "BoxFilter",
       "family": "image-processing",
       "currentProofLevel": "contract",
       "targetMinimumProofLevel": "public-benchmark",
@@ -1333,311 +1597,6 @@
         "semisynthetic-oracle"
       ],
       "nextAction": "Attach semisynthetic-oracle manifest, split, runner, and threshold gate",
-      "requiredABOutputs": [
-        "oldBaseline",
-        "newBaseline",
-        "failedCaseReplay",
-        "thresholdDelta",
-        "runtimeDelta",
-        "memoryDelta",
-        "regressionRisk"
-      ]
-    },
-    {
-      "operator": "AdaptiveThreshold",
-      "family": "image-processing",
-      "currentProofLevel": "golden",
-      "targetMinimumProofLevel": "public-benchmark",
-      "recommendedDatasets": [
-        "semisynthetic-oracle"
-      ],
-      "nextAction": "Attach semisynthetic-oracle manifest, split, runner, and threshold gate",
-      "requiredABOutputs": [
-        "oldBaseline",
-        "newBaseline",
-        "failedCaseReplay",
-        "thresholdDelta",
-        "runtimeDelta",
-        "memoryDelta",
-        "regressionRisk"
-      ]
-    },
-    {
-      "operator": "BilateralFilter",
-      "family": "image-processing",
-      "currentProofLevel": "contract",
-      "targetMinimumProofLevel": "public-benchmark",
-      "recommendedDatasets": [
-        "semisynthetic-oracle"
-      ],
-      "nextAction": "Attach semisynthetic-oracle manifest, split, runner, and threshold gate",
-      "requiredABOutputs": [
-        "oldBaseline",
-        "newBaseline",
-        "failedCaseReplay",
-        "thresholdDelta",
-        "runtimeDelta",
-        "memoryDelta",
-        "regressionRisk"
-      ]
-    },
-    {
-      "operator": "Filtering",
-      "family": "image-processing",
-      "currentProofLevel": "contract",
-      "targetMinimumProofLevel": "public-benchmark",
-      "recommendedDatasets": [
-        "semisynthetic-oracle"
-      ],
-      "nextAction": "Attach semisynthetic-oracle manifest, split, runner, and threshold gate",
-      "requiredABOutputs": [
-        "oldBaseline",
-        "newBaseline",
-        "failedCaseReplay",
-        "thresholdDelta",
-        "runtimeDelta",
-        "memoryDelta",
-        "regressionRisk"
-      ]
-    },
-    {
-      "operator": "ImageAdd",
-      "family": "image-processing",
-      "currentProofLevel": "contract",
-      "targetMinimumProofLevel": "public-benchmark",
-      "recommendedDatasets": [
-        "semisynthetic-oracle"
-      ],
-      "nextAction": "Attach semisynthetic-oracle manifest, split, runner, and threshold gate",
-      "requiredABOutputs": [
-        "oldBaseline",
-        "newBaseline",
-        "failedCaseReplay",
-        "thresholdDelta",
-        "runtimeDelta",
-        "memoryDelta",
-        "regressionRisk"
-      ]
-    },
-    {
-      "operator": "ImageBlend",
-      "family": "image-processing",
-      "currentProofLevel": "contract",
-      "targetMinimumProofLevel": "public-benchmark",
-      "recommendedDatasets": [
-        "semisynthetic-oracle"
-      ],
-      "nextAction": "Attach semisynthetic-oracle manifest, split, runner, and threshold gate",
-      "requiredABOutputs": [
-        "oldBaseline",
-        "newBaseline",
-        "failedCaseReplay",
-        "thresholdDelta",
-        "runtimeDelta",
-        "memoryDelta",
-        "regressionRisk"
-      ]
-    },
-    {
-      "operator": "ImageCrop",
-      "family": "image-processing",
-      "currentProofLevel": "contract",
-      "targetMinimumProofLevel": "public-benchmark",
-      "recommendedDatasets": [
-        "semisynthetic-oracle"
-      ],
-      "nextAction": "Attach semisynthetic-oracle manifest, split, runner, and threshold gate",
-      "requiredABOutputs": [
-        "oldBaseline",
-        "newBaseline",
-        "failedCaseReplay",
-        "thresholdDelta",
-        "runtimeDelta",
-        "memoryDelta",
-        "regressionRisk"
-      ]
-    },
-    {
-      "operator": "ImageDiff",
-      "family": "image-processing",
-      "currentProofLevel": "golden",
-      "targetMinimumProofLevel": "public-benchmark",
-      "recommendedDatasets": [
-        "semisynthetic-oracle"
-      ],
-      "nextAction": "Attach semisynthetic-oracle manifest, split, runner, and threshold gate",
-      "requiredABOutputs": [
-        "oldBaseline",
-        "newBaseline",
-        "failedCaseReplay",
-        "thresholdDelta",
-        "runtimeDelta",
-        "memoryDelta",
-        "regressionRisk"
-      ]
-    },
-    {
-      "operator": "ImageNormalize",
-      "family": "image-processing",
-      "currentProofLevel": "contract",
-      "targetMinimumProofLevel": "public-benchmark",
-      "recommendedDatasets": [
-        "semisynthetic-oracle"
-      ],
-      "nextAction": "Attach semisynthetic-oracle manifest, split, runner, and threshold gate",
-      "requiredABOutputs": [
-        "oldBaseline",
-        "newBaseline",
-        "failedCaseReplay",
-        "thresholdDelta",
-        "runtimeDelta",
-        "memoryDelta",
-        "regressionRisk"
-      ]
-    },
-    {
-      "operator": "ImageResize",
-      "family": "image-processing",
-      "currentProofLevel": "contract",
-      "targetMinimumProofLevel": "public-benchmark",
-      "recommendedDatasets": [
-        "semisynthetic-oracle"
-      ],
-      "nextAction": "Attach semisynthetic-oracle manifest, split, runner, and threshold gate",
-      "requiredABOutputs": [
-        "oldBaseline",
-        "newBaseline",
-        "failedCaseReplay",
-        "thresholdDelta",
-        "runtimeDelta",
-        "memoryDelta",
-        "regressionRisk"
-      ]
-    },
-    {
-      "operator": "ImageRotate",
-      "family": "image-processing",
-      "currentProofLevel": "contract",
-      "targetMinimumProofLevel": "public-benchmark",
-      "recommendedDatasets": [
-        "semisynthetic-oracle"
-      ],
-      "nextAction": "Attach semisynthetic-oracle manifest, split, runner, and threshold gate",
-      "requiredABOutputs": [
-        "oldBaseline",
-        "newBaseline",
-        "failedCaseReplay",
-        "thresholdDelta",
-        "runtimeDelta",
-        "memoryDelta",
-        "regressionRisk"
-      ]
-    },
-    {
-      "operator": "ImageSubtract",
-      "family": "image-processing",
-      "currentProofLevel": "golden",
-      "targetMinimumProofLevel": "public-benchmark",
-      "recommendedDatasets": [
-        "semisynthetic-oracle"
-      ],
-      "nextAction": "Attach semisynthetic-oracle manifest, split, runner, and threshold gate",
-      "requiredABOutputs": [
-        "oldBaseline",
-        "newBaseline",
-        "failedCaseReplay",
-        "thresholdDelta",
-        "runtimeDelta",
-        "memoryDelta",
-        "regressionRisk"
-      ]
-    },
-    {
-      "operator": "MeanFilter",
-      "family": "image-processing",
-      "currentProofLevel": "contract",
-      "targetMinimumProofLevel": "public-benchmark",
-      "recommendedDatasets": [
-        "semisynthetic-oracle"
-      ],
-      "nextAction": "Attach semisynthetic-oracle manifest, split, runner, and threshold gate",
-      "requiredABOutputs": [
-        "oldBaseline",
-        "newBaseline",
-        "failedCaseReplay",
-        "thresholdDelta",
-        "runtimeDelta",
-        "memoryDelta",
-        "regressionRisk"
-      ]
-    },
-    {
-      "operator": "Morphology",
-      "family": "image-processing",
-      "currentProofLevel": "contract",
-      "targetMinimumProofLevel": "public-benchmark",
-      "recommendedDatasets": [
-        "semisynthetic-oracle"
-      ],
-      "nextAction": "Attach semisynthetic-oracle manifest, split, runner, and threshold gate",
-      "requiredABOutputs": [
-        "oldBaseline",
-        "newBaseline",
-        "failedCaseReplay",
-        "thresholdDelta",
-        "runtimeDelta",
-        "memoryDelta",
-        "regressionRisk"
-      ]
-    },
-    {
-      "operator": "PerspectiveTransform",
-      "family": "image-processing",
-      "currentProofLevel": "golden",
-      "targetMinimumProofLevel": "public-benchmark",
-      "recommendedDatasets": [
-        "semisynthetic-oracle"
-      ],
-      "nextAction": "Attach semisynthetic-oracle manifest, split, runner, and threshold gate",
-      "requiredABOutputs": [
-        "oldBaseline",
-        "newBaseline",
-        "failedCaseReplay",
-        "thresholdDelta",
-        "runtimeDelta",
-        "memoryDelta",
-        "regressionRisk"
-      ]
-    },
-    {
-      "operator": "Thresholding",
-      "family": "image-processing",
-      "currentProofLevel": "contract",
-      "targetMinimumProofLevel": "public-benchmark",
-      "recommendedDatasets": [
-        "semisynthetic-oracle"
-      ],
-      "nextAction": "Attach semisynthetic-oracle manifest, split, runner, and threshold gate",
-      "requiredABOutputs": [
-        "oldBaseline",
-        "newBaseline",
-        "failedCaseReplay",
-        "thresholdDelta",
-        "runtimeDelta",
-        "memoryDelta",
-        "regressionRisk"
-      ]
-    },
-    {
-      "operator": "ColorMeasurement",
-      "family": "measurement-geometry",
-      "currentProofLevel": "contract",
-      "targetMinimumProofLevel": "public-benchmark",
-      "recommendedDatasets": [
-        "semisynthetic-geometry-oracle",
-        "bsds500"
-      ],
-      "nextAction": "Attach semisynthetic-geometry-oracle, bsds500 manifest, split, runner, and threshold gate",
       "requiredABOutputs": [
         "oldBaseline",
         "newBaseline",

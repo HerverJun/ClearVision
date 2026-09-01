@@ -1,7 +1,7 @@
 {
   "schemaVersion": "2026-04-29.quality-suite.v1",
   "suiteId": "full155_quality_suite",
-  "description": "Full 155-operator quasi-industrial evidence gate; runs validations and keeps gaps explicit.",
+  "description": "Stable full155 artifact ID over the dynamic governed operator population; runs validations and keeps gaps explicit.",
   "ciBudgetMinutes": 180,
   "execution": {
     "mode": "serial",

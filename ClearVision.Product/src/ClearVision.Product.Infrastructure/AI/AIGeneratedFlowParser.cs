@@ -133,7 +133,7 @@ public class AIGeneratedFlowParser
     /// </summary>
     private OperatorType ParseOperatorType(string typeString)
     {
-        return typeString switch
+        var type = typeString switch
         {
             "ImageAcquisition" => OperatorType.ImageAcquisition,
             "GaussianBlur" => OperatorType.GaussianBlur,
@@ -149,7 +149,6 @@ public class AIGeneratedFlowParser
             "LogicGate" => OperatorType.LogicGate,
             "TypeConvert" => OperatorType.TypeConvert,
             "HttpRequest" => OperatorType.HttpRequest,
-            "MqttPublish" => OperatorType.MqttPublish,
             "StringFormat" => OperatorType.StringFormat,
             "ImageSave" => OperatorType.ImageSave,
             "ConditionalBranch" => OperatorType.ConditionalBranch,
@@ -168,6 +167,14 @@ public class AIGeneratedFlowParser
             "RegionComplement" => OperatorType.RegionComplement,
             _ => throw new ArgumentException($"未知的算子类型: {typeString}")
         };
+
+        if (!OperatorExposureCatalog.IsProductVisible(type))
+        {
+            throw new ArgumentException(
+                $"算子类型 '{typeString}' 已被治理目录分类为 '{OperatorExposureCatalog.GetSlug(type)}'，不能用于新流程。");
+        }
+
+        return type;
     }
 
     /// <summary>

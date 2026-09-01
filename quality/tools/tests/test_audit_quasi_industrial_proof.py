@@ -167,6 +167,36 @@ class QuasiIndustrialAuditTests(unittest.TestCase):
 
         self.assertFalse(checks["public_benchmark_replay_commands_allowed"])
 
+    def test_public_benchmark_disposition_accepts_truthful_smoke_rejection(self) -> None:
+        proof = retained_public_proof()
+        deep_learning = next(row for row in proof["operators"] if row["operator"] == "DeepLearning")
+        deep_learning.update(
+            {
+                "proofLevel": "inference-smoke-only",
+                "accepted": False,
+                "precisionDisposition": "FAIL",
+                "precisionBlockingReasons": ["INFERENCE_SMOKE_ONLY", "ALL_PRECISION_METRICS_ZERO"],
+                "metrics": {"AP50": 0, "PrecisionAt50": 0, "RecallAt50": 0},
+            }
+        )
+        proof["accepted"] = False
+        proof["summary"]["acceptedCount"] -= 1
+        proof["summary"]["failedCount"] += 1
+        replay = replay_manifest()
+        (self.report_dir / "QualityFlywheel_public_benchmark_proof_baseline.summary.json").write_text(
+            json.dumps(proof),
+            encoding="utf-8",
+        )
+        (self.report_dir / "QualityFlywheel_public_benchmark_replay_manifest.json").write_text(
+            json.dumps(replay),
+            encoding="utf-8",
+        )
+
+        checks = self.inspect_public_checks()
+
+        self.assertTrue(checks["public_benchmark_proof_disposition_consistent"])
+        self.assertTrue(checks["public_benchmark_proof_deeplearning_smoke_truthful"])
+
 
 if __name__ == "__main__":
     unittest.main()

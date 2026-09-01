@@ -114,6 +114,13 @@ internal sealed class ProjectFlowMessageHandler
         }
 
         var operatorType = OperatorTypeAliasResolver.Resolve(parsedType);
+        if (!OperatorExposureCatalog.IsProductVisible(operatorType))
+        {
+            throw new InvalidOperationException(
+                $"OPERATOR_EXPOSURE_DENIED: Operator type '{operatorType}' is classified as " +
+                $"'{OperatorExposureCatalog.GetSlug(operatorType)}' and cannot be added to a flow.");
+        }
+
         var @operator = _operatorFactory.CreateOperator(
             operatorType,
             string.IsNullOrWhiteSpace(operatorData.Name) ? operatorType.ToString() : operatorData.Name,

@@ -1081,6 +1081,11 @@ public static class ApiEndpoints
         // 获取算子元数据
         app.MapGet("/api/operators/{type}/metadata", (Core.Enums.OperatorType type, IOperatorFactory factory) =>
         {
+            if (!OperatorExposureCatalog.IsProductVisible(type))
+            {
+                return Results.NotFound();
+            }
+
             var metadata = factory.GetMetadata(type);
             return metadata != null ? Results.Ok(metadata) : Results.NotFound();
         });

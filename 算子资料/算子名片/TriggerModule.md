@@ -5,6 +5,8 @@
 |------|------|
 | 类名 (Class) | `TriggerModuleOperator` |
 | 枚举值 (Enum) | `OperatorType.TriggerModule` |
+| 暴露分类 (Exposure) | `package-public` |
+| 暴露原因 (Exposure Reason) | Supported package-public operator. |
 | 分类 ID (CategoryId) | `FlowControl` |
 | 分类 (Category) | 流程控制 |
 | 分类顺序 (CategoryOrder) | 12 |

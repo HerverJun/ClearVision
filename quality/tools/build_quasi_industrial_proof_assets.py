@@ -18,6 +18,7 @@ MANIFEST_DIR = DATASET_DIR / "manifests"
 REPORT_DIR = REPO_ROOT / "quality" / "evals" / "reports"
 SUITE_DIR = REPO_ROOT / "quality" / "evals" / "suites"
 PUBLIC_DATA_ROOT = REPO_ROOT / "quality" / "public_datasets"
+GOVERNED_CATALOG = REPO_ROOT / "docs" / "算子资料" / "算子名片" / "catalog.json"
 
 GENERATED_AT = "2026-04-29T00:00:00Z"
 RAW_PATH_RE = re.compile(r"([A-Za-z]:\\|\\\\|/Users/|/home/|/mnt/)")
@@ -137,16 +138,25 @@ def parse_matrix_evidence() -> dict[str, dict[str, Any]]:
 
 def build_source_rows() -> list[dict[str, Any]]:
     matrix_rows = parse_matrix_evidence()
+    governed_catalog = read_json(GOVERNED_CATALOG)
     rows: list[dict[str, Any]] = []
-    for item in parse_catalog(DEFAULT_CATALOG, DEFAULT_CARD_DIR):
-        evidence = matrix_rows.get(item.operator, {})
+    for governed in governed_catalog.get("operators", []):
+        if not isinstance(governed, dict) or not governed.get("id"):
+            raise ValueError("governed catalog contains an invalid operator row")
+        operator = str(governed["id"])
+        evidence = matrix_rows.get(operator, {})
+        exposure = str(governed.get("exposureClassification") or "").strip()
+        if exposure not in {"package-public", "package-internal", "disabled"}:
+            raise ValueError(f"invalid formal exposure classification for {operator}: {exposure}")
         rows.append(
             {
-                "Operator": item.operator,
-                "OperatorType": item.operator_type,
-                "DisplayName": item.display_name,
-                "Category": item.category,
-                "QScore": item.qscore,
+                "Operator": operator,
+                "OperatorType": f"OperatorType.{operator}",
+                "DisplayName": str(governed.get("displayName") or operator),
+                "Category": str(governed.get("category") or governed.get("categoryId") or "Uncategorized"),
+                "QScore": parse_int(evidence.get("QScore")),
+                "ExposureClassification": exposure,
+                "GenerationFingerprint": str(governed.get("generationFingerprint") or ""),
                 "ContractCases": evidence.get("ContractCases", 0),
                 "GoldenCases": evidence.get("GoldenCases", 0),
                 "DatasetCases": evidence.get("DatasetCases", 0),
@@ -353,6 +363,8 @@ def build_operator_registry(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
                 "operatorType": row.get("OperatorType", ""),
                 "displayName": row.get("DisplayName", operator),
                 "category": row.get("Category", ""),
+                "exposureClassification": row.get("ExposureClassification", ""),
+                "generationFingerprint": row.get("GenerationFingerprint", ""),
                 "family": family,
                 "core20": operator in CORE20_OPERATORS,
                 "qScore": parse_int(row.get("QScore")),
@@ -379,6 +391,11 @@ def build_operator_registry(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
 def build_registry() -> dict[str, Any]:
     rows = build_source_rows()
     operators = build_operator_registry(rows)
+    catalog = read_json(GOVERNED_CATALOG)
+    population = catalog.get("population")
+    population_delta = catalog.get("populationDelta")
+    if not isinstance(population, dict) or not isinstance(population_delta, dict):
+        raise ValueError("governed catalog population and populationDelta are required")
     target_counts = Counter(row["targetMinimumProofLevel"] for row in operators)
     current_counts = Counter(row["currentProofLevel"] for row in operators)
     status_counts = Counter(row["targetStatus"] for row in operators)
@@ -386,7 +403,9 @@ def build_registry() -> dict[str, Any]:
     return {
         "schemaVersion": "2026-04-29.quasi-industrial-proof.v1",
         "generatedAtUtc": GENERATED_AT,
-        "scope": "All 155 operators; Core20 remains highest-priority but long-tail evidence is tracked in parallel.",
+        "scope": "Governed formal operator population; Core20 remains highest-priority but long-tail evidence is tracked in parallel.",
+        "population": population,
+        "populationDelta": population_delta,
         "proofModel": {
             "levels": list(PROOF_LEVELS),
             "highestAllowedWithoutFieldData": "field-substitute",
@@ -427,13 +446,15 @@ def build_registry() -> dict[str, Any]:
 def render_registry_markdown(registry: dict[str, Any]) -> str:
     summary = registry["summary"]
     lines = [
-        "# Quality Flywheel 155 Quasi-Industrial Proof Registry",
+        "# Quality Flywheel Governed-Population Quasi-Industrial Proof Registry",
         "",
         f"GeneratedAtUtc: `{registry['generatedAtUtc']}`",
         "",
         "## Summary",
         "",
         f"- Operators: {summary['operatorCount']}",
+        f"- Population fingerprint: `{registry['population']['fingerprint']}`",
+        f"- Exposure: public={registry['population']['packagePublic']}, internal={registry['population']['packageInternal']}, legacy={registry['population']['legacyAlias']}, disabled={registry['population']['disabled']}",
         f"- Core20 operators: {summary['core20Count']}",
         f"- Target met: {summary['targetMetCount']}",
         f"- Gap open: {summary['gapOpenCount']}",
@@ -561,7 +582,7 @@ def build_full155_suite() -> dict[str, Any]:
     return {
         "schemaVersion": "2026-04-29.quality-suite.v1",
         "suiteId": "full155_quality_suite",
-        "description": "Full 155-operator quasi-industrial evidence gate; runs validations and keeps gaps explicit.",
+        "description": "Stable full155 artifact ID over the dynamic governed operator population; runs validations and keeps gaps explicit.",
         "ciBudgetMinutes": 180,
         "execution": {"mode": "serial", "runner": "quality/tools/run_quality_suite.py"},
         "stages": [
@@ -916,11 +937,23 @@ def render_algorithm_plan(plan: dict[str, Any]) -> str:
 
 def validate_registry(registry: dict[str, Any]) -> list[str]:
     errors: list[str] = []
-    if registry.get("summary", {}).get("operatorCount") != 155:
-        errors.append("registry must include exactly 155 operators")
+    governed_catalog = read_json(GOVERNED_CATALOG)
+    population = governed_catalog.get("population", {})
+    governed_operators = governed_catalog.get("operators", [])
+    expected_count = population.get("formalTotal")
+    if registry.get("summary", {}).get("operatorCount") != expected_count:
+        errors.append(f"registry operator count must match governed formalTotal={expected_count}")
+    if registry.get("population") != population:
+        errors.append("registry population must match governed catalog population")
+    if registry.get("populationDelta") != governed_catalog.get("populationDelta"):
+        errors.append("registry populationDelta must match governed catalog baseline delta")
     if registry.get("summary", {}).get("realIndustrialValidationComplete") != 0:
         errors.append("registry must not claim real industrial validation complete")
     operators = registry.get("operators", [])
+    governed_ids = {str(item.get("id")) for item in governed_operators if isinstance(item, dict)}
+    registry_ids = {str(item.get("operator")) for item in operators if isinstance(item, dict)}
+    if registry_ids != governed_ids:
+        errors.append("registry operator identities must match governed formal catalog")
     seen = set()
     for row in operators:
         operator = row.get("operator")
@@ -939,6 +972,10 @@ def validate_registry(registry: dict[str, Any]) -> list[str]:
             errors.append(f"{operator} missing legacy baseline disposition")
         if not row.get("recommendedDatasets"):
             errors.append(f"{operator} missing recommendedDatasets")
+        if row.get("exposureClassification") not in {"package-public", "package-internal", "disabled"}:
+            errors.append(f"{operator} has invalid exposureClassification")
+        if not row.get("generationFingerprint"):
+            errors.append(f"{operator} missing generationFingerprint")
     for dataset in registry.get("publicDatasets", []):
         for key in ("datasetId", "name", "sourceUrl", "license", "status"):
             if not dataset.get(key):
@@ -991,7 +1028,7 @@ def render_dataset_cards(datasets: list[dict[str, Any]]) -> str:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Build 155-operator quasi-industrial proof assets.")
+    parser = argparse.ArgumentParser(description="Build governed-population quasi-industrial proof assets (stable full155 artifact ID).")
     parser.add_argument("--validate-only", action="store_true", help="Validate generated assets without writing files.")
     parser.add_argument("--focus", choices=("all", "datasets", "algorithms"), default="all")
     args = parser.parse_args()

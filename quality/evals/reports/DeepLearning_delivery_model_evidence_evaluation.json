@@ -1,0 +1,65 @@
+{
+  "schemaVersion": "clearvision.delivery-model-evidence-evaluation/v1",
+  "generatedAtUtc": "2026-09-01T05:33:46.111353+00:00",
+  "toolVersion": "evaluate_delivery_model_evidence/2026-09-01.wave3b",
+  "gitSha": "376174d830621d284c0d5da0b40a9b6c219a9150",
+  "repositoryDirty": true,
+  "environment": "Python 3.13.5; Windows-11-10.0.26200-SP0",
+  "evidencePurpose": "InferenceSmokeOnly",
+  "precisionDisposition": "FAIL",
+  "releaseReady": false,
+  "metrics": {
+    "precisionAt50": 0.0,
+    "recallAt50": 0.0,
+    "ap50": 0.0
+  },
+  "providerProfiles": {
+    "CPU": {
+      "policy": "required",
+      "supportStatus": "unvalidated",
+      "smokeStatus": "smoke-validated",
+      "requestedProvider": "CPUExecutionProvider",
+      "actualProvider": "CPUExecutionProvider",
+      "fallbackReason": ""
+    },
+    "CUDA": {
+      "policy": "optional",
+      "supportStatus": "unvalidated",
+      "smokeStatus": "unvalidated",
+      "requestedProvider": "CUDAExecutionProvider",
+      "actualProvider": "NotRun",
+      "fallbackReason": "Profile validation was not requested."
+    },
+    "TensorRT": {
+      "policy": "optional",
+      "supportStatus": "unvalidated",
+      "smokeStatus": "unvalidated",
+      "requestedProvider": "TensorrtExecutionProvider",
+      "actualProvider": "NotRun",
+      "fallbackReason": "Profile validation was not requested."
+    }
+  },
+  "blockingReasons": [
+    "INFERENCE_SMOKE_ONLY",
+    "ALL_PRECISION_METRICS_ZERO",
+    "MODEL_CHECKSUM_MISMATCH",
+    "MODEL_MANIFEST_HASH_MISSING",
+    "DATASET_MANIFEST_MISSING",
+    "THRESHOLD_FAILED_PRECISIONAT50",
+    "THRESHOLD_FAILED_RECALLAT50",
+    "THRESHOLD_FAILED_AP50",
+    "APPROVAL_MISSING",
+    "APPROVER_MISSING",
+    "APPROVAL_DATE_MISSING"
+  ],
+  "sourceIdentity": {
+    "GitSha": "376174d830621d284c0d5da0b40a9b6c219a9150",
+    "RepositoryDirty": true,
+    "ToolVersion": "DeepLearningCocoRealModelRunner/2026-09-01.wave3b-classification",
+    "Environment": "Historical smoke report reclassified in Wave 3B; source dataset payload is not present for replay in this checkout.",
+    "ModelContentSha256": "4c80a803ef8e2a3b931dfcfe77b0ef91a7f95b1735680e5a700b52cc488f3cbd",
+    "DatasetChecksumSha256": "79a914cd475c7beb0e600b44412382c202e708a5c6c746d892ac1aab67e1a072",
+    "ActualProvider": "CPUExecutionProvider",
+    "FallbackReason": ""
+  }
+}
