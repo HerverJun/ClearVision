@@ -34,7 +34,18 @@
         "passed": 47,
         "failed": 29,
         "skipped": 1,
-        "disposition": "current-head-recheck-before-confirmed-fixture-remediation"
+        "disposition": "pre-remediation-recheck"
+      },
+      {
+        "id": "u06a-seven-formal-specs-after-remediation",
+        "sha": "ec9192ad35932210c5c5d9434f7e1c649dacd92d",
+        "dirty": false,
+        "command": "npx playwright test tests/e2e/ai-agent-responsive.spec.ts tests/e2e/ai-build-workspace.spec.ts tests/e2e/ai-plan-clarification.spec.ts tests/e2e/flow-editor-port-contract.spec.ts tests/e2e/flow-layout-vm.spec.ts tests/e2e/high-frequency-regression.spec.ts tests/e2e/plc-settings.spec.ts --project=chromium --workers=1 --grep-invert \"visual baseline\" --reporter=list",
+        "discovered": 77,
+        "passed": 61,
+        "failed": 15,
+        "skipped": 1,
+        "disposition": "post-remediation-integration-baseline"
       }
     ],
     "entries": [
