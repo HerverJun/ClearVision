@@ -239,7 +239,7 @@ public sealed class StationPackageDeploymentServiceTests
             });
 
             await using var runtimeHost = new RuntimeHost(
-                Substitute.For<IFlowExecutionService>(),
+                CreateValidatingFlowExecutionService(),
                 loader,
                 new RuntimeResultNormalizer(),
                 NullLogger<RuntimeHost>.Instance);
@@ -295,7 +295,7 @@ public sealed class StationPackageDeploymentServiceTests
 
             var loader = new RuntimePackageLoader(new RuntimePackageValidator(), NullLogger<RuntimePackageLoader>.Instance);
             await using var runtimeHost = new RuntimeHost(
-                Substitute.For<IFlowExecutionService>(),
+                CreateValidatingFlowExecutionService(),
                 loader,
                 new RuntimeResultNormalizer(),
                 NullLogger<RuntimeHost>.Instance);
@@ -336,6 +336,14 @@ public sealed class StationPackageDeploymentServiceTests
             BindingFlags.NonPublic | BindingFlags.Static);
         method.Should().NotBeNull();
         method!.Invoke(null, [activeRoot, lastKnownGoodRoot]);
+    }
+
+    private static IFlowExecutionService CreateValidatingFlowExecutionService()
+    {
+        var service = Substitute.For<IFlowExecutionService>();
+        service.ValidateSnapshot(Arg.Any<ExecutionSnapshot>())
+            .Returns(new FlowValidationResult { IsValid = true });
+        return service;
     }
 
     private static ProjectDto CreateProjectWithCalibrationAsset(string name, string assetId, string bundleId)

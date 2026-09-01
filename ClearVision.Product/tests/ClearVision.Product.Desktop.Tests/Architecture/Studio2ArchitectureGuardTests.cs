@@ -320,6 +320,7 @@ public sealed class Studio2ArchitectureGuardTests
             "ClearVision.Product/src/ClearVision.Product.Desktop/Endpoints/PreviewArtifactEndpoints.cs",
             "ClearVision.Product/src/ClearVision.Product.Desktop/Endpoints/CalibrationDraftEndpoints.cs",
             "ClearVision.Product/src/ClearVision.Product.Desktop/Endpoints/ApiEndpoints.cs",
+            "ClearVision.Product/src/ClearVision.Product.Desktop/Handlers/WebMessageHandler.cs",
             "ClearVision.Product/src/ClearVision.Product.Desktop/Observation/",
             "ClearVision.Product/src/ClearVision.Product.Desktop/Program.cs"
         };

@@ -3,6 +3,7 @@ using System.Security.Cryptography;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using ClearVision.Product.Application.DTOs;
+using ClearVision.Product.Application.Services;
 using ClearVision.Product.Core.Enums;
 using ClearVision.Product.Core.Services;
 using ClearVision.Product.Desktop.Data;
@@ -10,6 +11,7 @@ using ClearVision.Product.Desktop.Station;
 using ClearVision.Product.Infrastructure.Data;
 using ClearVision.Product.Runtime;
 using ClearVision.Product.Runtime.Abstractions;
+using ClearVision.Product.Infrastructure.Services;
 using FluentAssertions;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
@@ -46,6 +48,7 @@ public sealed class StationPackageStoreTests
                 .AddSingleton<StationPackageStore>()
                 .AddSingleton<RuntimePackageValidator>()
                 .AddSingleton<RuntimePackageLoader>()
+                .AddSingleton<IWorkflowArtifactAdmissionGate>(_ => CreateWorkflowArtifactAdmissionGate())
                 .BuildServiceProvider())
             {
                 await using (var scope = provider.CreateAsyncScope())
@@ -107,6 +110,7 @@ public sealed class StationPackageStoreTests
                 .AddSingleton<StationPackageStore>()
                 .AddSingleton<RuntimePackageValidator>()
                 .AddSingleton<RuntimePackageLoader>()
+                .AddSingleton<IWorkflowArtifactAdmissionGate>(_ => CreateWorkflowArtifactAdmissionGate())
                 .BuildServiceProvider())
             {
                 await using (var scope = provider.CreateAsyncScope())
@@ -199,23 +203,15 @@ public sealed class StationPackageStoreTests
         Directory.CreateDirectory(Path.Combine(runtimeRoot, "quality"));
         Directory.CreateDirectory(Path.Combine(runtimeRoot, "field"));
 
+        var factory = new OperatorFactory();
         var flow = new OperatorFlowDto
         {
             Id = Guid.NewGuid(),
             Name = "Import test runtime flow",
             Operators =
             [
-                new OperatorDto
-                {
-                    Id = Guid.NewGuid(),
-                    Name = "Result",
-                    Type = OperatorType.ResultOutput,
-                    X = 0,
-                    Y = 0,
-                    InputPorts = [],
-                    OutputPorts = [],
-                    Parameters = []
-                }
+                CreateOperator(factory, OperatorType.ResultOutput),
+                CreateOperator(factory, OperatorType.ResultJudgment)
             ],
             Connections = []
         }.WithStringDecisionBinding();
@@ -259,11 +255,20 @@ public sealed class StationPackageStoreTests
 
     private static async Task CreateLegacyPackageRecordDatabaseAsync(string dbPath)
     {
+        var options = new DbContextOptionsBuilder<VisionDbContext>()
+            .UseSqlite($"Data Source={dbPath}")
+            .Options;
+        await using (var db = new VisionDbContext(options))
+        {
+            await db.Database.EnsureCreatedAsync();
+        }
+
         await using var connection = new SqliteConnection($"Data Source={dbPath}");
         await connection.OpenAsync();
 
         await using var createCommand = connection.CreateCommand();
         createCommand.CommandText = """
+            DROP TABLE "StationPackageRecords";
             CREATE TABLE "StationPackageRecords" (
                 "Id" INTEGER NOT NULL CONSTRAINT "PK_StationPackageRecords" PRIMARY KEY AUTOINCREMENT,
                 "PackageId" TEXT NOT NULL,
@@ -283,6 +288,62 @@ public sealed class StationPackageStoreTests
                 ('legacy-package', 'Legacy Package', '1.0.0', 'sha256:legacy', 'legacy.cvpkg', 'legacy.cvpkg', 10, 'legacy', 'Studio', '2026-01-01T00:00:00Z');
             """;
         await createCommand.ExecuteNonQueryAsync();
+    }
+
+    private static IWorkflowArtifactAdmissionGate CreateWorkflowArtifactAdmissionGate()
+    {
+        var factory = new OperatorFactory();
+        return new WorkflowArtifactAdmissionGate(
+            new WorkflowLegacyScanner(factory),
+            new WorkflowLegacyRepairService(factory),
+            new DiscardingQuarantineStore());
+    }
+
+    private static OperatorDto CreateOperator(OperatorFactory factory, OperatorType type)
+    {
+        var metadata = factory.GetMetadata(type)
+            ?? throw new InvalidOperationException($"Missing operator metadata for {type}.");
+        return new OperatorDto
+        {
+            Id = Guid.NewGuid(),
+            Name = metadata.DisplayName,
+            Type = metadata.Type,
+            InputPorts = metadata.InputPorts.Select(port => new PortDto
+            {
+                Id = Guid.NewGuid(),
+                Name = port.Name,
+                Direction = PortDirection.Input,
+                DataType = port.DataType,
+                IsRequired = port.IsRequired
+            }).ToList(),
+            OutputPorts = metadata.OutputPorts.Select(port => new PortDto
+            {
+                Id = Guid.NewGuid(),
+                Name = port.Name,
+                Direction = PortDirection.Output,
+                DataType = port.DataType
+            }).ToList(),
+            Parameters = metadata.Parameters.Select(parameter => new ParameterDto
+            {
+                Id = Guid.NewGuid(),
+                Name = parameter.Name,
+                DisplayName = parameter.DisplayName,
+                Description = parameter.Description,
+                DataType = parameter.DataType,
+                DefaultValue = parameter.DefaultValue,
+                MinValue = parameter.MinValue,
+                MaxValue = parameter.MaxValue,
+                IsRequired = parameter.IsRequired,
+                Options = parameter.Options
+            }).ToList()
+        };
+    }
+
+    private sealed class DiscardingQuarantineStore : IWorkflowArtifactQuarantineStore
+    {
+        public void Preserve(WorkflowArtifactQuarantineRecord record)
+        {
+        }
     }
 
     private static void DeleteDirectoryWithRetry(string path)
