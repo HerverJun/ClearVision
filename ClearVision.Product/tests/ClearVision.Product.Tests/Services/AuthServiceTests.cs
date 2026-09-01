@@ -218,6 +218,53 @@ public class AuthServiceTests
     }
 
     [Fact]
+    public async Task ConcurrentSessionLookups_ShouldKeepSameIssuedSessionValid()
+    {
+        var repository = Substitute.For<IUserRepository>();
+        var passwordHasher = Substitute.For<IPasswordHasher>();
+        var configurationService = CreateConfigurationService(
+            sessionTimeoutMinutes: 30,
+            loginFailureLockoutCount: 2);
+        var user = CreateUser("concurrent-session-user", "hash");
+        var bothLookupsEntered = new TaskCompletionSource<bool>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        var releaseLookups = new TaskCompletionSource<bool>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        var lookupCount = 0;
+
+        repository.GetByUsernameAsync("concurrent-session-user", Arg.Any<CancellationToken>()).Returns(user);
+        repository.GetByIdAsync(user.Id).Returns(async _ =>
+        {
+            if (Interlocked.Increment(ref lookupCount) == 2)
+            {
+                bothLookupsEntered.TrySetResult(true);
+            }
+
+            await releaseLookups.Task;
+            return user;
+        });
+        passwordHasher.VerifyPassword("correct-password", user.PasswordHash).Returns(true);
+        var service = new AuthService(repository, passwordHasher, configurationService);
+        var login = await service.LoginAsync("concurrent-session-user", "correct-password");
+        login.Success.Should().BeTrue();
+
+        var first = service.GetSessionAsync(login.Token!);
+        var second = service.GetSessionAsync(login.Token!);
+        try
+        {
+            await bothLookupsEntered.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        }
+        finally
+        {
+            releaseLookups.TrySetResult(true);
+        }
+
+        var sessions = await Task.WhenAll(first, second).WaitAsync(TimeSpan.FromSeconds(5));
+        sessions.Should().OnlyContain(session => session != null);
+        (await service.ValidateTokenAsync(login.Token!)).Should().BeTrue();
+    }
+
+    [Fact]
     public async Task ExistingSession_ShouldBeRevokedWhenRoleDowngrades()
     {
         var repository = Substitute.For<IUserRepository>();

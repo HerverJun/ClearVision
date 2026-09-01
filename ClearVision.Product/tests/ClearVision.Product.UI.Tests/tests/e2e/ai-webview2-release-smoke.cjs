@@ -129,7 +129,9 @@ async function authenticateAndOpenAi(page) {
     markerKeyPrefix: 'cv_ai_apply_safety_block_v1',
     recoveryKey: rollbackRecoveryFixtureKey,
   });
-  await page.goto('http://localhost:5000/index.html');
+  // Keep the WebView2 virtual-host origin so the authenticated sessionStorage
+  // written above survives navigation from login.html to the production root.
+  await page.goto('https://app.local/index.html');
   await page.waitForSelector('#loading-screen', { state: 'hidden', timeout: 45_000 });
   await activateView(page, 'ai');
   await page.waitForFunction(() => Boolean(window.aiPanel && !window.aiPanel._disposed));

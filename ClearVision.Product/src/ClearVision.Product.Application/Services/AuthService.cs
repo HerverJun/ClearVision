@@ -220,12 +220,13 @@ public class AuthService : IAuthService, IAuthSessionRevocationService
 
         lock (_lock)
         {
-            if (!_sessions.TryGetValue(token, out var current) || !ReferenceEquals(current, record))
+            if (!_sessions.TryGetValue(token, out var current) ||
+                current.CreatedSequence != record.CreatedSequence)
             {
                 return null;
             }
 
-            _sessions[token] = record with { Session = refreshed, LastValidatedAtUtc = utcNow };
+            _sessions[token] = current with { Session = refreshed, LastValidatedAtUtc = utcNow };
         }
 
         return refreshed;

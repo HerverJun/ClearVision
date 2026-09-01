@@ -3,6 +3,7 @@ param(
     [string]$Password = $env:CV_SMOKE_PASSWORD,
     [string]$Configuration = "Debug",
     [string]$EvidenceDirectory = "quality/evidence/ai-webview2-release",
+    [string]$ScratchDirectory = ".tmp/ai-webview2-release",
     [int]$WindowWidth = 1920,
     [int]$WindowHeight = 1080,
     [switch]$NoBuild
@@ -17,16 +18,25 @@ $uiTests = Join-Path $repoRoot "ClearVision.Product/tests/ClearVision.Product.UI
 $nodeSmoke = Join-Path $uiTests "tests/e2e/ai-webview2-release-smoke.cjs"
 $nodeExe = (Get-Command node.exe -ErrorAction Stop).Source
 $evidence = [System.IO.Path]::GetFullPath((Join-Path $repoRoot $EvidenceDirectory))
-$hostLogs = Join-Path $repoRoot ".tmp/ai-webview2-release-host-logs"
+$scratch = if ([System.IO.Path]::IsPathRooted($ScratchDirectory)) {
+    [System.IO.Path]::GetFullPath($ScratchDirectory)
+} else {
+    [System.IO.Path]::GetFullPath((Join-Path $repoRoot $ScratchDirectory))
+}
+$hostLogs = Join-Path $scratch "host-logs"
 $runtime = "net8.0-windows/win-x64"
 $exe = Join-Path $repoRoot "ClearVision.Product/src/ClearVision.Product.Desktop/bin/$Configuration/$runtime/ClearVision.Product.Desktop.exe"
 $useIsolatedAuth = [string]::IsNullOrWhiteSpace($Password)
-$isolatedAuthDirectory = Join-Path $repoRoot ".tmp/ai-webview2-release-auth"
+$isolatedAuthDirectory = Join-Path $scratch "auth"
 $isolatedDatabase = Join-Path $isolatedAuthDirectory "vision.db"
+$isolatedAgentStore = Join-Path $isolatedAuthDirectory ("agent-run-store-" + [Guid]::NewGuid().ToString("N"))
 $previousDatabasePath = $env:Database__Path
+$previousAgentRunStore = $env:CV_AGENT_RUN_EVENT_STORE
+$previousGovernanceStore = $env:CV_RUNTIME_PREVIEW_GOVERNANCE_STORE
 
 if ($useIsolatedAuth) {
     New-Item -ItemType Directory -Force -Path $isolatedAuthDirectory | Out-Null
+    New-Item -ItemType Directory -Force -Path $isolatedAgentStore | Out-Null
     Get-ChildItem -LiteralPath $isolatedAuthDirectory -File -ErrorAction SilentlyContinue |
         Where-Object { $_.Name -in @('vision.db', 'vision.db-shm', 'vision.db-wal') } |
         Remove-Item -Force
@@ -35,6 +45,8 @@ if ($useIsolatedAuth) {
     try { $random.GetBytes($randomBytes) } finally { $random.Dispose() }
     $Password = ([Convert]::ToBase64String($randomBytes) + "Aa1!")
     $env:Database__Path = $isolatedDatabase
+    $env:CV_AGENT_RUN_EVENT_STORE = $isolatedAgentStore
+    $env:CV_RUNTIME_PREVIEW_GOVERNANCE_STORE = $isolatedAgentStore
 }
 
 New-Item -ItemType Directory -Force -Path $evidence | Out-Null
@@ -127,12 +139,20 @@ function Start-DesktopHost {
         -RedirectStandardError $stderr `
         -WindowStyle Hidden `
         -PassThru
-    Wait-HttpEndpoint -Uri "http://127.0.0.1:5000/api/auth/setup-status"
-    Wait-HttpEndpoint -Uri "http://127.0.0.1:$CdpPort/json/version"
-    if (-not [ClearVisionReleaseSmoke.NativeWindow]::Resize([uint32]$process.Id, $WindowWidth, $WindowHeight)) {
-        throw "Could not resize the hidden WinForms window for PID $($process.Id)."
+    try {
+        Wait-HttpEndpoint -Uri "http://127.0.0.1:5000/api/auth/setup-status"
+        Wait-HttpEndpoint -Uri "http://127.0.0.1:$CdpPort/json/version"
+        if (-not [ClearVisionReleaseSmoke.NativeWindow]::Resize([uint32]$process.Id, $WindowWidth, $WindowHeight)) {
+            throw "Could not resize the hidden WinForms window for PID $($process.Id)."
+        }
+        return $process
+    } catch {
+        if (-not $process.HasExited) {
+            Stop-Process -Id $process.Id -Force
+            $process.WaitForExit(10000) | Out-Null
+        }
+        throw
     }
-    return $process
 }
 
 function Stop-DesktopHost {
@@ -200,6 +220,8 @@ try {
     }
 } finally {
     $env:Database__Path = $previousDatabasePath
+    $env:CV_AGENT_RUN_EVENT_STORE = $previousAgentRunStore
+    $env:CV_RUNTIME_PREVIEW_GOVERNANCE_STORE = $previousGovernanceStore
     if ($useIsolatedAuth) {
         Get-ChildItem -LiteralPath $isolatedAuthDirectory -File -ErrorAction SilentlyContinue |
             Where-Object { $_.Name -in @('vision.db', 'vision.db-shm', 'vision.db-wal') } |
