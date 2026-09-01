@@ -7,7 +7,7 @@ using ClearVision.Product.Core.Attributes;
 using ClearVision.Product.Core.Entities;
 using ClearVision.Product.Core.Enums;
 using ClearVision.Product.Core.Operators;
-using ClearVision.Product.Infrastructure.Services;
+using ClearVision.Product.Core.Services;
 using Microsoft.Extensions.Logging;
 namespace ClearVision.Product.Infrastructure.Operators;
 

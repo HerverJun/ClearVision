@@ -5,7 +5,9 @@ param(
     [string]$PackageVersion = "",
     [string]$SourceRevisionId = "",
     [string]$RepositoryBranch = "",
-    [string]$RepositoryCommit = ""
+    [string]$RepositoryCommit = "",
+    [string]$OutputPath = "",
+    [string]$SmokePackageRoot = ""
 )
 
 $ErrorActionPreference = "Stop"
@@ -13,13 +15,30 @@ $ErrorActionPreference = "Stop"
 $scriptRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
 $repoRoot = Split-Path -Parent $scriptRoot
 $projectPath = Join-Path $scriptRoot "ClearVision.OperatorLibrary.csproj"
-$nupkgPath = Join-Path $scriptRoot "nupkg"
+$nupkgPath = if ([string]::IsNullOrWhiteSpace($OutputPath)) {
+    Join-Path $scriptRoot "nupkg"
+}
+elseif ([System.IO.Path]::IsPathRooted($OutputPath)) {
+    [System.IO.Path]::GetFullPath($OutputPath)
+}
+else {
+    [System.IO.Path]::GetFullPath((Join-Path $repoRoot $OutputPath))
+}
 $smokeTestPath = Join-Path $scriptRoot "tests/ClearVision.OperatorLibrary.SmokeTests/ClearVision.OperatorLibrary.SmokeTests.csproj"
-$nugetConfigPath = Join-Path $scriptRoot "nuget.config"
+$smokeSupportProjectPath = Join-Path $repoRoot "quality/testing/ClearVision.Testing/ClearVision.Testing.csproj"
 $serialTestRunnerPath = Join-Path $repoRoot "scripts/run-dotnet-test-serial.ps1"
 $dotnetShimPath = Join-Path $repoRoot "scripts/dotnet.ps1"
-$smokePackageRoot = Join-Path $repoRoot ".tmp/nuget-packages/operator-library-smoke"
+$smokePackageRoot = if ([string]::IsNullOrWhiteSpace($SmokePackageRoot)) {
+    Join-Path $repoRoot ".tmp/nuget-packages/operator-library-smoke"
+}
+elseif ([System.IO.Path]::IsPathRooted($SmokePackageRoot)) {
+    [System.IO.Path]::GetFullPath($SmokePackageRoot)
+}
+else {
+    [System.IO.Path]::GetFullPath((Join-Path $repoRoot $SmokePackageRoot))
+}
 $smokeLockPath = Join-Path $smokePackageRoot "packages.lock.json"
+$smokeNugetConfigPath = Join-Path $smokePackageRoot "NuGet.Config"
 
 $dotnetPathOutput = & $dotnetShimPath -InstallIfMissing -PrintPath -ReturnExitCode
 if ($LASTEXITCODE -ne 0) {
@@ -126,14 +145,58 @@ if ($RunSmokeTest) {
         Remove-Item -LiteralPath $smokeLockPath -Force
     }
 
-    & $dotnetPath restore $smokeTestPath `
-        --configfile $nugetConfigPath `
+    $escapedPackageSource = [System.Security.SecurityElement]::Escape($nupkgPath)
+    $smokeNugetConfig = @"
+<?xml version="1.0" encoding="utf-8"?>
+<configuration>
+  <packageSources>
+    <clear />
+    <add key="nuget.org" value="https://api.nuget.org/v3/index.json" />
+    <add key="local-operator-library" value="$escapedPackageSource" />
+  </packageSources>
+  <packageSourceMapping>
+    <packageSource key="local-operator-library">
+      <package pattern="ClearVision.OperatorLibrary" />
+    </packageSource>
+    <packageSource key="nuget.org">
+      <package pattern="*" />
+    </packageSource>
+  </packageSourceMapping>
+</configuration>
+"@
+    [System.IO.File]::WriteAllText(
+        $smokeNugetConfigPath,
+        $smokeNugetConfig,
+        [System.Text.UTF8Encoding]::new($false))
+
+    & $dotnetPath restore $smokeSupportProjectPath `
+        --configfile $smokeNugetConfigPath `
         --packages $smokePackageRoot `
+        --locked-mode
+    if ($LASTEXITCODE -ne 0) {
+        throw "[pack] dotnet restore --locked-mode (smoke support) failed with exit code $LASTEXITCODE"
+    }
+
+    & $dotnetPath restore $smokeTestPath `
+        --configfile $smokeNugetConfigPath `
+        --packages $smokePackageRoot `
+        --no-dependencies `
         --no-cache `
         -p:NuGetLockFilePath=$smokeLockPath `
         -p:ClearVisionOperatorLibraryPackageVersion=$resolvedPackageVersion
     if ($LASTEXITCODE -ne 0) {
         throw "[pack] dotnet restore (smoke test) failed with exit code $LASTEXITCODE"
+    }
+
+    & $dotnetPath restore $smokeTestPath `
+        --configfile $smokeNugetConfigPath `
+        --packages $smokePackageRoot `
+        --no-dependencies `
+        --locked-mode `
+        -p:NuGetLockFilePath=$smokeLockPath `
+        -p:ClearVisionOperatorLibraryPackageVersion=$resolvedPackageVersion
+    if ($LASTEXITCODE -ne 0) {
+        throw "[pack] dotnet restore --locked-mode (smoke test) failed with exit code $LASTEXITCODE"
     }
 
     & $serialTestRunnerPath `

@@ -62,7 +62,7 @@
              Link="ClearVision.PlcComm\%(RecursiveDir)%(Filename)%(Extension)" />
 
     <Compile Include="..\ClearVision.Product\src\ClearVision.Product.Infrastructure\Operators\**\*.cs"
-             Exclude="..\ClearVision.Product\src\ClearVision.Product.Infrastructure\Operators\bin\**;..\ClearVision.Product\src\ClearVision.Product.Infrastructure\Operators\obj\**;..\ClearVision.Product\src\ClearVision.Product.Infrastructure\Operators\artifacts\**"
+             Exclude="..\ClearVision.Product\src\ClearVision.Product.Infrastructure\Operators\bin\**;..\ClearVision.Product\src\ClearVision.Product.Infrastructure\Operators\obj\**;..\ClearVision.Product\src\ClearVision.Product.Infrastructure\Operators\artifacts\**;..\ClearVision.Product\src\ClearVision.Product.Infrastructure\Operators\FrameChangeTriggerOperator.cs;..\ClearVision.Product\src\ClearVision.Product.Infrastructure\Operators\MqttPublishOperator.cs"
              Link="Operators\%(RecursiveDir)%(Filename)%(Extension)" />
     <Compile Include="..\ClearVision.Product\src\ClearVision.Product.Infrastructure\ImageProcessing\**\*.cs"
              Exclude="..\ClearVision.Product\src\ClearVision.Product.Infrastructure\ImageProcessing\bin\**;..\ClearVision.Product\src\ClearVision.Product.Infrastructure\ImageProcessing\obj\**;..\ClearVision.Product\src\ClearVision.Product.Infrastructure\ImageProcessing\artifacts\**"

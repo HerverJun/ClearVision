@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Sockets;
 using System.Globalization;
 using System.Text;
+using ClearVision.Product.Core.Services;
 using Microsoft.Extensions.Options;
 
 namespace ClearVision.Product.Infrastructure.Services;
@@ -20,37 +21,6 @@ public sealed class HttpResourceBrokerOptions
     public List<string> AllowedHosts { get; set; } = [];
     public List<int> AllowedPorts { get; set; } = [];
     public List<string> AdditionalAllowedCidrs { get; set; } = [];
-}
-
-public sealed record HttpResourceRequest(
-    string Url,
-    HttpMethod Method,
-    string? Body,
-    string? ContentType,
-    IReadOnlyDictionary<string, string>? Headers = null);
-
-public sealed record HttpResourceResponse(
-    HttpStatusCode StatusCode,
-    bool IsSuccessStatusCode,
-    string Body,
-    Uri FinalUri,
-    int RedirectCount);
-
-public sealed class HttpResourceBrokerException : Exception
-{
-    public HttpResourceBrokerException(string code, string message)
-        : base(message)
-    {
-        Code = code;
-    }
-
-    public HttpResourceBrokerException(string code, string message, Exception innerException)
-        : base(message, innerException)
-    {
-        Code = code;
-    }
-
-    public string Code { get; }
 }
 
 public interface IHttpResourceDnsResolver
@@ -192,13 +162,6 @@ public sealed class SecureHttpResourceTransport : IHttpResourceTransport
             $"Unable to connect to validated HTTP destination '{context.DnsEndPoint.Host}'.",
             lastFailure);
     }
-}
-
-public interface IHttpResourceBroker
-{
-    Task<HttpResourceResponse> SendAsync(
-        HttpResourceRequest request,
-        CancellationToken cancellationToken);
 }
 
 /// <summary>

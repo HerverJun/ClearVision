@@ -4,10 +4,10 @@
 using System.Globalization;
 using System.Text;
 using System.Text.Json;
-using ClearVision.Product.Application.Exports;
 using ClearVision.Product.Core.Attributes;
 using ClearVision.Product.Core.Entities;
 using ClearVision.Product.Core.Enums;
+using ClearVision.Product.Core.Exports;
 using ClearVision.Product.Core.Operators;
 using ClearVision.Product.Core.ValueObjects;
 using Microsoft.Extensions.Logging;
