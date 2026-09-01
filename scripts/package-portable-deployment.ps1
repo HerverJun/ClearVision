@@ -440,7 +440,16 @@ if (-not $SkipSupplyChain) {
                 reason = "Network vulnerability scan was not requested for this run; this is not a zero-vulnerability result."
                 vulnerabilityCount = $null
                 packageIdentities = @()
-                sources = @()
+                sources = @(
+                    [ordered]@{
+                        source = "scan-not-requested"
+                        status = "unavailable"
+                        retrievedAtUtc = [DateTimeOffset]::UtcNow.ToString("o")
+                        databaseRevision = $null
+                        etag = $null
+                        queries = @()
+                    }
+                )
                 vulnerabilities = @()
             })
         }
