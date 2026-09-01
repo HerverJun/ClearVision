@@ -976,6 +976,8 @@ jobs:
     runs-on: windows-latest
     needs: build-and-test
     if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
+    outputs:
+      version: ${{ steps.version.outputs.VERSION }}
 
     steps:
       - name: Checkout Code
@@ -1017,47 +1019,100 @@ jobs:
         id: version
         shell: pwsh
         run: |
-          if ('${{ github.event.inputs.version }}') {
-            $version = '${{ github.event.inputs.version }}'
-          } elseif ('${{ github.ref }}' -match 'refs/tags/v(.+)') {
+          if ('${{ github.ref }}' -match 'refs/tags/v(.+)') {
             $version = $matches[1]
           } else {
-            $version = '1.0.0-' + (Get-Date -Format 'yyyyMMdd-HHmmss')
+            $version = '1.0.0-ci.${{ github.run_number }}.${{ github.run_attempt }}'
           }
           echo "VERSION=$version" >> $env:GITHUB_OUTPUT
           Write-Host "Building version: $version"
 
-      - name: Publish Single File
-        run: |
-          dotnet publish ${{ env.DESKTOP_PROJECT }} `
-            -c Release `
-            -r win-x64 `
-            --self-contained true `
-            -p:PublishSingleFile=true `
-            -p:PublishReadyToRun=true `
-            -p:IncludeNativeLibrariesForSelfExtract=true `
-            -p:EnableCompressionInSingleFile=true `
-            -p:Version=${{ steps.version.outputs.VERSION }} `
-            -o "${{ env.PUBLISH_DIR }}/ClearVision-${{ steps.version.outputs.VERSION }}"
+      - name: Validate Canonical Portable Packaging Implementation
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: pwsh
+        run: '& "./scripts/test-package-portable-deployment.ps1"'
 
-      - name: Create Launcher Script
+      - name: Build Governed Tag Release Bundle
+        if: startsWith(github.ref, 'refs/tags/v')
         shell: pwsh
         run: |
-          $content = "@echo off`nchcp 65001 >nul`necho Starting ClearVision...`nstart `"`" `"%~dp0ClearVision.Product.Desktop.exe`""
-          $content | Out-File -FilePath "${{ env.PUBLISH_DIR }}/ClearVision-${{ steps.version.outputs.VERSION }}/Start-ClearVision.bat" -Encoding UTF8
+          & "./scripts/package-portable-deployment.ps1" `
+            -Application Studio `
+            -RuntimeIdentifier win-x64 `
+            -Profile field-self-contained `
+            -Version "${{ steps.version.outputs.VERSION }}" `
+            -SourceRevisionId "${{ github.sha }}" `
+            -OutputRoot "${{ env.PUBLISH_DIR }}/release" `
+            -NoRestore `
+            -RunOperatorSmoke `
+            -AttemptVulnerabilityScan `
+            -EnforceReleasePolicy
 
-      - name: Create ZIP Archive
+      - name: Verify Governed Tag Release Bundle
+        if: startsWith(github.ref, 'refs/tags/v')
         shell: pwsh
         run: |
-          Compress-Archive -Path "${{ env.PUBLISH_DIR }}/ClearVision-${{ steps.version.outputs.VERSION }}/*" -DestinationPath "${{ env.PUBLISH_DIR }}/ClearVision-${{ steps.version.outputs.VERSION }}-win-x64.zip" -Force
+          $root = "${{ env.PUBLISH_DIR }}/release"
+          $validation = Get-Content -Raw "$root/supply-chain/validation-summary.json" | ConvertFrom-Json
+          $result = Get-Content -Raw "$root/package-result.json" | ConvertFrom-Json
+          if (-not $validation.generationPassed -or -not $validation.artifactConsistencyPassed -or -not $validation.releaseEligible) {
+            throw "Tag release bundle failed supply-chain or policy validation."
+          }
+          if ($result.gitSha -ne "${{ github.sha }}" -or $result.repositoryDirty) {
+            throw "Tag release bundle is not bound to a clean checkout of the workflow commit."
+          }
 
-      - name: Upload Build Artifact
+      - name: Build Main Diagnostic Artifact
+        if: github.ref == 'refs/heads/main'
+        shell: pwsh
+        run: |
+          $diagnosticRoot = "${{ env.PUBLISH_DIR }}/diagnostic"
+          $publishRoot = "$diagnosticRoot/raw-build"
+          New-Item -ItemType Directory -Force -Path $publishRoot | Out-Null
+          dotnet publish $env:DESKTOP_PROJECT `
+            --configuration Release `
+            --runtime win-x64 `
+            --self-contained false `
+            --no-restore `
+            -p:DebugType=none `
+            -p:DebugSymbols=false `
+            -p:Version="${{ steps.version.outputs.VERSION }}" `
+            --output $publishRoot
+          & "./scripts/Test-ReleasePublishHygiene.ps1" -PublishDirectory $publishRoot
+          Set-Content -LiteralPath "$publishRoot/DIAGNOSTIC-ARTIFACT-NOT-FOR-SITE-DEPLOYMENT.txt" `
+            -Value "Raw main-branch diagnostic build. This is not the governed portable field package."
+          Compress-Archive -Path "$publishRoot/*" `
+            -DestinationPath "$diagnosticRoot/ClearVision-Diagnostic-RawBuild-${{ steps.version.outputs.VERSION }}-win-x64.zip" `
+            -Force
+
+      - name: Upload Governed Tag Release Bundle
         uses: actions/upload-artifact@v4
+        if: startsWith(github.ref, 'refs/tags/v')
         with:
-          name: ClearVision-Build-${{ steps.version.outputs.VERSION }}
+          name: ClearVision-Release-${{ steps.version.outputs.VERSION }}
           if-no-files-found: error
-          path: ${{ env.PUBLISH_DIR }}/ClearVision-${{ steps.version.outputs.VERSION }}-win-x64.zip
+          path: |
+            ${{ env.PUBLISH_DIR }}/release/artifacts/*.zip
+            ${{ env.PUBLISH_DIR }}/release/artifacts/*.nupkg
+            ${{ env.PUBLISH_DIR }}/release/supply-chain/SHA256SUMS
+            ${{ env.PUBLISH_DIR }}/release/supply-chain/SBOM.spdx.json
+            ${{ env.PUBLISH_DIR }}/release/supply-chain/THIRD-PARTY-NOTICES.txt
+            ${{ env.PUBLISH_DIR }}/release/supply-chain/dependency-report.json
+            ${{ env.PUBLISH_DIR }}/release/supply-chain/dependency-report.md
+            ${{ env.PUBLISH_DIR }}/release/supply-chain/identity-manifest.json
+            ${{ env.PUBLISH_DIR }}/release/supply-chain/validation-summary.json
+            ${{ env.PUBLISH_DIR }}/release/supply-chain/vulnerability-scan.json
+            ${{ env.PUBLISH_DIR }}/release/package-result.json
           retention-days: 30
+
+      - name: Upload Main Diagnostic Artifact
+        uses: actions/upload-artifact@v4
+        if: github.ref == 'refs/heads/main'
+        with:
+          name: ClearVision-Diagnostic-RawBuild-${{ steps.version.outputs.VERSION }}
+          if-no-files-found: error
+          path: ${{ env.PUBLISH_DIR }}/diagnostic/ClearVision-Diagnostic-RawBuild-${{ steps.version.outputs.VERSION }}-win-x64.zip
+          retention-days: 14
 
   create-release:
     name: Create Release
@@ -1069,12 +1124,23 @@ jobs:
       - name: Download Build Artifact
         uses: actions/download-artifact@v4
         with:
+          name: ClearVision-Release-${{ needs.release-build.outputs.version }}
           path: ./artifacts
 
       - name: Create Release
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v2
         with:
-          files: ./artifacts/**/*.zip
+          files: |
+            ./artifacts/**/*.zip
+            ./artifacts/**/*.nupkg
+            ./artifacts/**/SHA256SUMS
+            ./artifacts/**/SBOM.spdx.json
+            ./artifacts/**/THIRD-PARTY-NOTICES.txt
+            ./artifacts/**/dependency-report.json
+            ./artifacts/**/dependency-report.md
+            ./artifacts/**/identity-manifest.json
+            ./artifacts/**/validation-summary.json
+            ./artifacts/**/vulnerability-scan.json
           generate_release_notes: true
           draft: false
           prerelease: false

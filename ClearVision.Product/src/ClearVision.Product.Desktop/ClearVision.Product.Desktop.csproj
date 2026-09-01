@@ -79,7 +79,7 @@
 
   <!-- 复制 wwwroot 前端文件到输出目录 -->
   <ItemGroup>
-    <Content Include="wwwroot\**\*">
+    <Content Include="wwwroot\**\*" Exclude="wwwroot\**\*.test.*;wwwroot\**\*.spec.*">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       <ExcludeFromSingleFile>true</ExcludeFromSingleFile>
     </Content>

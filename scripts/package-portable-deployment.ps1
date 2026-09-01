@@ -1,577 +1,452 @@
+[CmdletBinding()]
 param(
+    [ValidateSet("Release")]
     [string]$Configuration = "Release",
+    [ValidateSet("Studio", "Station")]
+    [string]$Application = "Studio",
+    [ValidateSet("win-x64")]
     [string]$RuntimeIdentifier = "win-x64",
+    [ValidateSet("field-self-contained", "diagnostic-framework-dependent")]
+    [string]$Profile = "field-self-contained",
+    [string]$Version = "",
+    [string]$SourceRevisionId = "",
     [string]$OutputRoot = "",
-    [switch]$SkipPublish
+    [string]$VulnerabilityReportPath = "",
+    [switch]$NoRestore,
+    [switch]$RunOperatorSmoke,
+    [switch]$AttemptVulnerabilityScan,
+    [switch]$SkipOperatorPackage,
+    [switch]$SkipSupplyChain,
+    [switch]$EnforceReleasePolicy,
+    [switch]$KeepStaging
 )
 
 $ErrorActionPreference = "Stop"
 
-function Resolve-RepoRoot {
-    param(
-        [Parameter(Mandatory = $true)]
-        [string]$ScriptRoot
-    )
-
-    return (Resolve-Path (Join-Path $ScriptRoot "..")).Path
-}
-
-function Resolve-FirstExistingPath {
-    param(
-        [Parameter(Mandatory = $true)]
-        [string[]]$Candidates
-    )
-
-    foreach ($candidate in $Candidates) {
-        if ([string]::IsNullOrWhiteSpace($candidate)) {
-            continue
-        }
-
-        if (Test-Path $candidate) {
-            return (Resolve-Path $candidate).Path
-        }
-    }
-
-    return $null
-}
-
 function Ensure-Directory {
-    param(
-        [Parameter(Mandatory = $true)]
-        [string]$Path
-    )
-
-    if (-not (Test-Path $Path)) {
+    param([Parameter(Mandatory = $true)][string]$Path)
+    if (-not (Test-Path -LiteralPath $Path)) {
         New-Item -ItemType Directory -Path $Path | Out-Null
     }
 }
 
-function Get-FlowParameter {
+function Resolve-OutputPath {
     param(
-        [Parameter(Mandatory = $true)]
-        [object]$Operator,
-        [Parameter(Mandatory = $true)]
-        [string]$Name
+        [Parameter(Mandatory = $true)][string]$RepoRoot,
+        [Parameter(Mandatory = $true)][string]$Value
     )
-
-    if ($null -eq $Operator.parameters) {
-        return $null
+    if ([System.IO.Path]::IsPathRooted($Value)) {
+        return [System.IO.Path]::GetFullPath($Value)
     }
-
-    return $Operator.parameters | Where-Object { $_.name -eq $Name } | Select-Object -First 1
+    return [System.IO.Path]::GetFullPath((Join-Path $RepoRoot $Value))
 }
 
-function Get-OrAddUniqueRelativePath {
+function Assert-ChildPath {
     param(
-        [Parameter(Mandatory = $true)]
-        [hashtable]$Map,
-        [Parameter(Mandatory = $true)]
-        [string]$SourcePath,
-        [Parameter(Mandatory = $true)]
-        [string]$RelativeDirectory
+        [Parameter(Mandatory = $true)][string]$Parent,
+        [Parameter(Mandatory = $true)][string]$Child
     )
-
-    $normalizedSource = [System.IO.Path]::GetFullPath($SourcePath)
-    if ($Map.ContainsKey($normalizedSource)) {
-        return $Map[$normalizedSource]
+    $parentFull = [System.IO.Path]::GetFullPath($Parent).TrimEnd('\', '/') + [System.IO.Path]::DirectorySeparatorChar
+    $childFull = [System.IO.Path]::GetFullPath($Child)
+    if (-not $childFull.StartsWith($parentFull, [System.StringComparison]::OrdinalIgnoreCase)) {
+        throw "Refusing to mutate a path outside the configured output root: $childFull"
     }
-
-    $fileName = [System.IO.Path]::GetFileName($normalizedSource)
-    $baseName = [System.IO.Path]::GetFileNameWithoutExtension($normalizedSource)
-    $extension = [System.IO.Path]::GetExtension($normalizedSource)
-    $candidateName = $fileName
-    $index = 1
-
-    while ($Map.Values -contains (Join-Path $RelativeDirectory $candidateName)) {
-        $candidateName = "{0}-{1}{2}" -f $baseName, $index, $extension
-        $index++
-    }
-
-    $relativePath = (Join-Path $RelativeDirectory $candidateName).Replace("/", "\")
-    $Map[$normalizedSource] = $relativePath
-    return $relativePath
 }
 
-function Copy-FileWithParent {
+function Remove-SafePath {
     param(
-        [Parameter(Mandatory = $true)]
-        [string]$SourceFile,
-        [Parameter(Mandatory = $true)]
-        [string]$DestinationFile
+        [Parameter(Mandatory = $true)][string]$OutputRoot,
+        [Parameter(Mandatory = $true)][string]$Target
     )
-
-    $parent = [System.IO.Path]::GetDirectoryName($DestinationFile)
-    if (-not [string]::IsNullOrWhiteSpace($parent)) {
-        Ensure-Directory $parent
+    Assert-ChildPath -Parent $OutputRoot -Child $Target
+    if (Test-Path -LiteralPath $Target) {
+        Remove-Item -LiteralPath $Target -Recurse -Force
     }
-
-    Copy-Item -LiteralPath $SourceFile -Destination $DestinationFile -Force
 }
 
-function Update-AppSettingsForPortableDb {
-    param(
-        [Parameter(Mandatory = $true)]
-        [string]$AppSettingsPath
-    )
-
-    if (-not (Test-Path $AppSettingsPath)) {
-        return
-    }
-
-    $appSettings = Get-Content -LiteralPath $AppSettingsPath -Raw | ConvertFrom-Json
-    if ($null -eq $appSettings.Database) {
-        $appSettings | Add-Member -MemberType NoteProperty -Name Database -Value ([pscustomobject]@{})
-    }
-
-    $appSettings.Database.Path = "vision.db"
-    $appSettings | ConvertTo-Json -Depth 32 | Set-Content -LiteralPath $AppSettingsPath -Encoding UTF8
+function Get-Sha256 {
+    param([Parameter(Mandatory = $true)][string]$Path)
+    return (Get-FileHash -LiteralPath $Path -Algorithm SHA256).Hash.ToLowerInvariant()
 }
 
-function Update-ConfigForPortableStorage {
+function Get-RelativePath {
     param(
-        [Parameter(Mandatory = $true)]
-        [string]$ConfigPath
+        [Parameter(Mandatory = $true)][string]$Root,
+        [Parameter(Mandatory = $true)][string]$Path
     )
-
-    if (-not (Test-Path $ConfigPath)) {
-        return
-    }
-
-    $config = Get-Content -LiteralPath $ConfigPath -Raw | ConvertFrom-Json
-    if ($null -eq $config.storage) {
-        $config | Add-Member -MemberType NoteProperty -Name storage -Value ([pscustomobject]@{})
-    }
-
-    $config.storage.imageSavePath = "VisionData\Images"
-    $config | ConvertTo-Json -Depth 32 | Set-Content -LiteralPath $ConfigPath -Encoding UTF8
+    return [System.IO.Path]::GetRelativePath($Root, $Path).Replace("\", "/")
 }
 
-function Patch-FlowFiles {
+function Write-Utf8NoBom {
     param(
-        [Parameter(Mandatory = $true)]
-        [string]$FlowRoot,
-        [Parameter(Mandatory = $true)]
-        [hashtable]$ModelMap,
-        [Parameter(Mandatory = $true)]
-        [hashtable]$SampleMap,
-        [Parameter(Mandatory = $true)]
-        [string]$DefaultLabelsRelativePath
+        [Parameter(Mandatory = $true)][string]$Path,
+        [Parameter(Mandatory = $true)][string]$Content
     )
+    [System.IO.File]::WriteAllText($Path, $Content, [System.Text.UTF8Encoding]::new($false))
+}
 
-    $modelSources = @{}
-    $sampleSources = @{}
+function Write-JsonFile {
+    param(
+        [Parameter(Mandatory = $true)][string]$Path,
+        [Parameter(Mandatory = $true)][object]$Value,
+        [int]$Depth = 20
+    )
+    Write-Utf8NoBom -Path $Path -Content (($Value | ConvertTo-Json -Depth $Depth) + "`n")
+}
 
-    if (-not (Test-Path $FlowRoot)) {
-        return [pscustomobject]@{
-            ModelSources = @()
-            SampleSources = @()
+function Get-NugetPackagesRoot {
+    param([Parameter(Mandatory = $true)][string]$RepoRoot)
+    $candidates = @(
+        $env:NUGET_PACKAGES,
+        (Join-Path $RepoRoot ".dotnet_cli_home\.nuget\packages"),
+        (Join-Path ([Environment]::GetFolderPath("UserProfile")) ".nuget\packages")
+    )
+    foreach ($candidate in $candidates) {
+        if (-not [string]::IsNullOrWhiteSpace($candidate) -and (Test-Path -LiteralPath $candidate -PathType Container)) {
+            return (Resolve-Path -LiteralPath $candidate).Path
         }
     }
+    throw "Unable to resolve a NuGet package cache for license evidence."
+}
 
-    $flowFiles = Get-ChildItem -LiteralPath $FlowRoot -Filter *.json -File
-    foreach ($flowFile in $flowFiles) {
-        $flow = Get-Content -LiteralPath $flowFile.FullName -Raw | ConvertFrom-Json
-        $changed = $false
-
-        foreach ($operator in $flow.operators) {
-            if ($operator.type -eq "DeepLearning") {
-                $modelParam = Get-FlowParameter -Operator $operator -Name "ModelPath"
-                if ($null -ne $modelParam -and -not [string]::IsNullOrWhiteSpace([string]$modelParam.value)) {
-                    $modelSource = [System.IO.Path]::GetFullPath([string]$modelParam.value)
-                    $modelSources[$modelSource] = $true
-
-                    if (Test-Path $modelSource) {
-                        $modelParam.value = Get-OrAddUniqueRelativePath -Map $ModelMap -SourcePath $modelSource -RelativeDirectory "portable-assets\models"
-                        $changed = $true
-                    }
-                }
-
-                $labelsParam = Get-FlowParameter -Operator $operator -Name "LabelsPath"
-                if ($null -ne $labelsParam) {
-                    $labelsParam.value = $DefaultLabelsRelativePath
-                    $changed = $true
-                }
-            }
-
-            if ($operator.type -eq "ImageAcquisition") {
-                $fileParam = Get-FlowParameter -Operator $operator -Name "FilePath"
-                if ($null -ne $fileParam -and -not [string]::IsNullOrWhiteSpace([string]$fileParam.value)) {
-                    $sampleSource = [System.IO.Path]::GetFullPath([string]$fileParam.value)
-                    $sampleSources[$sampleSource] = $true
-
-                    if (Test-Path $sampleSource) {
-                        $fileParam.value = Get-OrAddUniqueRelativePath -Map $SampleMap -SourcePath $sampleSource -RelativeDirectory "portable-assets\samples"
-                        $changed = $true
+function Invoke-VulnerabilityAudit {
+    param(
+        [Parameter(Mandatory = $true)][string]$DotNetPath,
+        [Parameter(Mandatory = $true)][string]$ProjectPath,
+        [Parameter(Mandatory = $true)][string]$TargetPath
+    )
+    $checkedAt = [DateTimeOffset]::UtcNow.ToString("o")
+    $lines = @(& $DotNetPath list $ProjectPath package --vulnerable --include-transitive --format json --no-restore 2>&1)
+    $exitCode = $LASTEXITCODE
+    if ($exitCode -ne 0) {
+        Write-JsonFile -Path $TargetPath -Value ([ordered]@{
+            schemaVersion = "clearvision.vulnerability-scan/v1"
+            status = "unavailable"
+            checkedAtUtc = $checkedAt
+            dataAsOfUtc = $null
+            source = "NuGet audit advisory sources"
+            reason = "NuGet audit command failed or its advisory source was unavailable; this is not a zero-vulnerability result."
+            vulnerabilities = @()
+        })
+        return
+    }
+    $raw = ($lines -join [Environment]::NewLine)
+    $jsonStart = $raw.IndexOf("{")
+    if ($jsonStart -lt 0) {
+        throw "NuGet audit returned success without a JSON document."
+    }
+    $audit = $raw.Substring($jsonStart) | ConvertFrom-Json
+    $findings = @()
+    foreach ($project in @($audit.projects)) {
+        foreach ($framework in @($project.frameworks)) {
+            foreach ($collectionName in @("topLevelPackages", "transitivePackages")) {
+                foreach ($package in @($framework.$collectionName)) {
+                    foreach ($vulnerability in @($package.vulnerabilities)) {
+                        if ($null -eq $vulnerability) { continue }
+                        $findings += [ordered]@{
+                            package = $package.id
+                            version = $package.resolvedVersion
+                            severity = $vulnerability.severity
+                            advisoryUrl = $vulnerability.advisoryurl
+                        }
                     }
                 }
             }
         }
-
-        if ($changed) {
-            $flow | ConvertTo-Json -Depth 100 | Set-Content -LiteralPath $flowFile.FullName -Encoding UTF8
-        }
     }
-
-    return [pscustomobject]@{
-        ModelSources = @($modelSources.Keys)
-        SampleSources = @($sampleSources.Keys)
-    }
+    Write-JsonFile -Path $TargetPath -Value ([ordered]@{
+        schemaVersion = "clearvision.vulnerability-scan/v1"
+        status = "available"
+        checkedAtUtc = $checkedAt
+        dataAsOfUtc = $checkedAt
+        source = "NuGet audit advisory sources"
+        reason = $null
+        vulnerabilities = @($findings)
+    })
 }
 
-function Write-LaunchScript {
-    param(
-        [Parameter(Mandatory = $true)]
-        [string]$TargetPath
-    )
-
-    $content = @'
-@echo off
-setlocal
-pushd "%~dp0"
-
-if not exist "%ProgramFiles(x86)%\Microsoft\EdgeWebView\Application" (
-  echo [WARN] WebView2 Runtime was not detected.
-  echo [WARN] If the app opens with a blank window, run "Prereqs\Install Prereqs.bat" first.
-  echo.
-)
-
-set "PATH=%~dp0HikvisionRuntime;%~dp0HikvisionRuntime\ThirdParty;%PATH%"
-start "" "%~dp0ClearVision.Product.Desktop.exe"
-'@
-
-    Set-Content -LiteralPath $TargetPath -Value $content -Encoding ASCII
-}
-
-function Write-PrereqInstallerScript {
-    param(
-        [Parameter(Mandatory = $true)]
-        [string]$TargetPath
-    )
-
-    $content = @'
-@echo off
-setlocal
-pushd "%~dp0"
-
-if exist "VC_redist.x64.exe" (
-  echo Installing VC++ runtime...
-  start /wait "" "%~dp0VC_redist.x64.exe" /install /quiet /norestart
-)
-
-if exist "MicrosoftEdgeWebView2RuntimeInstallerX64.exe" (
-  echo Installing WebView2 runtime...
-  start /wait "" "%~dp0MicrosoftEdgeWebView2RuntimeInstallerX64.exe" /silent /install
-)
-
-if exist "windowsdesktop-runtime-8.0.22-win-x64.exe" (
-  echo Installing .NET Desktop Runtime...
-  start /wait "" "%~dp0windowsdesktop-runtime-8.0.22-win-x64.exe" /install /quiet /norestart
-)
-
-echo.
-echo Prerequisite installation completed. Please run "Launch ClearVision.bat" again.
-pause
-'@
-
-    Set-Content -LiteralPath $TargetPath -Value $content -Encoding ASCII
-}
-
-function Write-Readme {
-    param(
-        [Parameter(Mandatory = $true)]
-        [string]$TargetPath,
-        [Parameter(Mandatory = $true)]
-        [string]$PackageName,
-        [Parameter(Mandatory = $true)]
-        [string[]]$PackagedProjects
-    )
-
-    $projectLines = @()
-    if ($PackagedProjects.Count -gt 0) {
-        $projectLines = $PackagedProjects | Sort-Object -Unique | ForEach-Object { "- $_" }
-    }
-    else {
-        $projectLines = @("- Project names could not be resolved from vision.db. Please verify vision.db and App_Data\\ProjectFlows manually.")
-    }
-
-    $lines = @(
-        "ClearVision Portable Package",
-        "============================",
-        "",
-        "Package: $PackageName",
-        "",
-        "Included content",
-        "----------------"
-    )
-
-    $lines += $projectLines
-    $lines += @(
-        "- Active database: vision.db",
-        "- Project flow files: App_Data\\ProjectFlows",
-        "- Wire-sequence scenario package: scenario-package-wire-sequence",
-        "- Portable models and samples: portable-assets",
-        "- Huaray camera dependencies: MVSDK / GenICam DLLs in the package root",
-        "- Hikvision camera runtime: HikvisionRuntime",
-        "- Offline installers: Prereqs",
-        "",
-        "Recommended startup",
-        "-------------------",
-        "1. Launch via Launch ClearVision.bat.",
-        "2. If WebView2 is missing or the app starts with a blank window, run Prereqs\\Install Prereqs.bat first.",
-        "3. The packaged project still includes a sample image path for smoke testing. Switch to the on-site camera binding after deployment.",
-        "",
-        "Portable adjustments already applied",
-        "----------------------------------",
-        "- appsettings.json now points Database:Path to the packaged vision.db.",
-        "- config.json now saves images to VisionData\\Images inside the package.",
-        "- The current flow now uses packaged relative paths for the model and sample image.",
-        "- scenario-package-wire-sequence\\models now contains the ONNX model and labels.txt.",
-        "",
-        "Notes",
-        "-----",
-        "- Use Launch ClearVision.bat if Hikvision cameras are needed, because it injects HikvisionRuntime into PATH.",
-        "- The app is self-contained, but WebView2 / VC++ / .NET desktop installers are still included as offline fallbacks."
-    )
-
-    Set-Content -LiteralPath $TargetPath -Value ($lines -join [Environment]::NewLine) -Encoding UTF8
-}
-
-$repoRoot = Resolve-RepoRoot -ScriptRoot $PSScriptRoot
+$repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 $dotnetShimPath = Join-Path $repoRoot "scripts\dotnet.ps1"
 $dotnetPathOutput = & $dotnetShimPath -InstallIfMissing -PrintPath -ReturnExitCode
-if ($LASTEXITCODE -ne 0) {
-    throw "Unable to resolve repository .NET SDK with $dotnetShimPath."
-}
-
+if ($LASTEXITCODE -ne 0) { throw "Unable to resolve repository .NET SDK with $dotnetShimPath." }
 $dotnetPath = ($dotnetPathOutput | Select-Object -Last 1).Trim()
-if ([string]::IsNullOrWhiteSpace($dotnetPath)) {
-    throw "Resolved dotnet path is empty."
+if ([string]::IsNullOrWhiteSpace($dotnetPath)) { throw "Resolved dotnet path is empty." }
+
+$projectMap = @{
+    Studio = [ordered]@{
+        Project = Join-Path $repoRoot "ClearVision.Product\src\ClearVision.Product.Desktop\ClearVision.Product.Desktop.csproj"
+        Executable = "ClearVision.Product.Desktop.exe"
+        DisplayName = "ClearVision Studio"
+    }
+    Station = [ordered]@{
+        Project = Join-Path $repoRoot "ClearVision.Product\src\ClearVision.Product.Station\ClearVision.Product.Station.csproj"
+        Executable = "ClearVision.Product.Station.exe"
+        DisplayName = "ClearVision Station"
+    }
 }
+$selected = $projectMap[$Application]
+$projectPath = $selected.Project
+if (-not (Test-Path -LiteralPath $projectPath -PathType Leaf)) { throw "Application project does not exist: $projectPath" }
 
-if ([string]::IsNullOrWhiteSpace($OutputRoot)) {
-    $OutputRoot = Join-Path $repoRoot ".tmp\publish-check\portable-deployment"
+if ([string]::IsNullOrWhiteSpace($SourceRevisionId)) {
+    $SourceRevisionId = (& git -C $repoRoot rev-parse HEAD).Trim()
 }
-
-$desktopProject = Join-Path $repoRoot "ClearVision.Product\src\ClearVision.Product.Desktop\ClearVision.Product.Desktop.csproj"
-$runtimeStateDir = Resolve-FirstExistingPath @(
-    (Join-Path $repoRoot "ClearVision.Product\src\ClearVision.Product.Desktop\bin\Debug\net8.0-windows\win-x64"),
-    (Join-Path $repoRoot ".tmp\single-desktop-out")
-)
-$localDbSource = Resolve-FirstExistingPath @(
-    (Join-Path $env:LOCALAPPDATA "ClearVision\vision.db"),
-    (Join-Path $repoRoot "vision.db"),
-    (Join-Path $repoRoot "ClearVision.Product\src\ClearVision.Product.Desktop\vision.db")
-)
-$scenarioPackageSource = $null
-$scenarioPackageDirectory = Get-ChildItem -Path $repoRoot -Directory -ErrorAction SilentlyContinue |
-    ForEach-Object {
-        Get-ChildItem -Path $_.FullName -Directory -Filter "scenario-package-wire-sequence" -ErrorAction SilentlyContinue
-    } |
-    Select-Object -First 1
-if ($scenarioPackageDirectory) {
-    $scenarioPackageSource = $scenarioPackageDirectory.FullName
+if ($SourceRevisionId -notmatch '^[0-9a-fA-F]{40}$') { throw "SourceRevisionId must be a full 40-character Git SHA." }
+$shortSha = $SourceRevisionId.Substring(0, 8).ToLowerInvariant()
+if ([string]::IsNullOrWhiteSpace($Version)) {
+    $Version = (& $dotnetPath msbuild $projectPath -nologo -getProperty:InformationalVersion | Select-Object -Last 1).Trim()
 }
-
-$scenarioLabelsSource = if ($scenarioPackageSource) {
-    Resolve-FirstExistingPath @(
-        (Join-Path $scenarioPackageSource "labels\labels.txt")
-    )
+if ([string]::IsNullOrWhiteSpace($Version) -or $Version -notmatch '^[0-9A-Za-z][0-9A-Za-z._+-]*$') {
+    throw "Version must be non-empty and safe for artifact names and NuGet metadata."
 }
-else {
-    $null
-}
-
-$hikvisionRuntimeSource = "C:\Program Files (x86)\Common Files\MVS\Runtime\Win64_x64"
-
-$timestamp = Get-Date -Format "yyyyMMdd-HHmmss"
-$packageName = "ClearVision-Portable-$timestamp"
-$stagingDir = Join-Path $OutputRoot $packageName
-$zipPath = Join-Path $OutputRoot "$packageName.zip"
-
+$artifactVersion = $Version.Replace("+", ".")
+if ([string]::IsNullOrWhiteSpace($OutputRoot)) { $OutputRoot = ".tmp\publish-check\wave3c\release" }
+$OutputRoot = Resolve-OutputPath -RepoRoot $repoRoot -Value $OutputRoot
 Ensure-Directory $OutputRoot
 
-if (Test-Path $stagingDir) {
-    Remove-Item -LiteralPath $stagingDir -Recurse -Force
-}
-
-if (Test-Path $zipPath) {
+$isSelfContained = $Profile -eq "field-self-contained"
+$packageName = "ClearVision-$Application-$artifactVersion-$shortSha-$RuntimeIdentifier-$Profile"
+$stagingRoot = Join-Path $OutputRoot "staging"
+$stagingDir = Join-Path $stagingRoot $packageName
+$artifactDir = Join-Path $OutputRoot "artifacts"
+$supplyDir = Join-Path $OutputRoot "supply-chain"
+$zipPath = Join-Path $artifactDir "$packageName.zip"
+$resultPath = Join-Path $OutputRoot "package-result.json"
+Ensure-Directory $stagingRoot
+Ensure-Directory $artifactDir
+Ensure-Directory $supplyDir
+Remove-SafePath -OutputRoot $OutputRoot -Target $stagingDir
+if (Test-Path -LiteralPath $zipPath) {
+    Assert-ChildPath -Parent $OutputRoot -Child $zipPath
     Remove-Item -LiteralPath $zipPath -Force
 }
+Ensure-Directory $stagingDir
 
-if (-not $SkipPublish) {
-    Write-Host "Publishing self-contained desktop build..."
-    & $dotnetPath publish $desktopProject `
-        -c $Configuration `
-        -r $RuntimeIdentifier `
-        --self-contained true `
-        -p:PublishSingleFile=true `
-        -p:PublishReadyToRun=true `
-        -p:IncludeNativeLibrariesForSelfExtract=true `
-        -p:EnableCompressionInSingleFile=true `
-        -p:PublishTrimmed=false `
-        -o $stagingDir
+if (-not $NoRestore) {
+    Write-Host "[portable] Locked restore: $projectPath"
+    & $dotnetPath restore $projectPath --locked-mode
+    if ($LASTEXITCODE -ne 0) { throw "Locked restore failed with exit code $LASTEXITCODE." }
+}
 
-    if ($LASTEXITCODE -ne 0) {
-        throw "dotnet publish failed with exit code $LASTEXITCODE."
+Write-Host "[portable] Publishing $Application / $RuntimeIdentifier / $Profile"
+& $dotnetPath publish $projectPath `
+    --configuration $Configuration `
+    --runtime $RuntimeIdentifier `
+    --self-contained $isSelfContained.ToString().ToLowerInvariant() `
+    --no-restore `
+    -p:PublishSingleFile=false `
+    -p:PublishReadyToRun=true `
+    -p:PublishTrimmed=false `
+    -p:IncludeNativeLibrariesForSelfExtract=false `
+    -p:EnableCompressionInSingleFile=false `
+    -p:DebugType=none `
+    -p:DebugSymbols=false `
+    -p:Deterministic=true `
+    -p:ContinuousIntegrationBuild=true `
+    -p:Version=$Version `
+    -p:InformationalVersion="$Version+$SourceRevisionId" `
+    -p:RepositoryCommit=$SourceRevisionId `
+    -p:SourceRevisionId=$SourceRevisionId `
+    --output $stagingDir
+if ($LASTEXITCODE -ne 0) { throw "dotnet publish failed with exit code $LASTEXITCODE." }
+
+$executablePath = Join-Path $stagingDir $selected.Executable
+if (-not (Test-Path -LiteralPath $executablePath -PathType Leaf)) { throw "Published executable is missing: $($selected.Executable)" }
+$launcher = @"
+@echo off
+setlocal
+pushd "%~dp0"
+start "" "%~dp0$($selected.Executable)"
+popd
+"@
+Write-Utf8NoBom -Path (Join-Path $stagingDir "Launch-ClearVision.cmd") -Content ($launcher.Replace("`n", "`r`n"))
+
+$supportBoundary = if ($isSelfContained) {
+    ".NET runtime is bundled. Microsoft Edge WebView2 Runtime remains an explicit target-machine prerequisite for Studio."
+} else {
+    ".NET 8 Windows Desktop Runtime is required on the target machine. This diagnostic profile is not the tag-default field package."
+}
+$readme = @"
+ClearVision site deployment
+===========================
+
+Package: $packageName
+Application: $($selected.DisplayName)
+RID: $RuntimeIdentifier
+Profile: $Profile
+Git SHA: $SourceRevisionId
+
+Start
+-----
+Run Launch-ClearVision.cmd. The launch chain calls only the packaged .NET executable and does not call Node, npm, npx, or a development server.
+
+Support boundary
+----------------
+$supportBoundary
+No local database, user profile, API key, token, model, sample image, source patch, test result, Playwright report, Node runtime, node_modules, FrontendV2, or development manifest is copied into this package.
+Site databases, camera SDK prerequisites, credentials, models, PLC endpoints, and project data must be provisioned and approved separately.
+
+Evidence
+--------
+release/source-identity.json records source and runtime identity.
+release/package-content-manifest.json and release/package-files.sha256 bind the packaged file set.
+The sibling supply-chain directory contains the final ZIP/nupkg-derived SPDX SBOM, third-party notices, dependency report, identity manifest, policy disposition, and artifact checksums.
+
+Claims not made
+---------------
+This package is not evidence of a GitHub Release upload, a real no-Node target machine, real WebView2/DPI coverage, real device/model validation, site performance, or same-SHA GitHub CI.
+"@
+Write-Utf8NoBom -Path (Join-Path $stagingDir "README-site-deploy.txt") -Content ($readme.Replace("`n", "`r`n"))
+
+$gitDirty = [bool](& git -C $repoRoot status --porcelain)
+$sourceTimestampUtc = (& git -C $repoRoot show -s --format=%cI $SourceRevisionId).Trim()
+$sdkVersion = (& $dotnetPath --version | Select-Object -Last 1).Trim()
+$runtimeVersions = @(& $dotnetPath --list-runtimes | ForEach-Object {
+    # Runtime identity is required; installation locations are machine-local evidence and must not enter the package.
+    ($_.Trim() -replace '\s+\[[^\]]+\]\s*$', '')
+} | Where-Object { $_ })
+$releaseMetadataDir = Join-Path $stagingDir "release"
+Ensure-Directory $releaseMetadataDir
+$sourceIdentityPath = Join-Path $releaseMetadataDir "source-identity.json"
+$sourceIdentity = [ordered]@{
+    schemaVersion = "clearvision.package-source-identity/v1"
+    gitSha = $SourceRevisionId.ToLowerInvariant()
+    repositoryDirty = $gitDirty
+    sourceTimestampUtc = $sourceTimestampUtc
+    application = $Application
+    version = $Version
+    runtimeIdentifier = $RuntimeIdentifier
+    profile = $Profile
+    configuration = $Configuration
+    selfContained = $isSelfContained
+    sdkVersion = $sdkVersion
+    runtimeInventory = $runtimeVersions
+    packagingImplementation = "scripts/package-portable-deployment.ps1"
+    packagingImplementationSha256 = Get-Sha256 (Join-Path $repoRoot "scripts\package-portable-deployment.ps1")
+}
+Write-JsonFile -Path $sourceIdentityPath -Value $sourceIdentity
+
+$contentManifestPath = Join-Path $releaseMetadataDir "package-content-manifest.json"
+$packageChecksumsPath = Join-Path $releaseMetadataDir "package-files.sha256"
+$contentFiles = @(Get-ChildItem -LiteralPath $stagingDir -Recurse -File -Force | Where-Object {
+    $_.FullName -ne $contentManifestPath -and $_.FullName -ne $packageChecksumsPath
+} | Sort-Object { Get-RelativePath -Root $stagingDir -Path $_.FullName })
+$contentRows = @($contentFiles | ForEach-Object {
+    [ordered]@{ path = Get-RelativePath -Root $stagingDir -Path $_.FullName; sizeBytes = $_.Length; sha256 = Get-Sha256 $_.FullName }
+})
+$contentFingerprintInput = ($contentRows | ForEach-Object { "$($_.path)`0$($_.sizeBytes)`0$($_.sha256)" }) -join "`n"
+$contentFingerprintBytes = [System.Text.Encoding]::UTF8.GetBytes($contentFingerprintInput)
+$contentFingerprint = [Convert]::ToHexString([System.Security.Cryptography.SHA256]::HashData($contentFingerprintBytes)).ToLowerInvariant()
+Write-JsonFile -Path $contentManifestPath -Value ([ordered]@{
+    schemaVersion = "clearvision.package-content-manifest/v1"
+    packageName = $packageName
+    gitSha = $SourceRevisionId.ToLowerInvariant()
+    runtimeIdentifier = $RuntimeIdentifier
+    profile = $Profile
+    fileCount = $contentRows.Count
+    contentFingerprint = "sha256:$contentFingerprint"
+    files = $contentRows
+}) -Depth 10
+$checksumFiles = @(Get-ChildItem -LiteralPath $stagingDir -Recurse -File -Force | Where-Object {
+    $_.FullName -ne $packageChecksumsPath
+} | Sort-Object { Get-RelativePath -Root $stagingDir -Path $_.FullName })
+$checksumLines = @($checksumFiles | ForEach-Object {
+    "$(Get-Sha256 $_.FullName)  $(Get-RelativePath -Root $stagingDir -Path $_.FullName)"
+})
+Write-Utf8NoBom -Path $packageChecksumsPath -Content (($checksumLines -join "`n") + "`n")
+
+& (Join-Path $repoRoot "scripts\Test-ReleasePublishHygiene.ps1") `
+    -PublishDirectory $stagingDir `
+    -AllowedManifestRelativePath "release/package-content-manifest.json"
+if ($LASTEXITCODE -ne 0) { throw "Release publish hygiene failed." }
+
+Write-Host "[portable] Creating archive: $zipPath"
+Compress-Archive -Path (Join-Path $stagingDir "*") -DestinationPath $zipPath -CompressionLevel Optimal -Force
+if (-not (Test-Path -LiteralPath $zipPath -PathType Leaf)) { throw "Portable ZIP was not created." }
+
+$nupkgPath = $null
+if (-not $SkipOperatorPackage) {
+    $packArguments = @{
+        Configuration = "Release"
+        PackageVersion = $Version
+        SourceRevisionId = $SourceRevisionId
+        RepositoryCommit = $SourceRevisionId
+        RepositoryBranch = (& git -C $repoRoot branch --show-current).Trim()
+        OutputPath = $artifactDir
+        # Keep the package cache path short enough for transitive packages that still contain
+        # deeply nested Apple reference headers even though the smoke target is Windows.
+        SmokePackageRoot = (Join-Path $repoRoot ".tmp\publish-check\wave3c\operator-smoke")
     }
-}
-else {
-    Ensure-Directory $stagingDir
-}
-
-if (-not (Test-Path $stagingDir)) {
-    throw "Publish output directory was not created: $stagingDir"
+    if ($RunOperatorSmoke) { $packArguments.RunSmokeTest = $true }
+    & (Join-Path $repoRoot "ClearVision.OperatorLibrary\pack.ps1") @packArguments
+    if ($LASTEXITCODE -ne 0) { throw "OperatorLibrary pack failed." }
+    $nupkgPath = Join-Path $artifactDir "ClearVision.OperatorLibrary.$Version.nupkg"
+    if (-not (Test-Path -LiteralPath $nupkgPath -PathType Leaf)) { throw "Expected OperatorLibrary package is missing: $nupkgPath" }
 }
 
-if ($null -eq $localDbSource) {
-    throw "Could not find the active vision.db to package."
-}
-
-Write-Host "Copying runtime data..."
-Copy-FileWithParent -SourceFile $localDbSource -DestinationFile (Join-Path $stagingDir "vision.db")
-
-if ($null -ne $runtimeStateDir) {
-    $runtimeConfig = Join-Path $runtimeStateDir "config.json"
-    if (Test-Path $runtimeConfig) {
-        Copy-FileWithParent -SourceFile $runtimeConfig -DestinationFile (Join-Path $stagingDir "config.json")
+$validationPath = $null
+if (-not $SkipSupplyChain) {
+    if ($null -eq $nupkgPath) { throw "Supply-chain generation requires the final OperatorLibrary nupkg." }
+    $resolvedVulnerabilityReport = $VulnerabilityReportPath
+    if ([string]::IsNullOrWhiteSpace($resolvedVulnerabilityReport)) {
+        $resolvedVulnerabilityReport = Join-Path $supplyDir "vulnerability-scan.json"
+        if ($AttemptVulnerabilityScan) {
+            Invoke-VulnerabilityAudit -DotNetPath $dotnetPath -ProjectPath $projectPath -TargetPath $resolvedVulnerabilityReport
+        } else {
+            Write-JsonFile -Path $resolvedVulnerabilityReport -Value ([ordered]@{
+                schemaVersion = "clearvision.vulnerability-scan/v1"
+                status = "unavailable"
+                checkedAtUtc = [DateTimeOffset]::UtcNow.ToString("o")
+                dataAsOfUtc = $null
+                source = "NuGet audit advisory sources"
+                reason = "Network vulnerability scan was not requested for this run; this is not a zero-vulnerability result."
+                vulnerabilities = @()
+            })
+        }
+    } else {
+        $resolvedVulnerabilityReport = Resolve-OutputPath -RepoRoot $repoRoot -Value $resolvedVulnerabilityReport
     }
-
-    $runtimeAppData = Join-Path $runtimeStateDir "App_Data"
-    if (Test-Path $runtimeAppData) {
-        Copy-Item -LiteralPath $runtimeAppData -Destination (Join-Path $stagingDir "App_Data") -Recurse -Force
-    }
-
-    $runtimeInference = Join-Path $runtimeStateDir "inference"
-    if (Test-Path $runtimeInference) {
-        Copy-Item -LiteralPath $runtimeInference -Destination (Join-Path $stagingDir "inference") -Recurse -Force
-    }
+    $pythonCommand = Get-Command python -ErrorAction SilentlyContinue
+    if ($null -eq $pythonCommand) { throw "Python is required for final-artifact supply-chain generation." }
+    & $pythonCommand.Source (Join-Path $repoRoot "quality\tools\generate_release_supply_chain.py") `
+        --portable-zip $zipPath `
+        --nupkg $nupkgPath `
+        --output-dir $supplyDir `
+        --identity-input $sourceIdentityPath `
+        --policy (Join-Path $repoRoot "quality\policies\release-supply-chain-policy.json") `
+        --nuget-packages-root (Get-NugetPackagesRoot -RepoRoot $repoRoot) `
+        --vulnerability-report $resolvedVulnerabilityReport
+    if ($LASTEXITCODE -ne 0) { throw "Supply-chain generation failed with exit code $LASTEXITCODE." }
+    $validationPath = Join-Path $supplyDir "validation-summary.json"
+    $validation = Get-Content -LiteralPath $validationPath -Raw -Encoding UTF8 | ConvertFrom-Json
+    if (-not $validation.generationPassed -or -not $validation.artifactConsistencyPassed) { throw "Supply-chain structural validation failed." }
+    if ($EnforceReleasePolicy -and -not $validation.releaseEligible) { throw "Release policy remains blocked; see $validationPath." }
 }
 
-if (Test-Path $scenarioPackageSource) {
-    Write-Host "Copying wire-sequence scenario package..."
-    Copy-Item -LiteralPath $scenarioPackageSource -Destination (Join-Path $stagingDir "scenario-package-wire-sequence") -Recurse -Force
+$zipInfo = Get-Item -LiteralPath $zipPath
+$result = [ordered]@{
+    schemaVersion = "clearvision.portable-package-result/v1"
+    packageName = $packageName
+    application = $Application
+    version = $Version
+    gitSha = $SourceRevisionId.ToLowerInvariant()
+    repositoryDirty = $gitDirty
+    runtimeIdentifier = $RuntimeIdentifier
+    profile = $Profile
+    portableZip = [ordered]@{ path = Get-RelativePath -Root $OutputRoot -Path $zipPath; sizeBytes = $zipInfo.Length; sha256 = Get-Sha256 $zipPath }
+    operatorLibraryPackage = if ($nupkgPath) {
+        [ordered]@{ path = Get-RelativePath -Root $OutputRoot -Path $nupkgPath; sizeBytes = (Get-Item -LiteralPath $nupkgPath).Length; sha256 = Get-Sha256 $nupkgPath }
+    } else { $null }
+    contentFingerprint = "sha256:$contentFingerprint"
+    supplyChainDirectory = if (-not $SkipSupplyChain) { Get-RelativePath -Root $OutputRoot -Path $supplyDir } else { $null }
+    releasePolicyEnforced = [bool]$EnforceReleasePolicy
+    releaseEligible = if ($validationPath) { [bool]((Get-Content -LiteralPath $validationPath -Raw -Encoding UTF8 | ConvertFrom-Json).releaseEligible) } else { $false }
 }
-
-Update-AppSettingsForPortableDb -AppSettingsPath (Join-Path $stagingDir "appsettings.json")
-Update-ConfigForPortableStorage -ConfigPath (Join-Path $stagingDir "config.json")
-
-$portableAssetsRoot = Join-Path $stagingDir "portable-assets"
-Ensure-Directory (Join-Path $portableAssetsRoot "models")
-Ensure-Directory (Join-Path $portableAssetsRoot "samples")
-Ensure-Directory (Join-Path $stagingDir "VisionData\Images")
-
-$modelMap = @{}
-$sampleMap = @{}
-$defaultLabelsRelativePath = "portable-assets\models\labels.txt"
-$patchResult = Patch-FlowFiles `
-    -FlowRoot (Join-Path $stagingDir "App_Data\ProjectFlows") `
-    -ModelMap $modelMap `
-    -SampleMap $sampleMap `
-    -DefaultLabelsRelativePath $defaultLabelsRelativePath
-
-Write-Host "Copying external models and samples..."
-foreach ($modelSource in $modelMap.Keys) {
-    if (-not (Test-Path $modelSource)) {
-        throw "Model referenced by the current flow does not exist: $modelSource"
-    }
-
-    $relativeModelPath = $modelMap[$modelSource]
-    $targetModelPath = Join-Path $stagingDir $relativeModelPath
-    Copy-FileWithParent -SourceFile $modelSource -DestinationFile $targetModelPath
-}
-
-$portableLabelsPath = Join-Path $portableAssetsRoot "models\labels.txt"
-$firstModelSource = $modelMap.Keys | Select-Object -First 1
-$siblingLabels = $null
-if ($firstModelSource) {
-    $candidateSiblingLabels = Join-Path (Split-Path $firstModelSource -Parent) "labels.txt"
-    if (Test-Path $candidateSiblingLabels) {
-        $siblingLabels = $candidateSiblingLabels
-    }
-}
-
-if ($siblingLabels) {
-    Copy-FileWithParent -SourceFile $siblingLabels -DestinationFile $portableLabelsPath
-}
-elseif ($scenarioLabelsSource) {
-    Copy-FileWithParent -SourceFile $scenarioLabelsSource -DestinationFile $portableLabelsPath
-}
-
-foreach ($sampleSource in $sampleMap.Keys) {
-    if (-not (Test-Path $sampleSource)) {
-        Write-Warning "Sample image referenced by the current flow is missing: $sampleSource"
-        continue
-    }
-
-    $relativeSamplePath = $sampleMap[$sampleSource]
-    $targetSamplePath = Join-Path $stagingDir $relativeSamplePath
-    Copy-FileWithParent -SourceFile $sampleSource -DestinationFile $targetSamplePath
-}
-
-if ($firstModelSource -and (Test-Path (Join-Path $stagingDir "scenario-package-wire-sequence\models"))) {
-    $scenarioModelPath = Join-Path $stagingDir "scenario-package-wire-sequence\models\wire-seq-yolo-v1.2.onnx"
-    Copy-FileWithParent -SourceFile $firstModelSource -DestinationFile $scenarioModelPath
-
-    if (Test-Path $portableLabelsPath) {
-        Copy-FileWithParent -SourceFile $portableLabelsPath -DestinationFile (Join-Path $stagingDir "scenario-package-wire-sequence\models\labels.txt")
-    }
-}
-
-if (Test-Path $hikvisionRuntimeSource) {
-    Write-Host "Copying Hikvision runtime..."
-    $hikvisionRuntimeTarget = Join-Path $stagingDir "HikvisionRuntime"
-    Ensure-Directory $hikvisionRuntimeTarget
-    Copy-Item -Path (Join-Path $hikvisionRuntimeSource "*") -Destination $hikvisionRuntimeTarget -Recurse -Force
-}
-
-$prereqDir = Join-Path $stagingDir "Prereqs"
-Ensure-Directory $prereqDir
-
-Write-Host "Copying offline installers..."
-foreach ($installerName in @(
-    "MicrosoftEdgeWebView2RuntimeInstallerX64.exe",
-    "VC_redist.x64.exe",
-    "windowsdesktop-runtime-8.0.22-win-x64.exe"
-)) {
-    $installerSearchResult = Get-ChildItem -Path (Join-Path $env:USERPROFILE "Desktop") -Filter $installerName -Recurse -File -ErrorAction SilentlyContinue | Select-Object -First 1
-    $installerSource = if ($installerSearchResult) { $installerSearchResult.FullName } else { $null }
-    if (Test-Path $installerSource) {
-        Copy-FileWithParent -SourceFile $installerSource -DestinationFile (Join-Path $prereqDir $installerName)
-    }
-}
-
-Write-LaunchScript -TargetPath (Join-Path $stagingDir "Launch ClearVision.bat")
-Write-PrereqInstallerScript -TargetPath (Join-Path $prereqDir "Install Prereqs.bat")
-
-$packagedProjects = @()
-try {
-    $projectNames = & sqlite3 (Join-Path $stagingDir "vision.db") "SELECT Name FROM Projects ORDER BY Name;"
-    if ($LASTEXITCODE -eq 0 -and $projectNames) {
-        $packagedProjects = @($projectNames | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
-    }
-}
-catch {
-    Write-Warning "Failed to query project names from the packaged vision.db."
-}
-
-Write-Readme `
-    -TargetPath (Join-Path $stagingDir "README-site-deploy.txt") `
-    -PackageName $packageName `
-    -PackagedProjects $packagedProjects
-
-Write-Host "Creating ZIP archive..."
-Push-Location $OutputRoot
-try {
-    tar -a -c -f $zipPath $packageName
-    if ($LASTEXITCODE -ne 0) {
-        throw "ZIP packaging failed with exit code $LASTEXITCODE."
-    }
-}
-finally {
-    Pop-Location
-}
-
-Write-Host ""
-Write-Host "Portable package created:"
-Write-Host "  Folder: $stagingDir"
-Write-Host "  Zip:    $zipPath"
+Write-JsonFile -Path $resultPath -Value $result
+if (-not $KeepStaging) { Remove-SafePath -OutputRoot $OutputRoot -Target $stagingDir }
+Write-Host "[portable] Complete"
+Write-Host "  ZIP: $zipPath"
+Write-Host "  SHA-256: $($result.portableZip.sha256)"
+Write-Host "  Content fingerprint: $($result.contentFingerprint)"
+Write-Host "  Release eligible: $($result.releaseEligible)"
+Write-Output $resultPath

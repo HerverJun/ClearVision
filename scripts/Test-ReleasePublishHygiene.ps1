@@ -51,6 +51,19 @@ function Test-NodePackageManifest {
 }
 
 $violations = [System.Collections.Generic.List[string]]::new()
+$forbiddenSegments = @("FrontendV2", "TestResults", "test_results", "playwright-report", "coverage")
+$forbiddenExtensions = @(".trx", ".pdb", ".cs", ".csproj", ".sln", ".ps1", ".map")
+$textExtensions = @(".json", ".txt", ".config", ".xml", ".cmd", ".bat", ".html", ".js", ".css")
+$secretPatterns = @(
+    '(?i)"(?:api[_-]?key|access[_-]?token|refresh[_-]?token|client[_-]?secret|password)"\s*:\s*"(?!\s*")([^"\r\n]+)"',
+    '(?im)^\s*(?:api[_-]?key|access[_-]?token|refresh[_-]?token|client[_-]?secret|password)\s*=\s*(?!\s*$|\s*(?:null|none|redacted|changeme)\s*$)(\S.+)$',
+    '(?im)^\s*(?:api[_-]?key|access[_-]?token|refresh[_-]?token|client[_-]?secret|password)\s*:\s*[''"](?![''"]\s*[,;}])([^''"\r\n]+)[''"]',
+    '(?i)(?:github_pat_[A-Za-z0-9_]{20,}|ghp_[A-Za-z0-9]{20,}|sk-[A-Za-z0-9_-]{20,}|AKIA[0-9A-Z]{16})'
+)
+$absolutePathPatterns = @(
+    '(?i)(?:[A-Z]:[\\/]+(?:Users|Documents and Settings|ProgramData|Windows|Program Files)[\\/]+)',
+    '(?:file:///+[A-Z]:/|/Users/[^/]+/(?:Desktop|Documents|Downloads|Library)/|/home/[^/]+/)'
+)
 $items = @(Get-ChildItem -LiteralPath $publishRoot -Recurse -Force)
 foreach ($item in $items) {
     $relativePath = Get-RelativePublishPath -FullName $item.FullName
@@ -60,11 +73,28 @@ foreach ($item in $items) {
         continue
     }
 
+    if ($forbiddenSegments | Where-Object { $segments -contains $_ }) {
+        $violations.Add("development/test directory: $relativePath") | Out-Null
+        continue
+    }
+
     if ($item.PSIsContainer) {
         continue
     }
 
     $name = $item.Name
+    if ($forbiddenExtensions -contains $item.Extension.ToLowerInvariant()) {
+        $violations.Add("development/test file: $relativePath") | Out-Null
+        continue
+    }
+    if ($name -match '(?i)(?:\.tests?\.|\.test\.|\.spec\.|^testhost\.|^xunit\.|^nunit\.)') {
+        $violations.Add("test file: $relativePath") | Out-Null
+        continue
+    }
+    if ($name -match '(?i)^(?:appsettings\.(?:development|local)|launchsettings)\.json$') {
+        $violations.Add("development manifest: $relativePath") | Out-Null
+        continue
+    }
     if ($name -match '(?i)(^|[._-])patch([._-]|$).*\.(ps1|bat|cmd)$') {
         $violations.Add("development patch script: $relativePath") | Out-Null
         continue
@@ -87,6 +117,17 @@ foreach ($item in $items) {
 
     if ($name -match '(?i)(^|[._-])manifest([._-]|$).*\.json$' -and -not $allowedManifests.Contains($relativePath)) {
         $violations.Add("non-release manifest: $relativePath") | Out-Null
+        continue
+    }
+
+    if ($textExtensions -contains $item.Extension.ToLowerInvariant()) {
+        $content = Get-Content -LiteralPath $item.FullName -Raw -Encoding UTF8
+        if ($absolutePathPatterns | Where-Object { $content -match $_ }) {
+            $violations.Add("local absolute/user path: $relativePath") | Out-Null
+        }
+        if ($secretPatterns | Where-Object { $content -match $_ }) {
+            $violations.Add("non-empty secret-like value: $relativePath") | Out-Null
+        }
     }
 }
 

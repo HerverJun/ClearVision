@@ -6,6 +6,7 @@
     <Nullable>enable</Nullable>
     <AssemblyName>ClearVision.PlcComm</AssemblyName>
     <RootNamespace>ClearVision.PlcComm</RootNamespace>
+    <RuntimeIdentifiers>win-x64</RuntimeIdentifiers>
     <Version>1.0.0</Version>
     <Authors>ClearVision Team</Authors>
     <Description>High-performance industrial PLC communication framework for Siemens S7, Mitsubishi MC, and Omron FINS protocols</Description>
