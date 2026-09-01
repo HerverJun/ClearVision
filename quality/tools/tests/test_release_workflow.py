@@ -62,6 +62,8 @@ class ReleaseWorkflowTests(unittest.TestCase):
             "identity-manifest.json",
             "validation-summary.json",
             "vulnerability-scan.json",
+            "license-provenance.json",
+            "nuget-audit-source.json",
             "package-result.json",
         }
         self.assertEqual(required_names, {Path(value).name for value in paths})
@@ -90,6 +92,8 @@ class ReleaseWorkflowTests(unittest.TestCase):
                 "identity-manifest.json",
                 "validation-summary.json",
                 "vulnerability-scan.json",
+                "license-provenance.json",
+                "nuget-audit-source.json",
             }.issubset(asset_names)
         )
 

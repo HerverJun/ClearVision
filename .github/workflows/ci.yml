@@ -1143,7 +1143,9 @@ jobs:
             ./artifacts/**/dependency-report.md
             ./artifacts/**/identity-manifest.json
             ./artifacts/**/validation-summary.json
+            ./artifacts/**/license-provenance.json
             ./artifacts/**/vulnerability-scan.json
+            ./artifacts/**/nuget-audit-source.json
           generate_release_notes: true
           draft: false
           prerelease: false
