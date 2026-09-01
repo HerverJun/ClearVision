@@ -10,10 +10,10 @@ scope: "基于现有 ClearVision 功能的稳定性、质量、现场化、验�
 
 # ClearVision 全面提升 TODO
 
-> 2026-09-01 Wave 3A evidence settlement：早期清单保留为规划快照，35 个既有已实施主题及其 106 个原待同步 checkbox 已按现有实现、测试和 canonical ledger 同步为 `[x]`；本轮 U02 另使 P1-7 的 3 个 checkbox 达到关闭条件。连同原有 3 个已勾选项，当前为 36 个已实施主题、112 个已实施 checkbox；其余 9 个窄化主题、P2-2 架构取代项和 5 个总关闭条件仍保持原状。本页不把主题数与 102 项审计 ID 相加；唯一执行责任见 [未尽事项统一补齐 TODO](./ClearVision-未尽事项统一补齐TODO-2026-08-28.md)，逐 ID disposition 见 [持续问题排查记录](../待复核/持续问题排查记录-2026-07-06.md)。
-> 已同步主题：`P0-1~P0-8、P0-10、P0-11；P1-1~P1-13、P1-15、P1-17~P1-19、P1-21、P1-22；P2-1、P2-3~P2-5、P2-10~P2-12`。仍开放：`P0-9、P1-14、P1-16、P1-20、P1-23、P2-6~P2-9`。P2-2 由 current production-root 架构决定取代，不计作关闭主题；P1-2 的变量作用域主体和 P1-8 的聚合/分页主体不得被后续新问题反向判成整项未完成。
+> 2026-09-01 Wave 3B：早期清单保留为规划快照；在 Wave 3A 的 36 个已实施主题、112 个已实施 checkbox 上，本轮关闭 P0-9、P1-16、P2-7 共 3 个工程主题/9 个 checkbox。当前为 39 个已实施主题、121 个已实施 checkbox；其余 6 个窄化主题、P2-2 架构取代项和 5 个总关闭条件保持原状。本页不把主题数与 102 项审计 ID 相加；审计池虽已 102/102 CLOSED，U01-U07、U14 和项目仍未关闭。唯一执行责任见 [未尽事项统一补齐 TODO](./ClearVision-未尽事项统一补齐TODO-2026-08-28.md)，逐 ID disposition 见 [持续问题排查记录](../待复核/持续问题排查记录-2026-07-06.md)。
+> 已同步主题：`P0-1~P0-11；P1-1~P1-13、P1-15~P1-19、P1-21、P1-22；P2-1、P2-3~P2-5、P2-7、P2-10~P2-12`。仍开放：`P1-14、P1-20、P1-23、P2-6、P2-8、P2-9`。P2-2 由 current production-root 架构决定取代，不计作关闭主题；P1-2 的变量作用域主体和 P1-8 的聚合/分页主体不得被后续新问题反向判成整项未完成。
 >
-> Wave 3A 与审计池的交叉引用（仅引用、不计数）：项目/执行收敛对应 `CV-AUDIT-002/005/007/008/010/016/017/027/030/031/033/054/062/073`；权限、硬件和配置边界对应 `013/019/020/022/026/035/037/038/039/043/045/046/047/061/085`；TCP Server 能力对应 `094`。`004` 仍是 catalog/product-contract 的 `OPEN_RESCOPED`，因此 P1-16 继续未勾选。
+> Wave 3B 与审计池的交叉引用（仅引用、不计数）：`CV-AUDIT-004` 已由 implementation/integration SHA `01107f029fe73b76ee3cdf38035fc1eef76cb84b` 的显式 exposure catalog、API/UI/import/admission 负向矩阵关闭；102-ID 审计池为 `0 IMPLEMENTED_SYNC_PENDING / 0 engineering open / 102 CLOSED`。U01/U03/U06 的剩余真实模型、人工 sidecar、release/CI/覆盖率趋势仍按统一 TODO 开放。
 > 本清单由 5 个 GPT-5.5 子代理并行只读审阅后汇总：核心后端/运行时、桌面 UI/API、算子库与质量矩阵、CI/发布/安全、现场集成/PLC/Station。
 > 目标不是扩张新功能，而是把已有功能从“能跑”推进到“可证明、可交付、可维护、现场可诊断”。
 
@@ -87,10 +87,11 @@ scope: "基于现有 ClearVision 功能的稳定性、质量、现场化、验�
 
 ### P0-9 DeepLearning real-model gate 改名或提门槛
 
-- [ ] `AP50/Precision/Recall = 0` 但 `Accepted=True` 的 COCO real-model 报告只能作为推理链路 smoke。
-- [ ] 如果要作为模型精度证据，设置非零指标门槛并记录模型 hash、数据集版本、标签契约。
-- [ ] 更新质量矩阵中的 precision claim，避免将 smoke 误读为模型质量验收。
-- 依据：`quality/evals/reports/DeepLearning_coco_real_model_baseline.md`
+- [x] `AP50/Precision/Recall = 0` 的 generated constant COCO 报告已标为 `InferenceSmokeOnly` 且 `Accepted=false`，只能作为推理链路 smoke。
+- [x] delivery manifest schema 与 fail-closed evaluator 要求非零指标门槛、模型 hash、数据集版本/hash、标签/I/O 契约、provider policy 和批准状态；缺任一项不得 precision PASS。
+- [x] 质量矩阵/public benchmark/proof summary 已将 smoke 与 precision 隔离，当前 DeepLearning disposition 为 FAIL、public benchmark 9/10 accepted。
+- 依据：`quality/evals/reports/DeepLearning_coco_real_model_baseline.md`、`quality/evals/schemas/delivery-model-manifest.schema.json`、`quality/evals/reports/DeepLearning_delivery_model_evidence_evaluation.json`
+- 剩余边界：没有真实交付模型、批准数据集或目标 CPU/CUDA/TensorRT 硬件；U01 继续 `OPEN_RESCOPED`，本主题工程 gate 关闭不代表模型交付验收完成。
 
 ### P0-10 修复现场可见乱码
 
@@ -207,6 +208,7 @@ scope: "基于现有 ClearVision 功能的稳定性、质量、现场化、验�
 - [ ] 外部模型保持不入库时，在现场包 manifest 或部署包 manifest 中补 hash。
 - [ ] 视频流模板导入/发布前检查 `parametersNeedingReview`，避免 ROI `0,0,0,0` 未调直接上现场。
 - 依据：`线序检测/scenario-package-wire-sequence/manifest.json`
+- Wave 3B 子范围：只读 `PublishChecks` 已验证资产 hash、外部模型 manifest、`parametersNeedingReview`、零 ROI 与 unknown/disabled/legacy alias；fixture 为 1 pass + 1 blocked 且 `deliveryEvidence=false`。真实场景包 checksum、portable zip/SBOM/license/GitHub Release 仍开放，因此本主题不勾选。
 
 ### P1-15 MC/FINS 虚拟 PLC 测试扩展
 
@@ -217,10 +219,11 @@ scope: "基于现有 ClearVision 功能的稳定性、质量、现场化、验�
 
 ### P1-16 OperatorModuleCatalog 口径收敛
 
-- [ ] 不再直接 `Enum.GetValues<OperatorType>()` 全量曝光包侧模块。
-- [ ] 对齐 `OperatorTypeAliasResolver`、正式 catalog 或 `OperatorMetadataScanner`。
-- [ ] legacy alias 和未纳入正式质量矩阵的算子必须显式标注。
-- 依据：`ClearVision.OperatorLibrary/src/ClearVision.OperatorLibrary.Modules/OperatorModuleCatalog.cs`
+- [x] 不再直接 `Enum.GetValues<OperatorType>()` 全量曝光包侧模块，改由唯一显式 exposure catalog 投影 package-public。
+- [x] 对齐 `OperatorTypeAliasResolver`、正式 catalog、factory/API/AI/import admission；新增、缺失、重复或未知 enum fail closed。
+- [x] legacy alias、package-internal 和 disabled 均显式标注；`MqttPublish=disabled`，`FrameChangeTrigger=package-internal`，正式/公共资产按 exposure 投影。
+- 依据：`ClearVision.OperatorLibrary/src/ClearVision.OperatorLibrary.Modules/OperatorModuleCatalog.cs`、`ClearVision.Product/src/ClearVision.Product.Core/Enums/OperatorExposureCatalog.cs`
+- 验证边界：Product/Desktop/UI focused 通过；OperatorLibrary pack 建议 lane 被既有 package csproj 缺少 Application/`IHttpResourceBroker` 依赖阻断，不伪称 pack smoke 通过。
 
 ### P1-17 包级代表性验收扩展
 
@@ -314,13 +317,14 @@ scope: "基于现有 ClearVision 功能的稳定性、质量、现场化、验�
 - [ ] 减少模板化描述，保留生成器可重复生成的结构。
 - [ ] 复核后更新质量矩阵 evidence source。
 - 依据：`docs/算子资料/算子名片/`、`scripts/OperatorDocGenerator/Program.cs`
+- Wave 3B 子范围：新增独立人工 sidecar schema/ledger，生成器只读校验 card fingerprint 与 stale verdict，不覆盖人工字段。当前 `reviewed/unreviewed/stale/PASS=0/20/0/0`、release-not-ready；未伪造 reviewer、日期或 PASS，因此人工复核三项继续未勾选。
 
 ### P2-7 full155 quality suite 增加趋势和新增算子检查
 
-- [ ] 新增算子必须有证据入口检查。
-- [ ] 输出 Contract/Golden/Dataset/Field replay 缺口趋势。
-- [ ] suite validate-only 之外增加“质量口径漂移”检查。
-- 依据：`quality/evals/suites/full155_quality_suite.json`
+- [x] 新增算子必须有显式 classification、contract evidence 和必要 registry entry，否则 fail closed。
+- [x] 从 governed catalog 动态输出 enum/package-public/package-internal/legacy-alias/disabled 人口及 approved baseline 的 added/removed/reclassified/evidence delta。
+- [x] suite/registry/generator/quality report 增加人口 fingerprint 和质量口径漂移检查；稳定 artifact ID 仍为 `full155`，当前正式人口 158。
+- 依据：`quality/evals/suites/full155_quality_suite.json`、`quality/evals/baselines/operator-exposure-approved-baseline.json`、`quality/evals/reports/QualityFlywheel_155_quasi_industrial_registry.json`
 
 ### P2-8 SBOM 与依赖合规自动化
 
