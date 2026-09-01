@@ -141,6 +141,7 @@ try {
         @{ Path = "appsettings.Development.json"; Content = "{}" },
         @{ Path = "site.map"; Content = "{}" },
         @{ Path = "node.exe"; Content = "fixture" },
+        @{ Path = "MVSDK_Net.dll"; Content = "fixture" },
         @{ Path = "package.json"; Content = '{"dependencies":{"x":"1.0.0"}}' },
         @{ Path = "secret.json"; Content = '{"apiKey":"real-secret-value"}' },
         @{ Path = "secret.txt"; Content = "access_token=real-token-value" },

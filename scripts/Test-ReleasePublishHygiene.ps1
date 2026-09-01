@@ -95,6 +95,10 @@ foreach ($item in $items) {
         $violations.Add("development manifest: $relativePath") | Out-Null
         continue
     }
+    if ($name -ieq "MVSDK_Net.dll") {
+        $violations.Add("machine-local vendor SDK asset: $relativePath") | Out-Null
+        continue
+    }
     if ($name -match '(?i)(^|[._-])patch([._-]|$).*\.(ps1|bat|cmd)$') {
         $violations.Add("development patch script: $relativePath") | Out-Null
         continue
