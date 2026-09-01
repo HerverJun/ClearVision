@@ -4,8 +4,8 @@ doc_type: "plan"
 status: "active"
 topic: "跨计划闭环治理"
 created: "2026-08-28"
-updated: "2026-08-31"
-code_baseline: "431ab324afbe081f50c6738e749b6de9a10436a2"
+updated: "2026-09-01"
+code_baseline: "ec9192ad35932210c5c5d9434f7e1c649dacd92d"
 review_input_revision: "78d693fb4"
 ---
 
@@ -32,6 +32,12 @@ review_input_revision: "78d693fb4"
 > Wave 2D Execution Authority + Live Resource Safety 的实现/集成证据 SHA 为 `f06c95212fff33b53297c8a3157cd5b736cda3f6`；其运行时 operator metadata governance hygiene 已由独立 implementation/artifact SHA `1dc20977b3a5d166b572f087b2c9c1d4dd104d92` 关闭。该提交明确 version-bump 24 个受影响算子、更新 identity snapshot，并通过正式 OperatorDocGenerator、OperatorKnowledgeGraphRunner 和第二次生成 `0 diff`。历史 services `727/2/729` 保留为 Wave 2D 当时的结果；其中两项失败仅属 U14 生成文档同步，不能表述为 Wave 2D implementation 或产品回归失败。
 >
 > Wave 2E Engineering Audit Closure 的最终纯 implementation/integration evidence SHA 为 `dd5c066764b3f2e7b7d73fcc0b379e57dae1d857`（`feat: close wave 2e engineering audit findings`），不含两份 canonical 账本。该 SHA 关闭 U11/U12/U13 的余下 18 个工程 ID；正式 OperatorDocGenerator → OperatorKnowledgeGraphRunner 在实现后再次运行，1,061 个生成资产第二次生成 `0 diff`，identity snapshot 仍为 `EF6426A519C056D0240839C469295DC7FC5FAC02BA65F98EEF75E2E976DFBCF2`。显式版本递增为 Comparator `1.0.0→1.0.1`、DualModalVoting `1.0.0→1.0.1`、ModbusCommunication `1.1.0→1.1.1`、ResultOutput `1.0.1→1.0.2`、TextSave `1.0.1→1.0.2`；生成后复跑无额外 metadata 漂移。完整 Chromium 非视觉 lane 已在该 SHA 实跑，结果与遗留失败签名见 7.11，不能表述为 full Playwright PASS。
+>
+> Wave 3A U02 implementation/integration evidence SHA `27dff8bc923905133a83d2f24d9764fca3cdc38b` 删除未使用的 `Persistence/AppDbContext.cs` 并新增 production-context/Station DDL architecture guard；隔离临时 SQLite 的 initializer/maintenance focused acceptance `48/48` 通过（空库、N-1、完整/不完整 legacy adoption、safety backup、显式 discard）。U02=`CLOSED`；不要求 down migration、真实生产数据库或重写已集中 legacy repair SQL。
+>
+> Wave 3A U06A fixture/harness integration evidence SHA `ec9192ad35932210c5c5d9434f7e1c649dacd92d`；machine-readable registry 的 post-remediation baseline SHA 为 `2dbd58c084b50236d4796e8afde785e8696e4f5e`。当前 7 个正式 Chromium spec 在该 code/harness SHA 以单 worker 重跑为 `61 passed / 15 failed / 1 skipped`；Flow editor `5/5`、high-frequency `9/9`，ROI `24/24` 连跑三次 `72/72`（55.7/56.2/56.7s，p50 56.2s，p95 56.7s）。AI 四/五/三项与 Flow layout 三项仍分族开放；G08 继续 report-only，未 push 的 G02 继续开放，未更新 visual baseline。
+>
+> Wave 3A U14 逐项 settlement 已把 31 个旧 `IMPLEMENTED_SYNC_PENDING` 中的 30 项回填为 `CLOSED`。`CV-AUDIT-004` 复核后确认原问题仍存在（placeholder-disabled MQTT 仍进入公共 catalog），故转 `OPEN_RESCOPED`，不将其伪装为证据欠账。102 项当前为 `0 IMPLEMENTED_SYNC_PENDING / 1 engineering open / 101 CLOSED`；U14、U01-U07、G16、release/外部证据和同 SHA CI 不因此关闭。
 
 ## 1. 状态与证据口径
 
@@ -59,7 +65,7 @@ review_input_revision: "78d693fb4"
 | 前端生产路线 | 当前分支保留被 Desktop project/CI 隔离的 `Desktop/FrontendV2` 源码，不存在 `Desktop/StudioUI`；`WorkspaceV2Enabled` 已删除且 `/v2` 固定 404。缓存的 `studio-ui-next` 与当前分支大幅分叉。 | 本次发布以 `wwwroot/index.html + app.js + capability owners` 为唯一 production root；FrontendV2 为 non-production。未来 Vue/StudioUI 迁移必须另立完整 parity/migration epic，不再作为 G16 的“最后开关”。 |
 | DeepLearning tensor 复制 | 正式推理从 `DeepLearningOperator.cs:559` 使用 `PreprocessImageLease()`；带 `ToArray()` 的 `PreprocessImage()` 是无调用私有 wrapper。 | 删除“整张 tensor 复制是生产阻断”的旧结论；可删除死 wrapper，但不作为发布门禁。真正残项是证据类型、模型身份、provider 和目标硬件性能。 |
 | DeepLearning 精度证据 | `DeepLearning_coco_real_model_baseline` 使用 generated constant smoke model，AP50/Precision/Recall 为 0，却仍可 `Accepted=true` 并被质量聚合计为 Pass。 | 该报告降为机器可判的 inference smoke；模型精度按实际交付模型、manifest、hash、数据集和非零门槛验收。 |
-| 数据库权威 | 生产只注册 `VisionDbContext`，启动/旧库修复已集中到 `VisionDatabaseInitializer`/maintenance；`AppDbContext` 无注册、无调用。 | 不重写全部 legacy repair SQL，也不要求任意 down migration；只删除/隔离死上下文并加架构守卫。 |
+| 数据库权威 | 生产只注册 `VisionDbContext`，启动/旧库修复已集中到 `VisionDatabaseInitializer`/maintenance；未使用的 `AppDbContext` 已删除，architecture guard 禁止其回归或分散 Station DDL。 | U02=`CLOSED`；不重写全部 legacy repair SQL，也不要求任意 down migration。 |
 | 算子人口 | 产品目录为 158；若干 `full155` 工具、registry 和描述仍固定 155。`FrameChangeTrigger` 已有 product-public/package-internal 边界及测试。 | 保留稳定 artifact ID `full155`，人口和 completeness 改为从受治理 catalog 动态计算；不重开 FrameChangeTrigger 旧问题。 |
 | SDK | Wave 0 已将 `global.json`、本地 wrapper、文档和 CI 统一为 `9.0.300 + latestPatch`；validator 实际只接受 `9.0.300`–`9.0.399`。 | 固定 9.0.3xx feature band，允许安全 patch，不跨 feature band；portable/SBOM/license 仍由 U04 后续项承接。 |
 | Release | tag workflow 直接 publish+zip，只生成简化启动 bat；现场指南却把 GitHub Release 当交付入口。仓库 SPDX 是预制 seed，不是从最终产物生成。 | tag Release 定义为现场可交付 portable package；workflow 复用 portable packaging 或等价流程，并从最终 nupkg/zip 生成、校验和上传供应链产物。 |
@@ -67,17 +73,17 @@ review_input_revision: "78d693fb4"
 | 全量五次 repeat | 没有证据证明所有测试都需重复五次，且全量 repeat 成本和噪声过高。 | 只对 blocking lane、已知 flaky、时序/资源敏感测试做重复运行并登记失败签名；普通全量 Gate 不机械 5 次。 |
 | 正式 I/O | 保存后的工业流程必须能访问批准的文件、HTTP、DB、相机、TCP/PLC 等资源。风险来自不可信 Draft Flow 被正式入口提升权限。 | 不全面禁止工业 I/O；按 execution source、run mode、principal capability 和 resource binding 做准入。 |
 | 会话 TTL | 当前桌面会话设计为进程期有效，测试已固定该产品策略。 | 不强加时间 TTL；治理全局/每用户容量、撤销事件和最旧 token 淘汰。若改变 TTL，另作产品策略决策。 |
-| TCP Server | `TcpDeviceManager` 已通过全局 Profile 实现真实 Server；算子无 Profile 时拒绝 node-local Server 是架构边界。 | `CV-AUDIT-094` 转 `IMPLEMENTED_SYNC_PENDING`；只保留 node-local `Mode=Server` 命名/展示的派生 UX 收口。 |
+| TCP Server | `TcpDeviceManager` 已通过全局 Profile 实现真实 Server；算子无 Profile 时拒绝 node-local Server 是架构边界。 | `CV-AUDIT-094=CLOSED`；只保留 node-local `Mode=Server` 命名/展示的派生 UX 收口。 |
 | 取消外部副作用 | 已发出的 PLC 写、HTTP POST、文件 replace 不可能由客户端断开可靠回滚。 | 验收改为取消后不再 dispatch 新副作用；已 dispatch 操作用 correlation/idempotency 和 `indeterminate` 状态支持对账。 |
 
 ## 3. 七组源文档当前结论
 
 | 源文档 | 专业复核后的当前事实 | 本计划承接 |
 | --- | --- | --- |
-| [全面提升 TODO](./ClearVision-全面提升TODO-2026-05-09.md) | 按 46 个主题：35 个 `IMPLEMENTED_SYNC_PENDING`、10 个 `OPEN_RESCOPED`、P2-2 被本次前端架构决定取代。按 147 个 checkbox：原勾 3、实现待同步 106、实质残项 33、总关闭条件 5。 | U01-U06、U14 |
+| [全面提升 TODO](./ClearVision-全面提升TODO-2026-05-09.md) | 按 46 个主题：35 个既有主题已同步、P1-7 随 U02 关闭，故当前 36 个已实施、9 个 `OPEN_RESCOPED`、P2-2 被 production-root 架构决定取代；147 个 checkbox 中 112 已实施、30 窄化残项、P2-2 3 项、总关闭条件 5 项。 | U01-U06、U14 |
 | [T01 测试与覆盖率治理总体计划](./测试治理/ClearVision_T01_测试与覆盖率治理总体计划_PROPOSED_AUDITED.md) | G01 阶段证据已归档，G01B-R3/G02 仍需当前 SHA；G03-G06 原方案有重复建设，G07 引用了非当前分支架构，G08 仍应 report-only，G09 按 SKU 外部验收。 | U05-U07 |
 | [Studio2](../Studio2/README.md) | G00-G15 Goal 卡已完成或历史回填，但 G16 不能通过直接打开不具产品 parity 的 `/v2` 关闭；当前 release root 决定改为 legacy root + capability owners。 | U05 |
-| [持续问题排查记录](../待复核/持续问题排查记录-2026-07-06.md) | 102 个源 ID：31 个 `IMPLEMENTED_SYNC_PENDING`、0 个 engineering open、71 个已关闭；Wave 2E SHA `dd5c066764b3f2e7b7d73fcc0b379e57dae1d857` 关闭 `001/003/066/067/068/074/075/076/078/086/087/088/090/093/095/096/097/098`，U11/U12/U13 和 `CV-AUDIT-086` 均为 `CLOSED`。31 个待证据回填项、U14、G16 与发布/外部验证不因此关闭。 | U01-U07、U14 |
+| [持续问题排查记录](../待复核/持续问题排查记录-2026-07-06.md) | 102 个源 ID：`0 IMPLEMENTED_SYNC_PENDING / 1 engineering open / 101 CLOSED`。Wave 3A 回填并关闭其中 30 个旧待同步 ID；`CV-AUDIT-004` 因 MQTT placeholder 仍公开转 `OPEN_RESCOPED`。U14、G16 与发布/外部验证仍不因此关闭。 | U01-U07、U14 |
 | [0407 Qwen 排查](../未闭环事项/0407-Qwen排查未闭环.md) | #1-#26 已由当前实现、文件移除或等价契约覆盖，原状态未同步。 | U14 回填 |
 | [0418 临时问题记录](../未闭环事项/0418-临时问题记录.md) | 主体实现已落地；工业证据尾项去重并入 U01/U03/U13。 | U01、U03、U13、U14 |
 | [深度学习算子问题](../未闭环事项/深度学习算子问题.md) | 灰度/16-bit、NMS、异步加载和工程化契约已改造；旧 tensor-copy 阻断是死代码误判。真实残项是证据声明、模型身份、交付 profile 性能和现场签核。 | U01、U07、U14 |
@@ -98,11 +104,13 @@ review_input_revision: "78d693fb4"
 
 ### U02 数据库唯一生产上下文清理
 
-优先级：P2 架构清理。状态：`OPEN_RESCOPED`。Owner：持久化/架构。
+优先级：P2 架构清理。状态：`CLOSED`。Owner：持久化/架构。
 
-- [ ] 删除未使用的 `Persistence/AppDbContext.cs`；若短期不能删除，则明确 `deprecated/non-production`，并增加 architecture guard 禁止注册或生产引用。
-- [ ] 保持 `VisionDbContext + VisionDatabaseInitializer + VisionDatabaseMaintenance` 为唯一生产链路；禁止 Station DDL 再散落到 `Program.cs` 或业务服务，不重写已经集中的 legacy repair SQL。
-- [ ] 验收 SQLite 实际支持的空库、N-1 migration、完整 legacy adoption、不完整 legacy fail-closed、备份和显式 discard；不要求产品未承诺的任意 down migration。
+- [x] 删除未使用的 `Persistence/AppDbContext.cs`；若短期不能删除，则明确 `deprecated/non-production`，并增加 architecture guard 禁止注册或生产引用。
+- [x] 保持 `VisionDbContext + VisionDatabaseInitializer + VisionDatabaseMaintenance` 为唯一生产链路；禁止 Station DDL 再散落到 `Program.cs` 或业务服务，不重写已经集中的 legacy repair SQL。
+- [x] 验收 SQLite 实际支持的空库、N-1 migration、完整 legacy adoption、不完整 legacy fail-closed、备份和显式 discard；不要求产品未承诺的任意 down migration。
+
+实现/集成证据：`27dff8bc923905133a83d2f24d9764fca3cdc38b`。`VisionDatabaseArchitectureGuardTests` 固定唯一 EF 注册、bootstrap/maintenance 解析链和 Station DDL 集中性；`VisionDatabaseInitializerTests` 与 `VisionDatabaseMaintenanceServiceTests` 的隔离临时 SQLite focused acceptance 共 `48/48` 通过。负向边界：未跑真实生产库、无 down migration 要求，且 legacy repair SQL 仍只允许在 `VisionDatabaseMaintenance` 集中维护。
 
 ### U03 交付资产、算子人口与人工证据治理
 
@@ -140,13 +148,15 @@ Wave 0 只做了一次既有 Gate 的 generated artifact hygiene：通过 `Opera
 
 优先级：P1。状态：`OPEN_RESCOPED`。Owner：测试/CI。依赖：U01、U03、U05、U08-U13 实际修复。
 
-- [ ] G01B-R3 先在当前 HEAD 运行现存 7 个 spec；历史“21 个 fixture”仅作采样，已消失项关闭，当前失败按 failure signature、Owner、产品回归/fixture/环境分类重新建账。
+- [x] G01B-R3 先在当前 HEAD 运行现存 7 个 spec；历史“21 个 fixture”仅作采样，已消失项关闭，当前失败按 failure signature、Owner、产品回归/fixture/环境分类重新建账。
 - [ ] G02 取得同一最终 SHA 的 Safe CI、Agent Quality、UI/主 CI 必要 checks；历史 SHA、仓库内旧 artifact 或本地 ahead 状态不能替代。
 - [ ] G03 沿用现有 Domain/Purpose/Lane/Evidence/Oracle/Resource 分类，补 critical-contract Owner、批准 baseline/tolerance 和动态人口防回退；不引入 A/B/C 平行体系。
 - [ ] G04 的公共合同测试从 U08-U13 每个真实修复的状态与故障矩阵产生；不建立无限扩张的独立“四象限状态机计划”，也不新增未经批准的私有反射 Oracle。
-- [ ] G05 只对 blocking lane、已知 flaky 和时序/资源敏感测试做重复运行，输出 machine-readable flake registry、失败签名、p50/p95、retry/skip/expiry；不要求全部套件五次。
+- [x] G05 只对 blocking lane、已知 flaky 和时序/资源敏感测试做重复运行，输出 machine-readable flake registry、失败签名、p50/p95、retry/skip/expiry；不要求全部套件五次。
 - [ ] G06 仅要求 active/release-relevant 报告绑定 SHA、dirty、tool/data checksum 和环境；算法/人口证据实现分别由 U01/U03 承接，现场项由 U07 承接，不重生全部历史报告。
 - [ ] G08 在多个绿色 SHA、稳定模块人口和下降/模块缺失/baseline-update 自测齐备前保持 report-only，再由评审决定是否 blocking。
+
+Wave 3A 证据：`quality/test-gates.json.failureRegistry` 属于现有 gate manifest，不另建并行体系；integration SHA `ec9192ad35932210c5c5d9434f7e1c649dacd92d`。7 个正式 Chromium spec 的 serial recheck 为 `61 passed / 15 failed / 1 skipped`；修复的 Flow/Station/ROI fixture 或 stale assertion 均有 targeted result，ROI 三跑 `72/72`、p50/p95 `56.2/56.7s`。AI 与 Flow layout 失败族、Quiet Precision/visual 差异仍开放；G02 因未 push 不能用本地替代 CI，G08 继续 report-only。
 
 ### U07 按发布 SKU 的外部实验室与现场证据
 
@@ -268,31 +278,30 @@ Wave 2D 已关闭 `CV-AUDIT-057/058/059/060/063/071/081`；Wave 2E 已以 fake c
 
 优先级：随项。状态：`OPEN_CONFIRMED`。Owner：文档治理。
 
-- [ ] 每个源 ID 建 ledger：disposition、精确剩余动作、acceptance、evidence SHA、Owner、依赖；合并实现不等于合并验收或丢失 ID。
-- [ ] 31 个 `IMPLEMENTED_SYNC_PENDING` 逐项回填实现/测试依据后才标 `CLOSED`；当前 71 个 closed ID 均保留独立证据。Wave 2E 的 18 个工程项已按逐 ID acceptance 关闭，不能被误解为 31 个文档待回填项或 U14 已关闭。
+- [x] 每个源 ID 建 ledger：disposition、精确剩余动作、acceptance、evidence SHA、Owner、依赖；合并实现不等于合并验收或丢失 ID。
+- [x] 31 个 `IMPLEMENTED_SYNC_PENDING` 已逐项回填实现/测试依据；30 项为 `CLOSED`，`CV-AUDIT-004` 因原 MQTT catalog 问题仍存在转 `OPEN_RESCOPED`。Wave 2E 的 18 个工程项仍按逐 ID acceptance 保留，不能被误解为 U14 已关闭。
 - [x] Wave 2D metadata governance：独立 hygiene SHA `1dc20977b3a5d166b572f087b2c9c1d4dd104d92` 已审查 identity 的旧/新 hash、24 个受影响 operator、显式版本递增、正式 catalog/cards/version history/knowledge graph 和二次确定性生成；这只关闭该 generated-artifact hygiene，不关闭 U03 catalog governance 或 U14 的其余回填。
-- [ ] 全面提升 TODO 回填 35 个已实现主题（106 checkbox），10 个窄化主题随 U01-U06 关闭，P2-2 标记由前端架构决定取代；5 个总关闭条件最后验收。
+- [x] 全面提升 TODO 回填 35 个既有已实现主题（106 个原待同步 checkbox）；U02 另关闭 P1-7，当前为 36 个已实施主题、112 个已实施 checkbox。9 个窄化主题、P2-2 标记和 5 个总关闭条件仍保持原状。
 - [ ] 0407、0418、深度学习文档继续保留为历史快照；Studio2 仅在 G16 当前 release 验收关闭后整批归档 Goal 卡。
 - [ ] U01-U07 与 U14 的逐 ID ledger、源文档回填、关闭核对全部完成后，才关闭 U14、将本文改为 `closed` 并生成归档说明；任一 required release profile 仍外部阻断时不得宣称全项目闭环。U11/U12/U13 的 engineering closure 不替代该门禁。
 
 ## 5. 持续问题池 102 项覆盖映射
 
-### 5.1 `IMPLEMENTED_SYNC_PENDING`（31）
+### 5.1 `IMPLEMENTED_SYNC_PENDING`（0）
 
-`CV-AUDIT-002, CV-AUDIT-004, CV-AUDIT-005, CV-AUDIT-007, CV-AUDIT-008, CV-AUDIT-010, CV-AUDIT-013, CV-AUDIT-016, CV-AUDIT-017, CV-AUDIT-019, CV-AUDIT-020, CV-AUDIT-022, CV-AUDIT-026, CV-AUDIT-027, CV-AUDIT-030, CV-AUDIT-031, CV-AUDIT-033, CV-AUDIT-035, CV-AUDIT-037, CV-AUDIT-038, CV-AUDIT-039, CV-AUDIT-043, CV-AUDIT-045, CV-AUDIT-046, CV-AUDIT-047, CV-AUDIT-054, CV-AUDIT-061, CV-AUDIT-062, CV-AUDIT-073, CV-AUDIT-085, CV-AUDIT-094`
+无。Wave 3A 已逐项结算此前 31 项；30 项有可定位实现/测试证据而关闭，不能把剩余 MQTT catalog 缺陷继续称作“仅待文档同步”。
 
-这些 ID 只能在源文档补齐当前事实和证据后转 `CLOSED`。其中 `CV-AUDIT-094` 的关闭依据是全局 Profile/TcpDeviceManager 已实现真实 TCP Server；node-local UX 是派生项，不占用该 ID。
+### 5.2 工程开放（1）
 
-### 5.2 工程开放（0）
-
-无。Wave 2E 已逐项关闭 U11 的 `066/067/068/086/087/090/093`、U12 的 `001/003/074/075/076/078/088` 和 U13 的 `095/096/097/098`。`IMPLEMENTED_SYNC_PENDING`、U14、发布/G16、外部设备和同 SHA CI 是独立的证据/发布门禁，不计为 102 项审计池的 engineering open。
+`CV-AUDIT-004`：`MqttPublishOperator` 仍为 `placeholder-disabled` 且执行 fail-closed，但当前 `OperatorLifecyclePolicy` 和 `/operators/library` 尚未从公共 catalog 隐藏它。Owner：算子平台/产品契约；后续动作：在保持历史 flow fail-closed 的前提下，明确 public/legacy/disabled catalog policy 并补 API/UI contract test。U03/U13/U14 保持相关，不能因其余 30 项结算而关闭。
 
 部分已关闭子范围不得回退：`057` 的 OnnxPatch cache、`060` direct-acquire idle、`081` U08 读取授权与 `086` replay fail-soft P0；Wave 2E 为 `086` 补齐 P1 retention/health，故其整体也已关闭。
 
-### 5.3 已关闭（71）
+### 5.3 已关闭（101）
 
 | ID | 关闭证据 |
 | --- | --- |
+| `CV-AUDIT-002/005/007/008/010/013/016/017/019/020/022/026/027/030/031/033/035/037/038/039/043/045/046/047/054/061/062/073/085/094` | Wave 3A 逐 ID settlement 见 canonical [持续问题排查记录](../待复核/持续问题排查记录-2026-07-06.md)：每项保留 implementation SHA、当前 test/static evidence、negative boundary、Owner 与 U 关联；它们是 30 个独立关闭项，不与全面提升主题数相加。 |
 | `CV-AUDIT-001` | Wave 2E SHA `dd5c066764b3f2e7b7d73fcc0b379e57dae1d857`；共享 request recovery 对全部 HTTP verb 和 saved-port→5000 只在可证明未送达时重放一次；定向 Chromium 端口恢复通过。 |
 | `CV-AUDIT-003` | Wave 2E evidence SHA 同上；三个 patch 脚本已移除，Studio/Station framework-dependent publish 各通过 denylist hygiene（382/230 files），无 Node、node_modules、patch 或开发 manifest。 |
 | `CV-AUDIT-066` | Wave 2E evidence SHA 同上；AgentRun terminal-only bounded hot cache、CTS dispose、durable replay、TTL/capacity/owner-bound stream token 的 fake-clock/recovery 矩阵通过。 |
@@ -370,19 +379,19 @@ Wave 2D 已关闭 `CV-AUDIT-057/058/059/060/063/071/081`；Wave 2E 已以 fake c
 | 状态 | 主题 | 责任入口 |
 | --- | --- | --- |
 | `OPEN_RESCOPED` | P0-9 | U01 |
-| `OPEN_RESCOPED` | P1-7 | U02 |
 | `OPEN_RESCOPED` | P1-14、P1-16、P2-6、P2-7 | U03 |
 | `OPEN_CONFIRMED` | P1-20、P1-23、P2-8 | U04 |
 | `SUPERSEDED` | P2-2 | U05 当前 production-root 架构决定 |
 | `OPEN_RESCOPED` | P2-9 | U06 |
+| `CLOSED` | P1-7 | U02；`27dff8bc923905133a83d2f24d9764fca3cdc38b` architecture/SQLite acceptance |
 
-其余 35 个主题为 `IMPLEMENTED_SYNC_PENDING`，由 U14 回填，不重新实施。特别是 P1-2 的变量作用域主体和 P1-8 的数据库聚合/分页主体已实现；U10/U12 中的新问题不能反向把整个早期主题重新判为未完成。
+35 个既有已实施主题已由 U14 回填，P1-7 随 U02 关闭；两者都不再是 `IMPLEMENTED_SYNC_PENDING`。特别是 P1-2 的变量作用域主体和 P1-8 的数据库聚合/分页主体已实现；U10/U12 中的新问题不能反向把整个早期主题重新判为未完成。
 
 ## 7. 执行顺序与归档门禁
 
 1. **Wave 0：事实与产品决定** — 本轮已完成 U09 模板 authority、U05 owner disposition、U04 SDK policy 及对应 canonical 文档同步；U04/U05/U09 的后续 release/authority 子项不因此整体关闭。
 2. **Wave 1：安全与不可逆副作用** — Wave 1A 已完成 `CV-AUDIT-092/099/100/101` 与 `CV-AUDIT-086` replay fail-soft P0；Wave 1B1 已完成 `CV-AUDIT-011/014/015/018/028/034/091`；Wave 1B2 已完成 `CV-AUDIT-023/024/025`；Wave 1B3 已完成 `CV-AUDIT-036/064/077` 并关闭 U08。U10 Draft capability escalation 当时未开始，已由 Wave 2D 完成。
-3. **Wave 2：一致性与长进程稳定性** — Wave 2A 已关闭 Project authority/create 的 `CV-AUDIT-006/012/089`；Wave 2B 已关闭 AppConfig/相机一致性的 `CV-AUDIT-009/021/029/042/083/084`；Wave 2C 已关闭全部 U09（Station 双配置、AI persistence、database maintenance 与 workspace CAS），不再将 `040/079` 单列为未关项；Wave 2D 已关闭 U10 全部及 U11 的 `057/058/059/060/063/071/081`；Wave 2E 已关闭余下 U11/U12/U13 的 18 个工程 ID。因此 102 项审计池 engineering open 为 0；继续执行的是 U01-U07/U14 的证据、发布与外部验收门禁。
+3. **Wave 2：一致性与长进程稳定性** — Wave 2A 已关闭 Project authority/create 的 `CV-AUDIT-006/012/089`；Wave 2B 已关闭 AppConfig/相机一致性的 `CV-AUDIT-009/021/029/042/083/084`；Wave 2C 已关闭全部 U09（Station 双配置、AI persistence、database maintenance 与 workspace CAS），不再将 `040/079` 单列为未关项；Wave 2D 已关闭 U10 全部及 U11 的 `057/058/059/060/063/071/081`；Wave 2E 已关闭余下 U11/U12/U13 的 18 个工程 ID。Wave 3A 再以证据结算 30 项旧待同步 ID；102 项审计池当前仅 `CV-AUDIT-004` engineering open，继续执行的是 U01-U07/U14 的证据、发布与外部验收门禁。
 4. **Wave 3：质量、发布和当前 UI 证据** — U01、U03、U04、U05、U06。
 5. **Wave 4：目标 SKU 外部验收与归档** — U07、U14。
 
