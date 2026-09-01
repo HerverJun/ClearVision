@@ -46,6 +46,23 @@
         "failed": 15,
         "skipped": 1,
         "disposition": "post-remediation-integration-baseline"
+      },
+      {
+        "id": "wave-3d-four-family-targeted-nonvisual",
+        "sha": "2259e70981ff83977702c4747aa27dd2a6dfcad0",
+        "dirty": false,
+        "command": "Four family-specific Playwright invocations, chromium, workers=1, visual assertions excluded; each family repeated serially three times",
+        "discoveredPerRun": 14,
+        "passedAcrossRuns": 42,
+        "failedAcrossRuns": 0,
+        "skippedAcrossRuns": 0,
+        "runs": [
+          { "family": "ai-responsive", "passed": 12, "failed": 0, "durationsSeconds": [17.501, 15.886, 16.066], "p50Seconds": 16.066, "p95Seconds": 17.501 },
+          { "family": "ai-build-nonvisual", "passed": 15, "failed": 0, "durationsSeconds": [17.066, 15.662, 15.664], "p50Seconds": 15.664, "p95Seconds": 17.066 },
+          { "family": "ai-clarification-nonvisual", "passed": 6, "failed": 0, "durationsSeconds": [9.329, 7.902, 7.934], "p50Seconds": 7.934, "p95Seconds": 9.329 },
+          { "family": "flow-layout", "passed": 9, "failed": 0, "durationsSeconds": [15.681, 14.323, 14.514], "p50Seconds": 14.514, "p95Seconds": 15.681 }
+        ],
+        "disposition": "wave3d_nonvisual_failures_resolved_visual_baselines_remain_open"
       }
     ],
     "entries": [
@@ -139,82 +156,77 @@
           "AI agent Plan to Build exposes visible Apply button and applies through real click path",
           "AI agent Apply button keeps dimensions on narrow viewport after Build ready"
         ],
-        "stableSignature": "plan/clarification and build-gate UI contracts do not reach the asserted ready state",
+        "stableSignature": "same-plan _activatePlanIdentity re-entered the same mode setter and reset in-flight validating readiness; remaining assertions were stale fixture expectations",
         "owner": "AI experience owner",
-        "classification": "product",
-        "retry": { "attempts": 1, "passed": 0, "failed": 4 },
+        "classification": "product_and_fixture",
+        "retry": { "attempts": 3, "passed": 12, "failed": 0, "successRate": 1.0, "durationsSeconds": [17.501, 15.886, 16.066], "p50Seconds": 16.066, "p95Seconds": 17.501 },
         "expiry": "2026-10-01",
-        "disposition": "open_product_investigation",
-        "evidence": "No test relaxation, visual baseline update, or production behavior change in U06A."
+        "disposition": "resolved_wave3d_idempotent_plan_activation_and_fixture_contracts",
+        "evidence": "The production fix preserves in-flight readiness when activating the same plan identity. No CAS, WebMessage, execution-authority, owner, or safety contract was relaxed. Three serial family runs passed 12/12."
       },
       {
         "id": "U06A-OPEN-002",
         "spec": "tests/e2e/ai-build-workspace.spec.ts",
         "test": [
-          "resource workspace reuses the existing binding action and updates canonical result data",
-          "mixed ordinary and resource parameters stay partitioned through confirmation and binding",
-          "Applied remains inside Build and preserves the engineering history",
-          "Build remains reachable without horizontal overflow at 1024x768",
-          "Build remains reachable without horizontal overflow at 390x844"
+          "Applied engineering history visual baseline at 1366",
+          "Build compact visual baseline at 1024x768",
+          "Build narrow visual baseline at 390x844"
         ],
-        "stableSignature": "resource binding input is absent; applied history also has a screenshot diff",
+        "stableSignature": "explicit visual diffs remain: 10777 pixels/0.02, 5927 pixels/0.01, and 3223 pixels/0.03 respectively",
         "owner": "AI experience owner",
-        "classification": "product",
-        "retry": { "attempts": 1, "passed": 0, "failed": 5 },
+        "classification": "visual_baseline",
+        "retry": { "attempts": 1, "passed": 0, "failed": 3 },
         "expiry": "2026-10-01",
-        "disposition": "open_product_and_visual_investigation",
-        "evidence": "Visual evidence remains open; no visual baseline was updated."
+        "disposition": "open_visual_baseline_review_required",
+        "evidence": "The five original Wave 3A failures were separated into functional and visual assertions. Official PickFileCommand/_handleFilePickedEvent fixtures and the three functional Build cases passed 15/15 across three serial runs (p50 15.664s, p95 17.066s). These three screenshots still differ and no baseline was updated."
       },
       {
         "id": "U06A-OPEN-003",
         "spec": "tests/e2e/ai-plan-clarification.spec.ts",
-        "test": [
-          "manual supplement uses explicit_user_text and does not copy the main Composer",
-          "keyboard path reaches options and keeps the current action unique",
-          "confirmed clarification collapses into a low-emphasis light summary"
-        ],
-        "stableSignature": "clarification action/state differs from asserted current UI contract",
+        "test": "confirmed clarification collapses into a low-emphasis light summary",
+        "stableSignature": "semantic summary assertion passes, then clarification-confirmed-light-1366 screenshot differs by 11126 pixels (ratio 0.02)",
         "owner": "AI experience owner",
-        "classification": "product",
-        "retry": { "attempts": 1, "passed": 0, "failed": 3 },
+        "classification": "visual_baseline",
+        "retry": { "attempts": 1, "passed": 0, "failed": 1 },
         "expiry": "2026-10-01",
-        "disposition": "open_product_investigation"
+        "disposition": "open_visual_baseline_review_required",
+        "evidence": "The two nonvisual clarification failures passed 6/6 across three serial runs (p50 7.934s, p95 9.329s). The remaining test is an explicit visual difference; no baseline was updated."
       },
       {
         "id": "U06A-OPEN-004",
         "spec": "tests/e2e/flow-layout-vm.spec.ts",
         "test": "keeps the pixel probe live across hover, lock, ROI, and preview changes",
-        "stableSignature": "after switching to original-size mode, a pointer move over the computed image point remains data-probe-state=default",
+        "stableSignature": "the small fixture image was covered by its toast, so the pointer exercised the overlay rather than the pixel probe",
         "owner": "Flow editor product owner",
-        "classification": "product",
-        "retry": { "attempts": 1, "passed": 0, "failed": 1 },
+        "classification": "fixture",
+        "retry": { "attempts": 3, "passed": 3, "failed": 0, "successRate": 1.0, "familyDurationsSeconds": [15.681, 14.323, 14.514], "familyP50Seconds": 14.514, "familyP95Seconds": 15.681 },
         "expiry": "2026-10-01",
-        "disposition": "open_product_investigation",
-        "evidence": "Reproduced once at flow-layout-vm.spec.ts:1034; no wait was added because it is not shown to be timing-only."
+        "disposition": "resolved_fixture_toast_occlusion",
+        "evidence": "The fixture explicitly closes the toast before probing the image. Product pointer/probe behavior and waits were unchanged."
       },
       {
         "id": "U06A-OPEN-005",
         "spec": "tests/e2e/flow-layout-vm.spec.ts",
         "test": "syncs dependency-controlled fields for template matching",
-        "stableSignature": "after TemplateId=tpl-01, TemplatePath is readonly but remains enabled and data-effective-disabled=false",
+        "stableSignature": "fixture metadata omitted the TemplatePath/TemplateId mutual-exclusion constraints already enforced by the authoritative unit contract",
         "owner": "Flow editor contract owner",
         "classification": "fixture",
-        "retry": { "attempts": 1, "passed": 0, "failed": 1 },
+        "retry": { "attempts": 3, "passed": 3, "failed": 0, "successRate": 1.0, "familyDurationsSeconds": [15.681, 14.323, 14.514], "familyP50Seconds": 14.514, "familyP95Seconds": 15.681 },
         "expiry": "2026-10-01",
-        "disposition": "open_requires_authoritative_template_parameter_contract",
-        "evidence": "The fixture asserts a legacy TemplatePath/TemplateId mutual-exclusion rule that is not present in its supplied metadata; do not choose between restoring the product contract and retiring the assertion without a design decision."
+        "disposition": "resolved_fixture_authoritative_dependency_constraints",
+        "evidence": "Only fixture metadata changed; the production dependency engine and effective-disabled contract were not relaxed."
       },
       {
         "id": "U06A-OPEN-006",
         "spec": "tests/e2e/flow-layout-vm.spec.ts",
         "test": "captures one camera frame into the preview workbench and reuses it in the ROI editor at 1920x1080",
-        "stableSignature": "after a successful mocked soft-trigger frame, ROI editor displays '请先让该节点成功生成一次预览输入图像'",
+        "stableSignature": "fixture lacked an ImageAcquisition-to-RoiManager reachable connection, so production reachability correctly rejected the captured frame as ROI input",
         "owner": "Preview and ROI product owner",
-        "classification": "product",
-        "retry": { "attempts": 1, "passed": 0, "failed": 1 },
+        "classification": "fixture",
+        "retry": { "attempts": 3, "passed": 3, "failed": 0, "successRate": 1.0, "familyDurationsSeconds": [15.681, 14.323, 14.514], "familyP50Seconds": 14.514, "familyP95Seconds": 15.681 },
         "expiry": "2026-10-01",
-        "disposition": "open_product_investigation",
-        "evidence": "Reproduced at flow-layout-vm.spec.ts:1335; no production behavior was changed to make the fixture pass."
+        "disposition": "resolved_fixture_reachable_roi_graph",
+        "evidence": "The fixture now models the real reachable graph. Production reachability and ROI authority remain fail closed."
       },
       {
         "id": "U06A-OPEN-007",
@@ -233,12 +245,12 @@
       "G08 remains report-only.",
       "G02 remains open because this branch has not been pushed; local results are not CI evidence.",
       "Quiet Precision and visual-difference failures remain open and are not relabeled as fixture fixes.",
-      "No real WebView2, device, external database, clean clone, visual baseline update, or same-SHA CI run was performed."
+      "Local WebView2 release smoke passed, but no approved target-machine DPI/performance matrix, real device, external database, visual baseline update, or same-SHA CI run was performed."
     ]
   },
   "releaseEvidenceContract": {
-    "schemaVersion": "2026-09-01.wave3c-release-evidence.v1",
-    "scope": "Extension of the existing quality gate manifest for the formal Studio win-x64 field-self-contained portable profile; this is not a parallel gate system.",
+    "schemaVersion": "2026-09-01.wave3d-release-evidence.v1",
+    "scope": "Extension of the existing quality gate manifest for the formal Studio win-x64 field-self-contained portable profile and independently collected G16/U07 target profiles; this is not a parallel gate system.",
     "releaseStatus": "BLOCKED",
     "canonicalPackagingImplementation": "scripts/package-portable-deployment.ps1",
     "formalTagWorkflow": ".github/workflows/ci.yml",
@@ -285,8 +297,15 @@
     "currentDispositions": {
       "G02": "OPEN_BLOCKED_NOT_PUSHED",
       "G08": "REPORT_ONLY",
-      "U05_G16": "BLOCKED_RELEASE_EVIDENCE_GAP",
-      "S7NetPlus_0_20_0": "BLOCKED_NOASSERTION_PENDING_HUMAN_EXCEPTION",
+      "U04": "BLOCKED_LICENSE_VULNERABILITY_AND_TAG_RELEASE",
+      "U05_G16": "BLOCKED_REAL_TARGET_MATRIX_AND_RELEASE_EVIDENCE_GAP",
+      "AutoMapper_15_1_3": "IDENTIFIED_REVIEW_REQUIRED",
+      "Microsoft_Data_SqlClient_SNI_runtime_5_2_0": "IDENTIFIED_REVIEW_REQUIRED",
+      "BCrypt_Net_Next_4_0_3": "IDENTIFIED_POLICY_ALLOWED",
+      "HslCommunication_12_7_0": "CONFLICTING_EVIDENCE_REVIEW_REQUIRED",
+      "S7NetPlus_0_20_0": "IDENTIFIED_POLICY_ALLOWED",
+      "vulnerabilityScan": "UNAVAILABLE_COUNT_NULL_OSV_FINDING_PRESERVED",
+      "U07EvidenceKit": "READY_TARGET_PROFILES_NOT_RUN",
       "githubReleaseUpload": "NOT_RUN",
       "sameShaGitHubCi": "NOT_RUN"
     },

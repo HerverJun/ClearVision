@@ -325,6 +325,8 @@ Desktop PR Lane 新鲜 Cobertura：
 
 Wave 3C 本机证据绑定 implementation SHA `fc1f11bc605a8c9b4e16ba78af4de62457b27802`：本机 WebView2 Runtime smoke `4/4`，当前 `wwwroot` owner/lifecycle 与发布纵向 Desktop targeted `193/193`、AuthService `27/27` PASS；最终 portable package 排除 FrontendV2/Node/dev assets，受限 PATH no-Node 模拟 PASS。仍未完成批准的 100/125/150/200% OS DPI × 分辨率矩阵、真实 input-to-paint/working set、真实 no-Node 目标机或同 SHA CI，因此 T01-G07/G16 不关闭。
 
+Wave 3D Chromium settlement 绑定 production/fixture implementation SHA `2259e70981ff83977702c4747aa27dd2a6dfcad0`：Wave 3A registry 中 AI responsive 4、Build 5、Clarification 3、Flow layout 3 共 15 项，已将产品 readiness regression 与 stale fixture/assertion、visual baseline 分离。14 个非视觉断言按四族单 worker 连续三跑 `42/42`；AI responsive、Build、Clarification、Flow 的 p50/p95 分别为 `16.066/17.501s`、`15.664/17.066s`、`7.934/9.329s`、`14.514/15.681s`。剩余 4 个显式 visual tests 稳定为 `10,777 / 5,927 / 3,223 / 11,126` pixels diff，不更新 baseline。Agent UI contract `390/390`、完整 UI unit `1032/1032`、本机 WebView2/auth release smoke `4/4` PASS；未运行完整 Chromium lane，targeted 结果按本轮边界足够，但 T01-G02/G08 与真实 G16 matrix 仍开放。
+
 ### T01-G08：数据驱动的覆盖率防回退 Gate
 
 - **目标**：在可信、稳定的 current-HEAD 基线之上防止覆盖率下降；不采用预设 80%。
@@ -346,6 +348,8 @@ Wave 3C 本机证据绑定 implementation SHA `fc1f11bc605a8c9b4e16ba78af4de6245
 - **主要任务**：只对目标 SKU 声明支持的 PLC/TCP、相机/光学、Station、交付模型/provider、真实 LLM shadow 和当前 production UI 的 WebView2/DPI/键鼠做真实验收。
 - **完成标准**：每个 profile 有 Owner、SHA、设备型号/序列号、固件/驱动、数据 checksum、pass/fail、异常恢复和回滚；profile 可独立关闭，未发布/实验能力不阻塞项目。
 - **禁止修改范围**：普通 CI 连接真实设备或生产 DB；用 simulator/public/field-substitute 结果冒充现场；执行不存在的 StudioUI 人工验收路径。
+
+Wave 3D 已交付 `scripts/collect-g16-u07-target-evidence.ps1`、Draft 2020-12 schema、`NOT_RUN` 模板、README 与 self-test。记录按 target SKU/profile 独立绑定 portable ZIP SHA、Git SHA/dirty、OS/display/WebView2/GPU/Node、operator/model/device，并采集 health、no-Node、300/1000 input-to-paint/RAF/working set、Project/legacy package/Station/Agent、附件 hash 和人工 sign-off。collector 不修改 OS scale；fixture 强制 `fixture=true/FIXTURE` 且不能含签核；reviewer、设备序列号和批准结论不预填。工具就绪不关闭 T01-G09，真实 profile 仍全部 `NOT_RUN`。
 
 ## 9. 推荐执行顺序
 
