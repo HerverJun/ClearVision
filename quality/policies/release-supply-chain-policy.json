@@ -1,0 +1,54 @@
+{
+  "schemaVersion": "clearvision.release-policy/v1",
+  "defaultLicenseDisposition": "deny",
+  "unknownLicenseDisposition": "block",
+  "allowedLicenses": [
+    "0BSD",
+    "Apache-2.0",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "ISC",
+    "MIT",
+    "MS-PL",
+    "Unicode-3.0",
+    "Zlib"
+  ],
+  "deniedLicenses": [
+    "AGPL-1.0-only",
+    "AGPL-1.0-or-later",
+    "AGPL-3.0-only",
+    "AGPL-3.0-or-later",
+    "GPL-1.0-only",
+    "GPL-1.0-or-later",
+    "GPL-2.0-only",
+    "GPL-2.0-or-later",
+    "GPL-3.0-only",
+    "GPL-3.0-or-later",
+    "SSPL-1.0"
+  ],
+  "approvedExceptions": [],
+  "pendingExceptions": [
+    {
+      "scope": "license",
+      "package": "S7netplus",
+      "version": "0.20.0",
+      "license": "NOASSERTION",
+      "reason": "NuGet package 0.20.0 declares repository commit f1ae0ea084e712b59e414de6aaee7d196244a239 but its nuspec has no license field and the package has no license file. Upstream evidence could not be retrieved during this local run.",
+      "owner": null,
+      "approvalReference": null,
+      "expiry": null,
+      "status": "pending-human-review-not-approved"
+    }
+  ],
+  "vulnerabilityPolicy": {
+    "source": "NuGet audit advisory sources",
+    "maximumDataAgeHours": 24,
+    "unavailableDisposition": "block",
+    "blockedSeverities": [
+      "low",
+      "moderate",
+      "high",
+      "critical"
+    ]
+  }
+}
