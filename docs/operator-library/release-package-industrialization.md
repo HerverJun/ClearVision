@@ -1,6 +1,6 @@
 # OperatorLibrary Release Package Industrialization
 
-Date: 2026-04-29
+Date: 2026-04-29; Wave 3C release contract updated 2026-09-01
 
 Scope: `ClearVision.OperatorLibrary` NuGet packaging, native runtime expectations, third-party notice/SBOM baseline, deployment matrix, and resource-lifecycle limits for ONNX/OCR/PLC/database operators.
 
@@ -31,6 +31,25 @@ dotnet restore ClearVision.OperatorLibrary/ClearVision.OperatorLibrary.csproj --
 ```
 
 Do not publish from a restore that updates the lock file unexpectedly. This document records the reproducibility gate but does not generate packages or modify `packages.lock.json`.
+
+## Wave 3C Canonical Portable And Supply-Chain Contract
+
+The only portable implementation is `scripts/package-portable-deployment.ps1`. Studio/Station wrappers and the tag Release workflow call that implementation; PR/main raw build artifacts are diagnostic and are not field portable packages. The tag-default field profile is `Studio / win-x64 / field-self-contained`; `diagnostic-framework-dependent` has a different artifact name and support boundary.
+
+The official portable profile forces `EnableHuaraySdk=false`. Ignored, machine-local Huaray files must never make the package differ according to the build host; the Huaray runtime is a separately provisioned and approved site prerequisite. Publish hygiene and the package self-test reject `MVSDK_Net.dll`, Node/node_modules, FrontendV2, source/test/debug assets, development manifests, secrets, and machine-local absolute/user paths.
+
+For each final portable ZIP and OperatorLibrary nupkg, `quality/tools/generate_release_supply_chain.py` derives and validates:
+
+- `SBOM.spdx.json`;
+- `THIRD-PARTY-NOTICES.txt`;
+- `dependency-report.json` and `dependency-report.md`;
+- `identity-manifest.json`, `SHA256SUMS`, vulnerability status, and validation summary.
+
+These release artifacts bind Git SHA/dirty, SDK/runtime inventory, RID/profile, generator/version/time, final package hashes, and input checksums. The Markdown `SBOM.md` and notice material carried by the nupkg remain seed/documentation inputs only; they are not the formal final-package SBOM or redistribution evidence.
+
+The machine-readable policy is `quality/policies/release-supply-chain-policy.json`. Unknown/denied licenses and vulnerability findings fail closed unless a package+version exception has reason, Owner, approval basis, and expiry. A network advisory source failure is recorded as `unavailable` with vulnerability count `null`, never as zero vulnerabilities.
+
+Wave 3C implementation SHA `fc1f11bc605a8c9b4e16ba78af4de62457b27802` produced a 79-component SPDX/report set from the actual final ZIP/nupkg. Structural generation and artifact consistency passed, while release eligibility stayed false for AutoMapper 15.1.3 and Microsoft.Data.SqlClient.SNI.runtime 5.2.0 unapproved terms; BCrypt.Net-Next 4.0.3, HslCommunication 12.7.0, and S7NetPlus 0.20.0 `NOASSERTION`; and an unavailable vulnerability source. No exception Owner/approval/expiry was fabricated.
 
 ## Native Runtime Matrix
 
@@ -105,18 +124,19 @@ Operator maturity is explicit:
 - GPU ONNX acceleration is opportunistic; CPU fallback is expected when CUDA/TensorRT provider loading fails.
 - Modbus RTU is not supported by the packaged `ModbusCommunicationOperator`.
 - Static caches are process-local; multi-process hosts do not share ONNX/OCR/Modbus state.
-- `S7NetPlus` `0.20.0` does not declare a license in its local nuspec and requires manual upstream review before external redistribution.
-- The SBOM is currently Markdown generated from NuGet package restore output, not a formal CycloneDX or SPDX document.
+- `S7NetPlus` `0.20.0` does not declare a license in its local nuspec. Package/upstream evidence checked in Wave 3C did not justify assigning a license, so external redistribution remains blocked pending a real approved exception or authoritative evidence.
+- Formal release SBOM is SPDX JSON derived from the actual final ZIP/nupkg. In-package Markdown remains seed/documentation and must not be presented as the final release SBOM.
 
 ## Release Checklist
 
 1. Run `./analyze-deps.ps1` in `ClearVision.OperatorLibrary`.
 2. Restore with `--locked-mode` after `ClearVision.OperatorLibrary/packages.lock.json` is checked in.
-3. Run `./pack.ps1 -RunSmokeTest`.
+3. Run `./pack.ps1 -RunSmokeTest`; the installed smoke must preserve package-public 156, catalog population/fingerprint/metadata, no Desktop/runtime execution-host dependency, and disabled-operator rejection.
 4. Unpack the generated `.nupkg` and confirm `README.md`, `THIRD-PARTY-NOTICES.md`, and `SBOM.md` are present.
 5. Confirm native runtime payloads match the deployment matrix.
 6. Confirm no trained model or customer dataset is accidentally included.
 7. Attach versioned accuracy evidence for any release note that claims model/OCR/measurement quality.
 8. Attach external real-site evidence before claiming completed industrial validation.
-9. Record unresolved license review items before publishing outside an internal feed.
-10. Validate the operator plugin manifest against the host version and operator contract before exposing package operators in the catalog.
+9. Run canonical portable packaging with the approved RID/profile, validate final-package SPDX/notices/dependency/identity/checksums, and enforce `quality/policies/release-supply-chain-policy.json`.
+10. Do not publish while license/vulnerability policy reports blockers; do not turn unavailable advisory data into a zero-vulnerability claim.
+11. Validate the operator plugin manifest against the host version and operator contract before exposing package operators in the catalog.

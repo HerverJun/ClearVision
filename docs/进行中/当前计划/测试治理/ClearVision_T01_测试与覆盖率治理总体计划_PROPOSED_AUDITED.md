@@ -239,11 +239,24 @@ Desktop PR Lane 新鲜 Cobertura：
 | 对象 | 当前分支事实 | 本计划决定 | 状态 |
 | --- | --- | --- | --- |
 | Production root | `wwwroot/index.html + app.js + capability owners` | 作为本次 release 唯一 production root 继续验收 | `VERIFIED` |
-| FrontendV2 | 目录、构建和 `/v2` flag 仍存在，但 Tool/Review 等 capability 不完整且 flag 默认 false | 明确为 non-production；不补 production coverage，也不直接切换 | `VERIFIED` |
+| FrontendV2 | 源码目录仍保留，但 Desktop project 已用 `Content/None Remove` 隔离，production build/publish 不消费；`WorkspaceV2Enabled` 已删除，`/v2` 固定 404 | 明确为 non-production；不补 production coverage，也不直接切换 | `VERIFIED` |
 | StudioUI | 当前分支不存在 `Desktop/StudioUI` | 其 unit/E2E 路径和命令不得进入当前 Gate | `VERIFIED` |
 | 缓存 `studio-ui-next` | 2026-08-25 缓存 HEAD 为 `0c44df6c`，与当前分支显著分叉；本轮 fetch 失败 | 只作迁移调研。若未来采用，另立完整 parity/migration epic 并经正常合并 | `PARTIALLY_VERIFIED` |
 | 当前 UI 测试 | legacy/current `wwwroot` unit、Playwright、WebView2 与 capability owner 合同 | T01-G07 只接管这些当前可执行入口 | `VERIFIED` |
 | 后端/算法/coverage | 与最终 UI 路线弱耦合 | 可按当前分支继续，但 endpoint/owner 变更仍需文件级协调 | `INFERRED` |
+
+当前 production capability owner / legacy replacement matrix：
+
+| Capability | 唯一 production owner | replacement disposition | 当前自动化入口 |
+| --- | --- | --- | --- |
+| Property | `PropertyPanelCapabilityOwner` | capability owner 保留；legacy property surface 只允许在 owner 内 lazy import | 当前 `wwwroot` unit、Playwright、Desktop architecture guard |
+| Preview | `PreviewPanelCapabilityOwner` | capability owner 保留；legacy overlay/inspector 资源由 owner lifecycle 管理 | 当前 `wwwroot` unit、Playwright、WebView2 runtime smoke |
+| GlobalVariables | `GlobalVariablesCapabilityOwner` | capability owner 保留，正式保存仍归 `ProjectService + ProjectSaveCoordinator` | current-root unit/Playwright 与 Project save 回归 |
+| Project | `ProjectPageCapabilityOwner` | capability owner 保留，唯一正式保存 authority 不变 | current-root unit/Playwright、Project save/package 回归 |
+| ResultsReview | `ResultsReviewCapabilityOwner` | capability owner 保留，server-paged history/detail/compare 为唯一生产路径 | current-root unit/Playwright、inspection/result 回归 |
+| Settings | legacy `SettingsView` | 不完整实验 owner、adapter、服务端 flag 与客户端双重门禁已删除 | legacy unit/Playwright、WebView2 smoke、Desktop endpoint 回归 |
+| Inspection | legacy `InspectionPanel` | 不完整实验 owner、adapter、服务端 flag 与客户端双重门禁已删除 | legacy unit/Playwright、WebView2 smoke、inspection 回归 |
+| AI | legacy `AiPanel` | 不完整实验 owner、adapter、服务端 flag 与客户端双重门禁已删除 | legacy unit/Playwright、WebView2 smoke、Agent/Auth 回归 |
 
 ## 8. 分阶段总体计划
 
@@ -303,12 +316,14 @@ Desktop PR Lane 新鲜 Cobertura：
 
 ### T01-G07：当前 production UI 的 capability owner 测试接管
 
-- **当前 disposition**：原 StudioUI 路径和命令 `SUPERSEDED`。当前分支不存在 `Desktop/StudioUI`，FrontendV2 为 non-production，本次 release 不切 `/v2`。
-- **目标**：为 `wwwroot/index.html + app.js + capability owners` 建立 owner/legacy replacement matrix，保证 Settings、AI、Project、Inspection、Results、Preview 等实际 production capability 只有一个 mounted owner 和一组权威业务合同。
+- **当前 disposition**：`OPEN_RESCOPED`。owner/legacy replacement matrix 已按当前分支实现；FrontendV2 为 non-production，本次 release 不切 `/v2`。剩余项是 G16 的真实环境/批准矩阵，不是另一路 UI 的测试命令。
+- **目标**：以 `wwwroot/index.html + app.js` 为唯一 production root，用上表固定 Property、Preview、GlobalVariables、Project、ResultsReview 的 capability owner 与 Settings、Inspection、AI 的唯一 legacy owner，保证每项只有一个 mounted owner 和一组权威业务合同。
 - **允许修改范围**：当前 `wwwroot` unit、现有 Playwright、WebView2 脚本、capability owner architecture guard、CI 对应步骤和 legacy retirement ledger。
 - **禁止修改范围**：调用不存在的 StudioUI 测试命令；为 non-production FrontendV2 建发布阻断覆盖率；在 owner parity 未明确前删除现有业务保护。
-- **主要任务**：逐 capability 决定晋级或删除实验 owner/flag；current root 的 unit/E2E/WebView2 接管；每退役一组 legacy 行为必须有等价公共合同证据。
+- **主要任务**：matrix/owner disposition 已完成；继续只在 current root 的 unit/Playwright/WebView2 入口补证。每退役一组 legacy 行为必须有等价公共合同证据。
 - **完成标准**：production root、mounted owner、默认 flag、构建产物和测试 Gate 一致；真实 WebView2 及 G16 release matrix 通过。未来 Vue/StudioUI 迁移另立 epic，不在本 Goal 偷渡。
+
+Wave 3C 本机证据绑定 implementation SHA `fc1f11bc605a8c9b4e16ba78af4de62457b27802`：本机 WebView2 Runtime smoke `4/4`，当前 `wwwroot` owner/lifecycle 与发布纵向 Desktop targeted `193/193`、AuthService `27/27` PASS；最终 portable package 排除 FrontendV2/Node/dev assets，受限 PATH no-Node 模拟 PASS。仍未完成批准的 100/125/150/200% OS DPI × 分辨率矩阵、真实 input-to-paint/working set、真实 no-Node 目标机或同 SHA CI，因此 T01-G07/G16 不关闭。
 
 ### T01-G08：数据驱动的覆盖率防回退 Gate
 

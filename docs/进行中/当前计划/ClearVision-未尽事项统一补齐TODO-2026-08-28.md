@@ -41,6 +41,8 @@ review_input_revision: "78d693fb4"
 >
 > Wave 3B Operator Catalog Governance + AI Evidence Truthfulness 的纯 implementation/integration evidence SHA 为 `01107f029fe73b76ee3cdf38035fc1eef76cb84b`，不含三份 canonical 文档。它以唯一显式 exposure catalog 关闭 `CV-AUDIT-004`，将审计池结算为 `0 IMPLEMENTED_SYNC_PENDING / 0 engineering open / 102 CLOSED`；这不关闭 U01-U07、U14、G16 或项目。U01 的 smoke/precision/schema 子范围和 U03 的动态人口/sidecar/PublishChecks governance 已落地，但没有真实交付模型、数据集批准、目标 CPU/CUDA/TensorRT 硬件或 Core20 人工结论，故 U01/U03/U06 仍为 `OPEN_RESCOPED`。G02 因未 push 继续开放，G08 继续 report-only；U04 portable zip、SBOM、license 与 GitHub Release 仍开放。
 
+> Wave 3C Portable Release + Supply Chain + Local G16 Evidence 的最终纯 implementation/integration SHA 为 `fc1f11bc605a8c9b4e16ba78af4de62457b27802`，不含本文件、G16 与 T01 canonical 文档。canonical portable implementation、tag workflow 静态契约、OperatorLibrary installed smoke、最终 ZIP/nupkg 派生 SPDX/notices/dependency/identity/checksums、machine-readable license/vulnerability policy、PublishChecks/U06 联动和本机 clean clone 均已落地。当前 `releaseEligible=false`：5 个许可证处置未批准且漏洞源 unavailable；未 push、未创建 GitHub Release。G02=`OPEN_BLOCKED_NOT_PUSHED`、G08=`REPORT_ONLY`、G16=`BLOCKED_RELEASE_EVIDENCE_GAP`；U01/U03/U06/U07/U14 不因 packaging 自动关闭。
+
 ## 1. 状态与证据口径
 
 | 状态 | 含义 |
@@ -70,7 +72,7 @@ review_input_revision: "78d693fb4"
 | 数据库权威 | 生产只注册 `VisionDbContext`，启动/旧库修复已集中到 `VisionDatabaseInitializer`/maintenance；未使用的 `AppDbContext` 已删除，architecture guard 禁止其回归或分散 Station DDL。 | U02=`CLOSED`；不重写全部 legacy repair SQL，也不要求任意 down migration。 |
 | 算子人口 | 显式 catalog 当前为 enum 162、package-public 156、package-internal 1、legacy-alias 4、disabled 1；正式非 alias 资产 158，公共知识图 157。稳定 `full155` 只作 artifact ID。 | completeness、registry、generator 和报告从 catalog 动态计算；fingerprint 为 `sha256:4cd53973dd918e3669dc06e2ae1e901b440810e9021ac974fcce1038b719896a`，新增/缺失/重复/未知分类 fail closed，FrameChangeTrigger 边界不重设计。 |
 | SDK | Wave 0 已将 `global.json`、本地 wrapper、文档和 CI 统一为 `9.0.300 + latestPatch`；validator 实际只接受 `9.0.300`–`9.0.399`。 | 固定 9.0.3xx feature band，允许安全 patch，不跨 feature band；portable/SBOM/license 仍由 U04 后续项承接。 |
-| Release | tag workflow 直接 publish+zip，只生成简化启动 bat；现场指南却把 GitHub Release 当交付入口。仓库 SPDX 是预制 seed，不是从最终产物生成。 | tag Release 定义为现场可交付 portable package；workflow 复用 portable packaging 或等价流程，并从最终 nupkg/zip 生成、校验和上传供应链产物。 |
+| Release | Wave 3C 已让 tag workflow、Studio/Station wrapper 与本地 review 复用唯一 canonical packaging，并从最终 nupkg/zip 生成 SPDX/notices/dependency/identity/checksums；当前 license/vulnerability policy 阻断，真实 tag Release 未运行。 | tag Release 只有在 canonical package 与供应链策略全部通过时才可创建；本机实现/静态证据不能替代真实上传。 |
 | 测试分级 | 已有 `TestClassificationAttribute`、Domain/Purpose/Lane/Evidence/Oracle/Resource、`quality/test-gates.json` 和串行 Gate。 | 删除另建 A/B/C 分类体系；只补 critical-contract baseline、Owner、动态人口防回退和风险修复产生的公共合同测试。 |
 | 全量五次 repeat | 没有证据证明所有测试都需重复五次，且全量 repeat 成本和噪声过高。 | 只对 blocking lane、已知 flaky、时序/资源敏感测试做重复运行并登记失败签名；普通全量 Gate 不机械 5 次。 |
 | 正式 I/O | 保存后的工业流程必须能访问批准的文件、HTTP、DB、相机、TCP/PLC 等资源。风险来自不可信 Draft Flow 被正式入口提升权限。 | 不全面禁止工业 I/O；按 execution source、run mode、principal capability 和 resource binding 做准入。 |
@@ -83,7 +85,7 @@ review_input_revision: "78d693fb4"
 | 源文档 | 专业复核后的当前事实 | 本计划承接 |
 | --- | --- | --- |
 | [全面提升 TODO](./ClearVision-全面提升TODO-2026-05-09.md) | 按 46 个主题：Wave 3B 关闭 P0-9、P1-16、P2-7 的工程子项，当前 39 个已实施、6 个 `OPEN_RESCOPED`、P2-2 被 production-root 架构决定取代；147 个 checkbox 中 121 已实施、18 个窄化残项、P2-2 3 项、总关闭条件 5 项。 | U01-U06、U14 |
-| [T01 测试与覆盖率治理总体计划](./测试治理/ClearVision_T01_测试与覆盖率治理总体计划_PROPOSED_AUDITED.md) | G01 阶段证据已归档，G01B-R3/G02 仍需当前 SHA；G03-G06 原方案有重复建设，G07 引用了非当前分支架构，G08 仍应 report-only，G09 按 SKU 外部验收。 | U05-U07 |
+| [T01 测试与覆盖率治理总体计划](./测试治理/ClearVision_T01_测试与覆盖率治理总体计划_PROPOSED_AUDITED.md) | G01 阶段证据已归档，G01B-R3/G02 仍需 current-SHA 远端证据；G03-G06 已去重，G07 已改为当前 `wwwroot` owner/legacy matrix但真实 G16 环境仍开放，G08 继续 report-only，G09 按 SKU 外部验收。 | U05-U07 |
 | [Studio2](../Studio2/README.md) | G00-G15 Goal 卡已完成或历史回填，但 G16 不能通过直接打开不具产品 parity 的 `/v2` 关闭；当前 release root 决定改为 legacy root + capability owners。 | U05 |
 | [持续问题排查记录](../待复核/持续问题排查记录-2026-07-06.md) | 102 个源 ID：`0 IMPLEMENTED_SYNC_PENDING / 0 engineering open / 102 CLOSED`。Wave 3B 以显式 exposure catalog 和 API/UI/import/admission 负向矩阵关闭最后一项 `CV-AUDIT-004`。U01-U07、U14、G16 与发布/外部验证仍不因此关闭。 | U01-U07、U14 |
 | [0407 Qwen 排查](../未闭环事项/0407-Qwen排查未闭环.md) | #1-#26 已由当前实现、文件移除或等价契约覆盖，原状态未同步。 | U14 回填 |
@@ -131,12 +133,14 @@ Wave 3B 证据：正式 catalog 含 exposure，历史/治理资产保留 disable
 
 ### U04 SDK、现场 Release 与供应链契约
 
-优先级：P1。状态：`OPEN_CONFIRMED`。Owner：构建发布/供应链。
+优先级：P1。状态：`OPEN_RESCOPED`。Owner：构建发布/供应链。implementation 子范围已完成；许可证/漏洞策略未放行且真实 tag Release 未运行。
 
 - [x] 将 SDK 策略统一为 `9.0.300 + rollForward: latestPatch`，同步 `global.json`、根 README、项目总览、SDK 指南、`scripts/dotnet.ps1` 和 CI；`scripts/validate-dotnet-sdk-policy.ps1` 自测、实际 resolved SDK 与 10/10 workflow coverage 校验通过。
-- [ ] 明确 PR/main 的 raw build artifact 不是现场交付包；tag Release 必须调用 `package-portable-deployment.ps1` 或功能等价的唯一 packaging implementation，统一启动文件、离线依赖和 `README-site-deploy.txt`。
-- [ ] 从最终 `.nupkg` 与 portable zip 生成并核验 SPDX/SBOM、THIRD-PARTY-NOTICES 和 dependency report，随同一 GitHub Release 上传；仓库内预制 seed 只作输入，不作最终产物证据。
-- [ ] 明确漏洞/许可证 fail-or-approved-exception 策略，发布前处置 `S7NetPlus` 的 `NOASSERTION`。
+- [x] PR/main raw build artifact 已明确为 diagnostic；tag workflow、Studio/Station wrapper 和本地 review 复用 `scripts/package-portable-deployment.ps1`，统一 launcher、`README-site-deploy.txt`、source/content manifest 与 checksums。正式 profile 为 `Studio/win-x64/field-self-contained`；diagnostic framework-dependent 使用不同名称。
+- [x] 已从最终 `.nupkg` 与 portable zip 实际内容生成并核验 SPDX JSON、THIRD-PARTY-NOTICES、dependency report JSON/Markdown、identity manifest 与 SHA-256 checksums；tag workflow 已静态配置从同一 job/package directory 上传，仓库 seed 仅作输入/对照。真实 GitHub Release 未运行。
+- [x] machine-readable allow/deny/approved-exception policy 已落地，漏洞或禁止/未知许可证 fail closed；S7NetPlus 0.20.0 保持 `NOASSERTION`，pending exception 没有伪造 Owner/批准/expiry。当前策略不放行。
+
+Wave 3C disposition：最终本机 ZIP 为 940 archive files / 938 governed files / `291,339,424` bytes / SHA-256 `acd41ab7838792c3ebe246c953beb3a6ef721f3a274b8ccf0e5ec2bd3ce18320`；同工作树两次 content fingerprint 和 manifest SHA 稳定。OperatorLibrary nupkg 为 `1,422,413` bytes / SHA-256 `67c1332189bdf52eae2551c9d2defd0220b606d8e092acee6f2fa4962165faa2`，installed smoke `47/47`，package-public 156。SBOM/report 组件均为 79。AutoMapper 15.1.3、Microsoft.Data.SqlClient.SNI.runtime 5.2.0 为 unapproved license；BCrypt.Net-Next 4.0.3、HslCommunication 12.7.0、S7NetPlus 0.20.0 为 `NOASSERTION`；漏洞源 unavailable、count=`null`。因此 U04 不能关闭，也不能称最终发布完成。
 
 ### U05 当前生产前端、Studio2 G16 与 T01-G07
 
@@ -145,8 +149,8 @@ Wave 3B 证据：正式 catalog 含 exposure，历史/治理资产保留 disable
 - [x] 执行本次架构决定：`wwwroot/index.html + app.js + capability owners` 是当前 release 唯一 production root；删除 `WorkspaceV2Enabled`、V2 startup injection/root resolver，并以 `/v2` 固定 404 和 architecture guard 防止误切。
 - [x] Settings/Inspection/AI 的 disposition 固定为删除不完整实验 owner、adapter、服务端 flag 和客户端双重门禁；legacy `SettingsView`、`InspectionPanel`、`AiPanel` 分别担任唯一 production owner，并验证 lifecycle cleanup。
 - [x] 退役 FrontendV2 production build/flag/publish 与 release Gate 路径；源码通过 Desktop project `Content/None Remove` 隔离为 non-production，未来迁移须另立完整 parity/migration epic。
-- [ ] T01-G07 改为当前 UI 栈的 capability owner/legacy replacement matrix，覆盖现有 `wwwroot` unit、Playwright 和真实 WebView2；不得执行只存在于 `studio-ui-next` 的路径和命令。
-- [ ] G16 仍需 clean clone build/publish、无 Node 目标机离线启动、真实 WebView2、100/125/150/200% OS scale 与 1366x768/1920x1080/2560x1440/3840x2160 批准组合、300/1000 primitive 性能、旧工程/包/Station/Agent/Project save 回归和同 SHA GitHub CI。Node 微基准只作 CPU signal，release 性能必须在最终 publish/current root 的真实 WebView2 记录 input-to-paint、RAF long-frame、p95 和 working set。
+- [x] T01-G07 已改为当前 `wwwroot` capability owner/legacy replacement matrix：Property、Preview、GlobalVariables、Project、ResultsReview 使用各自 capability owner；Settings、Inspection、AI 使用唯一 legacy owner。FrontendV2 为 non-production，`/v2` 固定 404；Gate 不调用另一 UI 路线的命令。
+- [ ] G16 本机 clean clone build/publish/package、WebView2 runtime smoke `4/4`、300/1000 CPU/layout signal、发布相关 targeted vertical regression和受限 PATH no-Node 模拟已完成；仍需真实 no-Node 目标机、批准的 100/125/150/200% OS scale × 四分辨率矩阵、真实 WebView2 input-to-paint/RAF/p95/working set、现场设备/模型/完整纵向回归、同 SHA GitHub CI 与真实 GitHub Release。
 
 验收：唯一 production root 与构建/发布资产一致；实验入口不可能被误切为生产；owner disposition 全部明确；上述 Release evidence 完整。G16 关闭后 Studio2 Goal 卡才整批归档。
 
@@ -165,6 +169,8 @@ Wave 3B 证据：正式 catalog 含 exposure，历史/治理资产保留 disable
 Wave 3A 证据：`quality/test-gates.json.failureRegistry` 属于现有 gate manifest，不另建并行体系；integration SHA `ec9192ad35932210c5c5d9434f7e1c649dacd92d`。7 个正式 Chromium spec 的 serial recheck 为 `61 passed / 15 failed / 1 skipped`；修复的 Flow/Station/ROI fixture 或 stale assertion 均有 targeted result，ROI 三跑 `72/72`、p50/p95 `56.2/56.7s`。AI 与 Flow layout 失败族、Quiet Precision/visual 差异仍开放；G02 因未 push 不能用本地替代 CI，G08 继续 report-only。
 
 Wave 3B 证据：`critical-contract-governance.json` 将 CV-AUDIT-004、动态人口、smoke/precision 隔离、manifest identity/mismatch、Core20 stale fingerprint 和 PublishChecks truthfulness 绑定 Owner/baseline/tolerance；公共 C# 合同测试随 Product focused `85/85` 通过。新增 active reports 绑定 SHA/dirty/tool/data/environment。本轮未跑完整 Chromium 非视觉 lane，沿用 Wave 3A 的 15 个失败且不作为独立 catalog/evidence 子范围阻断；未更新视觉 baseline。G02/G08 状态不变，故 U06 保持 `OPEN_RESCOPED`。
+
+Wave 3C 证据：现有 `quality/test-gates.json` 已接入真实 portable package manifest、SBOM、license disposition 与 source identity，没有新增平行 gate。PublishChecks 继续要求真实模型/Core20 人工证据，`deliveryEvidence=false`；packaging fixture 不会把项目改成 release-ready。G02 因未 push 继续 `OPEN_BLOCKED_NOT_PUSHED`，G08 继续 `REPORT_ONLY`，故 U06 状态不变。
 
 ### U07 按发布 SKU 的外部实验室与现场证据
 
@@ -388,7 +394,7 @@ Wave 2D 已关闭 `CV-AUDIT-057/058/059/060/063/071/081`；Wave 2E 已以 fake c
 | 状态 | 主题 | 责任入口 |
 | --- | --- | --- |
 | `OPEN_RESCOPED` | P1-14、P2-6 | U03；PublishChecks fixture 与 sidecar schema 已完成，真实交付/人工证据未完成 |
-| `OPEN_CONFIRMED` | P1-20、P1-23、P2-8 | U04 |
+| `OPEN_RESCOPED` | P1-20、P1-23、P2-8 | U04；canonical packaging/供应链/policy implementation 已完成，待许可证/漏洞放行与真实 tag Release |
 | `SUPERSEDED` | P2-2 | U05 当前 production-root 架构决定 |
 | `OPEN_RESCOPED` | P2-9 | U06 |
 | `CLOSED` | P1-7 | U02；`27dff8bc923905133a83d2f24d9764fca3cdc38b` architecture/SQLite acceptance |
@@ -580,5 +586,17 @@ Wave 2D 已关闭 `CV-AUDIT-057/058/059/060/063/071/081`；Wave 2E 已以 fake c
 - Focused acceptance：Product catalog/admission/AI/metadata/MQTT executor `85/85`，Desktop catalog endpoint `1/1`，UI operator library/palette/template `28/28`，Python schema/aggregator/sidecar/PublishChecks/quasi `33/33`；PublishChecks fixture 为 1 pass + 1 blocked、`deliveryEvidence=false`。6 个 changed JS/MJS parse、34 个 JSON parse、11 个 Python compile 与 `git diff --check` 均通过；本轮无 changed PowerShell。
 - 正式生成与清理：正式 OperatorDoc → KnowledgeGraph 第二次运行 0 文件变化；`.tmp/publish-check` 两个临时 ONNX 已删除。OperatorLibrary pack smoke 作为建议 lane 尝试后，被未改动 package csproj 缺少 Application/`IHttpResourceBroker` 编译依赖阻断；不计为 catalog focused acceptance 失败，也不伪称通过。
 - 范围与 disposition：`CV-AUDIT-004=CLOSED`，102-ID 机器账本为 `0 IMPLEMENTED_SYNC_PENDING / 0 engineering open / 102 CLOSED`。未 push；未跑完整 Chromium 非视觉 lane、未更新视觉 baseline，Wave 3A 的 15 个失败不阻断本轮独立子范围。G02 继续 `OPEN_BLOCKED_NOT_PUSHED`，G08=`REPORT_ONLY`；U04 portable zip/SBOM/license/GitHub Release、U01/U03/U06、U14 和项目继续开放。
+
+### 7.13 Wave 3C Portable Release + Supply Chain + Local G16 Evidence（2026-09-01）
+
+- 提交链：OperatorLibrary boundary `b8af6cde1f721e4e620a990bf201fbc8e0632418`；supply-chain/PublishChecks `8921b601`；canonical packaging/workflow `ad4a8f6b82befd85147c11a16d027975d67437b8`；Desktop package fixtures `957c170e`；WebView2/auth recovery `2ae7e3518676b3059b011dcce48585d0e11bb13b`；test-gates integration `0224be0782d691827d4b29c365b41d60071ca459`；checkout-stable packaging boundary `5f601c49a4611296885041610d9179ed548592df`；最终 non-bundled vendor SDK boundary / implementation SHA `fc1f11bc605a8c9b4e16ba78af4de62457b27802`。
+- OperatorLibrary：contract 下沉保持只读 package boundary，没有引入 Desktop/runtime execution host；locked restore/build/pack/installed smoke `47/47`，package-public 156，disabled/legacy/internal 不可作为新建能力解析。最终 nupkg `1,422,413` bytes，SHA-256 `67c1332189bdf52eae2551c9d2defd0220b606d8e092acee6f2fa4962165faa2`。
+- Portable：正式 ZIP `ClearVision-Studio-1.0.3-wave3c.4-fc1f11bc-win-x64-field-self-contained.zip` 为 940 archive files / 938 governed files / `291,339,424` bytes，SHA-256 `acd41ab7838792c3ebe246c953beb3a6ef721f3a274b8ccf0e5ec2bd3ce18320`。同工作树第二次 ZIP SHA `cfe69a68d967ea946361626984580e76dd4fe679d1365a9322086d3fae698df3`，但 content fingerprint 均为 `sha256:e2fdae17d7dc3e7199151e26e4acd1883064347a6abe7b5978d04a5655bc3903`，manifest SHA-256 均为 `0e8f41f6d74c27195601609f0982d3bdbac25d77c18b2c2ef68f238ae5a22488`。ZIP 时间戳未被误作逐字节 reproducibility 要求。
+- 供应链：SPDX/report 各 79 个组件；generation 与 artifact consistency PASS。notices 只覆盖最终依赖，identity 绑定 SHA/dirty/SDK/runtime/RID/profile/generator/time/input checksums。包内 secret、绝对用户路径、Node/node_modules、源码/测试/TRX/Playwright/dev manifest/FrontendV2 和 machine-local Huaray SDK 均由 hygiene/self-test 拒绝。
+- 策略：`releaseEligible=false`；5 个 license blockers 与 vulnerability source unavailable 如 U04 所列。S7NetPlus 保持 `NOASSERTION`，没有伪造批准 exception；漏洞 count 为 `null`，未写成 0。
+- workflow：tag Release 静态/self-test 验证 canonical call、locked restore、SDK policy、policy enforce 与同一 package directory 上传 ZIP/nupkg/SBOM/notices/dependency/identity/checksums；未 push、未触发 workflow、未创建 GitHub Release。
+- clean clone：本机 `git clone --no-local` 精确 `fc1f11bc...`；初始/最终 Git clean。solution locked restore、Release build（12 warning / 0 error）、RID locked restore、Desktop publish hygiene（935 files）、canonical package/self-test PASS。深目录 repo-local NuGet cache首次受 Windows 长路径影响，显式共享 packages cache 后重跑通过；这是 local clean clone evidence，不是 CI。
+- G16：Desktop 发布纵向 `193/193`、AuthService `27/27`；本机 WebView2 Runtime smoke `4/4`，300/1000 primitive CPU/layout signal 已记录；最终 ZIP 的 Node-filtered restricted PATH 启动模拟 `/health=Healthy`。这些分别不是完整 Chromium/视觉 baseline、批准 DPI/input-to-paint 或真实 no-Node 目标机证据。
+- disposition：U04 implementation 子范围完成但受未批准 license/vulnerability policy 与未运行 tag Release 阻断；U05/G16 保持 `BLOCKED_RELEASE_EVIDENCE_GAP`，已收窄为真实目标机、批准 DPI/性能、现场设备/模型、同 SHA CI/GitHub Release。U01/U03/U06/U07/U14 状态不变；G02=`OPEN_BLOCKED_NOT_PUSHED`，G08=`REPORT_ONLY`。未 push。
 
 Wave 可以拆成小提交，但每个源 ID 必须保留独立验收行。只有在 required profiles、最终 Release SHA 和源文档回填全部关闭后，才归档本文及用户指定的七组文档。
