@@ -236,6 +236,68 @@
       "No real WebView2, device, external database, clean clone, visual baseline update, or same-SHA CI run was performed."
     ]
   },
+  "releaseEvidenceContract": {
+    "schemaVersion": "2026-09-01.wave3c-release-evidence.v1",
+    "scope": "Extension of the existing quality gate manifest for the formal Studio win-x64 field-self-contained portable profile; this is not a parallel gate system.",
+    "releaseStatus": "BLOCKED",
+    "canonicalPackagingImplementation": "scripts/package-portable-deployment.ps1",
+    "formalTagWorkflow": ".github/workflows/ci.yml",
+    "formalProfile": {
+      "application": "Studio",
+      "runtimeIdentifier": "win-x64",
+      "profile": "field-self-contained",
+      "restore": "locked-mode",
+      "frameworkDependentProfile": "diagnostic-framework-dependent",
+      "frameworkDependentDisposition": "diagnostic-only"
+    },
+    "requiredFinalEvidence": {
+      "packageResult": "package-result.json",
+      "portableZip": "ClearVision-Studio-<version>-<short-sha>-win-x64-field-self-contained.zip",
+      "operatorLibraryPackage": "ClearVision.OperatorLibrary.<version>.nupkg",
+      "portableContentManifest": "release/package-content-manifest.json inside the final ZIP",
+      "portableSourceIdentity": "release/source-identity.json inside the final ZIP",
+      "sbom": "supply-chain/SBOM.spdx.json",
+      "notices": "supply-chain/THIRD-PARTY-NOTICES.txt",
+      "dependencyReport": [
+        "supply-chain/dependency-report.json",
+        "supply-chain/dependency-report.md"
+      ],
+      "identityManifest": "supply-chain/identity-manifest.json",
+      "supplyChainValidation": "supply-chain/validation-summary.json",
+      "checksums": "supply-chain/SHA256SUMS"
+    },
+    "publishChecks": {
+      "implementation": "quality/tools/run_publish_checks.py",
+      "deliveryCandidateField": "releaseEvidence",
+      "structuralRequirements": [
+        "portable ZIP content hashes and embedded source identity match package-result",
+        "nupkg and portable hashes match the release identity manifest",
+        "SPDX, notices and dependency report component sets match",
+        "SHA256SUMS matches every governed final artifact",
+        "source identity is clean and all release artifacts come from one Git SHA, RID and profile",
+        "license and vulnerability policy is release-eligible"
+      ],
+      "deliveryEvidenceMustRemainFalseUntil": [
+        "realModelEvidenceApproved=true with genuine approved delivery evidence",
+        "core20HumanEvidenceApproved=true with genuine human review"
+      ]
+    },
+    "currentDispositions": {
+      "G02": "OPEN_BLOCKED_NOT_PUSHED",
+      "G08": "REPORT_ONLY",
+      "U05_G16": "BLOCKED_RELEASE_EVIDENCE_GAP",
+      "S7NetPlus_0_20_0": "BLOCKED_NOASSERTION_PENDING_HUMAN_EXCEPTION",
+      "githubReleaseUpload": "NOT_RUN",
+      "sameShaGitHubCi": "NOT_RUN"
+    },
+    "externalEvidenceThatCannotBeSubstituted": [
+      "actual GitHub Release upload",
+      "real no-Node target-machine launch",
+      "approved real WebView2 DPI and input-to-paint matrix",
+      "real device, delivery model and site performance evidence",
+      "same-SHA GitHub CI"
+    ]
+  },
   "projects": {
     "Product": "ClearVision.Product/tests/ClearVision.Product.Tests/ClearVision.Product.Tests.csproj",
     "Desktop": "ClearVision.Product/tests/ClearVision.Product.Desktop.Tests/ClearVision.Product.Desktop.Tests.csproj",
