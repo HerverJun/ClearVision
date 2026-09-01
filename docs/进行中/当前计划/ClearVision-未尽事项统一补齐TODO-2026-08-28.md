@@ -80,7 +80,7 @@ review_input_revision: "78d693fb4"
 
 | 源文档 | 专业复核后的当前事实 | 本计划承接 |
 | --- | --- | --- |
-| [全面提升 TODO](./ClearVision-全面提升TODO-2026-05-09.md) | 按 46 个主题：35 个既有主题已同步、P1-7 随 U02 关闭，故当前 36 个已实施、9 个 `OPEN_RESCOPED`、P2-2 被 production-root 架构决定取代；147 个 checkbox 中 112 已实施、30 窄化残项、P2-2 3 项、总关闭条件 5 项。 | U01-U06、U14 |
+| [全面提升 TODO](./ClearVision-全面提升TODO-2026-05-09.md) | 按 46 个主题：35 个既有主题已同步、P1-7 随 U02 关闭，故当前 36 个已实施、9 个 `OPEN_RESCOPED`、P2-2 被 production-root 架构决定取代；147 个 checkbox 中 112 已实施、27 个窄化残项、P2-2 3 项、总关闭条件 5 项。 | U01-U06、U14 |
 | [T01 测试与覆盖率治理总体计划](./测试治理/ClearVision_T01_测试与覆盖率治理总体计划_PROPOSED_AUDITED.md) | G01 阶段证据已归档，G01B-R3/G02 仍需当前 SHA；G03-G06 原方案有重复建设，G07 引用了非当前分支架构，G08 仍应 report-only，G09 按 SKU 外部验收。 | U05-U07 |
 | [Studio2](../Studio2/README.md) | G00-G15 Goal 卡已完成或历史回填，但 G16 不能通过直接打开不具产品 parity 的 `/v2` 关闭；当前 release root 决定改为 legacy root + capability owners。 | U05 |
 | [持续问题排查记录](../待复核/持续问题排查记录-2026-07-06.md) | 102 个源 ID：`0 IMPLEMENTED_SYNC_PENDING / 1 engineering open / 101 CLOSED`。Wave 3A 回填并关闭其中 30 个旧待同步 ID；`CV-AUDIT-004` 因 MQTT placeholder 仍公开转 `OPEN_RESCOPED`。U14、G16 与发布/外部验证仍不因此关闭。 | U01-U07、U14 |
