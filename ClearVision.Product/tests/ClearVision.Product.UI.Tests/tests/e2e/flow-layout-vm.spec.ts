@@ -56,6 +56,11 @@ const operators = [
     displayName: '模板匹配',
     category: '预处理',
     description: '定位模板姿态',
+    parameterConstraints: [
+      ...parameterRuleParitySpec.operatorConstraints.TemplateMatching,
+      { parameter: 'TemplatePath', mutuallyExclusiveGroup: 'template-source' },
+      { parameter: 'TemplateId', mutuallyExclusiveGroup: 'template-source' },
+    ],
     parameters: [
       { name: 'TemplatePath', displayName: '模板路径', dataType: 'string', value: '' },
       { name: 'TemplateId', displayName: '模板ID', dataType: 'string', value: '' },
@@ -962,6 +967,10 @@ test.describe('Flow layout VisionMaster-style shell', () => {
     const status = workbench.locator('[data-role="pixel-probe-status"]');
     await expect(image).toBeVisible();
     await expect(status).toHaveAttribute('data-probe-state', 'default');
+    const toastClose = page.locator('.cv-toast-close').last();
+    if (await toastClose.isVisible().catch(() => false)) {
+      await toastClose.click();
+    }
 
     await page.evaluate(async () => {
       const registry = (await import('/src/core/app/serviceRegistry.js')).default;
@@ -1328,6 +1337,21 @@ test.describe('Flow layout VisionMaster-style shell', () => {
     await page.locator('[data-palette-search="true"]').fill('ROI 管理器');
     await page.locator('#operator-group-flyout .operator-flyout-item[data-operator-type="RoiManager"]').click();
     await expect(page.locator('#operator-group-flyout')).toBeHidden();
+
+    await page.evaluate(() => {
+      const flowCanvas = (window as any).flowCanvas;
+      const roiNodeId = flowCanvas.selectedNode;
+      const acquisition = Array.from(flowCanvas.nodes.values())
+        .find((node: any) => node.type === 'ImageAcquisition') as any;
+      if (!acquisition || !roiNodeId) {
+        throw new Error('Camera-to-ROI fixture nodes are unavailable.');
+      }
+      flowCanvas.addConnection(acquisition.id, 0, roiNodeId, 0);
+      flowCanvas.selectedNode = roiNodeId;
+      flowCanvas.selectedConnection = null;
+      flowCanvas.markSelectionChanged('test-connect-camera-to-roi');
+      flowCanvas.render();
+    });
 
     const roiPanel = inspector.locator('.roi-editor-panel');
     await expect(roiPanel).toBeVisible();

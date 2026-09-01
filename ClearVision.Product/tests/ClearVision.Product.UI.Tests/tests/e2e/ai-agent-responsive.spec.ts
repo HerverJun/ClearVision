@@ -233,6 +233,7 @@ async function mockAgentPlanAndApplyReadyBuild(page: Page): Promise<void> {
         planHash: request.planHash,
         requirementMode: request.requirementMode || 'strict',
         answerRevision: request.answerRevision || 0,
+        resourceRevision: request.resourceRevision || 0,
         buildReadiness: {
           canBuild: true,
           blockers: [],
@@ -244,6 +245,13 @@ async function mockAgentPlanAndApplyReadyBuild(page: Page): Promise<void> {
         pendingConfirmationCount: 0,
         resourcePendingCount: 0,
         hardBlockerCount: 0,
+        buildBlockingConfirmationCount: 0,
+        buildRequiredResourceCount: 0,
+        deferredFieldCount: 0,
+        draftAllowedResourceCount: 0,
+        mustConfirmBeforeBuildCount: 0,
+        fillLaterCount: 0,
+        totalIncompleteCount: 0,
         contractValid: true,
         metadataOnly: true,
       }),
@@ -458,6 +466,19 @@ async function mockShellApis(page: Page): Promise<void> {
   });
   await page.route('**/api/health', async route => {
     await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true }) });
+  });
+  await page.route('**/api/ai/vision-agent/planning-deadline', async route => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        contractVersion: 'v1',
+        totalBudgetMs: 120000,
+        clientNetworkMarginMs: 15000,
+        minimumRepairBudgetMs: 5000,
+        metadataOnly: true,
+      }),
+    });
   });
   await page.route('**/api/inspection/decision-configuration/validate', async route => {
     await route.fulfill({
@@ -1250,6 +1271,50 @@ test('Plan pending recommendation records defer without becoming an effective an
   await page.setViewportSize({ width: 1280, height: 820 });
   await installFakeWebView2(page);
   await mockShellApis(page);
+  await page.route('**/api/ai/agent-plan/readiness-preview', async route => {
+    const request = route.request().postDataJSON();
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        planId: request.planId,
+        planHash: request.planHash,
+        requirementMode: request.requirementMode || 'strict',
+        answerRevision: request.answerRevision || 0,
+        resourceRevision: request.resourceRevision || 0,
+        acceptedAnswers: [],
+        deferredQuestionIds: ['image_source'],
+        buildReadiness: {
+          canBuild: false,
+          blockers: [{
+            id: 'hard_requirement:image_source',
+            category: 'hard_requirement',
+            field: 'image_source',
+            questionId: 'image_source',
+            blocksBuild: true,
+            resolutionMode: 'answer_question',
+            publicLabel: 'Image source pending',
+          }],
+          resolvedFields: ['inspection_object', 'task_type', 'acceptance_criteria'],
+          remainingFields: ['image_source'],
+          primaryMessage: 'Image source pending',
+          contractVersion: 'v2',
+        },
+        pendingConfirmationCount: 1,
+        resourcePendingCount: 0,
+        hardBlockerCount: 1,
+        buildBlockingConfirmationCount: 1,
+        buildRequiredResourceCount: 0,
+        deferredFieldCount: 1,
+        draftAllowedResourceCount: 0,
+        mustConfirmBeforeBuildCount: 1,
+        fillLaterCount: 1,
+        totalIncompleteCount: 1,
+        contractValid: true,
+        metadataOnly: true,
+      }),
+    });
+  });
   await bootAuthenticatedApp(page);
 
   await page.locator('.nav-btn[data-view="ai"]').evaluate(element => {
@@ -1365,8 +1430,8 @@ test('Plan pending recommendation records defer without becoming an effective an
   });
 
   const pending = page.locator('input[data-ai-plan-option="true"][value="camera_pending"]');
-  await pending.check();
-  await expect(page.locator('[data-ai-hook="clarification-question"]')).toContainText('建议暂缓');
+  await pending.click();
+  await expect(page.locator('[data-ai-hook="clarification-deferred"]')).toContainText('稍后确认，当前不会作为业务答案');
   await expect(page.locator('#ai-btn-start-build')).toBeDisabled();
   expect(await page.evaluate(() => {
     const panel = (window as any).aiPanel;
@@ -1560,7 +1625,8 @@ test('AI agent workbench default Plan view hides raw semantic trace until diagno
   await expect(page.locator('#ai-plan-workspace')).toContainText('推荐方案');
   await expect(page.locator('#ai-plan-workspace')).toContainText('关键问题');
   await expect(page.locator('#ai-plan-workspace')).toContainText('风险与工程详情');
-  await expect(page.locator('[data-ai-hook="clarification-question"]')).toContainText('前端不会创建替代答案入口');
+  await expect(page.locator('[data-ai-hook="clarification-question"]')).toHaveCount(0);
+  await expect(page.locator('[data-ai-hook="clarification-contract-gap"]')).toContainText('暂无可回答的关键问题');
   await expect(page.locator('[data-workspace-view-mode="plan"]')).toContainText('方案');
   await expect(page.locator('[data-workspace-view-mode="build"]')).toContainText('构建与验证');
   await expect(page.locator('[data-workspace-view-mode="build"]')).toBeDisabled();
@@ -1570,7 +1636,7 @@ test('AI agent workbench default Plan view hides raw semantic trace until diagno
   await expect(page.locator('#ai-agent-workspace-overview')).not.toContainText('可构建：否');
   await expect(page.locator('.ai-agent-overview-card')).toHaveClass(/is-warning/);
   await expect(page.locator('.ai-agent-overview-card')).not.toHaveClass(/is-danger/);
-  await expect(page.locator('[data-ai-hook="task-blockers"]')).toContainText('2 项阻断');
+  await expect(page.locator('[data-ai-hook="task-blockers"]')).toBeHidden();
   const visibleRawSnippets = await page.evaluate(() => {
     const root = document.querySelector('#ai-plan-workspace');
     const snippets = ['semantic.taskType', 'semantic.failureCode', 'objectSignals', 'metadataOnly'];
@@ -1693,12 +1759,12 @@ test('AI agent Plan to Build exposes visible Apply button and applies through re
 
   await page.waitForFunction(() => ((window as any).flowCanvas?.nodes?.size || 0) >= 3, null, { timeout: 10_000 });
   await page.screenshot({ path: path.join(applyEvidenceDir, 'after-apply-canvas-nodes.png'), fullPage: true });
-  const appliedNodeNames = await page.evaluate(() =>
+  const appliedNodeTypes = await page.evaluate(() =>
     Array.from((window as any).flowCanvas?.nodes?.values?.() || [])
-      .map((node: any) => node.title || node.displayName || node.name || node.type || '')
+      .map((node: any) => node.type || '')
       .filter(Boolean));
-  expect(appliedNodeNames).toEqual(expect.arrayContaining(['图像采集', 'ROI管理器', '二值化']));
-  expect(appliedNodeNames).toHaveLength(3);
+  expect(appliedNodeTypes).toEqual(expect.arrayContaining(['ImageAcquisition', 'ROIManager', 'Threshold']));
+  expect(appliedNodeTypes).toHaveLength(3);
 
   await page.locator('.nav-btn[data-view="ai"]').click();
   await page.waitForFunction(() => (window as any).aiPanel?.workbenchState === 'applied', null, { timeout: 10_000 });

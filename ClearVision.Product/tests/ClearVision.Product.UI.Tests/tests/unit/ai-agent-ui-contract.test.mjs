@@ -5016,6 +5016,28 @@ test('Plan requirement mode is scoped to plan identity and never restored from l
   assert.equal(planB.planHash, 'sha256:mode-b');
 });
 
+test('Repeated activation of the same plan preserves an in-flight authoritative readiness request', async () => {
+  const { AiPanel } = await loadAiPanel();
+  const panel = createPanel(AiPanel, { developer: false, enabled: true });
+  const plan = panel._normalizeBackendPlanResult(strategyConfirmationPlanResult());
+  panel.pendingVisionPlan = plan;
+  panel._activatePlanIdentity(plan);
+  panel._dispatchAgentWorkspaceEvent({
+    type: 'workspace/readiness-requested',
+    payload: {
+      planId: plan.planId,
+      planHash: plan.planHash,
+      answerRevision: panel.planAnswerRevision,
+      resourceRevision: panel.agentWorkspaceState.resources.revision,
+      requirementMode: 'strict'
+    }
+  });
+
+  panel._activatePlanIdentity(plan);
+
+  assert.equal(panel.agentWorkspaceState.readinessStatus, 'validating');
+});
+
 test('Strict to Draft persistence clears stale readiness before saving matching readiness in a second mutation', async () => {
   const { AiPanel } = await loadAiPanel();
   const panel = createPanel(AiPanel, { developer: false, enabled: true });

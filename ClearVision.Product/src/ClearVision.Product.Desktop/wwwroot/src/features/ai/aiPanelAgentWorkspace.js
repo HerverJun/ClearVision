@@ -1011,7 +1011,10 @@ export const aiPanelAgentWorkspaceMixin = {
             this.planRequirementModes.set(identity, 'strict');
         }
 
-        this.requirementMode = this._normalizeRequirementMode?.(this.planRequirementModes.get(identity)) || 'strict';
+        const rememberedMode = this._normalizeRequirementMode?.(this.planRequirementModes.get(identity)) || 'strict';
+        if ((this._normalizeRequirementMode?.(this.requirementMode) || 'strict') !== rememberedMode) {
+            this.requirementMode = rememberedMode;
+        }
     },
 
     _rememberRequirementModeForPlan(plan, mode) {
