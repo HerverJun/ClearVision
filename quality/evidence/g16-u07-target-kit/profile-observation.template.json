@@ -1,0 +1,69 @@
+{
+  "schemaVersion": "clearvision.g16-u07-target-observation/v1",
+  "execution": {
+    "startupAndHealth": {
+      "status": "NOT_RUN",
+      "launched": null,
+      "healthEndpoint": null,
+      "healthStatusCode": null,
+      "healthy": null,
+      "notes": null,
+      "evidenceRefs": []
+    },
+    "noNodeVerification": {
+      "status": "NOT_RUN",
+      "nodeAbsentBeforeLaunch": null,
+      "launched": null,
+      "healthy": null,
+      "notes": null,
+      "evidenceRefs": []
+    },
+    "performance": [
+      {
+        "primitiveCount": 300,
+        "status": "NOT_RUN",
+        "sampleCount": 0,
+        "inputToPaintMs": { "p50": null, "p95": null },
+        "rafFrameMs": { "p50": null, "p95": null, "longFrameThresholdMs": 16.7, "longFrameCount": null },
+        "notes": null,
+        "evidenceRefs": []
+      },
+      {
+        "primitiveCount": 1000,
+        "status": "NOT_RUN",
+        "sampleCount": 0,
+        "inputToPaintMs": { "p50": null, "p95": null },
+        "rafFrameMs": { "p50": null, "p95": null, "longFrameThresholdMs": 16.7, "longFrameCount": null },
+        "notes": null,
+        "evidenceRefs": []
+      }
+    ],
+    "workingSet": {
+      "status": "NOT_RUN",
+      "sampleCount": 0,
+      "p50MiB": null,
+      "p95MiB": null,
+      "peakMiB": null,
+      "notes": null,
+      "evidenceRefs": []
+    },
+    "workflows": {
+      "projectSaveLoad": { "status": "NOT_RUN", "notes": null, "evidenceRefs": [] },
+      "legacyProjectAndPackage": { "status": "NOT_RUN", "notes": null, "evidenceRefs": [] },
+      "stationReconnectAndResult": { "status": "NOT_RUN", "notes": null, "evidenceRefs": [] },
+      "agentWorkspace": { "status": "NOT_RUN", "notes": null, "evidenceRefs": [] }
+    }
+  },
+  "profileClosure": {
+    "status": "NOT_RUN",
+    "conclusion": null,
+    "blockedCapabilities": []
+  },
+  "signOff": {
+    "operatorIdentity": null,
+    "reviewer": null,
+    "deviceSerialNumber": null,
+    "approvalDecision": null,
+    "signedAtUtc": null
+  }
+}

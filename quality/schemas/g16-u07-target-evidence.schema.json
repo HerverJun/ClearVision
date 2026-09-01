@@ -1,0 +1,235 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://clearvision.local/schemas/g16-u07-target-evidence.v1.json",
+  "title": "ClearVision G16/U07 target-machine evidence",
+  "type": "object",
+  "required": [
+    "schemaVersion",
+    "generatedAtUtc",
+    "fixture",
+    "evidenceClass",
+    "releaseEligible",
+    "artifactBinding",
+    "target",
+    "environment",
+    "execution",
+    "evidenceFiles",
+    "profileClosure",
+    "signOff",
+    "nonExecutedReleaseBoundaries"
+  ],
+  "properties": {
+    "schemaVersion": { "const": "clearvision.g16-u07-target-evidence/v1" },
+    "generatedAtUtc": { "type": "string", "format": "date-time" },
+    "fixture": { "type": "boolean" },
+    "evidenceClass": { "enum": ["FIXTURE", "TARGET_MACHINE"] },
+    "releaseEligible": { "const": false },
+    "artifactBinding": {
+      "type": "object",
+      "required": ["portableZip", "gitSha", "gitDirty"],
+      "properties": {
+        "portableZip": {
+          "type": "object",
+          "required": ["fileName", "sha256", "sizeBytes"],
+          "properties": {
+            "fileName": { "type": "string", "minLength": 1 },
+            "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+            "sizeBytes": { "type": "integer", "minimum": 1 }
+          },
+          "additionalProperties": false
+        },
+        "gitSha": { "type": "string", "pattern": "^[a-f0-9]{40,64}$" },
+        "gitDirty": { "type": "boolean" }
+      },
+      "additionalProperties": false
+    },
+    "target": {
+      "type": "object",
+      "required": ["sku", "profile", "profileClass", "operatorProfile", "modelProfile", "deviceProfile"],
+      "properties": {
+        "sku": { "type": "string", "minLength": 1 },
+        "profile": { "type": "string", "minLength": 1 },
+        "profileClass": { "enum": ["formal-sku", "experimental"] },
+        "operatorProfile": { "type": "string", "minLength": 1 },
+        "modelProfile": { "type": "string", "minLength": 1 },
+        "deviceProfile": { "type": "string", "minLength": 1 }
+      },
+      "additionalProperties": false
+    },
+    "environment": {
+      "type": "object",
+      "required": ["machineName", "os", "display", "webView2Runtimes", "gpu", "node"],
+      "properties": {
+        "machineName": { "type": "string", "minLength": 1 },
+        "os": {
+          "type": "object",
+          "required": ["caption", "version", "build", "architecture"]
+        },
+        "display": {
+          "type": "object",
+          "required": ["resolutionWidth", "resolutionHeight", "osScalePercent", "scaleWasModifiedByCollector", "source"],
+          "properties": {
+            "resolutionWidth": { "type": "integer", "minimum": 1 },
+            "resolutionHeight": { "type": "integer", "minimum": 1 },
+            "osScalePercent": { "type": "integer", "minimum": 50, "maximum": 500 },
+            "scaleWasModifiedByCollector": { "const": false },
+            "source": { "const": "operator-supplied-and-target-bound" }
+          }
+        },
+        "webView2Runtimes": { "type": "array" },
+        "gpu": { "type": "array" },
+        "node": {
+          "type": "object",
+          "required": ["present", "version"],
+          "properties": {
+            "present": { "type": "boolean" },
+            "version": { "type": ["string", "null"] }
+          }
+        }
+      }
+    },
+    "execution": {
+      "type": "object",
+      "required": ["startupAndHealth", "noNodeVerification", "performance", "workingSet", "workflows"],
+      "properties": {
+        "startupAndHealth": { "$ref": "#/$defs/executionCase" },
+        "noNodeVerification": { "$ref": "#/$defs/executionCase" },
+        "performance": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 2,
+          "items": {
+            "allOf": [
+              { "$ref": "#/$defs/executionCase" },
+              {
+                "type": "object",
+                "required": ["primitiveCount", "sampleCount", "inputToPaintMs", "rafFrameMs"],
+                "properties": {
+                  "primitiveCount": { "enum": [300, 1000] },
+                  "sampleCount": { "type": "integer", "minimum": 0 },
+                  "inputToPaintMs": { "$ref": "#/$defs/percentiles" },
+                  "rafFrameMs": {
+                    "allOf": [
+                      { "$ref": "#/$defs/percentiles" },
+                      {
+                        "type": "object",
+                        "required": ["longFrameThresholdMs", "longFrameCount"],
+                        "properties": {
+                          "longFrameThresholdMs": { "type": "number", "exclusiveMinimum": 0 },
+                          "longFrameCount": { "type": ["integer", "null"], "minimum": 0 }
+                        }
+                      }
+                    ]
+                  }
+                }
+              }
+            ]
+          },
+          "contains": { "type": "object", "properties": { "primitiveCount": { "const": 300 } }, "required": ["primitiveCount"] },
+          "minContains": 1,
+          "maxContains": 1,
+          "allOf": [
+            {
+              "contains": { "type": "object", "properties": { "primitiveCount": { "const": 1000 } }, "required": ["primitiveCount"] },
+              "minContains": 1,
+              "maxContains": 1
+            }
+          ]
+        },
+        "workingSet": {
+          "allOf": [
+            { "$ref": "#/$defs/executionCase" },
+            {
+              "type": "object",
+              "required": ["sampleCount", "p50MiB", "p95MiB", "peakMiB"],
+              "properties": {
+                "sampleCount": { "type": "integer", "minimum": 0 },
+                "p50MiB": { "type": ["number", "null"], "minimum": 0 },
+                "p95MiB": { "type": ["number", "null"], "minimum": 0 },
+                "peakMiB": { "type": ["number", "null"], "minimum": 0 }
+              }
+            }
+          ]
+        },
+        "workflows": {
+          "type": "object",
+          "required": ["projectSaveLoad", "legacyProjectAndPackage", "stationReconnectAndResult", "agentWorkspace"],
+          "properties": {
+            "projectSaveLoad": { "$ref": "#/$defs/executionCase" },
+            "legacyProjectAndPackage": { "$ref": "#/$defs/executionCase" },
+            "stationReconnectAndResult": { "$ref": "#/$defs/executionCase" },
+            "agentWorkspace": { "$ref": "#/$defs/executionCase" }
+          },
+          "additionalProperties": false
+        }
+      }
+    },
+    "evidenceFiles": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["kind", "path", "sha256", "sizeBytes"],
+        "properties": {
+          "kind": { "enum": ["screenshot", "log"] },
+          "path": { "type": "string", "minLength": 1 },
+          "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+          "sizeBytes": { "type": "integer", "minimum": 0 }
+        },
+        "additionalProperties": false
+      }
+    },
+    "profileClosure": {
+      "type": "object",
+      "required": ["status", "independentProfile", "releaseBlocking", "conclusion", "blockedCapabilities"],
+      "properties": {
+        "status": { "enum": ["NOT_RUN", "OPEN", "CLOSED_PASS", "CLOSED_BLOCKED"] },
+        "independentProfile": { "const": true },
+        "releaseBlocking": { "type": "boolean" },
+        "conclusion": { "type": ["string", "null"] },
+        "blockedCapabilities": { "type": "array", "items": { "type": "string" } }
+      },
+      "additionalProperties": false
+    },
+    "signOff": {
+      "type": "object",
+      "required": ["operatorIdentity", "reviewer", "deviceSerialNumber", "approvalDecision", "signedAtUtc"],
+      "properties": {
+        "operatorIdentity": { "type": ["string", "null"] },
+        "reviewer": { "type": ["string", "null"] },
+        "deviceSerialNumber": { "type": ["string", "null"] },
+        "approvalDecision": { "enum": [null, "APPROVED", "REJECTED", "BLOCKED"] },
+        "signedAtUtc": { "type": ["string", "null"], "format": "date-time" }
+      },
+      "additionalProperties": false
+    },
+    "nonExecutedReleaseBoundaries": { "type": "array", "items": { "type": "string" }, "minItems": 1 }
+  },
+  "$defs": {
+    "status": { "enum": ["NOT_RUN", "PASS", "FAIL", "BLOCKED", "INCONCLUSIVE"] },
+    "executionCase": {
+      "type": "object",
+      "required": ["status", "notes", "evidenceRefs"],
+      "properties": {
+        "status": { "$ref": "#/$defs/status" },
+        "notes": { "type": ["string", "null"] },
+        "evidenceRefs": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "percentiles": {
+      "type": "object",
+      "required": ["p50", "p95"],
+      "properties": {
+        "p50": { "type": ["number", "null"], "minimum": 0 },
+        "p95": { "type": ["number", "null"], "minimum": 0 }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "fixture": { "const": true } }, "required": ["fixture"] },
+      "then": { "properties": { "evidenceClass": { "const": "FIXTURE" } } },
+      "else": { "properties": { "evidenceClass": { "const": "TARGET_MACHINE" } } }
+    }
+  ],
+  "additionalProperties": false
+}
