@@ -93,6 +93,16 @@ foreach ($wrapper in $wrappers) {
     }
 }
 $workflowText = Get-Content -LiteralPath $workflow -Raw -Encoding UTF8
+$canonicalText = Get-Content -LiteralPath $canonical -Raw -Encoding UTF8
+foreach ($required in @(
+    "-p:EnableHuaraySdk=false",
+    "Normalize-Utf8LineEndings",
+    'vendorCameraSdkPolicy = "not-bundled-site-prerequisite"'
+)) {
+    if (-not $canonicalText.Contains($required, [StringComparison]::Ordinal)) {
+        throw "Canonical packaging is missing deterministic vendor/text boundary: $required"
+    }
+}
 foreach ($required in @(
     "package-portable-deployment.ps1",
     "-Profile field-self-contained",
@@ -165,6 +175,15 @@ if (-not [string]::IsNullOrWhiteSpace($PackageResultPath)) {
         if ($manifest.contentFingerprint -ne $result.contentFingerprint) { throw "Content fingerprint mismatch." }
         if ($sourceIdentity.gitSha -ne $result.gitSha -or $sourceIdentity.runtimeIdentifier -ne $result.runtimeIdentifier -or $sourceIdentity.profile -ne $result.profile) {
             throw "ZIP source identity does not match package-result identity."
+        }
+        if ([bool]$sourceIdentity.bundledVendorCameraSdk -or $sourceIdentity.vendorCameraSdkPolicy -ne "not-bundled-site-prerequisite") {
+            throw "Official portable package did not preserve the non-bundled vendor camera SDK boundary."
+        }
+        $machineLocalVendorAssets = @($entries | Where-Object {
+            $_.Name -match '^(?i:MVSDK_Net\.dll|MVSDKmd\.dll|MVProducer(?:CXP|GEV|U3V)\.cti|CLIDelegate\.dll)$'
+        })
+        if ($machineLocalVendorAssets.Count -gt 0) {
+            throw "Portable ZIP contains machine-local vendor SDK assets: $($machineLocalVendorAssets.FullName -join ', ')"
         }
         if (@($sourceIdentity.runtimeInventory | Where-Object { $_ -match '(?i)[A-Z]:[\\/]+Users[\\/]+|/home/[^/]+/' }).Count -gt 0) {
             throw "ZIP source identity contains a machine-local runtime installation path."

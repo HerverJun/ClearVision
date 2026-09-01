@@ -85,6 +85,18 @@ function Write-Utf8NoBom {
     [System.IO.File]::WriteAllText($Path, $Content, [System.Text.UTF8Encoding]::new($false))
 }
 
+function Normalize-Utf8LineEndings {
+    param([Parameter(Mandatory = $true)][string]$Path)
+    $content = [System.IO.File]::ReadAllText($Path)
+    $normalized = $content.Replace("`r`n", "`n").Replace("`r", "`n")
+    Write-Utf8NoBom -Path $Path -Content $normalized
+}
+
+function Convert-ToCrLf {
+    param([Parameter(Mandatory = $true)][string]$Content)
+    return $Content.Replace("`r`n", "`n").Replace("`r", "`n").Replace("`n", "`r`n")
+}
+
 function Write-JsonFile {
     param(
         [Parameter(Mandatory = $true)][string]$Path,
@@ -247,8 +259,21 @@ Write-Host "[portable] Publishing $Application / $RuntimeIdentifier / $Profile"
     -p:InformationalVersion="$Version+$SourceRevisionId" `
     -p:RepositoryCommit=$SourceRevisionId `
     -p:SourceRevisionId=$SourceRevisionId `
+    -p:EnableHuaraySdk=false `
     --output $stagingDir
 if ($LASTEXITCODE -ne 0) { throw "dotnet publish failed with exit code $LASTEXITCODE." }
+
+# Official portable packages must not vary according to ignored, machine-local vendor SDK files.
+# Huaray runtime assets remain a separately provisioned and approved site prerequisite.
+$normalizedTextExtensions = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
+foreach ($extension in @(".json", ".html", ".js", ".mjs", ".css", ".txt", ".cmd", ".bat")) {
+    $normalizedTextExtensions.Add($extension) | Out-Null
+}
+Get-ChildItem -LiteralPath $stagingDir -Recurse -File -Force | Where-Object {
+    $normalizedTextExtensions.Contains($_.Extension)
+} | ForEach-Object {
+    Normalize-Utf8LineEndings -Path $_.FullName
+}
 
 $executablePath = Join-Path $stagingDir $selected.Executable
 if (-not (Test-Path -LiteralPath $executablePath -PathType Leaf)) { throw "Published executable is missing: $($selected.Executable)" }
@@ -259,7 +284,7 @@ pushd "%~dp0"
 start "" "%~dp0$($selected.Executable)"
 popd
 "@
-Write-Utf8NoBom -Path (Join-Path $stagingDir "Launch-ClearVision.cmd") -Content ($launcher.Replace("`n", "`r`n"))
+Write-Utf8NoBom -Path (Join-Path $stagingDir "Launch-ClearVision.cmd") -Content (Convert-ToCrLf -Content $launcher)
 
 $supportBoundary = if ($isSelfContained) {
     ".NET runtime is bundled. Microsoft Edge WebView2 Runtime remains an explicit target-machine prerequisite for Studio."
@@ -283,8 +308,8 @@ Run Launch-ClearVision.cmd. The launch chain calls only the packaged .NET execut
 Support boundary
 ----------------
 $supportBoundary
-No local database, user profile, API key, token, model, sample image, source patch, test result, Playwright report, Node runtime, node_modules, FrontendV2, or development manifest is copied into this package.
-Site databases, camera SDK prerequisites, credentials, models, PLC endpoints, and project data must be provisioned and approved separately.
+No local database, user profile, API key, token, model, sample image, source patch, test result, Playwright report, Node runtime, node_modules, FrontendV2, development manifest, or machine-local vendor SDK is copied into this package.
+Site databases, camera SDK prerequisites (including Huaray runtime assets), credentials, models, PLC endpoints, and project data must be provisioned and approved separately.
 
 Evidence
 --------
@@ -296,7 +321,7 @@ Claims not made
 ---------------
 This package is not evidence of a GitHub Release upload, a real no-Node target machine, real WebView2/DPI coverage, real device/model validation, site performance, or same-SHA GitHub CI.
 "@
-Write-Utf8NoBom -Path (Join-Path $stagingDir "README-site-deploy.txt") -Content ($readme.Replace("`n", "`r`n"))
+Write-Utf8NoBom -Path (Join-Path $stagingDir "README-site-deploy.txt") -Content (Convert-ToCrLf -Content $readme)
 
 $gitDirty = [bool](& git -C $repoRoot status --porcelain)
 $sourceTimestampUtc = (& git -C $repoRoot show -s --format=%cI $SourceRevisionId).Trim()
@@ -319,6 +344,8 @@ $sourceIdentity = [ordered]@{
     profile = $Profile
     configuration = $Configuration
     selfContained = $isSelfContained
+    bundledVendorCameraSdk = $false
+    vendorCameraSdkPolicy = "not-bundled-site-prerequisite"
     sdkVersion = $sdkVersion
     runtimeInventory = $runtimeVersions
     packagingImplementation = "scripts/package-portable-deployment.ps1"
