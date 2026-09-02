@@ -10,6 +10,7 @@
 - [operator-performance-benchmark-current](./operator-performance-benchmark-current.md)
 - [field-replay 证据分层记录](./field-replay证据分层记录-2026-04-29.md)
 - [AI 算子差距评估报告](./AI算子差距评估报告.md)
+- [AI 功能代码级与项目级整改闭环记录（2026-09）](./AI功能代码级与项目级整改闭环记录-2026-09.md)
 
 ## 维护规则
 
