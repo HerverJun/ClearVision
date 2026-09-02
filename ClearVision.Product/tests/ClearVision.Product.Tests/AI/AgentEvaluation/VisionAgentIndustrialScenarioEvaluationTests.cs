@@ -31,7 +31,8 @@ public sealed class VisionAgentIndustrialScenarioEvaluationTests
             .Should().Contain(["ImageAcquisition", "SurfaceDefectDetection", "BlobAnalysis", "ResultJudgment", "ResultOutput"]);
         AssertWorkflowUsesOnlyRealOperatorTypes(result);
         AssertWorkflowDoesNotContainParameter(result, "ModelId", "TemplatePath", "Rule", "Channel");
-        result.BuildResult.MissingResources.Should().Contain(item => item.ResourceType == "camera_binding");
+        result.BuildResult.MissingResources.Should().Contain(item => item.ResourceType == "image_source");
+        result.BuildResult.MissingResources.Should().NotContain(item => item.ResourceType == "camera_binding");
     }
 
     [Fact(DisplayName = "Scenario eval: terminal wire sequence should keep model and sequence labels pending")]
@@ -311,8 +312,13 @@ public sealed class VisionAgentIndustrialScenarioEvaluationTests
         result.BuildResult.Should().NotBeNull();
         result.BuildResult!.ValidationPreview.Should().NotBeNull();
         result.BuildResult.WorkflowDiff.ValidationFailures.Should().BeEmpty();
-        result.BuildResult.ApplyGate.CanvasApplyReady.Should().BeTrue();
-        result.BuildResult.ApplyGate.RuntimeDraftReady.Should().BeTrue();
+        var applyBlockers = string.Join(",", result.BuildResult.ApplyGate.ApplyBlockers);
+        var admissionContext =
+            $"task={result.BuildResult.TaskType};contract={result.BuildResult.ContractVersion};blockers={applyBlockers}";
+        result.BuildResult.ApplyGate.CanvasApplyReady.Should().BeTrue(
+            $"the canonical scenario draft should pass canvas admission; {admissionContext}");
+        result.BuildResult.ApplyGate.RuntimeDraftReady.Should().BeTrue(
+            $"the canonical scenario draft should pass metadata dry-run; {admissionContext}");
         result.BuildResult.ApplyGate.DeploymentReady.Should().BeFalse();
         result.BuildResult.ApplyGate.DeploymentBlockers.Should().NotBeEmpty();
         result.BuildResult.FirstFixRecommendation.Should().NotBeNullOrWhiteSpace();

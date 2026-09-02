@@ -4636,8 +4636,8 @@ test('Canonical field aliases are stored optimistically but cannot override back
       field: 'medical_modality_and_lesion_type',
       title: '检查类型',
       options: [
-        { value: 'ct_lung_nodule_detection', label: 'CT 肺结节', recommended: true },
-        { value: 'mri_lesion_detection', label: 'MRI 病灶', recommended: false }
+        { value: 'object_detection', label: '目标检测', recommended: true },
+        { value: 'surface_defect', label: '表面缺陷', recommended: false }
       ]
     }],
     buildReadiness: {
@@ -4650,7 +4650,7 @@ test('Canonical field aliases are stored optimistically but cannot override back
     }
   }));
   panel._requestBackendPlanReadinessPreview = () => new Promise(() => {});
-  panel._selectPlanQuestionOption('medical_modality_and_lesion_type', 'ct_lung_nodule_detection');
+  panel._selectPlanQuestionOption('medical_modality_and_lesion_type', 'object_detection');
   assert.equal(panel.planQuestionAnswers.task_type.field, 'task_type');
   assert.equal(panel.agentWorkspaceState.projection.readiness.canBuild, false);
   assert.equal(panel.agentWorkspaceState.projection.buildAction.canStart, false);

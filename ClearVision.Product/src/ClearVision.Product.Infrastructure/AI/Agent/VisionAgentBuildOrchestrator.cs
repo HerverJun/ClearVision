@@ -274,7 +274,8 @@ public sealed class VisionAgentBuildOrchestrator : IVisionAgentBuildOrchestrator
                 {
                     var assessment = _routeContractRegistry.Assess(
                         ResolveTaskType(loadPlan.Payload),
-                        currentDraft.Artifact.Graph);
+                        currentDraft.Artifact.Graph,
+                        loadPlan.Payload.Plan?.PlanFidelity.RequiredOutputSemantics);
                     return Task.FromResult(VisionAgentBuildSupport.StepResult(
                         assessment,
                         assessment.Satisfied

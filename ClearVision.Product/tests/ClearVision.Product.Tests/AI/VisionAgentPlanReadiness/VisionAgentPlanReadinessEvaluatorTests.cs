@@ -170,7 +170,7 @@ public sealed class VisionAgentPlanReadinessEvaluatorTests
     }
 
     [Fact]
-    public void Evaluate_StrictAnsweredImageSource_ShouldResolve()
+    public void Evaluate_StrictAnsweredFileSource_ShouldResolveFieldButRequireImageFile()
     {
         var baseline = Plan([]);
         var plan = baseline with
@@ -210,14 +210,19 @@ public sealed class VisionAgentPlanReadinessEvaluatorTests
             validatedAnswers: validation,
             requirementMode: AiRequirementModes.Strict);
 
-        readiness.CanBuild.Should().BeTrue();
-        readiness.Blockers.Should().NotContain(blocker => blocker.BlocksBuild);
+        readiness.CanBuild.Should().BeFalse();
+        readiness.Blockers.Should().ContainSingle(blocker =>
+            blocker.BlocksBuild &&
+            blocker.Resource != null &&
+            blocker.Resource.ResourceType == "image_file" &&
+            blocker.Resource.ParameterName == "FilePath" &&
+            blocker.Resource.ResolutionTarget == VisionAgentResourceResolutionTargets.ImageFilePicker);
         readiness.ResolvedFields.Should().Contain(VisionAgentPlanAnswerFields.ImageSource);
         AssertCanBuildInvariant(readiness);
     }
 
     [Fact]
-    public void Evaluate_RecommendedResolveField_ShouldResolveBlocker()
+    public void Evaluate_RecommendedFileSource_ShouldResolveFieldButRequireFileResource()
     {
         var baseline = Plan([]);
         var plan = baseline with
@@ -250,8 +255,13 @@ public sealed class VisionAgentPlanReadinessEvaluatorTests
         validation.AcceptedAnswers.Should().ContainSingle(answer =>
             answer.Field == VisionAgentPlanAnswerFields.ImageSource &&
             answer.Value == "file_sample");
-        readiness.CanBuild.Should().BeTrue();
-        readiness.Blockers.Should().NotContain(blocker => blocker.BlocksBuild);
+        readiness.CanBuild.Should().BeFalse();
+        readiness.ResolvedFields.Should().Contain(VisionAgentPlanAnswerFields.ImageSource);
+        readiness.Blockers.Should().ContainSingle(blocker =>
+            blocker.Resource != null &&
+            blocker.Resource.ResourceType == "image_file" &&
+            blocker.Resource.ParameterName == "FilePath" &&
+            blocker.BlocksBuild);
     }
 
     [Fact]
@@ -578,7 +588,8 @@ public sealed class VisionAgentPlanReadinessEvaluatorTests
 
         readiness.CanBuild.Should().BeTrue();
         readiness.Blockers.Should().ContainSingle(blocker =>
-            blocker.Resource != null && blocker.Resource.ResourceType == "camera_binding" &&
+            blocker.Resource != null && blocker.Resource.ResourceType == "image_source" &&
+            blocker.Resource.ParameterName == "SourceType" &&
             blocker.Category == VisionAgentBuildBlockerCategories.ResourcePending &&
             blocker.Field == VisionAgentPlanAnswerFields.ImageSource &&
             blocker.BlocksBuild == false &&
@@ -1004,7 +1015,8 @@ public sealed class VisionAgentPlanReadinessEvaluatorTests
         ]);
         readiness.Blockers.Should().ContainSingle(blocker =>
             blocker.Resource != null &&
-            blocker.Resource.ResourceType == "camera_binding" &&
+            blocker.Resource.ResourceType == "image_source" &&
+            blocker.Resource.ParameterName == "SourceType" &&
             blocker.Resource.DraftPolicy == VisionAgentResourceDraftPolicies.DraftAllowed &&
             blocker.Resource.BlockingScope == VisionAgentResourceBlockingScopes.DeployRun &&
             blocker.BlocksBuild == false);
@@ -1024,7 +1036,8 @@ public sealed class VisionAgentPlanReadinessEvaluatorTests
         readiness.CanBuild.Should().BeFalse();
         readiness.Blockers.Should().Contain(blocker =>
             blocker.Resource != null &&
-            blocker.Resource.ResourceType == "camera_binding" &&
+            blocker.Resource.ResourceType == "image_source" &&
+            blocker.Resource.ParameterName == "SourceType" &&
             blocker.BlocksBuild);
         AssertCanBuildInvariant(readiness);
     }
@@ -1054,7 +1067,7 @@ public sealed class VisionAgentPlanReadinessEvaluatorTests
     }
 
     [Fact]
-    public void Evaluate_ChineseMissingCameraOrSample_ShouldUseOneStableCameraBinding()
+    public void Evaluate_ChineseMissingCameraOrSample_ShouldUseOneStableSourceSelectionResource()
     {
         var baseline = Plan(["resource_pending:未提供现场相机或代表性图像样本"]);
         var plan = baseline with
@@ -1082,12 +1095,48 @@ public sealed class VisionAgentPlanReadinessEvaluatorTests
         strict.MissingResources.Should().ContainSingle();
         draft.MissingResources.Should().ContainSingle();
         strict.MissingResources.Single().Should().Match<VisionAgentResourceRequirement>(resource =>
-            resource.ResourceType == "camera_binding" &&
+            resource.ResourceType == "image_source" &&
             resource.DraftPolicy == VisionAgentResourceDraftPolicies.DraftAllowed &&
-            resource.ResolutionTarget == VisionAgentResourceResolutionTargets.CameraSettings);
+            resource.ResolutionTarget == VisionAgentResourceResolutionTargets.PlanWorkbench);
         draft.MissingResources.Single().CanonicalId.Should().Be(strict.MissingResources.Single().CanonicalId);
         strict.MissingResources.Should().NotContain(resource => resource.ResourceType == "resource");
         draft.MissingResources.Should().NotContain(resource => resource.ResourceType == "resource");
+    }
+
+    [Fact]
+    public void Evaluate_UnsupportedVideoSource_ShouldFailClosedWithSpecificBlocker()
+    {
+        var baseline = Plan([]);
+        var plan = baseline with
+        {
+            SemanticExtraction = baseline.SemanticExtraction! with { ImageSource = "video_stream" },
+            ConfirmedPlanAnswers =
+            [
+                new VisionAgentPlanAnswer
+                {
+                    QuestionId = "image_source",
+                    Field = VisionAgentPlanAnswerFields.ImageSource,
+                    Value = "video_stream",
+                    Origin = VisionAgentPlanAnswerOrigins.ExplicitUserSelection
+                }
+            ]
+        };
+        var validation = new VisionAgentPlanAnswerValidator().Validate(
+            plan,
+            plan.ConfirmedPlanAnswers,
+            null,
+            false);
+
+        var readiness = VisionAgentPlanReadinessEvaluator.Evaluate(
+            plan,
+            validatedAnswers: validation,
+            requirementMode: AiRequirementModes.Draft);
+
+        readiness.CanBuild.Should().BeFalse();
+        readiness.Blockers.Should().Contain(blocker =>
+            blocker.Id == "hard_requirement:unsupported_image_source" && blocker.BlocksBuild);
+        readiness.Blockers.Should().NotContain(blocker =>
+            blocker.Resource != null && blocker.Resource.ResourceType == "camera_binding");
     }
 
     [Fact]

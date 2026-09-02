@@ -21,6 +21,8 @@ public sealed class WorkflowArtifactAdmissionGateTests
 
         result.Disposition.Should().Be(WorkflowArtifactAdmissionDisposition.Canonical);
         result.Report.Diagnostics.Should().BeEmpty();
+        result.Report.PrimaryDiagnostic.Should().BeNull();
+        result.Report.SecondaryDiagnostics.Should().BeEmpty();
         result.Report.OriginalArtifactPreserved.Should().BeFalse();
         result.AllowedToPersist.Should().BeTrue();
         result.AllowedToRun.Should().BeTrue();
@@ -54,7 +56,7 @@ public sealed class WorkflowArtifactAdmissionGateTests
     }
 
     [Fact]
-    public void EntityRoundTrip_ShouldPreserveAiAdmissionMetadata()
+    public void EntityRoundTrip_V1ProcessorTerminal_ShouldPreserveMetadataButFailV2Admission()
     {
         var factory = new OperatorFactory();
         var camera = CreateOperator(
@@ -137,14 +139,21 @@ public sealed class WorkflowArtifactAdmissionGateTests
                 RouteSemanticsSatisfied = true
             });
 
-        result.Disposition.Should().Be(WorkflowArtifactAdmissionDisposition.Canonical);
-        result.Entity.Should().NotBeNull();
-        result.Entity!.Operators.Select(op => op.Metadata!["agentTaskType"])
-            .Should().OnlyContain(value => Equals(value, "template_matching"));
-        result.Entity.Operators.Select(op => op.Metadata!["agentArtifactFingerprint"])
-            .Should().OnlyContain(value => Equals(value, fingerprint));
-        result.Entity.Operators.Select(op => op.Metadata!["agentRouteSemanticsSatisfied"])
-            .Should().OnlyContain(value => Equals(value, true));
+        result.Disposition.Should().Be(WorkflowArtifactAdmissionDisposition.Quarantined);
+        result.Entity.Should().BeNull();
+        result.Report.OriginalArtifactPreserved.Should().BeTrue();
+        result.Report.Diagnostics.Select(item => item.Code).Should().Contain(
+            ["route_missing_result_output", "route_missing_judgment"]);
+        result.Report.RouteEvidence.Should().NotBeNull();
+        result.Report.RouteEvidence!.ContractVersion.Should().Be(VisionAgentPlanContractVersions.V2);
+        result.Report.RouteEvidence.TaskType.Should().Be(AiVisionTaskTypes.TemplateLocation);
+        result.Report.RouteEvidence.RequiredCapabilities.Should().Contain("TemplateMatching");
+        result.Report.RouteEvidence.MissingCapabilities.Should().Contain("TemplateMatching");
+        result.Report.RouteEvidence.RequiredResultSemantics.Should().Contain(VisionPortSemantics.TemplateMatches);
+        result.Report.RouteEvidence.MissingResultSemantics.Should().Contain(VisionPortSemantics.TemplateMatches);
+        result.Report.RouteEvidence.LegalTerminals.Should().Contain("ResultOutput");
+        result.Report.RouteEvidence.ReachedTerminals.Should().BeEmpty();
+        result.Report.RouteEvidence.Evidence.Should().NotBeEmpty();
     }
 
     [Fact]
@@ -219,6 +228,12 @@ public sealed class WorkflowArtifactAdmissionGateTests
         result.AllowedToExport.Should().BeFalse();
         result.AllowedToSyncStation.Should().BeFalse();
         result.Report.Diagnostics.Select(item => item.Code).Should().Contain("minimum_scaffold_task_incomplete");
+        result.Report.Diagnostics.Select(item => item.Code).Should().Contain("route_semantics_not_satisfied");
+        result.Report.PrimaryDiagnostic.Should().NotBeNull();
+        result.Report.PrimaryDiagnostic!.Code.Should().Be("route_missing_task_processor");
+        result.Report.SecondaryDiagnostics.Select(item => item.Code)
+            .Should().Contain("route_semantics_not_satisfied");
+        result.Report.SecondaryDiagnostics.Count.Should().Be(result.Report.Diagnostics.Count - 1);
     }
 
     [Fact]

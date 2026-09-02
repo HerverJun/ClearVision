@@ -7,6 +7,7 @@ using ClearVision.Product.Infrastructure.Data;
 using ClearVision.Product.Infrastructure.Repositories;
 using ClearVision.Product.Infrastructure.Security;
 using ClearVision.Product.Infrastructure.Services;
+using ClearVision.Product.Tests.TestSupport;
 using FluentAssertions;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
@@ -17,6 +18,7 @@ using NSubstitute;
 namespace ClearVision.Product.Tests.Integration;
 
 [TestClassification(TestDomain.General, TestPurpose.Regression, TestLane.Pr, TestEvidenceType.IntegrationEvidence, TestOracleType.Contract, TestResourceRequirement.Database, TestExpectedDuration.Fast, TestFlakyPolicy.Blocking, "product", Suites = "ServicesRegression")]
+[Collection(AuthServiceStateTestCollections.InMemorySessionState)]
 public sealed class UserAuthorityRepositoryTests
 {
     [Fact]

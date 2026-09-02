@@ -153,26 +153,29 @@ public static class AuditBaselineStore
             }
 
             var findingExists = findingIdentities.Contains(FindingIdentity(entry.FindingCode, entry.Operator, entry.Field));
+            if (entry.StaticDifferenceStatus == "resolved" && findingExists)
+            {
+                errors.Add($"resolved review finding still present:{entry.ReviewId}");
+            }
+            else if (entry.StaticDifferenceStatus == "present" && !findingExists)
+            {
+                errors.Add($"review finding missing:{entry.ReviewId}");
+            }
+
             if (entry.Verdict == "fixed-production-defect")
             {
                 if (entry.StaticDifferenceStatus != "resolved" ||
-                    entry.ProductionReachability != "reachable" ||
-                    findingExists)
+                    entry.ProductionReachability != "reachable")
                 {
                     errors.Add($"invalid fixed production defect:{entry.ReviewId}");
                 }
             }
-            else
-            {
-                if (entry.StaticDifferenceStatus != "present" || !findingExists)
-                {
-                    errors.Add($"review finding missing:{entry.ReviewId}");
-                }
-            }
 
-            if (entry.Verdict == "open-production-defect" && entry.ProductionReachability != "reachable")
+            if (entry.Verdict == "open-production-defect" &&
+                (entry.ProductionReachability != "reachable" ||
+                 entry.StaticDifferenceStatus != "present"))
             {
-                errors.Add($"open production defect must be reachable:{entry.ReviewId}");
+                errors.Add($"open production defect must be present and reachable:{entry.ReviewId}");
             }
         }
 
@@ -214,10 +217,18 @@ public static class AuditBaselineStore
             reviewed.Count(item => item.StaticDifferenceStatus == "resolved"),
             reviewed.Count(item => item.ProductionReachability == "reachable"),
             reviewed.Count(item => item.Verdict == "fixed-production-defect"),
-            reviewed.Count(item => item.Verdict == "open-production-defect"),
-            reviewed.Count(item => item.Verdict == "candidate"),
-            reviewed.Count(item => item.Verdict == "intentional-difference"),
-            reviewed.Count(item => item.Verdict == "audit-false-positive"),
+            reviewed.Count(item =>
+                item.StaticDifferenceStatus == "present" &&
+                item.Verdict == "open-production-defect"),
+            reviewed.Count(item =>
+                item.StaticDifferenceStatus == "present" &&
+                item.Verdict == "candidate"),
+            reviewed.Count(item =>
+                item.StaticDifferenceStatus == "present" &&
+                item.Verdict == "intentional-difference"),
+            reviewed.Count(item =>
+                item.StaticDifferenceStatus == "present" &&
+                item.Verdict == "audit-false-positive"),
             reviewed
                 .Select(item => categories.GetValueOrDefault(item.Operator, "audit-boundary"))
                 .Distinct(StringComparer.OrdinalIgnoreCase)

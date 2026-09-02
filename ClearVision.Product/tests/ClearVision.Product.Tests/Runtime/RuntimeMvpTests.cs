@@ -59,6 +59,54 @@ public class RuntimeMvpTests
     }
 
     [Fact]
+    public async Task PackageExporter_WhenAiAdmissionBlocks_ShouldExposePrioritizedDiagnostic()
+    {
+        var project = CreateProjectDto("prioritized-export-diagnostic");
+        project.Flow!.Operators.Single().Metadata = new Dictionary<string, object?>
+        {
+            ["agentPlanId"] = "plan-prioritized-diagnostic"
+        };
+        var generic = new WorkflowArtifactDiagnostic(
+            "route_semantics_not_satisfied",
+            "The route did not satisfy its generic semantic summary.");
+        var specific = new WorkflowArtifactDiagnostic(
+            "route_missing_task_processor",
+            "The route is missing the required task processor.");
+        var admission = new WorkflowArtifactAdmissionResult
+        {
+            Disposition = WorkflowArtifactAdmissionDisposition.Quarantined,
+            Report = new WorkflowQuarantineReport
+            {
+                Disposition = WorkflowArtifactAdmissionDisposition.Quarantined,
+                CanExport = false,
+                Diagnostics = [generic, specific],
+                PrimaryDiagnostic = specific,
+                SecondaryDiagnostics = [generic]
+            }
+        };
+        var gate = Substitute.For<IWorkflowArtifactAdmissionGate>();
+        gate.Inspect(
+                Arg.Any<OperatorFlowDto>(),
+                "runtime.export",
+                Arg.Any<string?>(),
+                Arg.Any<WorkflowArtifactAdmissionContext?>())
+            .Returns(admission);
+        var exporter = new RuntimePackageExporter(
+            new OperatorFactory(),
+            NullLogger<RuntimePackageExporter>.Instance,
+            workflowArtifactAdmissionGate: gate);
+
+        var act = () => exporter.ExportAsync(new RuntimePackageExportRequest
+        {
+            Project = project
+        });
+
+        var exception = await act.Should().ThrowAsync<RuntimePackageException>();
+        exception.Which.Message.Should().Contain(specific.Code);
+        exception.Which.Message.Should().NotContain(generic.Code);
+    }
+
+    [Fact]
     public async Task PackageLoader_ShouldRejectFlowHashMismatch()
     {
         var root = CreateTempDirectory();

@@ -116,13 +116,24 @@ internal sealed record CanonicalWorkflowConnection(
     string TargetTempId,
     string TargetPortName);
 
+internal sealed record VisionAgentSemanticEdgeAudit(
+    string SourceTempId,
+    string SourcePortName,
+    string SourceSemantic,
+    string TargetTempId,
+    string TargetPortName,
+    string TargetSemantic,
+    string SelectionReason,
+    bool CriticalBusinessEdge);
+
 internal sealed record CompiledWorkflowArtifact(
     CanonicalWorkflowGraph Graph,
     object WorkflowDraft,
     OperatorFlowDto CanvasProjection,
     string ArtifactFingerprint,
     string CatalogVersion,
-    string ReturnedFlowSemanticFingerprint);
+    string ReturnedFlowSemanticFingerprint,
+    IReadOnlyList<VisionAgentSemanticEdgeAudit> SemanticEdgeAudits);
 
 internal sealed record DraftWorkflowResolution(
     AiFlowGenerationResult GenerationResult,

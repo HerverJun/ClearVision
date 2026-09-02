@@ -489,20 +489,20 @@ public sealed class VisionAgentIntentRouterService : IVisionAgentIntentRouterSer
 
         var semantic = request.SemanticExtraction;
         var updates = new List<VisionAgentPlanAnswer>();
-        AddRequirementAnswer(updates, remaining, VisionAgentPlanAnswerFields.InspectionObject, semantic?.InspectionObject);
-        AddRequirementAnswer(updates, remaining, VisionAgentPlanAnswerFields.ImageSource, semantic?.ImageSource);
-        AddRequirementAnswer(updates, remaining, VisionAgentPlanAnswerFields.AcceptanceCriteria, VisionAgentPlanFieldPolicy.FormatAcceptanceCriteria(semantic?.OkCondition, semantic?.NgCondition));
-        AddRequirementAnswer(updates, remaining, VisionAgentPlanAnswerFields.OutputTarget, semantic?.OutputTarget);
-        AddRequirementAnswer(updates, remaining, VisionAgentPlanAnswerFields.TargetAttribute, semantic?.TargetAttribute);
-        AddRequirementAnswer(updates, remaining, VisionAgentPlanAnswerFields.DefectType, semantic?.DefectType);
-        AddRequirementAnswer(updates, remaining, VisionAgentPlanAnswerFields.MeasurementTarget, semantic?.MeasurementTarget);
+        AddRequirementAnswer(updates, remaining, VisionAgentPlanAnswerFields.InspectionObject, semantic?.InspectionObject, request.Description);
+        AddRequirementAnswer(updates, remaining, VisionAgentPlanAnswerFields.ImageSource, semantic?.ImageSource, request.Description);
+        AddRequirementAnswer(updates, remaining, VisionAgentPlanAnswerFields.AcceptanceCriteria, VisionAgentPlanFieldPolicy.FormatAcceptanceCriteria(semantic?.OkCondition, semantic?.NgCondition), request.Description);
+        AddRequirementAnswer(updates, remaining, VisionAgentPlanAnswerFields.OutputTarget, semantic?.OutputTarget, request.Description);
+        AddRequirementAnswer(updates, remaining, VisionAgentPlanAnswerFields.TargetAttribute, semantic?.TargetAttribute, request.Description);
+        AddRequirementAnswer(updates, remaining, VisionAgentPlanAnswerFields.DefectType, semantic?.DefectType, request.Description);
+        AddRequirementAnswer(updates, remaining, VisionAgentPlanAnswerFields.MeasurementTarget, semantic?.MeasurementTarget, request.Description);
 
         var taskType = Clean(semantic?.TaskType);
         if (!string.IsNullOrWhiteSpace(taskType) &&
             !string.Equals(taskType, AiVisionTaskTypes.Unknown, StringComparison.OrdinalIgnoreCase) &&
             !string.Equals(taskType, AiVisionTaskTypes.AbstractGoal, StringComparison.OrdinalIgnoreCase))
         {
-            AddRequirementAnswer(updates, remaining, VisionAgentPlanAnswerFields.TaskType, taskType);
+            AddRequirementAnswer(updates, remaining, VisionAgentPlanAnswerFields.TaskType, taskType, request.Description);
         }
 
         if (updates.Count == 0 && remaining.Count == 1)
@@ -510,7 +510,7 @@ public sealed class VisionAgentIntentRouterService : IVisionAgentIntentRouterSer
             var field = remaining.First();
             if (IsRequirementAnswerField(field))
             {
-                AddRequirementAnswer(updates, remaining, field, request.Description);
+                AddRequirementAnswer(updates, remaining, field, request.Description, request.Description);
             }
         }
 
@@ -524,7 +524,8 @@ public sealed class VisionAgentIntentRouterService : IVisionAgentIntentRouterSer
         List<VisionAgentPlanAnswer> updates,
         ISet<string> remaining,
         string field,
-        string? value)
+        string? value,
+        string? userText)
     {
         var normalizedField = NormalizePlanField(field);
         var text = SafeText(value);
@@ -536,11 +537,26 @@ public sealed class VisionAgentIntentRouterService : IVisionAgentIntentRouterSer
             return;
         }
 
+        if (normalizedField == VisionAgentPlanAnswerFields.TaskType)
+        {
+            if (!AiVisionTaskCatalog.TryNormalizePrimary(text, out var canonicalTaskType))
+            {
+                return;
+            }
+            text = canonicalTaskType;
+        }
+
+        var evidence = SafeText(userText);
+        var hasLiteralEvidence = !string.IsNullOrWhiteSpace(evidence) &&
+                                 evidence.Contains(SafeText(value), StringComparison.OrdinalIgnoreCase);
         updates.Add(new VisionAgentPlanAnswer
         {
             Field = normalizedField,
             Value = Truncate(text, 256),
-            Origin = VisionAgentPlanAnswerOrigins.ExplicitUserText
+            Origin = hasLiteralEvidence
+                ? VisionAgentPlanAnswerOrigins.ExplicitUserText
+                : VisionAgentPlanAnswerOrigins.ModelInferred,
+            EvidenceText = hasLiteralEvidence ? Truncate(evidence, 256) : string.Empty
         });
     }
 
@@ -607,7 +623,8 @@ public sealed class VisionAgentIntentRouterService : IVisionAgentIntentRouterSer
             request.SemanticExtraction);
         return NormalizePlanFields(ResolvedFieldsFromAnswers(request.ConfirmedPlanAnswers)
                 .Concat(ResolvedFieldsFromAnswers(updates ?? []))
-                .Concat(ResolvedFieldsFromAnswers(explicitPromptAnswers)))
+                .Concat(ResolvedFieldsFromAnswers(explicitPromptAnswers))
+                .Concat(ResolvedFieldsFromAlignedInference(explicitPromptAnswers, request.SemanticExtraction)))
             .ToList();
     }
 
@@ -618,6 +635,30 @@ public sealed class VisionAgentIntentRouterService : IVisionAgentIntentRouterSer
                              !string.IsNullOrWhiteSpace(answer.Value) &&
                              !VisionAgentPlanFieldPolicy.IsPlaceholderValue(answer.Value))
             .Select(answer => answer.Field);
+    }
+
+    private static IEnumerable<string> ResolvedFieldsFromAlignedInference(
+        IEnumerable<VisionAgentPlanAnswer> answers,
+        VisionAgentSemanticExtractionResult? semantic)
+    {
+        var semanticTask = AiVisionTaskCatalog.NormalizePrimaryOrUnknown(semantic?.TaskType);
+        foreach (var answer in answers.Where(answer =>
+                     answer.Origin is VisionAgentPlanAnswerOrigins.RuleInferred or VisionAgentPlanAnswerOrigins.LegacyInferred))
+        {
+            var field = NormalizePlanField(answer.Field);
+            if (field != VisionAgentPlanAnswerFields.TaskType)
+            {
+                yield return field;
+                continue;
+            }
+
+            if (semanticTask != AiVisionTaskTypes.Unknown &&
+                AiVisionTaskCatalog.TryNormalizePrimary(answer.Value, out var ruleTask) &&
+                string.Equals(semanticTask, ruleTask, StringComparison.OrdinalIgnoreCase))
+            {
+                yield return field;
+            }
+        }
     }
 
     private static List<string> MergeRemainingPlanFields(

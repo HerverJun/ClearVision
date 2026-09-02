@@ -71,6 +71,15 @@ public class AiConfigStoreTests : IDisposable
         return new AiConfigStore(_mockOptions, _mockLogger, _testDir, faultInjector);
     }
 
+    private static Task RunOnDedicatedThread(Action action)
+    {
+        return Task.Factory.StartNew(
+            action,
+            CancellationToken.None,
+            TaskCreationOptions.LongRunning,
+            TaskScheduler.Default);
+    }
+
     [Fact]
     public void Constructor_WhenNoFiles_CreatesDefaultFromOptions()
     {
@@ -784,6 +793,7 @@ public class AiConfigStoreTests : IDisposable
         var store = CreateStore(faultInjector);
         using var firstCandidateEntered = new ManualResetEventSlim(false);
         using var releaseFirstCandidate = new ManualResetEventSlim(false);
+        using var secondMutationStarted = new ManualResetEventSlim(false);
         var candidatePaths = new List<string>();
         var candidateCount = 0;
         faultInjector.SetHandler((stage, _, path) =>
@@ -801,11 +811,11 @@ public class AiConfigStoreTests : IDisposable
             if (Interlocked.Increment(ref candidateCount) == 1)
             {
                 firstCandidateEntered.Set();
-                Assert.True(releaseFirstCandidate.Wait(TimeSpan.FromSeconds(5)));
+                Assert.True(releaseFirstCandidate.Wait(TimeSpan.FromSeconds(30)));
             }
         });
 
-        var first = Task.Run(() => store.Add(new AiModelConfig
+        var first = RunOnDedicatedThread(() => store.Add(new AiModelConfig
         {
             Id = "concurrent-a",
             Name = "Concurrent A",
@@ -815,16 +825,21 @@ public class AiConfigStoreTests : IDisposable
         }));
         Assert.True(firstCandidateEntered.Wait(TimeSpan.FromSeconds(5)));
 
-        var second = Task.Run(() => store.Add(new AiModelConfig
+        var second = RunOnDedicatedThread(() =>
         {
-            Id = "concurrent-b",
-            Name = "Concurrent B",
-            Provider = "OpenAI Compatible",
-            Model = "gpt-4o-mini",
-            ApiKey = "secret-b"
-        }));
-        await Task.Delay(100);
-        Assert.False(second.IsCompleted);
+            secondMutationStarted.Set();
+            store.Add(new AiModelConfig
+            {
+                Id = "concurrent-b",
+                Name = "Concurrent B",
+                Provider = "OpenAI Compatible",
+                Model = "gpt-4o-mini",
+                ApiKey = "secret-b"
+            });
+        });
+        Assert.True(secondMutationStarted.Wait(TimeSpan.FromSeconds(5)));
+        var completedBeforeRelease = await Task.WhenAny(second, Task.Delay(TimeSpan.FromMilliseconds(100)));
+        Assert.NotSame(second, completedBeforeRelease);
 
         releaseFirstCandidate.Set();
         await Task.WhenAll(first, second);
@@ -843,6 +858,7 @@ public class AiConfigStoreTests : IDisposable
         var secondStore = CreateStore();
         using var firstCandidateEntered = new ManualResetEventSlim(false);
         using var releaseFirstCandidate = new ManualResetEventSlim(false);
+        using var secondMutationStarted = new ManualResetEventSlim(false);
         var blocked = 0;
         firstFault.SetHandler((stage, authority, _) =>
         {
@@ -851,25 +867,30 @@ public class AiConfigStoreTests : IDisposable
                 Interlocked.Exchange(ref blocked, 1) == 0)
             {
                 firstCandidateEntered.Set();
-                Assert.True(releaseFirstCandidate.Wait(TimeSpan.FromSeconds(5)));
+                Assert.True(releaseFirstCandidate.Wait(TimeSpan.FromSeconds(30)));
             }
         });
 
-        var first = Task.Run(() => firstStore.Add(new AiModelConfig
+        var first = RunOnDedicatedThread(() => firstStore.Add(new AiModelConfig
         {
             Id = "cross-instance-one",
             Name = "Cross Instance One",
             ApiKey = "one-key"
         }));
         Assert.True(firstCandidateEntered.Wait(TimeSpan.FromSeconds(5)));
-        var second = Task.Run(() => secondStore.Add(new AiModelConfig
+        var second = RunOnDedicatedThread(() =>
         {
-            Id = "cross-instance-two",
-            Name = "Cross Instance Two",
-            ApiKey = "two-key"
-        }));
-        await Task.Delay(100);
-        Assert.False(second.IsCompleted);
+            secondMutationStarted.Set();
+            secondStore.Add(new AiModelConfig
+            {
+                Id = "cross-instance-two",
+                Name = "Cross Instance Two",
+                ApiKey = "two-key"
+            });
+        });
+        Assert.True(secondMutationStarted.Wait(TimeSpan.FromSeconds(5)));
+        var completedBeforeRelease = await Task.WhenAny(second, Task.Delay(TimeSpan.FromMilliseconds(100)));
+        Assert.NotSame(second, completedBeforeRelease);
 
         releaseFirstCandidate.Set();
         await Task.WhenAll(first, second);

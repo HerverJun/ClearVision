@@ -7,6 +7,7 @@ public static partial class VisionAgentResourceIdentity
     public static string NormalizeResourceType(string? value)
     {
         var normalized = NormalizeToken(value);
+        if (normalized.Contains("imagefile", StringComparison.Ordinal) || normalized.Contains("image_file", StringComparison.Ordinal)) return "image_file";
         if (normalized.Contains("camera", StringComparison.Ordinal)) return "camera_binding";
         if (normalized.Contains("model", StringComparison.Ordinal)) return "model_resource";
         if (normalized.Contains("template", StringComparison.Ordinal)) return "template_artifact";

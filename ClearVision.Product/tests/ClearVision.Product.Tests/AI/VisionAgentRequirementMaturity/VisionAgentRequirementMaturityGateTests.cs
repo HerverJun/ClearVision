@@ -546,7 +546,7 @@ public sealed class VisionAgentRequirementMaturityGateTests
     }
 
     [Theory(DisplayName = "Concrete known prompts should be plannable with expected task type")]
-    [InlineData("检测包装箱胶带是否贴歪", AiVisionTaskTypes.SurfaceOrPoseDefect)]
+    [InlineData("检测包装箱胶带是否贴歪", AiVisionTaskTypes.SurfaceDefect)]
     [InlineData("测量两个圆形孔位的圆心距离", AiVisionTaskTypes.GeometryMeasurement)]
     public void ConcreteKnownPrompt_ShouldBePlannable(string prompt, string expectedTaskType)
     {
@@ -836,10 +836,12 @@ public sealed class VisionAgentRequirementMaturityGateTests
 
         plan.ConfirmedPlanAnswers.Select(answer => answer.Field).Should().Contain([
             VisionAgentPlanAnswerFields.InspectionObject,
-            VisionAgentPlanAnswerFields.TaskType,
             VisionAgentPlanAnswerFields.ImageSource,
             VisionAgentPlanAnswerFields.OutputTarget
         ]);
+        plan.ConfirmedPlanAnswers.Select(answer => answer.Field)
+            .Should().NotContain(VisionAgentPlanAnswerFields.TaskType);
+        plan.ResolvedPlanFields.Should().Contain(VisionAgentPlanAnswerFields.TaskType);
         plan.ConfirmedPlanAnswers.Should().OnlyContain(answer =>
             answer.Origin == VisionAgentPlanAnswerOrigins.ExplicitUserText);
         plan.RemainingPlanFields.Should().BeEquivalentTo([

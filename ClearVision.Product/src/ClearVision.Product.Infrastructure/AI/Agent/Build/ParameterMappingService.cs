@@ -1,3 +1,5 @@
+using System.Globalization;
+using System.Text.RegularExpressions;
 using ClearVision.Product.Core.DTOs;
 using ClearVision.Product.Core.Services;
 using ClearVision.Product.Infrastructure.AI.AgentRun;
@@ -141,20 +143,37 @@ public sealed class ParameterMappingService
         VisionAgentOperatorContract schema,
         IEnumerable<VisionAgentParameterMapping> mappings)
     {
+        var mappedParameters = mappings.ToList();
         if (schema.ParameterConstraints is not { Count: > 0 })
         {
             return new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         }
 
-        var values = mappings.ToDictionary(
+        var values = mappedParameters.ToDictionary(
             mapping => mapping.ParameterName,
             mapping => (object?)mapping.ValueSummary,
             StringComparer.OrdinalIgnoreCase);
 
-        return OperatorParameterConstraintEvaluator.ResolveStates(schema.Metadata, values)
+        var disabled = OperatorParameterConstraintEvaluator.ResolveStates(schema.Metadata, values)
             .Where(state => state.EffectiveDisabled)
             .Select(state => state.Constraint.Parameter)
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        // A deferred source choice is a real third draft state, not an implicit camera/file
+        // choice. Keep both conditional resource branches out of the draft until the user
+        // selects one; otherwise their shared operator aliases can also collapse two distinct
+        // resources into one misleading requirement.
+        var sourceType = mappedParameters.FirstOrDefault(mapping =>
+            mapping.ParameterName.Equals("SourceType", StringComparison.OrdinalIgnoreCase));
+        if (schema.OperatorType.Equals("ImageAcquisition", StringComparison.OrdinalIgnoreCase) &&
+            sourceType?.Pending == true)
+        {
+            disabled.Add("FilePath");
+            disabled.Add("CameraId");
+            disabled.Add("CameraBindingId");
+        }
+
+        return disabled;
     }
 
     private static string ResolveParameterStrategy(
@@ -197,6 +216,7 @@ public sealed class ParameterMappingService
     {
         var key = $"{op.OperatorType}.{parameter.Name}";
         if (!IsTraditionalNumericRuleProtectedParameter(op.OperatorType, parameter.Name, parameterStrategy) &&
+            !IsTaskAwareJudgmentParameter(op.OperatorType, parameter.Name) &&
             (load.ParameterSelections.TryGetValue(parameter.Name, out var direct) ||
              load.ParameterSelections.TryGetValue(key, out direct)))
         {
@@ -252,6 +272,13 @@ public sealed class ParameterMappingService
                operatorType.Equals("BlobAnalysis", StringComparison.OrdinalIgnoreCase);
     }
 
+    private static bool IsTaskAwareJudgmentParameter(string operatorType, string parameterName)
+    {
+        return operatorType.Equals("ResultJudgment", StringComparison.OrdinalIgnoreCase) &&
+               parameterName is "FieldName" or "Condition" or "ExpectValue" or
+                   "ExpectValueMin" or "ExpectValueMax" or "MinConfidence";
+    }
+
     private static string DefaultParameterValue(
         string operatorType,
         VisionAgentParameterContract parameter,
@@ -262,7 +289,7 @@ public sealed class ParameterMappingService
         if (operatorType.Equals("ImageAcquisition", StringComparison.OrdinalIgnoreCase) &&
             parameterName.Equals("SourceType", StringComparison.OrdinalIgnoreCase))
         {
-            return "Camera";
+            return VisionAgentImageSourceResolver.Resolve(EffectiveImageSource(load)).SourceType;
         }
 
         if (parameterName.Contains("camera", StringComparison.OrdinalIgnoreCase))
@@ -314,23 +341,19 @@ public sealed class ParameterMappingService
             }
         }
 
+        if (operatorType.Equals("ResultJudgment", StringComparison.OrdinalIgnoreCase))
+        {
+            var judgmentValue = TaskAwareJudgmentParameterValue(parameterName, load);
+            if (judgmentValue != null)
+            {
+                return judgmentValue;
+            }
+        }
+
         return operatorType switch
         {
             "DeepLearning" when parameterName.Equals("TaskType", StringComparison.OrdinalIgnoreCase) =>
                 EffectiveDeepLearningTaskType(load, parameterStrategy),
-            "ResultJudgment" when parameterName.Equals("FieldName", StringComparison.OrdinalIgnoreCase) && IsWireSequenceScenario(load) => "Value",
-            "ResultJudgment" when parameterName.Equals("Condition", StringComparison.OrdinalIgnoreCase) && IsWireSequenceScenario(load) => "Equal",
-            "ResultJudgment" when parameterName.Equals("ExpectValue", StringComparison.OrdinalIgnoreCase) && IsWireSequenceScenario(load) => "线序待确认",
-            "ResultJudgment" when parameterName.Equals("FieldName", StringComparison.OrdinalIgnoreCase) && IsMeasurementScenario(load) => "Value",
-            "ResultJudgment" when parameterName.Equals("Condition", StringComparison.OrdinalIgnoreCase) && IsMeasurementScenario(load) => "Range",
-            "ResultJudgment" when parameterName.Equals("ExpectValueMin", StringComparison.OrdinalIgnoreCase) && IsMeasurementScenario(load) => "<pending-measurement-threshold>",
-            "ResultJudgment" when parameterName.Equals("ExpectValueMax", StringComparison.OrdinalIgnoreCase) && IsMeasurementScenario(load) => "<pending-measurement-threshold>",
-            "ResultJudgment" when parameterName.Equals("FieldName", StringComparison.OrdinalIgnoreCase) && IsAttributeClassificationScenario(load) => "TopClassLabel",
-            "ResultJudgment" when parameterName.Equals("Condition", StringComparison.OrdinalIgnoreCase) && IsAttributeClassificationScenario(load) => "Equal",
-            "ResultJudgment" when parameterName.Equals("ExpectValue", StringComparison.OrdinalIgnoreCase) && IsAttributeClassificationScenario(load) => ExpectedClassificationOkValue(load),
-            "ResultJudgment" when parameterName.Equals("MinConfidence", StringComparison.OrdinalIgnoreCase) && IsAttributeClassificationScenario(load) => "0.6",
-            "ResultJudgment" when parameterName.Equals("Condition", StringComparison.OrdinalIgnoreCase) => "GreaterOrEqual",
-            "ResultJudgment" when parameterName.Equals("ExpectValue", StringComparison.OrdinalIgnoreCase) => "1",
             "DetectionSequenceJudge" when parameterName.Equals("ExpectedLabels", StringComparison.OrdinalIgnoreCase) && IsWireSequenceScenario(load) => "<pending-wire-sequence-labels>",
             "DetectionSequenceJudge" when parameterName.Equals("Direction", StringComparison.OrdinalIgnoreCase) && IsWireSequenceScenario(load) => "LeftToRight",
             "Thresholding" when parameterName.Equals("Mode", StringComparison.OrdinalIgnoreCase) => "adaptive_review",
@@ -370,13 +393,475 @@ public sealed class ParameterMappingService
         };
     }
 
+    private static string? TaskAwareJudgmentParameterValue(
+        string parameterName,
+        BuildPlanLoad load)
+    {
+        var strategy = ResolveJudgmentStrategy(load);
+        return parameterName switch
+        {
+            "FieldName" => strategy.FieldName,
+            "Condition" => strategy.Condition,
+            "ExpectValue" => strategy.ExpectValue,
+            "ExpectValueMin" => strategy.ExpectValueMin,
+            "ExpectValueMax" => strategy.ExpectValueMax,
+            "MinConfidence" => strategy.MinConfidence,
+            _ => null
+        };
+    }
+
+    private static JudgmentStrategy ResolveJudgmentStrategy(BuildPlanLoad load)
+    {
+        var rawTaskType = EffectiveTaskType(load);
+        var taskType = AiVisionTaskCatalog.TryNormalizePrimary(rawTaskType, out var canonicalTaskType)
+            ? canonicalTaskType
+            : rawTaskType;
+        var acceptance = AcceptanceText(load);
+
+        if (taskType.Equals(AiVisionTaskTypes.TemplateLocation, StringComparison.OrdinalIgnoreCase))
+        {
+            return new JudgmentStrategy(
+                "IsMatch",
+                "Equal",
+                "true",
+                string.Empty,
+                string.Empty,
+                ResolveConfidence(load, acceptance, "0.8"));
+        }
+
+        if (taskType.Equals(AiVisionTaskTypes.WireSequence, StringComparison.OrdinalIgnoreCase) ||
+            IsWireSequenceScenario(load))
+        {
+            return new JudgmentStrategy("IsMatch", "Equal", "true", string.Empty, string.Empty, "0");
+        }
+
+        if (taskType.Equals(AiVisionTaskTypes.SurfaceDefect, StringComparison.OrdinalIgnoreCase))
+        {
+            var areaJudgment = MentionsArea(load, acceptance);
+            var upperBound = FirstExplicitValue(
+                load,
+                areaJudgment
+                    ? ["max_defect_area", "defect_area_max", "defect_upper_bound", "upper_bound", "ResultJudgment.ExpectValue", "ExpectValue"]
+                    : ["max_defect_count", "defect_count_max", "defect_upper_bound", "upper_bound", "ResultJudgment.ExpectValue", "ExpectValue"]);
+            upperBound = NormalizeNumericValue(upperBound) ?? ExtractUpperBound(acceptance);
+            if (string.IsNullOrWhiteSpace(upperBound) && MeansNoDefect(AcceptedOutcomeText(acceptance)))
+            {
+                upperBound = "0";
+            }
+
+            return new JudgmentStrategy(
+                areaJudgment ? "DefectArea" : "DefectCount",
+                "LessOrEqual",
+                FirstNonEmpty(upperBound, "<pending-defect-upper-bound>"),
+                string.Empty,
+                string.Empty,
+                "0");
+        }
+
+        if (taskType.Equals(AiVisionTaskTypes.PresenceAbsence, StringComparison.OrdinalIgnoreCase))
+        {
+            var expectation = ResolvePresenceExpectation(load, acceptance);
+            return expectation switch
+            {
+                PresenceExpectation.Present => new JudgmentStrategy(
+                    "PresenceCount", "GreaterOrEqual", "1", string.Empty, string.Empty, "0"),
+                PresenceExpectation.Absent => new JudgmentStrategy(
+                    "PresenceCount", "Equal", "0", string.Empty, string.Empty, "0"),
+                _ => new JudgmentStrategy(
+                    "PresenceCount", "GreaterOrEqual", "<pending-presence-expectation>", string.Empty, string.Empty, "0")
+            };
+        }
+
+        if (taskType.Equals(AiVisionTaskTypes.AttributeClassification, StringComparison.OrdinalIgnoreCase) ||
+            IsAttributeClassificationScenario(load))
+        {
+            return new JudgmentStrategy(
+                "TopClassLabel",
+                "Equal",
+                ExpectedClassificationOkValue(load),
+                string.Empty,
+                string.Empty,
+                ResolveConfidence(load, acceptance, "0.6"));
+        }
+
+        if (taskType.Equals(AiVisionTaskTypes.GeometryMeasurement, StringComparison.OrdinalIgnoreCase) ||
+            IsMeasurementScenario(load))
+        {
+            var minimum = NormalizeNumericValue(FirstExplicitValue(
+                load,
+                "ResultJudgment.ExpectValueMin",
+                "ExpectValueMin",
+                "measurement_min",
+                "lower_bound",
+                "min_value"));
+            var maximum = NormalizeNumericValue(FirstExplicitValue(
+                load,
+                "ResultJudgment.ExpectValueMax",
+                "ExpectValueMax",
+                "measurement_max",
+                "upper_bound",
+                "max_value"));
+            if (TryExtractRange(acceptance, out var rangeMin, out var rangeMax))
+            {
+                minimum ??= rangeMin;
+                maximum ??= rangeMax;
+            }
+
+            minimum ??= ExtractLowerBound(acceptance);
+            maximum ??= ExtractUpperBound(acceptance);
+            return new JudgmentStrategy(
+                "Value",
+                "Range",
+                string.Empty,
+                FirstNonEmpty(minimum, "<pending-measurement-minimum>"),
+                FirstNonEmpty(maximum, "<pending-measurement-maximum>"),
+                "0");
+        }
+
+        if (taskType.Equals(AiVisionTaskTypes.CodeRecognition, StringComparison.OrdinalIgnoreCase))
+        {
+            var expectedCode = ResolveExpectedCode(load, acceptance);
+            return !string.IsNullOrWhiteSpace(expectedCode)
+                ? new JudgmentStrategy("Text", "Equal", expectedCode, string.Empty, string.Empty, "0")
+                : new JudgmentStrategy("CodeCount", "GreaterOrEqual", "1", string.Empty, string.Empty, "0");
+        }
+
+        if (taskType.Equals(AiVisionTaskTypes.ObjectDetection, StringComparison.OrdinalIgnoreCase))
+        {
+            return ResolveObjectCountStrategy(load, acceptance);
+        }
+
+        return new JudgmentStrategy(
+            "Value",
+            "Equal",
+            "<pending-judgment-rule>",
+            string.Empty,
+            string.Empty,
+            "0");
+    }
+
+    private static JudgmentStrategy ResolveObjectCountStrategy(BuildPlanLoad load, string acceptance)
+    {
+        var exact = NormalizeNumericValue(FirstExplicitValue(
+            load,
+            "expected_object_count",
+            "object_count",
+            "ResultJudgment.ExpectValue",
+            "ExpectValue")) ?? ExtractExactCount(acceptance);
+        var minimum = NormalizeNumericValue(FirstExplicitValue(
+            load,
+            "min_object_count",
+            "object_count_min",
+            "lower_bound")) ?? ExtractLowerBound(acceptance);
+        var maximum = NormalizeNumericValue(FirstExplicitValue(
+            load,
+            "max_object_count",
+            "object_count_max",
+            "upper_bound")) ?? ExtractUpperBound(acceptance);
+
+        if (!string.IsNullOrWhiteSpace(exact))
+        {
+            return new JudgmentStrategy("ObjectCount", "Equal", exact, string.Empty, string.Empty, "0");
+        }
+
+        if (!string.IsNullOrWhiteSpace(minimum) && !string.IsNullOrWhiteSpace(maximum))
+        {
+            return new JudgmentStrategy("ObjectCount", "Range", string.Empty, minimum, maximum, "0");
+        }
+
+        if (!string.IsNullOrWhiteSpace(minimum))
+        {
+            return new JudgmentStrategy("ObjectCount", "GreaterOrEqual", minimum, string.Empty, string.Empty, "0");
+        }
+
+        if (!string.IsNullOrWhiteSpace(maximum))
+        {
+            return new JudgmentStrategy("ObjectCount", "LessOrEqual", maximum, string.Empty, string.Empty, "0");
+        }
+
+        return new JudgmentStrategy(
+            "ObjectCount",
+            "GreaterOrEqual",
+            "<pending-object-count-acceptance>",
+            string.Empty,
+            string.Empty,
+            "0");
+    }
+
+    private static string ResolveConfidence(BuildPlanLoad load, string acceptance, string acceptedDefault)
+    {
+        var selected = NormalizeNumericValue(FirstExplicitValue(
+            load,
+            "ResultJudgment.MinConfidence",
+            "MinConfidence",
+            "min_confidence",
+            "classification_min_confidence",
+            "template_min_confidence"));
+        var value = selected ?? ExtractConfidence(acceptance);
+        if (value == null ||
+            !double.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out var parsed))
+        {
+            return acceptedDefault;
+        }
+
+        if (parsed > 1 && parsed <= 100)
+        {
+            parsed /= 100;
+        }
+
+        return parsed is >= 0 and <= 1
+            ? parsed.ToString("G15", CultureInfo.InvariantCulture)
+            : acceptedDefault;
+    }
+
+    private static PresenceExpectation ResolvePresenceExpectation(BuildPlanLoad load, string acceptance)
+    {
+        var explicitValue = FirstExplicitValue(
+            load,
+            "expected_presence",
+            "presence_expected",
+            "presence_state",
+            "expected_state",
+            "ResultJudgment.ExpectValue",
+            "ExpectValue");
+        var text = FirstNonEmpty(explicitValue, AcceptedOutcomeText(acceptance)).ToLowerInvariant();
+        if (ContainsAny(text, "不得缺失", "不可缺失", "不能缺失", "must be present", "must exist", "not missing"))
+        {
+            return PresenceExpectation.Present;
+        }
+
+        if (ContainsAny(text, "absent", "missing", "not present", "not exist", "without", "缺失", "不存在", "未安装", "无此", "没有"))
+        {
+            return PresenceExpectation.Absent;
+        }
+
+        if (ContainsAny(text, "present", "exists", "exist", "installed", "detected", "存在", "已安装", "到位", "有此", "true", "yes") ||
+            text == "1")
+        {
+            return PresenceExpectation.Present;
+        }
+
+        if (text is "false" or "no" or "0")
+        {
+            return PresenceExpectation.Absent;
+        }
+
+        return PresenceExpectation.Unknown;
+    }
+
+    private static string ResolveExpectedCode(BuildPlanLoad load, string acceptance)
+    {
+        var selected = FirstExplicitValue(
+            load,
+            "expected_code",
+            "code_value",
+            "expected_text",
+            "ResultJudgment.ExpectValue",
+            "ExpectValue");
+        if (!string.IsNullOrWhiteSpace(selected))
+        {
+            return VisionAgentBuildSupport.CleanValue(selected);
+        }
+
+        var text = AcceptedOutcomeText(acceptance);
+        var quoted = Regex.Match(
+            text,
+            "(?:code|barcode|qr|码值|条码|二维码|内容)\\s*(?:==|=|equals?|is|应为|必须为|为)\\s*[\\\"“'](?<value>[^\\\"”']+)[\\\"”']",
+            RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+        if (quoted.Success)
+        {
+            return quoted.Groups["value"].Value.Trim();
+        }
+
+        var token = Regex.Match(
+            text,
+            "(?:code|barcode|qr|码值|条码|二维码|内容)\\s*(?:==|=|equals?|is|应为|必须为|为)\\s*(?<value>[A-Za-z0-9_.:/-]+)",
+            RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+        if (!token.Success)
+        {
+            return string.Empty;
+        }
+
+        var candidate = token.Groups["value"].Value.Trim();
+        return IsCodeOutcomeWord(candidate) ? string.Empty : candidate;
+    }
+
+    private static bool IsCodeOutcomeWord(string value) =>
+        value.Equals("decode", StringComparison.OrdinalIgnoreCase) ||
+        value.Equals("decoded", StringComparison.OrdinalIgnoreCase) ||
+        value.Equals("read", StringComparison.OrdinalIgnoreCase) ||
+        value.Equals("recognized", StringComparison.OrdinalIgnoreCase) ||
+        value.Equals("detected", StringComparison.OrdinalIgnoreCase) ||
+        value.Equals("found", StringComparison.OrdinalIgnoreCase) ||
+        value.Equals("valid", StringComparison.OrdinalIgnoreCase) ||
+        value.Equals("success", StringComparison.OrdinalIgnoreCase) ||
+        value.Equals("successful", StringComparison.OrdinalIgnoreCase) ||
+        value.Equals("successfully", StringComparison.OrdinalIgnoreCase);
+
+    private static string EffectiveImageSource(BuildPlanLoad load)
+    {
+        return VisionAgentBuildSupport.FirstNonEmpty(
+            EffectiveValue(load, VisionAgentPlanAnswerFields.ImageSource),
+            load.RequirementAnswers.TryGetValue(VisionAgentPlanAnswerFields.ImageSource, out var requirementSource)
+                ? requirementSource
+                : string.Empty,
+            load.Plan?.SemanticExtraction?.ImageSource);
+    }
+
+    private static string AcceptanceText(BuildPlanLoad load)
+    {
+        return string.Join(
+            "; ",
+            new[]
+            {
+                EffectiveValue(load, VisionAgentPlanAnswerFields.AcceptanceCriteria),
+                load.RequirementAnswers.TryGetValue(VisionAgentPlanAnswerFields.AcceptanceCriteria, out var requirementAcceptance)
+                    ? requirementAcceptance
+                    : string.Empty,
+                load.Plan?.SemanticExtraction?.OkCondition,
+                load.Plan?.SemanticExtraction?.NgCondition,
+                load.Plan?.AcceptanceCriteria is { Count: > 0 }
+                    ? string.Join("; ", load.Plan.AcceptanceCriteria)
+                    : string.Empty,
+                load.OriginalUserPrompt
+            }
+            .Where(value => !string.IsNullOrWhiteSpace(value)));
+    }
+
+    private static string AcceptedOutcomeText(string acceptance)
+    {
+        var parsed = VisionAgentPlanFieldPolicy.ParseAcceptanceCriteria(acceptance);
+        return FirstNonEmpty(parsed.Ok, acceptance);
+    }
+
+    private static bool MentionsArea(BuildPlanLoad load, string acceptance)
+    {
+        var text = $"{acceptance} {EffectiveValue(load, VisionAgentPlanAnswerFields.MeasurementTarget)} " +
+                   $"{string.Join(' ', load.Plan?.PlanFidelity?.RequiredOutputSemantics ?? [])}";
+        return ContainsAny(text, "area", "面积", "defect_area");
+    }
+
+    private static bool MeansNoDefect(string text) =>
+        ContainsAny(text, "no defect", "zero defect", "without defect", "无缺陷", "不得有缺陷", "缺陷为零", "缺陷数为0");
+
+    private static string? FirstExplicitValue(BuildPlanLoad load, params string[] keys)
+    {
+        foreach (var key in keys)
+        {
+            if ((load.ParameterSelections.TryGetValue(key, out var value) ||
+                 load.RequirementAnswers.TryGetValue(key, out value) ||
+                 load.BuildDecisions.TryGetValue(key, out value)) &&
+                !string.IsNullOrWhiteSpace(value) &&
+                !VisionAgentPlanFieldPolicy.IsPlaceholderValue(value))
+            {
+                return VisionAgentBuildSupport.CleanValue(value);
+            }
+        }
+
+        return null;
+    }
+
+    private static string? NormalizeNumericValue(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return null;
+        }
+
+        if (double.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out var direct) &&
+            double.IsFinite(direct))
+        {
+            return direct.ToString("G15", CultureInfo.InvariantCulture);
+        }
+
+        var match = Regex.Match(value, "[-+]?(?:\\d+(?:\\.\\d+)?|\\.\\d+)", RegexOptions.CultureInvariant);
+        return match.Success &&
+               double.TryParse(match.Value, NumberStyles.Float, CultureInfo.InvariantCulture, out var parsed) &&
+               double.IsFinite(parsed)
+            ? parsed.ToString("G15", CultureInfo.InvariantCulture)
+            : null;
+    }
+
+    private static bool TryExtractRange(string text, out string minimum, out string maximum)
+    {
+        minimum = string.Empty;
+        maximum = string.Empty;
+        var match = Regex.Match(
+            text,
+            "(?<min>[-+]?(?:\\d+(?:\\.\\d+)?|\\.\\d+))\\s*(?:~|～|至|到|\\bto\\b|-)\\s*(?<max>[-+]?(?:\\d+(?:\\.\\d+)?|\\.\\d+))",
+            RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+        if (!match.Success)
+        {
+            match = Regex.Match(
+                text,
+                "(?:between|范围)\\s*(?<min>[-+]?(?:\\d+(?:\\.\\d+)?|\\.\\d+))\\s*(?:and|与|到|至)\\s*(?<max>[-+]?(?:\\d+(?:\\.\\d+)?|\\.\\d+))",
+                RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+        }
+
+        if (!match.Success)
+        {
+            return false;
+        }
+
+        minimum = NormalizeNumericValue(match.Groups["min"].Value) ?? string.Empty;
+        maximum = NormalizeNumericValue(match.Groups["max"].Value) ?? string.Empty;
+        return !string.IsNullOrWhiteSpace(minimum) && !string.IsNullOrWhiteSpace(maximum);
+    }
+
+    private static string? ExtractUpperBound(string text) => ExtractNumberAfterMarker(
+        text,
+        "(?:<=|≤|不超过|不得超过|至多|最多|at\\s+most|no\\s+more\\s+than|上限(?:为)?|max(?:imum)?(?:\\s+(?:value|count|area))?)");
+
+    private static string? ExtractLowerBound(string text) => ExtractNumberAfterMarker(
+        text,
+        "(?:>=|≥|不少于|不低于|至少|at\\s+least|no\\s+fewer\\s+than|下限(?:为)?|min(?:imum)?(?:\\s+(?:value|count))?)");
+
+    private static string? ExtractExactCount(string text) => ExtractNumberAfterMarker(
+        text,
+        "(?:exactly|等于|恰好|数量为|个数为|count\\s*(?:==|=|is))");
+
+    private static string? ExtractConfidence(string text) => ExtractNumberAfterMarker(
+        text,
+        "(?:confidence|score|置信度|匹配分数)\\s*(?:>=|>|≥|不低于|至少|为)?");
+
+    private static string? ExtractNumberAfterMarker(string text, string markerPattern)
+    {
+        var match = Regex.Match(
+            text,
+            $"{markerPattern}[^0-9+.-]*(?<value>[-+]?(?:\\d+(?:\\.\\d+)?|\\.\\d+))",
+            RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+        return match.Success ? NormalizeNumericValue(match.Groups["value"].Value) : null;
+    }
+
+    private static bool ContainsAny(string value, params string[] terms) =>
+        terms.Any(term => value.Contains(term, StringComparison.OrdinalIgnoreCase));
+
+    private static string FirstNonEmpty(params string?[] values) =>
+        values.FirstOrDefault(value => !string.IsNullOrWhiteSpace(value))?.Trim() ?? string.Empty;
+
+    private enum PresenceExpectation
+    {
+        Unknown,
+        Present,
+        Absent
+    }
+
+    private sealed record JudgmentStrategy(
+        string FieldName,
+        string Condition,
+        string ExpectValue,
+        string ExpectValueMin,
+        string ExpectValueMax,
+        string MinConfidence);
+
     private static bool IsPendingParameter(
         string operatorType,
         VisionAgentParameterContract parameter,
         string fallback,
         BuildPlanLoad load)
     {
-        if (fallback.Contains("pending", StringComparison.OrdinalIgnoreCase))
+        if (fallback.Contains("pending", StringComparison.OrdinalIgnoreCase) ||
+            fallback.Contains("unsupported-image-source", StringComparison.OrdinalIgnoreCase))
         {
             return true;
         }
@@ -402,6 +887,8 @@ public sealed class ParameterMappingService
     {
         return resourceKind switch
         {
+            "image_file" => operatorType.Equals("ImageAcquisition", StringComparison.OrdinalIgnoreCase) &&
+                            parameterName.Equals("FilePath", StringComparison.OrdinalIgnoreCase),
             "camera_binding" => parameterName.Equals("CameraId", StringComparison.OrdinalIgnoreCase) ||
                                 parameterName.Equals("CameraBindingId", StringComparison.OrdinalIgnoreCase),
             "model_resource" => IsPreferredModelParameter(parameterName),
@@ -500,9 +987,7 @@ public sealed class ParameterMappingService
                      "ResultJudgment.ExpectValue",
                      "ExpectValue",
                      "classification_ok_label",
-                     "ok_label",
-            "target_attribute",
-            "targetAttribute"
+                     "ok_label"
          })
         {
             if ((load.ParameterSelections.TryGetValue(key, out var selected) ||
@@ -526,10 +1011,7 @@ public sealed class ParameterMappingService
             return fromOkCondition;
         }
 
-        var target = VisionAgentBuildSupport.FirstNonEmpty(
-            EffectiveValue(load, VisionAgentPlanAnswerFields.TargetAttribute),
-            semantic?.TargetAttribute);
-        return string.IsNullOrWhiteSpace(target) ? "<pending-ok-class-label>" : target;
+        return "<pending-ok-class-label>";
     }
 
     private static string EffectiveTaskType(BuildPlanLoad load)
@@ -580,9 +1062,7 @@ public sealed class ParameterMappingService
             }
         }
 
-        return text.Replace("OK", string.Empty, StringComparison.OrdinalIgnoreCase)
-            .Replace("ok", string.Empty, StringComparison.OrdinalIgnoreCase)
-            .Trim(' ', ',', '.', ';', ':', '，', '。', '；', '：');
+        return string.Empty;
     }
 
     private static string MissingResourceKind(
@@ -594,6 +1074,12 @@ public sealed class ParameterMappingService
         if (!pending)
         {
             return string.Empty;
+        }
+
+        if (operatorType.Equals("ImageAcquisition", StringComparison.OrdinalIgnoreCase) &&
+            parameterName.Equals("SourceType", StringComparison.OrdinalIgnoreCase))
+        {
+            return "image_source";
         }
 
         if (IsTraditionalNumericRule(parameterStrategy))
@@ -628,6 +1114,8 @@ public sealed class ParameterMappingService
     {
         return VisionAgentResourceIdentity.NormalizeResourceType(resourceType) switch
         {
+            "image_source" => "图像来源",
+            "image_file" => "图像文件",
             "camera_binding" => "相机绑定",
             "model_resource" => "模型资源",
             "template_artifact" => "模板资源",
@@ -642,6 +1130,8 @@ public sealed class ParameterMappingService
     {
         return VisionAgentResourceIdentity.NormalizeResourceType(resourceType) switch
         {
+            "image_source" => VisionAgentResourceResolutionTargets.PlanWorkbench,
+            "image_file" => VisionAgentResourceResolutionTargets.ImageFilePicker,
             "camera_binding" => VisionAgentResourceResolutionTargets.CameraSettings,
             "model_resource" => VisionAgentResourceResolutionTargets.ModelPicker,
             "template_artifact" => VisionAgentResourceResolutionTargets.TemplatePicker,

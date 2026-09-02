@@ -3,6 +3,7 @@ import { AiWorkbenchStates } from './aiPanelWorkbench.js';
 import { AgentWorkspaceEventTypes } from './agentWorkspaceState.js';
 import { isPendingParameterSentinel } from '../../shared/parameterDependencyRules.js';
 import { normalizeCanonicalResource, serializeResourceDecision } from './aiResourceIdentity.js';
+import { normalizeAiPrimaryTask, planAnswerOriginPriority } from './aiTaskContract.js';
 
 export const AgentWorkspaceModes = Object.freeze({
     PLAN: 'plan',
@@ -107,7 +108,12 @@ const PLAN_ANSWER_FIELDS = Object.freeze({
 const PLAN_ANSWER_ORIGINS = Object.freeze({
     EXPLICIT_USER_SELECTION: 'explicit_user_selection',
     ACCEPTED_RECOMMENDED_DEFAULT: 'accepted_recommended_default',
-    EXPLICIT_USER_TEXT: 'explicit_user_text'
+    EXPLICIT_USER_TEXT: 'explicit_user_text',
+    RULE_INFERRED: 'rule_inferred',
+    LEGACY_INFERRED: 'legacy_inferred',
+    RESOURCE_BOUND: 'resource_bound',
+    MODEL_INFERRED: 'model_inferred',
+    DEFAULT_ASSUMPTION: 'default_assumption'
 });
 
 const PLAN_BUILD_BLOCKER_CATEGORIES = Object.freeze({
@@ -1371,22 +1377,14 @@ export const aiPanelAgentWorkspaceMixin = {
         const nextSelections = { ...(this.planQuestionSelections || {}) };
         let changed = false;
 
-        const originPriority = {
-            'explicit_user_text': 4,
-            'explicit_user_selection': 4,
-            'resource_bound': 3,
-            'model_inferred': 2,
-            'accepted_recommended_default': 1
-        };
-
         backendAnswers.forEach(answer => {
             const key = answer.field;
             const existing = nextAnswers[key]
                 ? this._normalizePlanAnswer(nextAnswers[key])
                 : null;
             if (existing) {
-                const existingPri = originPriority[existing.origin] || 0;
-                const backendPri = originPriority[answer.origin] || 0;
+                const existingPri = planAnswerOriginPriority(existing.origin);
+                const backendPri = planAnswerOriginPriority(answer.origin);
                 if (existingPri > backendPri) {
                     return;
                 }
@@ -1944,14 +1942,6 @@ export const aiPanelAgentWorkspaceMixin = {
         const nextSelections = { ...(this.planQuestionSelections || {}) };
         let changed = false;
 
-        const originPriority = {
-            'explicit_user_text': 4,
-            'explicit_user_selection': 4,
-            'resource_bound': 3,
-            'model_inferred': 2,
-            'accepted_recommended_default': 1
-        };
-
         updates.forEach(update => {
             const rawUpdate = this._asObject?.(update) || update || {};
             const answer = this._normalizePlanAnswer({
@@ -1972,8 +1962,8 @@ export const aiPanelAgentWorkspaceMixin = {
                 ? this._normalizePlanAnswer(nextAnswers[key])
                 : null;
             if (existing) {
-                const existingPri = originPriority[existing.origin] || 0;
-                const newPri = originPriority[merged.origin] || 0;
+                const existingPri = planAnswerOriginPriority(existing.origin);
+                const newPri = planAnswerOriginPriority(merged.origin);
                 if (existingPri > newPri) {
                     return;
                 }
@@ -3633,17 +3623,23 @@ export const aiPanelAgentWorkspaceMixin = {
             this._fallbackPlanQuestionField(fallbackQuestion || { id: questionId, field: item.field || item.Field }, questionId);
         const value = String(item.value || item.Value || '').trim();
         const origin = String(item.origin || item.Origin || PLAN_ANSWER_ORIGINS.EXPLICIT_USER_SELECTION).trim().toLowerCase();
+        const evidenceText = String(item.evidenceText || item.EvidenceText || '').trim();
         if (!field || !value || this._isPlanPlaceholderValue(value)) return null;
+        const normalizedValue = field === PLAN_ANSWER_FIELDS.TASK_TYPE
+            ? normalizeAiPrimaryTask(value)
+            : value;
+        if (field === PLAN_ANSWER_FIELDS.TASK_TYPE && !normalizedValue) return null;
         const option = this._toArray(fallbackQuestion?.options || fallbackQuestion?.Options)
             .find(candidate => String(candidate?.value || candidate?.Value || '').trim() === value);
         if (option && !this._isResolveFieldOption(option)) return null;
         return {
             questionId,
             field,
-            value,
+            value: normalizedValue,
             origin: Object.values(PLAN_ANSWER_ORIGINS).includes(origin)
                 ? origin
-                : PLAN_ANSWER_ORIGINS.EXPLICIT_USER_SELECTION
+                : PLAN_ANSWER_ORIGINS.EXPLICIT_USER_SELECTION,
+            evidenceText
         };
     },
 
@@ -4562,27 +4558,24 @@ export const aiPanelAgentWorkspaceMixin = {
     },
 
     _formatRequirementTaskTypeLabel(value) {
-        switch (String(value || '').trim()) {
+        const raw = String(value || '').trim();
+        switch (normalizeAiPrimaryTask(raw) || raw) {
             case 'surface_defect':
-            case 'surface_or_pose_defect':
                 return '缺陷/贴附/位姿';
             case 'geometry_measurement':
                 return '几何测量';
             case 'wire_sequence':
                 return '线序检测';
             case 'code_recognition':
-            case 'barcode_qr':
                 return '读码/OCR';
             case 'presence_absence':
                 return '有无/漏装';
-            case 'classification':
-                return '分类识别';
             case 'attribute_classification':
                 return '属性分类 / OK-NG 判别';
+            case 'object_detection':
+                return '目标检测';
             case 'template_location':
                 return '模板定位';
-            case 'plc_output':
-                return 'PLC 输出';
             case 'abstract_goal':
                 return '方案愿景';
             case 'unknown':
@@ -5849,7 +5842,8 @@ export const aiPanelAgentWorkspaceMixin = {
             questionId,
             field,
             value: cleanedValue,
-            origin: PLAN_ANSWER_ORIGINS.EXPLICIT_USER_TEXT
+            origin: PLAN_ANSWER_ORIGINS.EXPLICIT_USER_TEXT,
+            evidenceText: cleanedValue
         };
         this._dispatchAgentWorkspaceEvent?.({
             type: AgentWorkspaceEventTypes.ANSWER_OPTIMISTIC_SET,

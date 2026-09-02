@@ -581,7 +581,51 @@ PlannerCandidateParsed:
             repairNotes.Add("unsafe_text_redacted");
         }
 
-        return result;
+        return ApplyPlanFidelity(request, result, repairNotes, warnings);
+    }
+
+    private static VisionAgentPlanModeResult ApplyPlanFidelity(
+        VisionAgentPlanModeRequest request,
+        VisionAgentPlanModeResult plan,
+        ICollection<string> repairNotes,
+        ICollection<string> warnings)
+    {
+        var validation = new VisionAgentPlanFidelityValidator().Validate(request, plan);
+        foreach (var note in validation.RepairNotes)
+        {
+            repairNotes.Add(note);
+        }
+
+        foreach (var warning in validation.Warnings)
+        {
+            warnings.Add(warning);
+        }
+
+        var fidelityBlockers = validation.Assessment.BlockingReasons
+            .Select(reason => $"safety_blocker:{reason}")
+            .ToList();
+        var updated = plan with
+        {
+            RecommendedRoute = validation.Route,
+            Risks = validation.Risks.ToList(),
+            PlanFidelity = validation.Assessment,
+            CanBuild = plan.CanBuild && validation.Assessment.Satisfied,
+            BlockingReasons = plan.BlockingReasons
+                .Concat(fidelityBlockers)
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList()
+        };
+        if (!validation.Assessment.Satisfied)
+        {
+            repairNotes.Add("plan_fidelity_fail_closed");
+        }
+
+        return updated with
+        {
+            BuildReadiness = VisionAgentPlanReadinessEvaluator.Evaluate(
+                updated,
+                requirementMode: request.RequirementMode)
+        };
     }
 
     private async Task<JsonRepairAttempt> TryRepairJsonAsync(
@@ -741,6 +785,18 @@ PlannerCandidateParsed:
             ],
             MetadataOnly = true
         };
+        result = ApplyPlanFidelity(
+            new VisionAgentPlanModeRequest
+            {
+                Description = baseline.OriginalUserPrompt,
+                OriginalUserPrompt = baseline.OriginalUserPrompt,
+                RequirementMode = baseline.BuildReadiness.ContractVersion == VisionAgentPlanContractVersions.V2
+                    ? AiRequirementModes.Strict
+                    : AiRequirementModes.Strict
+            },
+            result,
+            result.ContractRepairNotes,
+            result.PlanWarnings);
         return result with
         {
             PlanHash = VisionAgentOrchestrator.ComputePlanHash(result)
@@ -1677,7 +1733,7 @@ public sealed class VisionAgentPlanPromptComposer
         return """
 {
   "goal": "short public goal",
-  "intent": "surface_defect|measurement|wire_sequence|code_recognition|presence_absence|classification|attribute_classification|template_location|general_inspection",
+  "intent": "surface_defect|measurement|wire_sequence|code_recognition|presence_absence|attribute_classification|object_detection|template_location",
   "confidence": "low|medium|high",
   "requirementUnderstanding": ["public facts from the user requirement"],
   "recommendedRoute": {

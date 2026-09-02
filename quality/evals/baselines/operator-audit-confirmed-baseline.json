@@ -12,5 +12,19 @@
     "field": "factory->catalog",
     "reason": "FrameChangeTrigger is explicitly listed in OperatorModuleCatalog.InternalOnlyTypes and is intentionally excluded from the package-public module catalog.",
     "status": "intentional-difference"
+  },
+  {
+    "code": "SURFACE_IDENTITY_MISMATCH",
+    "operator": "MqttPublish",
+    "field": "infrastructureSource->factory",
+    "reason": "MqttPublish remains as a source-level fail-closed historical-flow executor, but OperatorExposureCatalog marks it Disabled with MQTT_PUBLISH_DISABLED and OperatorFactory intentionally excludes disabled operators from the product-visible catalog.",
+    "status": "intentional-difference"
+  },
+  {
+    "code": "SURFACE_IDENTITY_MISMATCH",
+    "operator": "MqttPublish",
+    "field": "scannerCanonical->factory",
+    "reason": "The metadata scanner observes the disabled historical-flow executor by design, while OperatorFactory.GetAllMetadata applies OperatorExposureCatalog and omits MqttPublish from every product-visible and AI contract surface.",
+    "status": "intentional-difference"
   }
 ]

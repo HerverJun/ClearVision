@@ -14,7 +14,7 @@ namespace ClearVision.Product.Tests.UI;
 [TestClassification(TestDomain.General, TestPurpose.Regression, TestLane.Pr, TestEvidenceType.Contract, TestOracleType.Contract, TestResourceRequirement.None, TestExpectedDuration.Fast, TestFlakyPolicy.Blocking, "product")]
 public class FlowEditorTests : UITestBase
 {
-    [Fact(Skip = "owner=ui; expires=2026-08-31; reason=需要迁移到 Playwright/可启动 host 的 UI gate")]
+    [Fact(Skip = "owner=ui; expires=2026-09-30; reason=需要迁移到 Playwright/可启动 host 的 UI gate")]
     public async Task FlowEditor_PageLoad_ShouldDisplayCanvas()
     {
         // Arrange
@@ -27,7 +27,7 @@ public class FlowEditorTests : UITestBase
         canvas.Should().NotBeNull();
     }
 
-    [Fact(Skip = "owner=ui; expires=2026-08-31; reason=需要迁移到 Playwright/可启动 host 的 UI gate")]
+    [Fact(Skip = "owner=ui; expires=2026-09-30; reason=需要迁移到 Playwright/可启动 host 的 UI gate")]
     public async Task FlowEditor_DragOperator_ShouldCreateNode()
     {
         // Arrange

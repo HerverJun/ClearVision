@@ -22,6 +22,7 @@ public static class AiVisionTaskTypes
     public const string PresenceAbsence = "presence_absence";
     public const string Classification = "classification";
     public const string AttributeClassification = "attribute_classification";
+    public const string ObjectDetection = "object_detection";
     public const string TemplateLocation = "template_location";
     public const string PlcOutput = "plc_output";
 }
@@ -76,6 +77,7 @@ public static class VisionAgentPlanAnswerOrigins
     public const string ExplicitUserSelection = "explicit_user_selection";
     public const string AcceptedRecommendedDefault = "accepted_recommended_default";
     public const string ExplicitUserText = "explicit_user_text";
+    public const string RuleInferred = "rule_inferred";
     public const string LegacyInferred = "legacy_inferred";
     public const string ResourceBound = "resource_bound";
     public const string ModelInferred = "model_inferred";
@@ -129,6 +131,7 @@ public static class VisionAgentResourceDraftPolicies
 public static class VisionAgentResourceResolutionTargets
 {
     public const string PlanWorkbench = "plan_workbench";
+    public const string ImageFilePicker = "picker:image_file";
     public const string CameraSettings = "settings:cameras";
     public const string ModelPicker = "picker:model";
     public const string TemplatePicker = "picker:template";
@@ -178,6 +181,7 @@ public sealed record VisionAgentPlanAnswer
     public string Field { get; init; } = string.Empty;
     public string Value { get; init; } = string.Empty;
     public string Origin { get; init; } = string.Empty;
+    public string EvidenceText { get; init; } = string.Empty;
     public double Confidence { get; init; } = 1.0;
     public bool Resolved { get; init; } = true;
 }
@@ -397,8 +401,36 @@ public sealed record VisionAgentPlanModeResult
     public string PlcOutputPolicy { get; init; } = string.Empty;
     public List<string> PlanWarnings { get; init; } = [];
     public List<string> ContractRepairNotes { get; init; } = [];
+    public VisionAgentPlanFidelityAssessment PlanFidelity { get; init; } = new();
     public List<VisionAgentPlanPublicEvent> PublicEvents { get; init; } = [];
     public bool MetadataOnly { get; init; } = true;
+}
+
+public sealed record VisionAgentCapabilityConstraint
+{
+    public string Id { get; init; } = string.Empty;
+    public string OperatorType { get; init; } = string.Empty;
+    public string ParameterName { get; init; } = string.Empty;
+    public string RequiredValue { get; init; } = string.Empty;
+    public string Source { get; init; } = string.Empty;
+    public string EvidenceText { get; init; } = string.Empty;
+    public bool Strong { get; init; } = true;
+}
+
+public sealed record VisionAgentPlanFidelityAssessment
+{
+    public string ContractVersion { get; init; } = VisionAgentPlanContractVersions.V2;
+    public string TaskType { get; init; } = string.Empty;
+    public bool Satisfied { get; init; } = true;
+    public bool Repaired { get; init; }
+    public List<VisionAgentCapabilityConstraint> RequiredCapabilities { get; init; } = [];
+    public List<string> RequiredOutputSemantics { get; init; } = [];
+    public List<string> SatisfiedCapabilities { get; init; } = [];
+    public List<string> AvailableOutputSemantics { get; init; } = [];
+    public List<string> MissingCapabilities { get; init; } = [];
+    public List<string> MissingOutputSemantics { get; init; } = [];
+    public List<string> BlockingReasons { get; init; } = [];
+    public List<string> Evidence { get; init; } = [];
 }
 
 public sealed record VisionAgentPlannerCandidate

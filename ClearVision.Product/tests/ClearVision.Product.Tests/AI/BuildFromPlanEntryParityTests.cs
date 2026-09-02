@@ -152,6 +152,54 @@ public sealed class BuildFromPlanEntryParityTests : IDisposable
     }
 
     [Fact]
+    public async Task LegacyAliasSnapshot_ShouldValidateOriginalHashBeforeCanonicalNormalization()
+    {
+        using var harness = CreateHarness();
+        var baseline = BuildPlan(VisionAgentPlanContractVersions.V1, includeHash: false);
+        var legacyAlias = baseline with
+        {
+            Intent = AiVisionTaskTypes.SurfaceOrPoseDefect,
+            ConfirmedPlanAnswers = baseline.ConfirmedPlanAnswers
+                .Select(answer => answer.Field == VisionAgentPlanAnswerFields.TaskType
+                    ? answer with { Value = AiVisionTaskTypes.SurfaceOrPoseDefect }
+                    : answer)
+                .ToList(),
+            RequirementMaturity = baseline.RequirementMaturity! with
+            {
+                TaskType = AiVisionTaskTypes.SurfaceOrPoseDefect
+            }
+        };
+        legacyAlias = legacyAlias with
+        {
+            PlanHash = VisionAgentOrchestrator.ComputePlanHash(legacyAlias)
+        };
+        var canonicalizedWithoutRehash = legacyAlias with
+        {
+            Intent = AiVisionTaskTypes.SurfaceDefect,
+            ConfirmedPlanAnswers = legacyAlias.ConfirmedPlanAnswers
+                .Select(answer => answer.Field == VisionAgentPlanAnswerFields.TaskType
+                    ? answer with { Value = AiVisionTaskTypes.SurfaceDefect }
+                    : answer)
+                .ToList(),
+            RequirementMaturity = legacyAlias.RequirementMaturity! with
+            {
+                TaskType = AiVisionTaskTypes.SurfaceDefect
+            }
+        };
+        var request = BuildRequest(canonicalizedWithoutRehash) with
+        {
+            SessionId = "session-legacy-alias-stale"
+        };
+
+        var entry = await RunAgentRunEntryAsync(harness, request);
+
+        var projection = TerminalBusinessProjection(entry.Replay);
+        projection.CompletionStatus.Should().Be(AiFlowGenerationResult.CompletionStatusFailed);
+        projection.FailureCode.Should().Be(VisionAgentBuildFailureCodes.StalePlan);
+        projection.PlanHash.Should().NotBe(legacyAlias.PlanHash);
+    }
+
+    [Fact]
     public async Task ToolLoopMode_ShouldBeRejectedByProductionWebMessageEntry()
     {
         using var harness = CreateHarness();

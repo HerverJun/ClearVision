@@ -126,7 +126,7 @@
     "input": "检测外观缺陷。",
     "expectedMaturity": "ambiguous",
     "expectedIntent": "actionable_vision_plan",
-    "expectedTaskType": "surface_or_pose_defect",
+    "expectedTaskType": "surface_defect",
     "expectedCanPlan": true,
     "expectedCanBuild": false,
     "expectedMissingFields": [
@@ -150,7 +150,7 @@
     "input": "检测包装箱胶带是否贴正。",
     "expectedMaturity": "ambiguous",
     "expectedIntent": "actionable_vision_plan",
-    "expectedTaskType": "surface_or_pose_defect",
+    "expectedTaskType": "surface_defect",
     "expectedCanBuild": false,
     "expectedMissingFields": [
       "image_source",
@@ -163,7 +163,7 @@
     "input": "检测金属表面的划痕和凹坑。",
     "expectedMaturity": "ambiguous",
     "expectedIntent": "actionable_vision_plan",
-    "expectedTaskType": "surface_or_pose_defect",
+    "expectedTaskType": "surface_defect",
     "expectedCanBuild": false,
     "expectedMissingFields": [
       "image_source",
@@ -176,7 +176,7 @@
     "input": "检查纸箱箱角是否破损。",
     "expectedMaturity": "ambiguous",
     "expectedIntent": "actionable_vision_plan",
-    "expectedTaskType": "surface_or_pose_defect",
+    "expectedTaskType": "surface_defect",
     "expectedCanBuild": false,
     "expectedMissingFields": [
       "image_source",
@@ -189,7 +189,7 @@
     "input": "判断瓶盖表面是否有脏污。",
     "expectedMaturity": "ambiguous",
     "expectedIntent": "actionable_vision_plan",
-    "expectedTaskType": "surface_or_pose_defect",
+    "expectedTaskType": "surface_defect",
     "expectedCanBuild": false,
     "expectedMissingFields": [
       "image_source",
@@ -202,7 +202,7 @@
     "input": "检测标签是否贴歪。",
     "expectedMaturity": "ambiguous",
     "expectedIntent": "actionable_vision_plan",
-    "expectedTaskType": "surface_or_pose_defect",
+    "expectedTaskType": "surface_defect",
     "expectedCanBuild": false,
     "expectedMissingFields": [
       "image_source",
@@ -331,7 +331,7 @@
     "input": "识别标签上的二维码。",
     "expectedMaturity": "ambiguous",
     "expectedIntent": "actionable_vision_plan",
-    "expectedTaskType": "barcode_qr",
+    "expectedTaskType": "code_recognition",
     "expectedCanBuild": false,
     "expectedMissingFields": [
       "image_source",
@@ -344,7 +344,7 @@
     "input": "读取包装箱上的条码。",
     "expectedMaturity": "ambiguous",
     "expectedIntent": "actionable_vision_plan",
-    "expectedTaskType": "barcode_qr",
+    "expectedTaskType": "code_recognition",
     "expectedCanBuild": false,
     "expectedMissingFields": [
       "image_source",
@@ -357,7 +357,7 @@
     "input": "OCR 识别标签字符并输出结果。",
     "expectedMaturity": "ambiguous",
     "expectedIntent": "actionable_vision_plan",
-    "expectedTaskType": "barcode_qr",
+    "expectedTaskType": "code_recognition",
     "expectedCanBuild": false,
     "expectedMissingFields": [
       "image_source"
@@ -369,7 +369,7 @@
     "input": "Read the QR code on the product label.",
     "expectedMaturity": "ambiguous",
     "expectedIntent": "actionable_vision_plan",
-    "expectedTaskType": "barcode_qr",
+    "expectedTaskType": "code_recognition",
     "expectedCanBuild": false,
     "expectedMissingFields": [
       "image_source",
@@ -434,7 +434,7 @@
     "input": "对产品型号做分类识别。",
     "expectedMaturity": "ambiguous",
     "expectedIntent": "actionable_vision_plan",
-    "expectedTaskType": "classification",
+    "expectedTaskType": "attribute_classification",
     "expectedCanBuild": false,
     "expectedMissingFields": [
       "image_source",
@@ -447,7 +447,7 @@
     "input": "识别零件类别并输出类别名称。",
     "expectedMaturity": "ambiguous",
     "expectedIntent": "actionable_vision_plan",
-    "expectedTaskType": "classification",
+    "expectedTaskType": "attribute_classification",
     "expectedCanBuild": false,
     "expectedMissingFields": [
       "image_source"
@@ -485,7 +485,7 @@
     "input": "检测产品后输出 PLC OK 信号。",
     "expectedMaturity": "ambiguous",
     "expectedIntent": "actionable_vision_plan",
-    "expectedTaskType": "plc_output",
+    "expectedTaskType": "unknown",
     "expectedCanBuild": false,
     "expectedMissingFields": [
       "image_source"
@@ -497,7 +497,7 @@
     "input": "识别标签二维码后把结果输出到 PLC 地址。",
     "expectedMaturity": "ambiguous",
     "expectedIntent": "actionable_vision_plan",
-    "expectedTaskType": "barcode_qr",
+    "expectedTaskType": "code_recognition",
     "expectedCanBuild": false,
     "expectedMissingFields": [
       "image_source"
@@ -520,7 +520,7 @@
     "hasCurrentFlow": true,
     "expectedMaturity": "modify_existing_flow",
     "expectedIntent": "modify_existing_flow",
-    "expectedTaskType": "barcode_qr",
+    "expectedTaskType": "code_recognition",
     "expectedCanBuild": true,
     "expectedMissingFields": []
   },

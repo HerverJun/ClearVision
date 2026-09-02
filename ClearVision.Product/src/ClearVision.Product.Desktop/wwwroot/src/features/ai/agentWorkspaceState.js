@@ -1,4 +1,5 @@
 import { mergeCanonicalResources, normalizeCanonicalResource, serializeCanonicalResource } from './aiResourceIdentity.js';
+import { normalizeAiPrimaryTask, PLAN_ANSWER_ORIGIN_PRIORITY } from './aiTaskContract.js';
 
 export const AgentWorkspaceEventTypes = Object.freeze({
     RESET: 'workspace/reset',
@@ -33,15 +34,7 @@ export const AgentWorkspaceEventTypes = Object.freeze({
 });
 
 const TERMINAL_EVENT_TYPES = new Set(['run.completed', 'run.failed', 'run.cancelled']);
-const ANSWER_ORIGIN_PRIORITY = Object.freeze({
-    explicit_user_text: 60,
-    explicit_user_selection: 50,
-    resource_bound: 40,
-    model_inferred: 30,
-    accepted_recommended_default: 20,
-    default_assumption: 10,
-    legacy_inferred: 0
-});
+const ANSWER_ORIGIN_PRIORITY = PLAN_ANSWER_ORIGIN_PRIORITY;
 const PLACEHOLDER_VALUES = new Set([
     'custom',
     'custom_input',
@@ -91,17 +84,22 @@ export function isPlaceholderAnswer(value) {
 export function normalizeWorkspaceAnswer(value, fallback = {}) {
     const item = asObject(value);
     const field = normalizeCanonicalField(read(item, 'field') || read(fallback, 'field'));
-    const answerValue = clean(read(item, 'value'));
+    const rawAnswerValue = clean(read(item, 'value'));
+    const answerValue = field === 'task_type' ? normalizeAiPrimaryTask(rawAnswerValue) : rawAnswerValue;
     if (!field || !answerValue || isPlaceholderAnswer(answerValue)) return null;
     const origin = lower(read(item, 'origin'));
     const normalizedOrigin = ANSWER_ORIGIN_PRIORITY[origin] === undefined ? 'legacy_inferred' : origin;
+    const evidenceText = clean(read(item, 'evidenceText'));
+    const authoritative = AUTHORITATIVE_ANSWER_ORIGINS.has(normalizedOrigin) &&
+        !(field === 'task_type' && normalizedOrigin === 'explicit_user_text' && !evidenceText);
     return {
         field,
         questionId: clean(read(item, 'questionId') || read(fallback, 'questionId')),
         value: answerValue,
         origin: normalizedOrigin,
+        evidenceText,
         confidence: Number(read(item, 'confidence') ?? 1) || 1,
-        resolved: read(item, 'resolved') !== false && AUTHORITATIVE_ANSWER_ORIGINS.has(normalizedOrigin)
+        resolved: read(item, 'resolved') !== false && authoritative
     };
 }
 

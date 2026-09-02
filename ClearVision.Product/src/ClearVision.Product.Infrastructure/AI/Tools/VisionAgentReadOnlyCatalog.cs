@@ -77,6 +77,7 @@ internal static class VisionAgentReadOnlyCatalog
                 Link("op_roi", "Image", "op_detect", "Image"),
                 Link("op_detect", "DetectionList", "op_sequence", "Detections"),
                 Link("op_sequence", "IsMatch", "op_judge", "Value"),
+                Link("op_sequence", "ActualOrder", "op_out", "Data"),
                 Link("op_judge", "JudgmentResult", "op_out", "Result")
             ]),
         new(
@@ -87,7 +88,9 @@ internal static class VisionAgentReadOnlyCatalog
             ["ImageAcquisition", "TemplateMatching", "ResultJudgment", "ResultOutput"],
             [
                 Link("op_cam", "Image", "op_match", "Image"),
-                Link("op_match", "Score", "op_judge", "Value"),
+                Link("op_match", "IsMatch", "op_judge", "Value"),
+                Link("op_match", "Score", "op_judge", "Confidence"),
+                Link("op_match", "Matches", "op_out", "Data"),
                 Link("op_judge", "JudgmentResult", "op_out", "Result")
             ]),
         new(
@@ -95,14 +98,17 @@ internal static class VisionAgentReadOnlyCatalog
             "measurement",
             "Hole distance measurement",
             ["hole", "distance", "spacing", "measurement"],
-            ["ImageAcquisition", "CircleMeasurement", "CircleMeasurement", "Measurement", "UnitConvert", "ResultJudgment", "ResultOutput"],
+            ["ImageAcquisition", "CircleMeasurement", "CircleMeasurement", "Measurement", "UnitConvert", "Aggregator", "ResultJudgment", "ResultOutput"],
             [
                 Link("op_cam", "Image", "op_circle_a", "Image"),
                 Link("op_cam", "Image", "op_circle_b", "Image"),
                 Link("op_circle_a", "Center", "op_distance", "PointA"),
                 Link("op_circle_b", "Center", "op_distance", "PointB"),
                 Link("op_distance", "Distance", "op_calibration", "Value"),
+                Link("op_calibration", "Result", "op_aggregate", "Value1"),
+                Link("op_calibration", "Unit", "op_aggregate", "Value2"),
                 Link("op_calibration", "Result", "op_judge", "Value"),
+                Link("op_aggregate", "Result", "op_out", "Data"),
                 Link("op_judge", "JudgmentResult", "op_out", "Result")
             ])
     ];

@@ -76,6 +76,7 @@ public sealed class ResultOutputStorage : IResultOutputStorage
             Directory.CreateDirectory(directory);
             var filePath = Path.Combine(directory, $"result_{now:HHmmssfff}_{Guid.NewGuid():N}{extension}");
             File.WriteAllText(filePath, formattedText, new UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
+            File.SetLastWriteTimeUtc(filePath, now.UtcDateTime);
             return filePath;
         }
     }

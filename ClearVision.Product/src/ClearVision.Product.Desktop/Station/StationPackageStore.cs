@@ -282,7 +282,7 @@ public sealed class StationPackageStore
             var admission = _workflowArtifactAdmissionGate.InspectJson(originalFlowJson, "station.import");
             if (!admission.AllowedToSyncStation || admission.Flow == null)
             {
-                var diagnostic = admission.Report.Diagnostics.FirstOrDefault()?.Code ??
+                var diagnostic = admission.Report.PrimaryDiagnostic?.Code ??
                     $"workflow_artifact_{admission.Disposition.ToString().ToLowerInvariant()}";
                 throw new RuntimePackageException(
                     $"Station import blocked by workflow artifact admission: {diagnostic}. {admission.Report.PublicMessage}");

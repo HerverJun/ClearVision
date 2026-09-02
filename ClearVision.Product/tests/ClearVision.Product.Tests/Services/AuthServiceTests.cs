@@ -3,6 +3,7 @@ using ClearVision.Product.Application.Services;
 using ClearVision.Product.Core.Entities;
 using ClearVision.Product.Core.Enums;
 using ClearVision.Product.Core.Interfaces;
+using ClearVision.Product.Tests.TestSupport;
 using FluentAssertions;
 using Microsoft.Extensions.Logging;
 using NSubstitute;
@@ -10,6 +11,7 @@ using NSubstitute;
 namespace ClearVision.Product.Tests.Services;
 
 [TestClassification(TestDomain.General, TestPurpose.Regression, TestLane.Pr, TestEvidenceType.Contract, TestOracleType.Contract, TestResourceRequirement.None, TestExpectedDuration.Fast, TestFlakyPolicy.Blocking, "product", Suites = "ServicesRegression")]
+[Collection(AuthServiceStateTestCollections.InMemorySessionState)]
 public class AuthServiceTests
 {
     public AuthServiceTests()

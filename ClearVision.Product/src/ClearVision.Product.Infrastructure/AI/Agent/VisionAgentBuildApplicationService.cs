@@ -876,19 +876,28 @@ public sealed class VisionAgentBuildApplicationService : IVisionAgentBuildApplic
             return;
         }
 
-        var diagnostic = admission.Report.Diagnostics.FirstOrDefault()?.Code ??
+        var primaryDiagnostic = admission.Report.PrimaryDiagnostic;
+        var diagnostic = primaryDiagnostic?.Code ??
             $"workflow_artifact_{admission.Disposition.ToString().ToLowerInvariant()}";
         var message = admission.Report.PublicMessage;
         result.Success = false;
         result.CompletionStatus = AiFlowGenerationResult.CompletionStatusFailed;
         result.FailureType = AiFlowGenerationResult.FailureTypeSystemError;
-        result.ErrorMessage = $"Build result was blocked by workflow artifact admission: {diagnostic}. {message}";
+        var specificMessage = primaryDiagnostic?.Message;
+        result.ErrorMessage = string.IsNullOrWhiteSpace(specificMessage)
+            ? $"Build result was blocked by workflow artifact admission: {diagnostic}. {message}"
+            : $"Build result was blocked by workflow artifact admission: {diagnostic}. {specificMessage} {message}";
         result.FailureSummary = new AiFailureSummary
         {
             Category = "workflow_artifact_admission",
             Code = diagnostic,
             Message = result.ErrorMessage,
-            RepairTarget = "修复并重新构建完整 Workflow Artifact；禁止将当前结果直接应用或部署。"
+            RepairTarget = "修复并重新构建完整 Workflow Artifact；禁止将当前结果直接应用或部署。",
+            SecondaryDiagnosticCodes = admission.Report.SecondaryDiagnostics
+                .Select(item => item.Code)
+                .Where(code => !string.IsNullOrWhiteSpace(code))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList()
         };
         result.Flow = null;
         result.InteractionState = AiInteractionStates.Failed;

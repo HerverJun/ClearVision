@@ -78,6 +78,7 @@ public static class VisionAgentPlanReadinessEvaluator
         var strictMode = !string.Equals(requirementMode, AiRequirementModes.Draft, StringComparison.OrdinalIgnoreCase);
 
         AddValidationBlockers(validatedAnswers, blockers);
+        AddImageSourceContractBlocker(planSnapshot, effectiveForReadiness, validatedAnswers, blockers);
 
         foreach (var reason in plan.BlockingReasons)
         {
@@ -168,10 +169,15 @@ public static class VisionAgentPlanReadinessEvaluator
         var effectiveRemainingFields = remainingFields
             .Where(field => !IsFieldSatisfiedByBoundResource(planSnapshot, field, resourceDecisions))
             .ToList();
-        var distinctBlockers = blockers
+        var eligibleBlockers = blockers
             .Where(item => !string.IsNullOrWhiteSpace(item.Id))
             .Where(item => item.Resource == null || !IsResourceBound(item.Resource, resourceDecisions))
             .Where(item => !IsFieldSatisfiedByBoundResource(planSnapshot, item.Field, resourceDecisions))
+            .ToList();
+        var hasSpecificImageSourceResource = blockers.Any(item =>
+            item.Resource?.ResourceType is "camera_binding" or "image_file");
+        var distinctBlockers = eligibleBlockers
+            .Where(item => !hasSpecificImageSourceResource || !IsGenericImageSourceBlocker(item))
             .GroupBy(item => item.Resource?.CanonicalId is { Length: > 0 } canonicalId
                     ? $"resource:{canonicalId}"
                     : item.Id,
@@ -337,6 +343,19 @@ public static class VisionAgentPlanReadinessEvaluator
                 true,
                 VisionAgentBuildBlockerResolutionModes.AnswerQuestion,
                 "存在无效的回答值，请重新确认关键问题。"));
+
+            if (validatedAnswers.InvalidValues.Any(value =>
+                    value.EndsWith(":unsupported_image_source", StringComparison.OrdinalIgnoreCase)))
+            {
+                AddOrReplace(blockers, Blocker(
+                    "hard_requirement:unsupported_image_source",
+                    VisionAgentBuildBlockerCategories.HardRequirement,
+                    VisionAgentPlanAnswerFields.ImageSource,
+                    string.Empty,
+                    true,
+                    VisionAgentBuildBlockerResolutionModes.AnswerQuestion,
+                    "当前图像来源不受 ImageAcquisition 支持，请选择文件样张或相机。"));
+            }
         }
 
         foreach (var field in validatedAnswers.ConflictedFields)
@@ -350,6 +369,42 @@ public static class VisionAgentPlanReadinessEvaluator
                 VisionAgentBuildBlockerResolutionModes.AnswerQuestion,
                 $"字段“{FieldLabel(field)}”存在冲突回答，请保留一个选择。"));
         }
+    }
+
+    private static void AddImageSourceContractBlocker(
+        VisionAgentPlanModeResult plan,
+        VisionAgentEffectiveRequirement? effectiveRequirement,
+        VisionAgentPlanAnswerValidationResult? validatedAnswers,
+        List<VisionAgentBuildBlocker> blockers)
+    {
+        var effectiveSource = effectiveRequirement?.Values.TryGetValue(
+            VisionAgentPlanAnswerFields.ImageSource,
+            out var overlaySource) == true
+            ? overlaySource
+            : string.Empty;
+        var answerSource = validatedAnswers?.AcceptedAnswers
+            .LastOrDefault(answer => VisionAgentPlanFieldPolicy.NormalizeField(answer.Field)
+                .Equals(VisionAgentPlanAnswerFields.ImageSource, StringComparison.OrdinalIgnoreCase))?.Value;
+        var source = FirstNonEmpty(effectiveSource, answerSource, plan.SemanticExtraction?.ImageSource);
+        if (string.IsNullOrWhiteSpace(source))
+        {
+            return;
+        }
+
+        var resolution = VisionAgentImageSourceResolver.Resolve(source);
+        if (resolution.Kind != VisionAgentImageSourceKind.Unsupported)
+        {
+            return;
+        }
+
+        AddOrReplace(blockers, Blocker(
+            "hard_requirement:unsupported_image_source",
+            VisionAgentBuildBlockerCategories.HardRequirement,
+            VisionAgentPlanAnswerFields.ImageSource,
+            string.Empty,
+            true,
+            VisionAgentBuildBlockerResolutionModes.AnswerQuestion,
+            "当前图像来源不受 ImageAcquisition 支持，请选择文件样张或相机。"));
     }
 
     private static VisionAgentBuildBlocker UpgradeLegacyBlocker(
@@ -415,7 +470,12 @@ public static class VisionAgentPlanReadinessEvaluator
                     "默认使用本地结构化结果输出，不需要额外输出资源。");
             }
 
-            var resource = BuildLegacyResourceRequirement(plan, parsed.Key, field, questionId);
+            var resource = BuildLegacyResourceRequirement(
+                plan,
+                parsed.Key,
+                field,
+                questionId,
+                validatedAnswers?.AcceptedAnswers);
             var blocksResource = ResourceBlocksBuild(resource, requirementMode, maturity, hasSupportedRoute);
             resource = resource with
             {
@@ -519,7 +579,7 @@ public static class VisionAgentPlanReadinessEvaluator
             field.Equals(VisionAgentPlanAnswerFields.ImageSource, StringComparison.OrdinalIgnoreCase) &&
             !ShouldBlockField(plan, field, requirementMode, maturity, explicitOutputTargetBlocker: true))
         {
-            var resource = BuildCameraRequirement(plan) with
+            var resource = BuildImageSourceRequirement(plan, validatedAnswers?.AcceptedAnswers) with
             {
                 Source = "field_blocker",
                 BlockingScope = VisionAgentResourceBlockingScopes.DeployRun
@@ -747,15 +807,17 @@ public static class VisionAgentPlanReadinessEvaluator
         foreach (var answer in answers)
         {
             var field = VisionAgentPlanFieldPolicy.NormalizeField(answer.Field);
-            var value = Clean(answer.Value).ToLowerInvariant();
+            var sourceResolution = VisionAgentImageSourceResolver.Resolve(answer.Value);
             if (!field.Equals(VisionAgentPlanAnswerFields.ImageSource, StringComparison.OrdinalIgnoreCase) ||
-                value is not ("station_camera" or "line_camera") ||
+                !sourceResolution.Supported ||
                 answer.Origin.Equals(VisionAgentPlanAnswerOrigins.ResourceBound, StringComparison.OrdinalIgnoreCase))
             {
                 continue;
             }
 
-            var resource = BuildCameraRequirement(plan);
+            var resource = sourceResolution.Kind == VisionAgentImageSourceKind.File
+                ? BuildImageFileRequirement(plan)
+                : BuildCameraRequirement(plan);
             if (IsResourceBound(resource, resourceDecisions)) continue;
             var blocksResource = ResourceBlocksBuild(resource, requirementMode, maturity, hasSupportedRoute);
             AddOrReplace(blockers, Blocker(
@@ -794,15 +856,21 @@ public static class VisionAgentPlanReadinessEvaluator
             ordinals[normalizedType] = ordinal + 1;
             var operatorKey = VisionAgentResourceIdentity.OperatorKey(operatorType, ordinal);
 
+            var sourceResolution = VisionAgentImageSourceResolver.Resolve(imageSource);
             if (operatorType.Equals("ImageAcquisition", StringComparison.OrdinalIgnoreCase) &&
-                imageSource is not null &&
-                (imageSource.Contains("camera", StringComparison.OrdinalIgnoreCase) ||
-                 imageSource.Contains("station", StringComparison.OrdinalIgnoreCase) ||
-                 imageSource.Contains("line", StringComparison.OrdinalIgnoreCase)))
+                sourceResolution.Kind == VisionAgentImageSourceKind.Camera)
             {
                 requirements.Add(CreateResourceRequirement(
                     "camera_binding", "相机绑定", operatorKey, operatorType, ordinal,
                     "CameraBindingId", VisionAgentResourceResolutionTargets.CameraSettings,
+                    VisionAgentResourceDraftPolicies.DraftAllowed, "plan_route"));
+            }
+            else if (operatorType.Equals("ImageAcquisition", StringComparison.OrdinalIgnoreCase) &&
+                     sourceResolution.Kind == VisionAgentImageSourceKind.File)
+            {
+                requirements.Add(CreateResourceRequirement(
+                    "image_file", "图像文件", operatorKey, operatorType, ordinal,
+                    "FilePath", VisionAgentResourceResolutionTargets.ImageFilePicker,
                     VisionAgentResourceDraftPolicies.DraftAllowed, "plan_route"));
             }
             else if (PlanMentionsResourceRequirement(plan, "model") &&
@@ -858,17 +926,50 @@ public static class VisionAgentPlanReadinessEvaluator
             VisionAgentResourceDraftPolicies.DraftAllowed, "accepted_answer");
     }
 
+    private static VisionAgentResourceRequirement BuildImageFileRequirement(VisionAgentPlanModeResult plan)
+    {
+        var operators = plan.RecommendedRoute?.Operators ?? [];
+        var index = operators.FindIndex(item => item.Equals("ImageAcquisition", StringComparison.OrdinalIgnoreCase));
+        return CreateResourceRequirement(
+            "image_file", "图像文件",
+            VisionAgentResourceIdentity.OperatorKey("ImageAcquisition", Math.Max(0, index)),
+            "ImageAcquisition", Math.Max(0, index), "FilePath",
+            VisionAgentResourceResolutionTargets.ImageFilePicker,
+            VisionAgentResourceDraftPolicies.DraftAllowed, "accepted_answer");
+    }
+
+    private static VisionAgentResourceRequirement BuildImageSourceRequirement(
+        VisionAgentPlanModeResult plan,
+        IReadOnlyList<VisionAgentPlanAnswer>? acceptedAnswers = null)
+    {
+        var source = FirstNonEmpty(
+            acceptedAnswers?
+                .LastOrDefault(answer => VisionAgentPlanFieldPolicy.NormalizeField(answer.Field)
+                    .Equals(VisionAgentPlanAnswerFields.ImageSource, StringComparison.OrdinalIgnoreCase))?.Value,
+            plan.ConfirmedPlanAnswers?
+                .LastOrDefault(answer => VisionAgentPlanFieldPolicy.NormalizeField(answer.Field)
+                    .Equals(VisionAgentPlanAnswerFields.ImageSource, StringComparison.OrdinalIgnoreCase))?.Value,
+            plan.SemanticExtraction?.ImageSource);
+        return VisionAgentImageSourceResolver.Resolve(source).Kind switch
+        {
+            VisionAgentImageSourceKind.File => BuildImageFileRequirement(plan),
+            VisionAgentImageSourceKind.Camera => BuildCameraRequirement(plan),
+            _ => CreateResourceRequirement(
+                "image_source", "图像来源",
+                VisionAgentResourceIdentity.OperatorKey("ImageAcquisition", 0),
+                "ImageAcquisition", 0, "SourceType",
+                VisionAgentResourceResolutionTargets.PlanWorkbench,
+                VisionAgentResourceDraftPolicies.DraftAllowed, "accepted_answer")
+        };
+    }
+
     private static VisionAgentResourceRequirement BuildLegacyResourceRequirement(
         VisionAgentPlanModeResult plan,
         string key,
         string field,
-        string questionId)
+        string questionId,
+        IReadOnlyList<VisionAgentPlanAnswer>? acceptedAnswers)
     {
-        if (IsCameraResourceSignal(plan, key, field))
-        {
-            return BuildCameraRequirement(plan) with { Source = "legacy_blocker" };
-        }
-
         if (VisionAgentResourceIdentity.TryParseCanonicalId(
                 key,
                 out var canonicalType,
@@ -888,6 +989,21 @@ public static class VisionAgentPlanReadinessEvaluator
                 "canonical_blocker");
         }
 
+        if (IsExplicitCameraResourceKey(key))
+        {
+            return BuildCameraRequirement(plan) with { Source = "legacy_blocker" };
+        }
+
+        if (IsExplicitFileResourceKey(key))
+        {
+            return BuildImageFileRequirement(plan) with { Source = "legacy_blocker" };
+        }
+
+        if (IsImageSourceResourceSignal(plan, key, field))
+        {
+            return BuildImageSourceRequirement(plan, acceptedAnswers) with { Source = "legacy_blocker" };
+        }
+
         var normalized = VisionAgentResourceIdentity.NormalizeToken($"{key}_{field}");
         if (normalized.Contains("model", StringComparison.Ordinal))
         {
@@ -905,7 +1021,7 @@ public static class VisionAgentPlanReadinessEvaluator
         return CreateResourceRequirement("resource", "工程资源", string.Empty, string.Empty, -1, field, VisionAgentResourceResolutionTargets.Replan, VisionAgentResourceDraftPolicies.BuildRequired, "legacy_blocker", key);
     }
 
-    private static bool IsCameraResourceSignal(VisionAgentPlanModeResult plan, string key, string field)
+    private static bool IsImageSourceResourceSignal(VisionAgentPlanModeResult plan, string key, string field)
     {
         var normalizedField = VisionAgentPlanFieldPolicy.NormalizeField(field);
         if (normalizedField.Equals(VisionAgentPlanAnswerFields.ImageSource, StringComparison.OrdinalIgnoreCase))
@@ -944,8 +1060,38 @@ public static class VisionAgentPlanReadinessEvaluator
         return ContainsAny(key, "camera", "image source", "image sample", "相机", "图像", "样本");
     }
 
+    private static bool IsExplicitCameraResourceKey(string key)
+    {
+        var normalized = VisionAgentResourceIdentity.NormalizeToken(key);
+        return ContainsAny(
+            normalized,
+            "camerabinding",
+            "stationcamera",
+            "linecamera",
+            "industrialcamera",
+            "cameraconfiguration",
+            "cameraidentifier");
+    }
+
+    private static bool IsExplicitFileResourceKey(string key)
+    {
+        var normalized = VisionAgentResourceIdentity.NormalizeToken(key);
+        return ContainsAny(normalized, "imagefile", "filesample", "imagefolder", "sampleimage");
+    }
+
+    private static bool IsGenericImageSourceBlocker(VisionAgentBuildBlocker blocker)
+    {
+        var resourceType = blocker.Resource?.ResourceType ?? string.Empty;
+        return resourceType.Equals("image_source", StringComparison.OrdinalIgnoreCase) ||
+               (resourceType.Equals("resource", StringComparison.OrdinalIgnoreCase) &&
+                VisionAgentPlanFieldPolicy.NormalizeField(blocker.Field)
+                    .Equals(VisionAgentPlanAnswerFields.ImageSource, StringComparison.OrdinalIgnoreCase));
+    }
+
     private static string ResourceName(string resourceType) => resourceType switch
     {
+        "image_file" => "图像文件",
+        "image_source" => "图像来源",
         "camera_binding" => "相机绑定",
         "model_resource" => "模型资源",
         "template_artifact" => "模板资源",
@@ -956,6 +1102,7 @@ public static class VisionAgentPlanReadinessEvaluator
 
     private static string ResolutionTarget(string resourceType) => resourceType switch
     {
+        "image_file" => VisionAgentResourceResolutionTargets.ImageFilePicker,
         "camera_binding" => VisionAgentResourceResolutionTargets.CameraSettings,
         "model_resource" => VisionAgentResourceResolutionTargets.ModelPicker,
         "template_artifact" => VisionAgentResourceResolutionTargets.TemplatePicker,
@@ -1019,7 +1166,8 @@ public static class VisionAgentPlanReadinessEvaluator
     {
         return VisionAgentPlanFieldPolicy.NormalizeField(field)
                    .Equals(VisionAgentPlanAnswerFields.ImageSource, StringComparison.OrdinalIgnoreCase) &&
-               IsResourceBound(BuildCameraRequirement(plan), decisions);
+               (IsResourceBound(BuildCameraRequirement(plan), decisions) ||
+                IsResourceBound(BuildImageFileRequirement(plan), decisions));
     }
 
     private static bool ResourceBlocksBuild(
@@ -1037,7 +1185,7 @@ public static class VisionAgentPlanReadinessEvaluator
         $"resource_pending:{VisionAgentResourceIdentity.Canonicalize(resource.CanonicalId)}";
 
     private static string ResourceField(VisionAgentResourceRequirement resource) =>
-        resource.ResourceType.Equals("camera_binding", StringComparison.OrdinalIgnoreCase)
+        resource.ResourceType is "camera_binding" or "image_file" or "image_source"
             ? VisionAgentPlanAnswerFields.ImageSource
             : resource.ResourceType;
 

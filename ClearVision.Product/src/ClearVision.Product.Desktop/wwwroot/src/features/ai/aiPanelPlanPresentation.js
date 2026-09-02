@@ -3,6 +3,7 @@ import {
     deriveAiClarificationPresentation,
     renderAiClarification
 } from './aiPanelClarificationPresentation.js';
+import { normalizeAiPrimaryTask } from './aiTaskContract.js';
 
 const UNDERSTANDING_FIELDS = Object.freeze([
     { field: 'inspection_object', label: '检测对象', semantic: 'inspectionObject' },
@@ -72,7 +73,9 @@ function readSemanticValue(panel, semantic, definition) {
     const raw = semantic?.[definition.semantic] ?? semantic?.[definition.fallbackSemantic];
     if (['unknown', 'unspecified', 'pending', 'not_set'].includes(clean(raw).toLowerCase())) return '';
     if (definition.format === 'taskType') {
-        return clean(panel?._formatRequirementTaskTypeLabel?.(raw) || localize(panel, raw));
+        const canonical = normalizeAiPrimaryTask(raw);
+        if (!canonical) return '';
+        return clean(panel?._formatRequirementTaskTypeLabel?.(canonical) || localize(panel, canonical));
     }
     return localize(panel, raw);
 }
@@ -81,14 +84,20 @@ function readUnderstandingItem(panel, plan, definition) {
     const state = panel?.agentWorkspaceState;
     const semantic = plan?.semanticExtraction || {};
     const { confirmed, optimistic } = readAnswer(state, definition.field, definition.fallbackField);
-    const answer = optimistic || confirmed;
+    const rawAnswer = optimistic || confirmed;
+    const canonicalAnswer = definition.format === 'taskType'
+        ? normalizeAiPrimaryTask(rawAnswer?.value)
+        : clean(rawAnswer?.value);
+    const answer = rawAnswer && canonicalAnswer
+        ? { ...rawAnswer, value: canonicalAnswer }
+        : null;
     const semanticValue = readSemanticValue(panel, semantic, definition);
     const value = clean(answer?.value)
         ? formatAnswerValue(panel, plan, definition.field, answer.value)
         : semanticValue || '待确认';
-    const status = optimistic
+    const status = answer && optimistic
         ? 'confirming'
-        : confirmed
+        : answer && confirmed
             ? 'confirmed'
             : semanticValue
                 ? 'inferred'

@@ -160,13 +160,19 @@ test('custom and other controls are never accepted as business answers', () => {
   assert.equal(isPlaceholderAnswer('other'), true);
   assert.equal(isPlaceholderAnswer('custom_input'), true);
   assert.equal(normalizeWorkspaceAnswer({ field: 'task_type', value: 'other', origin: 'explicit_user_selection' }), null);
+  assert.equal(
+    normalizeWorkspaceAnswer({ field: 'task_type', value: '我自己描述的分拣任务', origin: 'explicit_user_text', evidenceText: '我自己描述的分拣任务' }),
+    null,
+    'unknown free text cannot resolve the canonical task contract'
+  );
   assert.deepEqual(
-    normalizeWorkspaceAnswer({ field: 'task_type', value: '我自己描述的分拣任务', origin: 'explicit_user_text' }),
+    normalizeWorkspaceAnswer({ field: 'task_type', value: 'classification', origin: 'explicit_user_text', evidenceText: 'classification' }),
     {
       field: 'task_type',
       questionId: '',
-      value: '我自己描述的分拣任务',
+      value: 'attribute_classification',
       origin: 'explicit_user_text',
+      evidenceText: 'classification',
       confidence: 1,
       resolved: true
     }
@@ -182,7 +188,7 @@ test('clarification batch advances only after the whole current batch is submitt
   let state = reduce(createAgentWorkspaceState({ sessionId: 's1' }), AgentWorkspaceEventTypes.PLAN_RECEIVED, { plan: plan() }, { sessionId: 's1' });
   for (const [questionId, field] of [['q-object', 'inspection_object'], ['q-task', 'task_type'], ['q-image', 'image_source']]) {
     state = reduce(state, AgentWorkspaceEventTypes.ANSWER_OPTIMISTIC_SET, {
-      answer: { questionId, field, value: `${field}_a`, origin: 'explicit_user_selection' }
+      answer: { questionId, field, value: field === 'task_type' ? 'surface_defect' : `${field}_a`, origin: 'explicit_user_selection' }
     }, { planId: 'plan-1', planHash: 'hash-1' });
   }
 

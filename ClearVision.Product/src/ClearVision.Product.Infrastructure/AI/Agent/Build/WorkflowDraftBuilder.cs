@@ -20,10 +20,15 @@ public sealed class WorkflowDraftBuilder
     private const string AgentBuildIntentMetadataKey = "agentBuildIntent";
     private const string AgentRouteSemanticsSatisfiedMetadataKey = "agentRouteSemanticsSatisfied";
     private const string AgentRouteContractVersionMetadataKey = "agentRouteContractVersion";
+    private const string AgentRouteRequiredResultsMetadataKey = "agentRouteRequiredResults";
+    private const string AgentRouteMatchedCapabilitiesMetadataKey = "agentRouteMatchedCapabilities";
+    private const string AgentRouteEvidenceMetadataKey = "agentRouteEvidence";
+    private const string AgentSemanticEdgeAuditMetadataKey = "agentSemanticEdgeAudit";
     private static readonly Regex LegacyTempIdNamePattern = new(
         "^(op|operator|temp)_[A-Za-z0-9][A-Za-z0-9_-]*$",
         RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
     private readonly IVisionAgentOperatorContractCatalog _contractCatalog;
+    private readonly VisionAgentPortSemanticCatalog _semanticCatalog;
 
     public WorkflowDraftBuilder()
         : this(new VisionAgentOperatorContractCatalog())
@@ -38,6 +43,7 @@ public sealed class WorkflowDraftBuilder
     internal WorkflowDraftBuilder(IVisionAgentOperatorContractCatalog contractCatalog)
     {
         _contractCatalog = contractCatalog;
+        _semanticCatalog = new VisionAgentPortSemanticCatalog();
     }
 
     internal Task<BuildStepResult<DraftWorkflowResolution>> DraftAsync(
@@ -48,7 +54,7 @@ public sealed class WorkflowDraftBuilder
         ParameterMappingResolution parameters,
         CancellationToken cancellationToken)
     {
-        var connectionSpecs = BuildConnectionSpecs(pipeline.Steps);
+        var connectionSpecs = BuildConnectionSpecs(pipeline.Steps, load);
         var artifact = Compile(load, intent, pipeline, parameters, connectionSpecs);
         var generation = BuildDraftGenerationResult(artifact.CanvasProjection);
 
@@ -71,6 +77,8 @@ public sealed class WorkflowDraftBuilder
                 operatorCount = pipeline.Steps.Count,
                 canvasOperatorCount = artifact.CanvasProjection.Operators.Count,
                 connectionCount = artifact.Graph.Connections.Count,
+                semanticEdgeAuditCount = artifact.SemanticEdgeAudits.Count,
+                criticalSemanticEdgeAuditCount = artifact.SemanticEdgeAudits.Count(item => item.CriticalBusinessEdge),
                 artifactFingerprint = artifact.ArtifactFingerprint,
                 catalogVersion = artifact.CatalogVersion,
                 buildIntent = intent.BuildIntent,
@@ -112,7 +120,7 @@ public sealed class WorkflowDraftBuilder
         IReadOnlyList<string> issueCodes,
         int repairRound)
     {
-        var connectionSpecs = BuildConnectionSpecs(pipeline.Steps, forceBestEffort: true);
+        var connectionSpecs = BuildConnectionSpecs(pipeline.Steps, load, forceBestEffort: true);
         var artifact = Compile(load, intent, pipeline, parameters, connectionSpecs);
         var normalizedCodes = issueCodes
             .Where(code => !string.IsNullOrWhiteSpace(code))
@@ -166,6 +174,15 @@ public sealed class WorkflowDraftBuilder
         IReadOnlyList<ConnectionSpec> connectionSpecs)
     {
         var graph = BuildGraph(pipeline, parameters, connectionSpecs);
+        var semanticEdgeAudits = connectionSpecs.Select(spec => new VisionAgentSemanticEdgeAudit(
+            spec.SourceTempId,
+            spec.SourcePortName,
+            spec.SourceSemantic,
+            spec.TargetTempId,
+            spec.TargetPortName,
+            spec.TargetSemantic,
+            spec.SelectionReason,
+            spec.CriticalBusinessEdge)).ToList();
         var canonical = BuildCanonicalDraft(graph);
         var catalogVersion = VisionAgentBuildSupport.FirstNonEmpty(
             load.OperatorCatalogVersion,
@@ -183,6 +200,7 @@ public sealed class WorkflowDraftBuilder
             load.PlanHash,
             catalogVersion,
             intent.BuildIntent);
+        StampSemanticEdgeAudit(canvas, semanticEdgeAudits);
         var returnedFlowSemanticFingerprint = WorkflowArtifactFingerprint.ComputeCanvasProjection(
             canvas,
             load.PlanHash,
@@ -196,7 +214,8 @@ public sealed class WorkflowDraftBuilder
             canvas,
             artifactFingerprint,
             catalogVersion,
-            returnedFlowSemanticFingerprint);
+            returnedFlowSemanticFingerprint,
+            semanticEdgeAudits);
     }
 
     internal static void StampRouteAssessment(
@@ -209,6 +228,9 @@ public sealed class WorkflowDraftBuilder
             op.Metadata[AgentTaskTypeMetadataKey] = assessment.TaskType;
             op.Metadata[AgentRouteSemanticsSatisfiedMetadataKey] = assessment.Satisfied;
             op.Metadata[AgentRouteContractVersionMetadataKey] = assessment.ContractVersion;
+            op.Metadata[AgentRouteRequiredResultsMetadataKey] = string.Join(",", assessment.RequiredResultSemantics);
+            op.Metadata[AgentRouteMatchedCapabilitiesMetadataKey] = string.Join(",", assessment.MatchedCapabilities);
+            op.Metadata[AgentRouteEvidenceMetadataKey] = string.Join("|", assessment.Evidence);
         }
     }
 
@@ -228,6 +250,28 @@ public sealed class WorkflowDraftBuilder
             op.Metadata[AgentPlanHashMetadataKey] = planHash;
             op.Metadata[AgentCatalogVersionMetadataKey] = catalogVersion;
             op.Metadata[AgentBuildIntentMetadataKey] = buildIntent;
+        }
+    }
+
+    private static void StampSemanticEdgeAudit(
+        OperatorFlowDto flow,
+        IReadOnlyList<VisionAgentSemanticEdgeAudit> audits)
+    {
+        var serialized = JsonSerializer.Serialize(audits.Select(item => new
+        {
+            item.SourceTempId,
+            item.SourcePortName,
+            item.SourceSemantic,
+            item.TargetTempId,
+            item.TargetPortName,
+            item.TargetSemantic,
+            item.SelectionReason,
+            item.CriticalBusinessEdge
+        }));
+        foreach (var op in flow.Operators)
+        {
+            op.Metadata ??= new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase);
+            op.Metadata[AgentSemanticEdgeAuditMetadataKey] = serialized;
         }
     }
 
@@ -544,6 +588,7 @@ public sealed class WorkflowDraftBuilder
 
     private IReadOnlyList<ConnectionSpec> BuildConnectionSpecs(
         IReadOnlyList<VisionAgentOperatorPipelineStep> steps,
+        BuildPlanLoad load,
         bool forceBestEffort = false)
     {
         var specs = new List<ConnectionSpec>();
@@ -589,7 +634,13 @@ public sealed class WorkflowDraftBuilder
                     continue;
                 }
 
-                Add(FindLatestCompatibleSource(steps, targetIndex, target, input.Name, PreferredSourcePorts(target.OperatorType, input.Name)));
+                if (target.OperatorType.Equals("Measurement", StringComparison.OrdinalIgnoreCase) &&
+                    input.Name is "PointA" or "PointB" or "Element1" or "Element2")
+                {
+                    continue;
+                }
+
+                Add(FindBusinessSemanticSource(steps, targetIndex, target, input.Name, load));
             }
 
             switch (target.OperatorType)
@@ -600,27 +651,37 @@ public sealed class WorkflowDraftBuilder
                 case "BlobAnalysis":
                 case "TemplateMatching":
                 case "CircleMeasurement":
-                    Add(FindLatestCompatibleSource(steps, targetIndex, target, "Image", ["Image", "DefectMask", "Mask"]));
+                case "LineMeasurement":
+                case "ContourMeasurement":
+                case "AngleMeasurement":
+                case "CodeRecognition":
+                case "EdgeDetection":
+                case "Thresholding":
+                    Add(FindBusinessSemanticSource(steps, targetIndex, target, "Image", load));
                     break;
                 case "DetectionSequenceJudge":
-                    Add(FindLatestCompatibleSource(steps, targetIndex, target, "Detections", ["DetectionList", "Defects", "Objects", "SortedDetections"]));
+                    Add(FindBusinessSemanticSource(steps, targetIndex, target, "Detections", load));
                     break;
                 case "Measurement":
                     AddMeasurementPointConnections(steps, targetIndex, target, Add);
-                    Add(FindLatestCompatibleSource(steps, targetIndex, target, "Image", ["Image"]));
+                    Add(FindBusinessSemanticSource(steps, targetIndex, target, "Image", load));
                     break;
                 case "UnitConvert":
-                    Add(FindLatestCompatibleSource(steps, targetIndex, target, "Value", ["Distance", "Radius", "Diameter", "DefectArea"]));
+                    Add(FindBusinessSemanticSource(steps, targetIndex, target, "Value", load));
+                    break;
+                case "Aggregator":
+                    Add(FindBusinessSemanticSource(steps, targetIndex, target, "Value1", load));
+                    Add(FindBusinessSemanticSource(steps, targetIndex, target, "Value2", load));
                     break;
                 case "ResultJudgment":
-                    Add(FindLatestCompatibleSource(steps, targetIndex, target, "Value",
-                        ["TopClassLabel", "Result", "IsMatch", "BlobCount", "DefectCount", "ObjectCount", "MatchCount", "Score", "Distance", "JudgmentResult"]));
-                    Add(FindLatestCompatibleSource(steps, targetIndex, target, "Confidence", ["TopClassConfidence", "Score", "NormalizedScore"]));
+                    Add(FindBusinessSemanticSource(steps, targetIndex, target, "Value", load));
+                    Add(FindBusinessSemanticSource(steps, targetIndex, target, "Confidence", load));
                     break;
                 case "ResultOutput":
-                    Add(FindLatestCompatibleSource(steps, targetIndex, target, "Result",
-                        ["JudgmentResult", "IsOk", "ConditionResult", "Result", "Data", "DefectCount", "BlobCount", "MatchCount"]));
-                    Add(FindLatestCompatibleSource(steps, targetIndex, target, "Image", ["Image"]));
+                    Add(FindBusinessSemanticSource(steps, targetIndex, target, "Result", load));
+                    Add(FindBusinessSemanticSource(steps, targetIndex, target, "Text", load));
+                    Add(FindBusinessSemanticSource(steps, targetIndex, target, "Data", load));
+                    Add(FindBusinessSemanticSource(steps, targetIndex, target, "Image", load));
                     break;
             }
 
@@ -628,12 +689,117 @@ public sealed class WorkflowDraftBuilder
             {
                 foreach (var input in targetContract.InputPorts)
                 {
-                    Add(FindLatestCompatibleSource(steps, targetIndex, target, input.Name, PreferredSourcePorts(target.OperatorType, input.Name)));
+                    Add(FindBusinessSemanticSource(steps, targetIndex, target, input.Name, load));
                 }
             }
         }
 
         return specs;
+    }
+
+    private ConnectionSpec? FindBusinessSemanticSource(
+        IReadOnlyList<VisionAgentOperatorPipelineStep> steps,
+        int targetIndex,
+        VisionAgentOperatorPipelineStep target,
+        string targetPortName,
+        BuildPlanLoad load)
+    {
+        if (!_contractCatalog.TryGet(target.OperatorType, out var targetContract))
+        {
+            return null;
+        }
+
+        var targetPort = targetContract.InputPorts.FirstOrDefault(port =>
+            string.Equals(port.Name, targetPortName, StringComparison.OrdinalIgnoreCase));
+        if (targetPort == null)
+        {
+            return null;
+        }
+
+        var requiredOutputs = load.Plan?.PlanFidelity.RequiredOutputSemantics ?? [];
+        var measurementTarget = EffectiveRequirementValue(
+            load,
+            VisionAgentPlanAnswerFields.MeasurementTarget,
+            load.Plan?.SemanticExtraction?.MeasurementTarget);
+        var acceptanceCriteria = EffectiveRequirementValue(
+            load,
+            VisionAgentPlanAnswerFields.AcceptanceCriteria,
+            VisionAgentBuildSupport.FirstNonEmpty(
+                load.Plan?.SemanticExtraction?.OkCondition,
+                load.Plan?.SemanticExtraction?.NgCondition));
+        var accepted = _semanticCatalog.AcceptedInputSemantics(
+            load.TaskType,
+            target.OperatorType,
+            targetPort.Name,
+            requiredOutputs,
+            measurementTarget,
+            acceptanceCriteria);
+
+        foreach (var semantic in accepted)
+        {
+            for (var sourceIndex = targetIndex - 1; sourceIndex >= 0; sourceIndex--)
+            {
+                var source = steps[sourceIndex];
+                if (!_contractCatalog.TryGet(source.OperatorType, out var sourceContract))
+                {
+                    continue;
+                }
+
+                var sourcePorts = sourceContract.OutputPorts.AsEnumerable();
+                if (semantic.Equals(VisionPortSemantics.MeasurementValue, StringComparison.OrdinalIgnoreCase))
+                {
+                    var preferredMeasurementPort = PreferredMeasurementValuePort(
+                        source.OperatorType,
+                        measurementTarget);
+                    sourcePorts = sourcePorts.OrderBy(port =>
+                        port.Name.Equals(preferredMeasurementPort, StringComparison.OrdinalIgnoreCase) ? 0 : 1);
+                }
+
+                foreach (var sourcePort in sourcePorts)
+                {
+                    if (!_semanticCatalog.OutputSemantics(source.OperatorType, sourcePort.Name)
+                            .Contains(semantic, StringComparer.OrdinalIgnoreCase) ||
+                        !PortDataTypeCompatibility.AreCompatible(sourcePort.DataType, targetPort.DataType))
+                    {
+                        continue;
+                    }
+
+                    var critical = _semanticCatalog.IsCriticalBusinessInput(target.OperatorType, targetPort.Name);
+                    return new ConnectionSpec(
+                        source.TempId,
+                        sourcePort.Name,
+                        target.TempId,
+                        targetPort.Name,
+                        semantic,
+                        semantic,
+                        "business_semantic_allow_list",
+                        critical);
+                }
+            }
+        }
+
+        if (_semanticCatalog.IsCriticalBusinessInput(target.OperatorType, targetPort.Name))
+        {
+            return null;
+        }
+
+        return FindLatestCompatibleSource(
+            steps,
+            targetIndex,
+            target,
+            targetPort.Name,
+            PreferredSourcePorts(target.OperatorType, targetPort.Name));
+    }
+
+    private static string EffectiveRequirementValue(
+        BuildPlanLoad load,
+        string field,
+        string? fallback)
+    {
+        return load.EffectiveRequirement.Values.TryGetValue(field, out var value) &&
+               !string.IsNullOrWhiteSpace(value)
+            ? value
+            : fallback?.Trim() ?? string.Empty;
     }
 
     private void AddMeasurementPointConnections(
@@ -648,12 +814,24 @@ public sealed class WorkflowDraftBuilder
             .ToList();
         if (circleSources.Count > 0)
         {
-            add(BuildConnection(circleSources[0], "Center", target, "PointA"));
+            add(BuildConnection(
+                circleSources[0],
+                "Center",
+                target,
+                "PointA",
+                VisionPortSemantics.GeometryElement,
+                criticalBusinessEdge: true));
         }
 
         if (circleSources.Count > 1)
         {
-            add(BuildConnection(circleSources[1], "Center", target, "PointB"));
+            add(BuildConnection(
+                circleSources[1],
+                "Center",
+                target,
+                "PointB",
+                VisionPortSemantics.GeometryElement,
+                criticalBusinessEdge: true));
         }
     }
 
@@ -691,7 +869,17 @@ public sealed class WorkflowDraftBuilder
                 if (sourcePort != null &&
                     PortDataTypeCompatibility.AreCompatible(sourcePort.DataType, targetPort.DataType))
                 {
-                    return new ConnectionSpec(source.TempId, sourcePort.Name, target.TempId, targetPort.Name);
+                    var semantics = _semanticCatalog.OutputSemantics(source.OperatorType, sourcePort.Name);
+                    var semantic = semantics.FirstOrDefault() ?? string.Empty;
+                    return new ConnectionSpec(
+                        source.TempId,
+                        sourcePort.Name,
+                        target.TempId,
+                        targetPort.Name,
+                        semantic,
+                        semantic,
+                        "preferred_type_compatible_fallback",
+                        false);
                 }
             }
 
@@ -699,7 +887,17 @@ public sealed class WorkflowDraftBuilder
                 PortDataTypeCompatibility.AreCompatible(port.DataType, targetPort.DataType));
             if (compatible != null)
             {
-                return new ConnectionSpec(source.TempId, compatible.Name, target.TempId, targetPort.Name);
+                var semantics = _semanticCatalog.OutputSemantics(source.OperatorType, compatible.Name);
+                var semantic = semantics.FirstOrDefault() ?? string.Empty;
+                return new ConnectionSpec(
+                    source.TempId,
+                    compatible.Name,
+                    target.TempId,
+                    targetPort.Name,
+                    semantic,
+                    semantic,
+                    "type_compatible_fallback",
+                    false);
             }
         }
 
@@ -710,7 +908,9 @@ public sealed class WorkflowDraftBuilder
         VisionAgentOperatorPipelineStep source,
         string sourcePortName,
         VisionAgentOperatorPipelineStep target,
-        string targetPortName)
+        string targetPortName,
+        string semantic = "",
+        bool criticalBusinessEdge = false)
     {
         if (!_contractCatalog.TryGet(source.OperatorType, out var sourceContract) ||
             !_contractCatalog.TryGet(target.OperatorType, out var targetContract))
@@ -729,7 +929,17 @@ public sealed class WorkflowDraftBuilder
             return null;
         }
 
-        return new ConnectionSpec(source.TempId, sourcePort.Name, target.TempId, targetPort.Name);
+        return new ConnectionSpec(
+            source.TempId,
+            sourcePort.Name,
+            target.TempId,
+            targetPort.Name,
+            semantic,
+            semantic,
+            string.IsNullOrWhiteSpace(semantic)
+                ? "explicit_contract_connection"
+                : "business_semantic_allow_list",
+            criticalBusinessEdge);
     }
 
     private static IReadOnlyList<string> PreferredSourcePorts(string operatorType, string targetPortName)
@@ -754,6 +964,32 @@ public sealed class WorkflowDraftBuilder
             "DetectionSequenceJudge" => ["DetectionList", "Defects", "Objects"],
             "UnitConvert" => ["Distance", "Radius", "Diameter"],
             _ => ["Output", "Result", "Image", "Data"]
+        };
+    }
+
+    private static string PreferredMeasurementValuePort(string operatorType, string? measurementTarget)
+    {
+        var target = measurementTarget?.Trim() ?? string.Empty;
+        return operatorType switch
+        {
+            "CircleMeasurement" when target.Contains("圆度", StringComparison.OrdinalIgnoreCase) ||
+                                     target.Contains("circularity", StringComparison.OrdinalIgnoreCase) => "Circularity",
+            "CircleMeasurement" => "Radius",
+            "LineMeasurement" when target.Contains("角", StringComparison.OrdinalIgnoreCase) ||
+                                   target.Contains("angle", StringComparison.OrdinalIgnoreCase) => "Angle",
+            "LineMeasurement" => "Length",
+            "ContourMeasurement" when target.Contains("周长", StringComparison.OrdinalIgnoreCase) ||
+                                      target.Contains("perimeter", StringComparison.OrdinalIgnoreCase) => "Perimeter",
+            "ContourMeasurement" => "Area",
+            "AngleMeasurement" => "Angle",
+            "Measurement" when target.Contains("角", StringComparison.OrdinalIgnoreCase) ||
+                               target.Contains("angle", StringComparison.OrdinalIgnoreCase) => "Angle",
+            "Measurement" => "Distance",
+            "WidthMeasurement" => "Width",
+            "GapMeasurement" => "MeanGap",
+            "ColorMeasurement" => "DeltaE",
+            "UnitConvert" => "Result",
+            _ => string.Empty
         };
     }
 
@@ -891,5 +1127,9 @@ public sealed class WorkflowDraftBuilder
         string SourceTempId,
         string SourcePortName,
         string TargetTempId,
-        string TargetPortName);
+        string TargetPortName,
+        string SourceSemantic = "",
+        string TargetSemantic = "",
+        string SelectionReason = "explicit_contract_connection",
+        bool CriticalBusinessEdge = false);
 }

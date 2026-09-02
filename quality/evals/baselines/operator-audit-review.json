@@ -65,14 +65,14 @@
     "operator": "MitsubishiMcCommunication",
     "field": "Port",
     "reviewStatus": "reviewed",
-    "staticDifferenceStatus": "present",
+    "staticDifferenceStatus": "resolved",
     "productionReachability": "reachable",
     "verdict": "intentional-difference",
     "evidence": [
-      "Formal metadata supplies port 5002 for normal authoring, while ResolveConnectionSettings treats an absent operator endpoint as incomplete unless global fallback is explicitly enabled.",
-      "Historical and direct DTO flows can omit the field, but execution admission remains a separate prerequisite for real PLC I/O."
+      "The formal Mitsubishi contract now accepts only a governed ProfileId plus an allow-listed Address/Operation binding and no longer declares a raw Port parameter.",
+      "Execution and validation reject IpAddress, Port, UseGlobalFallback, and DataType as authority-bearing raw targets, so the reviewed Port fallback identity is absent from the current audit findings."
     ],
-    "reason": "The zero fallback is a fail-closed signal paired with missing IP handling; changing only the port would not create a complete endpoint and could weaken explicit PLC configuration requirements."
+    "reason": "The historical intentional fallback difference was retired by the profile-only PLC authority contract. It is resolved without reclassifying the original review as a production defect."
   },
   {
     "reviewId": "OAR-006",
@@ -80,14 +80,14 @@
     "operator": "MqttPublish",
     "field": "Broker",
     "reviewStatus": "reviewed",
-    "staticDifferenceStatus": "present",
+    "staticDifferenceStatus": "resolved",
     "productionReachability": "not-applicable",
     "verdict": "intentional-difference",
     "evidence": [
-      "MqttPublish metadata marks the operator maturity as placeholder-disabled and Execute always returns MQTT_PUBLISH_DISABLED without publishing.",
-      "Validation rejects a structurally absent Broker even though normal authoring supplies localhost."
+      "MqttPublish remains tagged maturity:placeholder-disabled and execution always returns MQTT_PUBLISH_DISABLED without publishing.",
+      "The current governed source/metadata audit no longer emits the reviewed Broker fallback identity; no production publish path was enabled by that audit-surface change."
     ],
-    "reason": "The current difference is a deliberate fail-closed validation boundary on a disabled integration; there is no enabled production publish path whose broker behavior can be regressed."
+    "reason": "The historical intentional difference is no longer present in the current static finding set. Its resolved state does not imply that the disabled MQTT integration became production-reachable."
   },
   {
     "reviewId": "OAR-007",
@@ -95,14 +95,14 @@
     "operator": "MqttPublish",
     "field": "Topic",
     "reviewStatus": "reviewed",
-    "staticDifferenceStatus": "present",
+    "staticDifferenceStatus": "resolved",
     "productionReachability": "not-applicable",
     "verdict": "intentional-difference",
     "evidence": [
-      "MqttPublish is explicitly placeholder-disabled and never performs a real publish.",
-      "A missing Topic is rejected before the disabled-integration result, while normal authoring metadata supplies cv/results."
+      "MqttPublish remains explicitly placeholder-disabled and never performs a real publish.",
+      "The current governed source/metadata audit no longer emits the reviewed Topic fallback identity; the operator still fails closed and exposes no enabled MQTT side effect."
     ],
-    "reason": "Keeping a missing publish destination fail-closed is intentional until a real MQTT client and execution lifecycle are enabled and reviewed."
+    "reason": "The historical intentional difference is resolved in the current static finding set while the disabled-integration safety boundary remains unchanged."
   },
   {
     "reviewId": "OAR-008",
@@ -125,14 +125,14 @@
     "operator": "PointSetTool",
     "field": "FilterMaxX",
     "reviewStatus": "reviewed",
-    "staticDifferenceStatus": "present",
+    "staticDifferenceStatus": "resolved",
     "productionReachability": "not-proven",
     "verdict": "candidate",
     "evidence": [
-      "Metadata declares 1000000000 while the absent-field fallback is double.MaxValue.",
-      "A behavioral difference requires Operation=Filter, an omitted FilterMaxX, and input coordinates above 1000000000; no formal production fixture or saved project proving that combination was found."
+      "PointSetTool metadata declares FilterMaxX=1000000000 and execution now uses the same 1000000000 fallback.",
+      "The current audit finding set no longer contains the reviewed FilterMaxX identity; explicit values and the other filter bounds remain independently configurable."
     ],
-    "reason": "The static difference is real, but production impact is not established. It remains a candidate rather than being changed to reduce finding count."
+    "reason": "The unproven candidate was retired by aligning the fallback with formal metadata; no production-defect claim is made retroactively."
   },
   {
     "reviewId": "OAR-010",
@@ -140,14 +140,14 @@
     "operator": "PolarUnwrap",
     "field": "OuterRadius",
     "reviewStatus": "reviewed",
-    "staticDifferenceStatus": "present",
+    "staticDifferenceStatus": "resolved",
     "productionReachability": "reachable",
     "verdict": "candidate",
     "evidence": [
-      "ValidateParameters uses 1 when OuterRadius is structurally absent, while Execute derives half of the input image size and metadata declares 100.",
-      "Historical or direct DTO construction can reach the absent-field path, but the repository does not establish whether the adaptive image-size fallback is an intentional legacy contract."
+      "PolarUnwrap metadata declares OuterRadius=100, and both execution and validation now use 100 when the field is structurally absent.",
+      "The current audit finding set no longer contains the reviewed OuterRadius identity while explicit radius values still override the fallback."
     ],
-    "reason": "The three-way difference needs product intent and legacy-project evidence before changing geometry behavior, so it remains a candidate."
+    "reason": "The previously unproven three-way candidate is resolved through deterministic metadata alignment without asserting that the historical adaptive behavior was a confirmed production defect."
   },
   {
     "reviewId": "OAR-011",
@@ -170,14 +170,14 @@
     "operator": "StringFormat",
     "field": "Template",
     "reviewStatus": "reviewed",
-    "staticDifferenceStatus": "present",
+    "staticDifferenceStatus": "resolved",
     "productionReachability": "reachable",
-    "verdict": "open-production-defect",
+    "verdict": "fixed-production-defect",
     "evidence": [
-      "Formal metadata declares Result is {0} and {1}, while a structurally absent Template falls back to an empty string and concatenates inputs.",
-      "ProjectService and direct DTO construction can produce an operator without the field, making the output difference observable in formal execution."
+      "Formal metadata declares Result is {0} and {1}, and StringFormat execution now uses that exact fallback when Template is structurally absent.",
+      "StringFormat reads indexed values only from the declared Arg1/Arg2 inputs; operator and formal-flow tests preserve explicit empty templates and configured values."
     ],
-    "reason": "This is a confirmed production-reachable output difference, but it remains open because the round is capped at five fixes and higher-risk file, state, flow-control, and matching issues were prioritized."
+    "reason": "The previously open production-reachable output difference is fixed: absent Template behavior now matches formal metadata without overriding an explicit empty template."
   },
   {
     "reviewId": "OAR-013",

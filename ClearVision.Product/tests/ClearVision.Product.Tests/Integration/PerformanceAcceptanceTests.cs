@@ -260,8 +260,12 @@ namespace ClearVision.Product.Tests.Integration
             var mockScopedProvider = Substitute.For<IServiceProvider>();
             var mockScope = Substitute.For<IServiceScope>();
             var mockScopeFactory = Substitute.For<IServiceScopeFactory>();
-            var mockSubFlowService = Substitute.For<IFlowExecutionEngine>();
-            mockSubFlowService.ExecuteFlowAsync(Arg.Any<OperatorFlow>(), Arg.Any<Dictionary<string, object>>(), Arg.Any<bool>(), Arg.Any<CancellationToken>())
+            var mockSubFlowService = Substitute.For<IFlowExecutionService>();
+            mockSubFlowService.ExecuteWithSnapshotAsync(
+                    Arg.Any<ExecutionSnapshot>(),
+                    Arg.Any<Dictionary<string, object>?>(),
+                    Arg.Any<bool>(),
+                    Arg.Any<CancellationToken>())
                 .Returns(async _ =>
                 {
                     await Task.Delay(50);
@@ -272,7 +276,7 @@ namespace ClearVision.Product.Tests.Integration
                     };
                 });
 
-            mockScopedProvider.GetService(typeof(IFlowExecutionEngine)).Returns(mockSubFlowService);
+            mockScopedProvider.GetService(typeof(IFlowExecutionService)).Returns(mockSubFlowService);
             mockScope.ServiceProvider.Returns(mockScopedProvider);
             mockScopeFactory.CreateScope().Returns(mockScope);
 
@@ -281,8 +285,28 @@ namespace ClearVision.Product.Tests.Integration
 
             var inputArray = Enumerable.Range(0, 15).Select(x => (object)x).ToList();
             var inputs = new Dictionary<string, object> { { "Items", inputArray } };
+            const long revision = 1;
+            var bindings = ExecutionResourceBindingManifest.Build(
+                flow,
+                "StoredProject",
+                new Dictionary<string, string>
+                {
+                    ["ProjectRevision"] = revision.ToString(CultureInfo.InvariantCulture)
+                });
+            var snapshot = new ExecutionSnapshot(
+                Guid.NewGuid(),
+                flow,
+                revision,
+                ExecutionSnapshotSource.PersistedProject,
+                ExecutionRunMode.FormalPrimary,
+                bindings,
+                principal: new ExecutionPrincipal("performance-test", "Performance Test", "Engineer", true),
+                capabilityManifest: ExecutionCapabilityManifest.Derive(flow, isExplicit: true),
+                sessionId: Guid.NewGuid(),
+                runId: Guid.NewGuid());
 
             var stopwatch = Stopwatch.StartNew();
+            using var authority = ExecutionAuthorityContext.Enter(snapshot);
             var result = await flowService.ExecuteFlowAsync(flow, inputs);
             stopwatch.Stop();
 

@@ -23,9 +23,9 @@ public sealed class VisionAgentPlanPlannerTests
     [Theory(DisplayName = "Plan planner should return planner-sourced golden scenario questions")]
     [InlineData("帮我做一个金属表面划痕检测流程", "surface_defect", "defect_morphology", "SurfaceDefectDetection")]
     [InlineData("做一个线序检测流程", "wire_sequence", "sequence_rule", "DeepLearning")]
-    [InlineData("做一个孔距测量流程", "measurement", "calibration_policy", "MeasureDistance")]
+    [InlineData("做一个孔距测量流程", "measurement", "calibration_policy", "Measurement")]
     [InlineData("做一个模板定位流程", "template_location", "template_asset", "TemplateMatching")]
-    [InlineData("检测后输出 PLC OK/NG", "plc_output", "plc_policy", "ResultOutput")]
+    [InlineData("检测产品裂纹并输出 PLC OK/NG", "surface_defect", "plc_policy", "SurfaceDefectDetection")]
     public async Task CreatePlanAsync_ShouldReturnPlannerSourcedGoldenScenarios(
         string description,
         string intent,
@@ -674,8 +674,8 @@ public sealed class VisionAgentPlanPlannerTests
         JsonSerializer.Serialize(result).Should().NotContain("tmpl-model-hallucinated");
     }
 
-    [Fact(DisplayName = "Planner should keep source reasons separate from canonical readiness blockers")]
-    public async Task CreatePlanAsync_ChineseCameraReason_ShouldNotFeedDerivedReadinessIdBackIntoSourceReasons()
+    [Fact(DisplayName = "Planner should keep ambiguous source reasons generic and separate from canonical blockers")]
+    public async Task CreatePlanAsync_AmbiguousChineseSourceReason_ShouldNotAssumeCameraOrFeedDerivedIdBack()
     {
         var service = CreateService(_ => PlannerPlanJson(
             "surface_defect",
@@ -724,8 +724,11 @@ public sealed class VisionAgentPlanPlannerTests
 
         result.BuildReadiness.CanBuild.Should().BeTrue();
         result.BuildReadiness.MissingResources.Should().ContainSingle(resource =>
-            resource.ResourceType == "camera_binding" &&
+            resource.ResourceType == "image_source" &&
+            resource.ParameterName == "SourceType" &&
             resource.DraftPolicy == VisionAgentResourceDraftPolicies.DraftAllowed);
+        result.BuildReadiness.MissingResources.Should().NotContain(resource =>
+            resource.ResourceType == "camera_binding");
         result.BlockingReasons.Should().NotContain(reason =>
             reason.Contains("resourcev1", StringComparison.OrdinalIgnoreCase));
     }

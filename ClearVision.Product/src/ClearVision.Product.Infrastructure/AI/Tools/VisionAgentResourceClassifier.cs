@@ -4,6 +4,13 @@ internal static class VisionAgentResourceClassifier
 {
     public static string Classify(string operatorType, string parameterName, string? dataType = null)
     {
+        if (operatorType.Equals("ImageAcquisition", StringComparison.OrdinalIgnoreCase) &&
+            (parameterName.Equals("FilePath", StringComparison.OrdinalIgnoreCase) ||
+             string.Equals(dataType, "file", StringComparison.OrdinalIgnoreCase)))
+        {
+            return "image_file";
+        }
+
         if (parameterName.Contains("camera", StringComparison.OrdinalIgnoreCase) ||
             string.Equals(parameterName, "CameraId", StringComparison.OrdinalIgnoreCase) ||
             string.Equals(dataType, "cameraBinding", StringComparison.OrdinalIgnoreCase))
@@ -49,6 +56,7 @@ internal static class VisionAgentResourceClassifier
     {
         return resourceType switch
         {
+            "image_file" => "图像文件",
             "model_resource" => "模型资源",
             "template_artifact" => "模板资源",
             "measurement_parameter" => "测量/标定参数",

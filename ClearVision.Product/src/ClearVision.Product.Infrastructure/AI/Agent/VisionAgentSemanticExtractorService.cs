@@ -280,7 +280,7 @@ public sealed class VisionAgentSemanticExtractorService : IVisionAgentSemanticEx
             "You are ClearVision SemanticExtractor for industrial vision requirements.",
             "Return exactly one JSON object. No markdown, prose, comments, raw prompt, system prompt, reasoning, or chain-of-thought.",
             "Only extract semantic slots. Do not generate a workflow, call tools, read files/images/base64, bind cameras/models, write PLC, or make Build decisions.",
-            "Allowed taskType values: surface_defect, geometry_measurement, wire_sequence, code_recognition, presence_absence, classification, attribute_classification, template_location, plc_output, abstract_goal, unknown.",
+            "Allowed primary taskType values: presence_absence, attribute_classification, object_detection, template_location, surface_defect, geometry_measurement, wire_sequence, code_recognition, abstract_goal, unknown. PLC is an outputTarget, never a primary taskType.",
             "Use attribute_classification when the user describes an object attribute and OK/NG condition, for example maturity, color, grade, state, or category.",
             "Use surface_defect or template_location for skew, pose, tape placement, scratches, stains, cracks, dents, and visible defects.",
             "Required JSON fields: isVisionRequest, intent, taskType, confidence, taskTypeConfidence, inspectionObject, targetAttribute, defectType, measurementTarget, imageSource, okCondition, ngCondition, outputTarget, suggestedRoute, canPlanCandidate, canBuildCandidate, objectSignals, taskSignals, missingFields, clarificationQuestions."
@@ -464,11 +464,11 @@ public sealed class VisionAgentSemanticExtractorService : IVisionAgentSemanticEx
             }
             suggestedRoute = "属性分类 / OK-NG 判别路线";
         }
-        else if (taskType == AiVisionTaskTypes.Classification)
+        else if (taskType == AiVisionTaskTypes.AttributeClassification)
         {
             suggestedRoute = "属性分类 / OK-NG 判别路线";
         }
-        else if (taskType is AiVisionTaskTypes.SurfaceDefect or AiVisionTaskTypes.SurfaceOrPoseDefect)
+        else if (taskType == AiVisionTaskTypes.SurfaceDefect)
         {
             suggestedRoute = "表面缺陷检测路线";
         }
@@ -480,7 +480,7 @@ public sealed class VisionAgentSemanticExtractorService : IVisionAgentSemanticEx
         {
             suggestedRoute = "线序检测路线";
         }
-        else if (taskType is AiVisionTaskTypes.BarcodeQr or AiVisionTaskTypes.CodeRecognition)
+        else if (taskType == AiVisionTaskTypes.CodeRecognition)
         {
             suggestedRoute = "OCR / 条码识别路线";
         }
@@ -492,6 +492,10 @@ public sealed class VisionAgentSemanticExtractorService : IVisionAgentSemanticEx
         {
             suggestedRoute = "模板定位 / 位姿路线";
         }
+        else if (taskType == AiVisionTaskTypes.ObjectDetection)
+        {
+            suggestedRoute = "目标检测路线";
+        }
 
         if (string.IsNullOrWhiteSpace(inspectionObject))
         {
@@ -501,12 +505,20 @@ public sealed class VisionAgentSemanticExtractorService : IVisionAgentSemanticEx
         return new RuleSemanticSlots(
             SafeText(inspectionObject),
             SafeText(targetAttribute),
-            SafeText(taskType is AiVisionTaskTypes.SurfaceDefect or AiVisionTaskTypes.SurfaceOrPoseDefect ? maturity.TaskSignals.FirstOrDefault() ?? string.Empty : string.Empty),
-            SafeText(taskType == AiVisionTaskTypes.GeometryMeasurement ? maturity.TaskSignals.FirstOrDefault() ?? string.Empty : string.Empty),
+            SafeText(taskType == AiVisionTaskTypes.SurfaceDefect ? maturity.TaskSignals.FirstOrDefault() ?? string.Empty : string.Empty),
+            SafeText(taskType == AiVisionTaskTypes.GeometryMeasurement
+                ? maturity.TaskSignals.FirstOrDefault() ?? string.Empty
+                : taskType == AiVisionTaskTypes.SurfaceDefect && ContainsAny(text, ["面积", "area"])
+                    ? "defect_area"
+                    : string.Empty),
             SafeText(imageSource),
             SafeText(okCondition),
             string.IsNullOrWhiteSpace(ngCondition) && !string.IsNullOrWhiteSpace(okCondition) ? "否则为NG" : SafeText(ngCondition),
-            ContainsAny(text, ["输出", "report", "结果"]) ? "结果输出" : string.Empty,
+            taskType == AiVisionTaskTypes.SurfaceDefect && ContainsAny(text, ["面积", "area"])
+                ? "defect_area"
+                : ContainsAny(text, ["输出", "report", "结果", "PLC", "plc"])
+                    ? ContainsAny(text, ["PLC", "plc"]) ? "plc_ok_ng" : "结果输出"
+                    : string.Empty,
             NormalizeTaskType(taskType),
             SafeText(suggestedRoute));
     }
@@ -581,24 +593,17 @@ public sealed class VisionAgentSemanticExtractorService : IVisionAgentSemanticEx
 
     private static string NormalizeTaskType(string? taskType)
     {
-        return SafeToken(taskType).ToLowerInvariant() switch
+        var normalized = SafeToken(taskType).ToLowerInvariant();
+        if (normalized is "" or AiVisionTaskTypes.Unknown)
         {
-            AiVisionTaskTypes.SurfaceDefect => AiVisionTaskTypes.SurfaceDefect,
-            AiVisionTaskTypes.SurfaceOrPoseDefect => AiVisionTaskTypes.SurfaceDefect,
-            AiVisionTaskTypes.GeometryMeasurement => AiVisionTaskTypes.GeometryMeasurement,
-            "measurement" => AiVisionTaskTypes.GeometryMeasurement,
-            AiVisionTaskTypes.WireSequence => AiVisionTaskTypes.WireSequence,
-            AiVisionTaskTypes.CodeRecognition => AiVisionTaskTypes.CodeRecognition,
-            AiVisionTaskTypes.BarcodeQr => AiVisionTaskTypes.CodeRecognition,
-            "ocr" => AiVisionTaskTypes.CodeRecognition,
-            AiVisionTaskTypes.PresenceAbsence => AiVisionTaskTypes.PresenceAbsence,
-            AiVisionTaskTypes.Classification => AiVisionTaskTypes.Classification,
-            AiVisionTaskTypes.AttributeClassification => AiVisionTaskTypes.AttributeClassification,
-            AiVisionTaskTypes.TemplateLocation => AiVisionTaskTypes.TemplateLocation,
-            AiVisionTaskTypes.PlcOutput => AiVisionTaskTypes.PlcOutput,
-            AiVisionTaskTypes.AbstractGoal => AiVisionTaskTypes.AbstractGoal,
-            _ => AiVisionTaskTypes.Unknown
-        };
+            return AiVisionTaskTypes.Unknown;
+        }
+        if (normalized == AiVisionTaskTypes.AbstractGoal)
+        {
+            return AiVisionTaskTypes.AbstractGoal;
+        }
+
+        return AiVisionTaskCatalog.NormalizePrimaryOrUnknown(normalized);
     }
 
     private static string NormalizeIntent(

@@ -56,16 +56,16 @@ public static class VisionAgentRequirementMaturityGate
 
     private static readonly Dictionary<string, string[]> TaskSignalTerms = new(StringComparer.OrdinalIgnoreCase)
     {
-        [AiVisionTaskTypes.GeometryMeasurement] =
+        [AiVisionTaskTypes.SurfaceDefect] =
         [
-            "测量", "尺寸", "孔距", "圆心距", "圆心距离", "直径", "宽度", "高度", "距离", "间距", "角度", "面积",
-            "measure", "measurement", "distance", "diameter", "width", "height", "hole", "spacing", "angle"
+            "缺陷", "外观", "划痕", "刮伤", "裂纹", "破损", "凹坑", "压痕", "脏污", "污渍", "贴正", "贴歪", "贴附", "胶带", "偏斜",
+            "surface", "defect", "scratch", "crack", "damage", "dent", "stain", "tape", "pose"
         ],
         [AiVisionTaskTypes.WireSequence] =
         [
             "线序", "端子", "线束", "排线", "插线", "颜色顺序", "wire sequence", "terminal", "harness", "wire order"
         ],
-        [AiVisionTaskTypes.BarcodeQr] =
+        [AiVisionTaskTypes.CodeRecognition] =
         [
             "二维码", "条码", "读码", "扫码", "标签识别", "OCR", "字符", "文字", "DataMatrix", "barcode", "qr", "code", "ocr"
         ],
@@ -73,7 +73,7 @@ public static class VisionAgentRequirementMaturityGate
         [
             "有无", "漏装", "缺件", "少装", "缺失", "装配完整", "装配是否完整", "是否存在", "presence", "absence", "missing part"
         ],
-        [AiVisionTaskTypes.Classification] =
+        [AiVisionTaskTypes.AttributeClassification] =
         [
             "分类", "类别", "型号", "类型识别", "classification", "classify", "type recognition"
         ],
@@ -83,14 +83,14 @@ public static class VisionAgentRequirementMaturityGate
             "锁螺丝", "焊缝引导", "焊缝跟踪", "涂胶轨迹", "胶路", "轨迹定位", "locate", "position", "align", "template",
             "matching", "pose", "robot guidance", "screw driving", "weld seam", "glue path"
         ],
-        [AiVisionTaskTypes.PlcOutput] =
+        [AiVisionTaskTypes.ObjectDetection] =
         [
-            "PLC", "输出信号", "握手", "地址", "plc output", "station output"
+            "目标检测", "物体检测", "目标框", "检测框", "object detection", "target detection", "bounding box"
         ],
-        [AiVisionTaskTypes.SurfaceOrPoseDefect] =
+        [AiVisionTaskTypes.GeometryMeasurement] =
         [
-            "缺陷", "外观", "划痕", "刮伤", "裂纹", "破损", "凹坑", "压痕", "脏污", "污渍", "贴正", "贴歪", "贴附", "胶带", "偏斜",
-            "surface", "defect", "scratch", "crack", "damage", "dent", "stain", "tape", "pose"
+            "测量", "尺寸", "孔距", "圆心距", "圆心距离", "直径", "宽度", "高度", "距离", "间距", "角度", "面积",
+            "measure", "measurement", "distance", "diameter", "width", "height", "hole", "spacing", "angle"
         ]
     };
 
@@ -450,22 +450,14 @@ public static class VisionAgentRequirementMaturityGate
 
     public static string ToPlanIntent(AiRequirementMaturityResult maturity)
     {
-        return maturity.TaskType switch
+        if (string.Equals(maturity.TaskType, AiVisionTaskTypes.AbstractGoal, StringComparison.OrdinalIgnoreCase))
         {
-            AiVisionTaskTypes.WireSequence => "wire_sequence",
-            AiVisionTaskTypes.CodeRecognition => "code_recognition",
-            AiVisionTaskTypes.BarcodeQr => "code_recognition",
-            AiVisionTaskTypes.GeometryMeasurement => "measurement",
-            AiVisionTaskTypes.TemplateLocation => "template_location",
-            AiVisionTaskTypes.PlcOutput => "plc_output",
-            AiVisionTaskTypes.PresenceAbsence => "presence_absence",
-            AiVisionTaskTypes.AttributeClassification => "attribute_classification",
-            AiVisionTaskTypes.Classification => "classification",
-            AiVisionTaskTypes.SurfaceDefect => "surface_defect",
-            AiVisionTaskTypes.SurfaceOrPoseDefect => "surface_defect",
-            AiVisionTaskTypes.AbstractGoal => "abstract_goal",
-            _ => "general_inspection"
-        };
+            return "abstract_goal";
+        }
+
+        return AiVisionTaskCatalog.GetPlanIntent(maturity.TaskType) is { Length: > 0 } intent
+            ? intent
+            : "requirement_clarification";
     }
 
     public static string ToRouterIntent(AiRequirementMaturityResult maturity)
@@ -495,32 +487,41 @@ public static class VisionAgentRequirementMaturityGate
             @"(?:检测目标|检测对象)\s*(?:是|为|:|：)?\s*(?<value>[^，。；;,.!?！？]+)",
             @"读取\s*(?<value>[^，。；;,.!?！？]{1,32}?)\s*上的",
             @"(?:相机|图像|图片|视频|文件)?\s*输入\s*(?<value>[^，。；;,.!?！？\s]{1,32})(?:并|后|，|,)");
+        var objectOrigin = string.IsNullOrWhiteSpace(explicitObject)
+            ? VisionAgentPlanAnswerOrigins.RuleInferred
+            : VisionAgentPlanAnswerOrigins.ExplicitUserText;
         if (string.IsNullOrWhiteSpace(explicitObject) &&
             ContainsLiteralEvidence(text, semantic?.InspectionObject))
         {
             explicitObject = semantic!.InspectionObject;
+            objectOrigin = VisionAgentPlanAnswerOrigins.ExplicitUserText;
         }
         if (string.IsNullOrWhiteSpace(explicitObject))
         {
             explicitObject = ExtractSemanticSlots(text).ObjectSignals.FirstOrDefault() ??
                              HitTerms(text, ObjectSignals).FirstOrDefault();
+            objectOrigin = VisionAgentPlanAnswerOrigins.RuleInferred;
         }
-        AddExplicitAnswer(answers, VisionAgentPlanAnswerFields.InspectionObject, explicitObject);
+        AddPlanAnswer(answers, VisionAgentPlanAnswerFields.InspectionObject, explicitObject, objectOrigin, explicitObject);
 
         var explicitTaskType = ResolveExplicitTaskType(text, semantic);
-        AddExplicitAnswer(answers, VisionAgentPlanAnswerFields.TaskType, explicitTaskType);
+        AddPlanAnswer(
+            answers,
+            VisionAgentPlanAnswerFields.TaskType,
+            explicitTaskType,
+            VisionAgentPlanAnswerOrigins.RuleInferred);
 
         if (ContainsAny(text, ["相机", "工业相机", "采集", "camera"]))
         {
-            AddExplicitAnswer(answers, VisionAgentPlanAnswerFields.ImageSource, "station_camera");
+            AddPlanAnswer(answers, VisionAgentPlanAnswerFields.ImageSource, "station_camera", VisionAgentPlanAnswerOrigins.ExplicitUserText, FirstContainedTerm(text, ["工业相机", "相机", "采集", "camera"]));
         }
         else if (ContainsAny(text, ["图片", "图像文件", "照片", "样张", "文件夹", "image", "photo", "file"]))
         {
-            AddExplicitAnswer(answers, VisionAgentPlanAnswerFields.ImageSource, "file_sample");
+            AddPlanAnswer(answers, VisionAgentPlanAnswerFields.ImageSource, "file_sample", VisionAgentPlanAnswerOrigins.ExplicitUserText, FirstContainedTerm(text, ["图像文件", "样张", "文件夹", "图片", "照片", "image", "photo", "file"]));
         }
         else if (ContainsAny(text, ["视频", "video"]))
         {
-            AddExplicitAnswer(answers, VisionAgentPlanAnswerFields.ImageSource, "video_stream");
+            AddPlanAnswer(answers, VisionAgentPlanAnswerFields.ImageSource, "video_stream", VisionAgentPlanAnswerOrigins.ExplicitUserText, FirstContainedTerm(text, ["视频", "video"]));
         }
 
         if (HasAcceptanceCriteriaText(text))
@@ -528,37 +529,55 @@ public static class VisionAgentRequirementMaturityGate
             var acceptance = VisionAgentPlanFieldPolicy.FormatAcceptanceCriteria(
                 semantic?.OkCondition,
                 semantic?.NgCondition);
-            AddExplicitAnswer(
+            AddPlanAnswer(
                 answers,
                 VisionAgentPlanAnswerFields.AcceptanceCriteria,
-                string.IsNullOrWhiteSpace(acceptance) ? BoundedText(text) : acceptance);
+                string.IsNullOrWhiteSpace(acceptance) ? BoundedText(text) : acceptance,
+                VisionAgentPlanAnswerOrigins.ExplicitUserText,
+                BoundedText(text));
         }
 
         var outputTarget = FirstRegexValue(text,
             @"(?:输出|返回)\s*(?<value>[^，。；;,.!?！？]+)",
             @"(?:写入|发送到|保存到)\s*(?<value>[^，。；;,.!?！？]+)");
-        AddExplicitAnswer(answers, VisionAgentPlanAnswerFields.OutputTarget, outputTarget);
+        AddPlanAnswer(answers, VisionAgentPlanAnswerFields.OutputTarget, outputTarget, VisionAgentPlanAnswerOrigins.ExplicitUserText, outputTarget);
+
+        if (ContainsAny(text, ["PLC", "plc output", "station output"]) &&
+            !answers.ContainsKey(VisionAgentPlanAnswerFields.OutputTarget))
+        {
+            AddPlanAnswer(answers, VisionAgentPlanAnswerFields.OutputTarget, "plc_ok_ng", VisionAgentPlanAnswerOrigins.ExplicitUserText, FirstContainedTerm(text, ["PLC", "plc output", "station output"]));
+        }
+
+        if (explicitTaskType == AiVisionTaskTypes.SurfaceDefect &&
+            ContainsAny(text, ["面积", "area"]))
+        {
+            AddPlanAnswer(answers, VisionAgentPlanAnswerFields.MeasurementTarget, "defect_area", VisionAgentPlanAnswerOrigins.RuleInferred);
+            if (!answers.ContainsKey(VisionAgentPlanAnswerFields.OutputTarget))
+            {
+                AddPlanAnswer(answers, VisionAgentPlanAnswerFields.OutputTarget, "defect_area", VisionAgentPlanAnswerOrigins.RuleInferred);
+            }
+        }
 
         if (ContainsLiteralEvidence(text, semantic?.TargetAttribute))
         {
-            AddExplicitAnswer(answers, VisionAgentPlanAnswerFields.TargetAttribute, semantic!.TargetAttribute);
+            AddPlanAnswer(answers, VisionAgentPlanAnswerFields.TargetAttribute, semantic!.TargetAttribute, VisionAgentPlanAnswerOrigins.ExplicitUserText, semantic.TargetAttribute);
         }
         if (ContainsLiteralEvidence(text, semantic?.DefectType))
         {
-            AddExplicitAnswer(answers, VisionAgentPlanAnswerFields.DefectType, semantic!.DefectType);
+            AddPlanAnswer(answers, VisionAgentPlanAnswerFields.DefectType, semantic!.DefectType, VisionAgentPlanAnswerOrigins.ExplicitUserText, semantic.DefectType);
         }
         if (ContainsLiteralEvidence(text, semantic?.MeasurementTarget))
         {
-            AddExplicitAnswer(answers, VisionAgentPlanAnswerFields.MeasurementTarget, semantic!.MeasurementTarget);
+            AddPlanAnswer(answers, VisionAgentPlanAnswerFields.MeasurementTarget, semantic!.MeasurementTarget, VisionAgentPlanAnswerOrigins.ExplicitUserText, semantic.MeasurementTarget);
         }
 
         if (ContainsAny(text, ["深度学习", "分类模型", "检测模型", "AI 模型", "neural", "deep learning"]))
         {
-            AddExplicitAnswer(answers, VisionAgentPlanAnswerFields.AlgorithmStrategy, "model_strategy");
+            AddPlanAnswer(answers, VisionAgentPlanAnswerFields.AlgorithmStrategy, "model_strategy", VisionAgentPlanAnswerOrigins.ExplicitUserText, FirstContainedTerm(text, ["深度学习", "分类模型", "检测模型", "AI 模型", "neural", "deep learning"]));
         }
         else if (ContainsAny(text, ["传统算法", "规则算法", "几何算法", "阈值规则", "traditional rule", "rule based"]))
         {
-            AddExplicitAnswer(answers, VisionAgentPlanAnswerFields.AlgorithmStrategy, "traditional_rule");
+            AddPlanAnswer(answers, VisionAgentPlanAnswerFields.AlgorithmStrategy, "traditional_rule", VisionAgentPlanAnswerOrigins.ExplicitUserText, FirstContainedTerm(text, ["传统算法", "规则算法", "几何算法", "阈值规则", "traditional rule", "rule based"]));
         }
 
         return answers.Values.ToList();
@@ -575,25 +594,21 @@ public static class VisionAgentRequirementMaturityGate
         if (Regex.IsMatch(text, @"(?:输出|识别|判别)[^，。；;,.!?！？]{0,24}(?:类型|类别|品类)", RegexOptions.IgnoreCase) ||
             ContainsAny(text, ["分类", "classification", "classify"]))
         {
-            return AiVisionTaskTypes.Classification;
+            return AiVisionTaskTypes.AttributeClassification;
         }
         if (Regex.IsMatch(text, @"识别内容\s*(?:是|为|:|：)", RegexOptions.IgnoreCase))
         {
-            return AiVisionTaskTypes.Classification;
+            return AiVisionTaskTypes.AttributeClassification;
         }
-        if (Regex.IsMatch(text, @"检测\s*[^，。；;,.!?！？]+?上的[^，。；;,.!?！？]+", RegexOptions.IgnoreCase))
+        if (ContainsAny(text, TaskSignalTerms[AiVisionTaskTypes.SurfaceDefect]))
         {
-            return AiVisionTaskTypes.PresenceAbsence;
+            return AiVisionTaskTypes.SurfaceDefect;
         }
         if (semantic != null &&
             NormalizeSemanticTaskType(semantic.TaskType) == AiVisionTaskTypes.AttributeClassification &&
             ContainsAnyLiteralEvidence(text, semantic.TargetAttribute))
         {
             return AiVisionTaskTypes.AttributeClassification;
-        }
-        if (ContainsAny(text, TaskSignalTerms[AiVisionTaskTypes.GeometryMeasurement]))
-        {
-            return AiVisionTaskTypes.GeometryMeasurement;
         }
         if (ContainsAny(text, TaskSignalTerms[AiVisionTaskTypes.WireSequence]))
         {
@@ -607,9 +622,17 @@ public static class VisionAgentRequirementMaturityGate
         {
             return AiVisionTaskTypes.TemplateLocation;
         }
-        if (ContainsAny(text, TaskSignalTerms[AiVisionTaskTypes.SurfaceOrPoseDefect]))
+        if (ContainsAny(text, TaskSignalTerms[AiVisionTaskTypes.ObjectDetection]))
         {
-            return AiVisionTaskTypes.SurfaceOrPoseDefect;
+            return AiVisionTaskTypes.ObjectDetection;
+        }
+        if (ContainsAny(text, TaskSignalTerms[AiVisionTaskTypes.GeometryMeasurement]))
+        {
+            return AiVisionTaskTypes.GeometryMeasurement;
+        }
+        if (Regex.IsMatch(text, @"检测\s*[^，。；;,.!?！？]+?上的[^，。；;,.!?！？]+", RegexOptions.IgnoreCase))
+        {
+            return AiVisionTaskTypes.PresenceAbsence;
         }
 
         var semanticTaskType = NormalizeSemanticTaskType(semantic?.TaskType);
@@ -621,39 +644,37 @@ public static class VisionAgentRequirementMaturityGate
         return taskType switch
         {
             AiVisionTaskTypes.CodeRecognition => ContainsAny(text, ["DataMatrix", "二维码", "条码", "读码", "扫码", "code", "ocr"]),
-            AiVisionTaskTypes.Classification or AiVisionTaskTypes.AttributeClassification =>
+            AiVisionTaskTypes.AttributeClassification =>
                 ContainsAny(text, ["分类", "类型", "类别", "品类", "classification", "classify"]),
             AiVisionTaskTypes.GeometryMeasurement => ContainsAny(text, TaskSignalTerms[AiVisionTaskTypes.GeometryMeasurement]),
             AiVisionTaskTypes.WireSequence => ContainsAny(text, TaskSignalTerms[AiVisionTaskTypes.WireSequence]),
             AiVisionTaskTypes.PresenceAbsence => ContainsAny(text, TaskSignalTerms[AiVisionTaskTypes.PresenceAbsence]),
             AiVisionTaskTypes.TemplateLocation => ContainsAny(text, TaskSignalTerms[AiVisionTaskTypes.TemplateLocation]),
-            AiVisionTaskTypes.SurfaceDefect or AiVisionTaskTypes.SurfaceOrPoseDefect =>
-                ContainsAny(text, TaskSignalTerms[AiVisionTaskTypes.SurfaceOrPoseDefect]),
-            AiVisionTaskTypes.PlcOutput => ContainsAny(text, TaskSignalTerms[AiVisionTaskTypes.PlcOutput]),
+            AiVisionTaskTypes.SurfaceDefect => ContainsAny(text, TaskSignalTerms[AiVisionTaskTypes.SurfaceDefect]),
+            AiVisionTaskTypes.ObjectDetection => ContainsAny(text, TaskSignalTerms[AiVisionTaskTypes.ObjectDetection]),
             _ => false
         };
     }
 
     private static bool RequiresAlgorithmStrategyDecision(string taskType)
     {
-        return taskType is AiVisionTaskTypes.Classification or
-            AiVisionTaskTypes.AttributeClassification or
-            AiVisionTaskTypes.SurfaceDefect or
-            AiVisionTaskTypes.SurfaceOrPoseDefect;
+        return taskType is AiVisionTaskTypes.AttributeClassification or
+            AiVisionTaskTypes.SurfaceDefect;
     }
 
     private static bool RequiresOutputContract(string taskType)
     {
         return taskType is AiVisionTaskTypes.CodeRecognition or
-            AiVisionTaskTypes.Classification or
             AiVisionTaskTypes.AttributeClassification or
-            AiVisionTaskTypes.PlcOutput;
+            AiVisionTaskTypes.ObjectDetection;
     }
 
-    private static void AddExplicitAnswer(
+    private static void AddPlanAnswer(
         IDictionary<string, VisionAgentPlanAnswer> answers,
         string field,
-        string? value)
+        string? value,
+        string origin,
+        string? evidenceText = null)
     {
         var normalizedField = VisionAgentPlanFieldPolicy.NormalizeField(field);
         var normalizedValue = BoundedText(value);
@@ -668,9 +689,14 @@ public static class VisionAgentRequirementMaturityGate
         {
             Field = normalizedField,
             Value = normalizedValue,
-            Origin = VisionAgentPlanAnswerOrigins.ExplicitUserText
+            Origin = origin,
+            EvidenceText = BoundedText(evidenceText),
+            Confidence = origin == VisionAgentPlanAnswerOrigins.RuleInferred ? 0.45 : 1.0
         };
     }
+
+    private static string FirstContainedTerm(string text, IEnumerable<string> terms) =>
+        terms.FirstOrDefault(term => text.Contains(term, StringComparison.OrdinalIgnoreCase)) ?? string.Empty;
 
     private static string FirstRegexValue(string text, params string[] patterns)
     {
@@ -901,7 +927,7 @@ public static class VisionAgentRequirementMaturityGate
         var task = Clean(value);
         if (ContainsAny(task, ["缺陷", "异常"]))
         {
-            return AiVisionTaskTypes.SurfaceOrPoseDefect;
+            return AiVisionTaskTypes.SurfaceDefect;
         }
 
         if (ContainsAny(task, ["有无", "漏装", "缺失", "少装"]))
@@ -921,7 +947,7 @@ public static class VisionAgentRequirementMaturityGate
 
         if (ContainsAny(task, ["分类"]))
         {
-            return AiVisionTaskTypes.Classification;
+            return AiVisionTaskTypes.AttributeClassification;
         }
 
         return AiVisionTaskTypes.Unknown;
@@ -929,20 +955,33 @@ public static class VisionAgentRequirementMaturityGate
 
     private static List<string> HitTaskTerms(string text, out string taskType)
     {
-        taskType = AiVisionTaskTypes.Unknown;
-        foreach (var pair in TaskSignalTerms)
+        var hitsByTask = TaskSignalTerms
+            .Select(pair => (TaskType: pair.Key, Hits: HitTerms(text, pair.Value)))
+            .Where(item => item.Hits.Count > 0)
+            .ToDictionary(item => item.TaskType, item => item.Hits, StringComparer.OrdinalIgnoreCase);
+        var priority = new[]
         {
-            var hits = HitTerms(text, pair.Value);
-            if (hits.Count == 0)
-            {
-                continue;
-            }
-
-            taskType = pair.Key;
-            return hits;
+            AiVisionTaskTypes.CodeRecognition,
+            AiVisionTaskTypes.WireSequence,
+            AiVisionTaskTypes.SurfaceDefect,
+            AiVisionTaskTypes.ObjectDetection,
+            AiVisionTaskTypes.TemplateLocation,
+            AiVisionTaskTypes.PresenceAbsence,
+            AiVisionTaskTypes.AttributeClassification,
+            AiVisionTaskTypes.GeometryMeasurement
+        };
+        taskType = priority.FirstOrDefault(hitsByTask.ContainsKey) ?? AiVisionTaskTypes.Unknown;
+        if (taskType == AiVisionTaskTypes.Unknown)
+        {
+            return [];
         }
 
-        return [];
+        return priority
+            .Where(hitsByTask.ContainsKey)
+            .SelectMany(item => hitsByTask[item])
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Take(16)
+            .ToList();
     }
 
     private static List<string> HitTerms(string text, IEnumerable<string> terms)
@@ -976,24 +1015,17 @@ public static class VisionAgentRequirementMaturityGate
 
     private static string NormalizeSemanticTaskType(string? taskType)
     {
-        return Clean(taskType).ToLowerInvariant() switch
+        var normalized = Clean(taskType).ToLowerInvariant();
+        if (normalized is AiVisionTaskTypes.Unknown or "")
         {
-            AiVisionTaskTypes.SurfaceDefect => AiVisionTaskTypes.SurfaceDefect,
-            AiVisionTaskTypes.SurfaceOrPoseDefect => AiVisionTaskTypes.SurfaceDefect,
-            AiVisionTaskTypes.GeometryMeasurement => AiVisionTaskTypes.GeometryMeasurement,
-            "measurement" => AiVisionTaskTypes.GeometryMeasurement,
-            AiVisionTaskTypes.WireSequence => AiVisionTaskTypes.WireSequence,
-            AiVisionTaskTypes.CodeRecognition => AiVisionTaskTypes.CodeRecognition,
-            AiVisionTaskTypes.BarcodeQr => AiVisionTaskTypes.CodeRecognition,
-            "ocr" => AiVisionTaskTypes.CodeRecognition,
-            AiVisionTaskTypes.PresenceAbsence => AiVisionTaskTypes.PresenceAbsence,
-            AiVisionTaskTypes.Classification => AiVisionTaskTypes.Classification,
-            AiVisionTaskTypes.AttributeClassification => AiVisionTaskTypes.AttributeClassification,
-            AiVisionTaskTypes.TemplateLocation => AiVisionTaskTypes.TemplateLocation,
-            AiVisionTaskTypes.PlcOutput => AiVisionTaskTypes.PlcOutput,
-            AiVisionTaskTypes.AbstractGoal => AiVisionTaskTypes.AbstractGoal,
-            _ => AiVisionTaskTypes.Unknown
-        };
+            return AiVisionTaskTypes.Unknown;
+        }
+        if (normalized == AiVisionTaskTypes.AbstractGoal)
+        {
+            return AiVisionTaskTypes.AbstractGoal;
+        }
+
+        return AiVisionTaskCatalog.NormalizePrimaryOrUnknown(normalized);
     }
 
     private static List<string> BuildSemanticObjectSignals(VisionAgentSemanticExtractionResult semantic)

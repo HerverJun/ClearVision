@@ -193,6 +193,43 @@ test('failed Build presentation keeps the quarantined artifact summary and block
   assert.ok(presentation.actionItems.some(item => item.priority === 'blocking'));
 });
 
+test('failed Build presentation prioritizes sanitized FailureSummary and first repair target', () => {
+  const result = readyResult();
+  result.flow = null;
+  result.failureSummary = {
+    category: 'workflow_artifact_admission',
+    code: 'route_missing_task_processor',
+    message: 'Processor is missing near C:\\factory\\secret\\flow.json.',
+    repairTarget: 'Add the required processor before Apply.',
+    secondaryDiagnosticCodes: ['route_semantics_not_satisfied', 'route_graph_unverified']
+  };
+  result.applyGate = {
+    canvasApplyReady: false,
+    blocked: true,
+    status: 'blocked',
+    applyBlockers: ['route_semantics_not_satisfied']
+  };
+  result.buildResult.applyGate = result.applyGate;
+  const panel = createPanel(result, {
+    workbenchState: 'failed',
+    _sanitizeBuildWorkspaceText: (value, maxChars) => String(value || '')
+      .replace(/C:\\factory\\secret\\flow\.json/gi, '[redacted-path]')
+      .slice(0, maxChars)
+  });
+
+  const presentation = deriveAiBuildPresentation(panel);
+
+  assert.equal(presentation.actionItems[0].key, 'failure');
+  assert.match(presentation.actionItems[0].title, /route_missing_task_processor/);
+  assert.match(presentation.actionItems[0].summary, /\[redacted-path\]/);
+  assert.doesNotMatch(presentation.actionItems[0].summary, /C:\\factory/);
+  assert.match(presentation.actionItems[0].impact, /required processor/);
+  assert.deepEqual(presentation.failureSummary.secondaryDiagnosticCodes, [
+    'route_semantics_not_satisfied',
+    'route_graph_unverified'
+  ]);
+});
+
 test('Build presentation keeps resolved resource drafts out of the unresolved count', () => {
   const result = readyResult();
   result.missingResources = [{ resourceType: 'model_resource', resourceKey: 'op_2.ModelPath' }];

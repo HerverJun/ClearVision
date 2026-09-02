@@ -198,6 +198,19 @@ internal static class VisionAgentFlowDraftValidator
                      contractCatalog))
         {
             var violation = issue.Violation;
+            if (IsDeferredImageSourceChoice(canonicalFlow, issue))
+            {
+                AddMissingResource(
+                    missingResources,
+                    new VisionAgentMissingResource(
+                        "image_source",
+                        "SourceType",
+                        issue.TempId,
+                        issue.OperatorType,
+                        "ImageAcquisition.SourceType is intentionally deferred in this editable draft."));
+                continue;
+            }
+
             if ((violation.Code is "required" or "at-least-one") &&
                 !string.IsNullOrWhiteSpace(violation.ResourceKind))
             {
@@ -582,6 +595,24 @@ internal static class VisionAgentFlowDraftValidator
         return OperatorParameterValueSemantics.IsMissing(value);
     }
 
+    private static bool IsDeferredImageSourceChoice(
+        VisionAgentFlowDraft flow,
+        VisionAgentParameterConstraintIssue issue)
+    {
+        if (!issue.OperatorType.Equals("ImageAcquisition", StringComparison.OrdinalIgnoreCase) ||
+            !issue.Violation.Code.Equals("required", StringComparison.OrdinalIgnoreCase) ||
+            issue.Violation.ParameterNames.Count != 1 ||
+            !issue.Violation.ParameterNames[0].Equals("SourceType", StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        var op = flow.Operators.FirstOrDefault(candidate =>
+            candidate.TempId.Equals(issue.TempId, StringComparison.OrdinalIgnoreCase));
+        return op?.Parameters.TryGetValue("SourceType", out var value) == true &&
+               string.Equals(value, "<pending-image-source>", StringComparison.OrdinalIgnoreCase);
+    }
+
     private static bool IsRecognizedMetadataParameter(
         string operatorType,
         string parameterName,
@@ -666,6 +697,7 @@ internal static class VisionAgentFlowDraftValidator
     {
         return resourceKind switch
         {
+            "image_source" => "missing_image_source",
             "model_resource" => "missing_model_resource",
             "template_artifact" => "missing_template_resource",
             "measurement_parameter" => "missing_calibration_parameter",

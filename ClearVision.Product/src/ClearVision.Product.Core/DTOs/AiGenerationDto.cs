@@ -350,6 +350,7 @@ public class AiFailureSummary
     public string Code { get; set; } = string.Empty;
     public string Message { get; set; } = string.Empty;
     public string RepairTarget { get; set; } = string.Empty;
+    public List<string> SecondaryDiagnosticCodes { get; set; } = new();
     public int RetryCount { get; set; }
     public string LastOutputSummary { get; set; } = string.Empty;
 }

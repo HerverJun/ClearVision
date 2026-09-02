@@ -17,6 +17,7 @@ using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
+using NSubstitute;
 
 namespace ClearVision.Product.Desktop.Tests;
 
@@ -149,6 +150,69 @@ public sealed class StationPackageStoreTests
         finally
         {
             SqliteConnection.ClearAllPools();
+            if (Directory.Exists(root))
+            {
+                DeleteDirectoryWithRetry(root);
+            }
+        }
+    }
+
+    [Fact]
+    public async Task ImportRuntimePackageAsync_WhenAdmissionBlocks_ShouldExposePrioritizedDiagnostic()
+    {
+        var root = Path.Combine(
+            Path.GetTempPath(),
+            "ClearVisionStationPackageAdmissionDiagnosticTests",
+            Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+
+        try
+        {
+            var runtimeRoot = Path.Combine(root, "runtime-package");
+            await CreateRuntimePackageRootAsync(runtimeRoot, "cvpkg-prioritized-diagnostic");
+            var generic = new WorkflowArtifactDiagnostic(
+                "route_semantics_not_satisfied",
+                "The route did not satisfy its generic semantic summary.");
+            var specific = new WorkflowArtifactDiagnostic(
+                "route_missing_task_processor",
+                "The route is missing the required task processor.");
+            var admission = new WorkflowArtifactAdmissionResult
+            {
+                Disposition = WorkflowArtifactAdmissionDisposition.Quarantined,
+                Report = new WorkflowQuarantineReport
+                {
+                    Disposition = WorkflowArtifactAdmissionDisposition.Quarantined,
+                    CanSyncStation = false,
+                    Diagnostics = [generic, specific],
+                    PrimaryDiagnostic = specific,
+                    SecondaryDiagnostics = [generic]
+                }
+            };
+            var gate = Substitute.For<IWorkflowArtifactAdmissionGate>();
+            gate.InspectJson(
+                    Arg.Any<string>(),
+                    "station.import",
+                    Arg.Any<WorkflowArtifactAdmissionContext?>())
+                .Returns(admission);
+            await using var provider = new ServiceCollection()
+                .AddLogging()
+                .BuildServiceProvider();
+            var store = new StationPackageStore(
+                provider.GetRequiredService<IServiceScopeFactory>(),
+                NullLogger<StationPackageStore>.Instance,
+                gate);
+
+            var act = () => store.ImportRuntimePackageAsync(
+                runtimeRoot,
+                "unit-test",
+                CancellationToken.None);
+
+            var exception = await act.Should().ThrowAsync<RuntimePackageException>();
+            exception.Which.Message.Should().Contain(specific.Code);
+            exception.Which.Message.Should().NotContain(generic.Code);
+        }
+        finally
+        {
             if (Directory.Exists(root))
             {
                 DeleteDirectoryWithRetry(root);

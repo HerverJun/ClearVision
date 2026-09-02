@@ -86,7 +86,7 @@ public sealed class RuntimePackageExporter
             var admission = _workflowArtifactAdmissionGate.Inspect(flow, "runtime.export");
             if (!admission.AllowedToExport || admission.Flow == null)
             {
-                var diagnostic = admission.Report.Diagnostics.FirstOrDefault()?.Code ??
+                var diagnostic = admission.Report.PrimaryDiagnostic?.Code ??
                     $"workflow_artifact_{admission.Disposition.ToString().ToLowerInvariant()}";
                 throw new RuntimePackageException(
                     $"Export blocked by workflow artifact admission: {diagnostic}. {admission.Report.PublicMessage}");

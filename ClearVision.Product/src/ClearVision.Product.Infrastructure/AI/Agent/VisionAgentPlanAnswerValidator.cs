@@ -5,6 +5,12 @@ using ClearVision.Product.Core.DTOs;
 
 namespace ClearVision.Product.Infrastructure.AI.Agent;
 
+public sealed record VisionAgentTaskTypeNormalizationAudit(
+    string Source,
+    string RawValue,
+    string CanonicalValue,
+    bool ExplicitUserChoice);
+
 public sealed record VisionAgentPlanAnswerValidationResult(
     List<VisionAgentPlanAnswer> AcceptedAnswers,
     Dictionary<string, string> RequirementAnswers,
@@ -18,6 +24,8 @@ public sealed record VisionAgentPlanAnswerValidationResult(
     List<string> Warnings)
 {
     public List<string> DeferredFields { get; init; } = [];
+    public string CanonicalTaskType { get; init; } = string.Empty;
+    public List<VisionAgentTaskTypeNormalizationAudit> TaskTypeNormalizationAudit { get; init; } = [];
 }
 
 public sealed class VisionAgentPlanAnswerValidator
@@ -34,7 +42,35 @@ public sealed class VisionAgentPlanAnswerValidator
         "ExpectValue",
         "classification_ok_label",
         "ok_label",
-        "targetAttribute"
+        "targetAttribute",
+        "ResultJudgment.ExpectValueMin",
+        "ResultJudgment.ExpectValueMax",
+        "ResultJudgment.MinConfidence",
+        "ExpectValueMin",
+        "ExpectValueMax",
+        "MinConfidence",
+        "measurement_min",
+        "measurement_max",
+        "lower_bound",
+        "upper_bound",
+        "min_value",
+        "max_value",
+        "max_defect_area",
+        "max_defect_count",
+        "defect_upper_bound",
+        "expected_presence",
+        "presence_expected",
+        "presence_state",
+        "expected_state",
+        "expected_code",
+        "code_value",
+        "expected_text",
+        "expected_object_count",
+        "object_count",
+        "min_object_count",
+        "max_object_count",
+        "classification_min_confidence",
+        "template_min_confidence"
     };
 
     public VisionAgentPlanAnswerValidationResult Validate(
@@ -54,8 +90,9 @@ public sealed class VisionAgentPlanAnswerValidator
         var warnings = new List<string>();
         var parameterSelections = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         var deferred = ResolveDeferredSelections(questions.Values, blockingReasons, legacySelections);
+        var answerList = (confirmedAnswers ?? []).ToList();
 
-        foreach (var answer in confirmedAnswers ?? [])
+        foreach (var answer in answerList)
         {
             var answerField = VisionAgentPlanFieldPolicy.NormalizeField(answer.Field);
             if (deferred.QuestionIds.Contains(Clean(answer.QuestionId)) ||
@@ -143,6 +180,24 @@ public sealed class VisionAgentPlanAnswerValidator
         }
 
         var accepted = ResolveConflicts(candidates, out var conflictedFields);
+        var taskResolution = VisionAgentTaskTypeResolver.Resolve(
+            plan,
+            (plan?.ConfirmedPlanAnswers ?? []).Concat(answerList));
+        warnings.AddRange(taskResolution.Warnings);
+        if (taskResolution.BlockingConflict)
+        {
+            accepted.RemoveAll(answer =>
+                string.Equals(answer.Field, VisionAgentPlanAnswerFields.TaskType, StringComparison.OrdinalIgnoreCase));
+            conflictedFields.Add(VisionAgentPlanAnswerFields.TaskType);
+        }
+        else if (!string.IsNullOrWhiteSpace(taskResolution.CanonicalValue))
+        {
+            accepted = accepted.Select(answer =>
+                    string.Equals(answer.Field, VisionAgentPlanAnswerFields.TaskType, StringComparison.OrdinalIgnoreCase)
+                        ? answer with { Value = taskResolution.CanonicalValue }
+                        : answer)
+                .ToList();
+        }
         var requirementAnswers = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         var buildDecisions = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         foreach (var answer in accepted)
@@ -180,6 +235,14 @@ public sealed class VisionAgentPlanAnswerValidator
         {
             DeferredFields = deferred.Fields
                 .OrderBy(value => value, StringComparer.OrdinalIgnoreCase)
+                .ToList(),
+            CanonicalTaskType = taskResolution.CanonicalValue,
+            TaskTypeNormalizationAudit = taskResolution.Evidence
+                .Select(item => new VisionAgentTaskTypeNormalizationAudit(
+                    item.Source,
+                    item.RawValue,
+                    item.CanonicalValue,
+                    item.ExplicitUserChoice))
                 .ToList()
         };
     }
@@ -238,13 +301,39 @@ public sealed class VisionAgentPlanAnswerValidator
             invalidValues.Add($"{questionId}:{field}:placeholder_value");
             return false;
         }
+        var acceptedValue = value;
+        if (string.Equals(field, VisionAgentPlanAnswerFields.TaskType, StringComparison.OrdinalIgnoreCase))
+        {
+            if (!AiVisionTaskCatalog.TryNormalizePrimary(value, out acceptedValue))
+            {
+                invalidValues.Add($"{questionId}:{field}:unsupported_task_type");
+                return false;
+            }
+            if (origin == VisionAgentPlanAnswerOrigins.ExplicitUserText &&
+                string.IsNullOrWhiteSpace(answer.EvidenceText))
+            {
+                invalidValues.Add($"{questionId}:{field}:explicit_text_evidence_missing");
+                warnings.Add("explicit_user_text_missing_evidence:task_type");
+                return false;
+            }
+        }
+        else if (string.Equals(field, VisionAgentPlanAnswerFields.ImageSource, StringComparison.OrdinalIgnoreCase))
+        {
+            var imageSource = VisionAgentImageSourceResolver.Resolve(value);
+            if (!imageSource.Supported)
+            {
+                invalidValues.Add($"{questionId}:{field}:{imageSource.DiagnosticCode}");
+                return false;
+            }
+        }
 
         if (origin == VisionAgentPlanAnswerOrigins.ExplicitUserText)
         {
             return TryValidateTextAnswer(
                 questionId,
                 field,
-                value,
+                acceptedValue,
+                answer.EvidenceText,
                 questions,
                 blockingReasons,
                 candidates,
@@ -262,10 +351,13 @@ public sealed class VisionAgentPlanAnswerValidator
                     {
                         QuestionId = questionId,
                         Field = field,
-                        Value = value,
-                        Origin = origin
+                        Value = acceptedValue,
+                        Origin = origin,
+                        EvidenceText = CleanValue(answer.EvidenceText),
+                        Confidence = answer.Confidence,
+                        Resolved = answer.Resolved
                     },
-                    Priority(origin),
+                    VisionAgentPlanFieldPolicy.AnswerOriginPriority(origin),
                     generatedRecommended));
                 return true;
             }
@@ -292,7 +384,7 @@ public sealed class VisionAgentPlanAnswerValidator
         }
 
         var selectedOption = question.Options.FirstOrDefault(option =>
-            Clean(option.Value).Equals(value, StringComparison.OrdinalIgnoreCase));
+                Clean(option.Value).Equals(value, StringComparison.OrdinalIgnoreCase));
         if (!VisionAgentPlanFieldPolicy.IsResolveFieldOption(selectedOption))
         {
             invalidValues.Add($"{questionId}:answer_effect_not_resolve_field");
@@ -321,10 +413,13 @@ public sealed class VisionAgentPlanAnswerValidator
             {
                 QuestionId = questionId,
                 Field = field,
-                Value = value,
-                Origin = origin
+                Value = acceptedValue,
+                Origin = origin,
+                EvidenceText = CleanValue(answer.EvidenceText),
+                Confidence = answer.Confidence,
+                Resolved = answer.Resolved
             },
-            Priority(origin),
+            VisionAgentPlanFieldPolicy.AnswerOriginPriority(origin),
             generatedRecommended));
         return true;
     }
@@ -333,6 +428,7 @@ public sealed class VisionAgentPlanAnswerValidator
         string questionId,
         string field,
         string value,
+        string evidenceText,
         IReadOnlyDictionary<string, VisionAgentClarificationQuestion> questions,
         IReadOnlyList<string> blockingReasons,
         List<CandidateAnswer> candidates,
@@ -362,9 +458,10 @@ public sealed class VisionAgentPlanAnswerValidator
                         QuestionId = questionId,
                         Field = field,
                         Value = value,
-                        Origin = VisionAgentPlanAnswerOrigins.ExplicitUserText
+                        Origin = VisionAgentPlanAnswerOrigins.ExplicitUserText,
+                        EvidenceText = CleanValue(evidenceText)
                     },
-                    Priority(VisionAgentPlanAnswerOrigins.ExplicitUserText),
+                    VisionAgentPlanFieldPolicy.AnswerOriginPriority(VisionAgentPlanAnswerOrigins.ExplicitUserText),
                     GeneratedRecommended: false));
                 return true;
             }
@@ -384,9 +481,10 @@ public sealed class VisionAgentPlanAnswerValidator
                 QuestionId = questionId,
                 Field = field,
                 Value = value,
-                Origin = VisionAgentPlanAnswerOrigins.ExplicitUserText
+                Origin = VisionAgentPlanAnswerOrigins.ExplicitUserText,
+                EvidenceText = CleanValue(evidenceText)
             },
-            Priority(VisionAgentPlanAnswerOrigins.ExplicitUserText),
+            VisionAgentPlanFieldPolicy.AnswerOriginPriority(VisionAgentPlanAnswerOrigins.ExplicitUserText),
             GeneratedRecommended: false));
         return true;
     }
@@ -436,6 +534,7 @@ public sealed class VisionAgentPlanAnswerValidator
                 field = Clean(answer.Field),
                 questionId = Clean(answer.QuestionId),
                 origin = NormalizeOrigin(answer.Origin),
+                evidenceText = CleanValue(answer.EvidenceText),
                 value = CleanValue(answer.Value)
             })
             .ToList();
@@ -517,26 +616,12 @@ public sealed class VisionAgentPlanAnswerValidator
             VisionAgentPlanAnswerOrigins.ExplicitUserSelection => VisionAgentPlanAnswerOrigins.ExplicitUserSelection,
             VisionAgentPlanAnswerOrigins.AcceptedRecommendedDefault => VisionAgentPlanAnswerOrigins.AcceptedRecommendedDefault,
             VisionAgentPlanAnswerOrigins.ExplicitUserText => VisionAgentPlanAnswerOrigins.ExplicitUserText,
+            VisionAgentPlanAnswerOrigins.RuleInferred => VisionAgentPlanAnswerOrigins.RuleInferred,
             VisionAgentPlanAnswerOrigins.LegacyInferred => VisionAgentPlanAnswerOrigins.LegacyInferred,
             VisionAgentPlanAnswerOrigins.ResourceBound => VisionAgentPlanAnswerOrigins.ResourceBound,
             VisionAgentPlanAnswerOrigins.ModelInferred => VisionAgentPlanAnswerOrigins.ModelInferred,
             VisionAgentPlanAnswerOrigins.DefaultAssumption => VisionAgentPlanAnswerOrigins.DefaultAssumption,
             _ => string.Empty
-        };
-    }
-
-    private static int Priority(string origin)
-    {
-        return origin switch
-        {
-            VisionAgentPlanAnswerOrigins.ExplicitUserText => 6,
-            VisionAgentPlanAnswerOrigins.ExplicitUserSelection => 6,
-            VisionAgentPlanAnswerOrigins.ResourceBound => 5,
-            VisionAgentPlanAnswerOrigins.ModelInferred => 4,
-            VisionAgentPlanAnswerOrigins.AcceptedRecommendedDefault => 3,
-            VisionAgentPlanAnswerOrigins.LegacyInferred => 2,
-            VisionAgentPlanAnswerOrigins.DefaultAssumption => 1,
-            _ => 0
         };
     }
 

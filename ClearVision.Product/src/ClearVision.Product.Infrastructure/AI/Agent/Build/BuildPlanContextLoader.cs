@@ -40,7 +40,7 @@ public sealed class BuildPlanContextLoader
                 request.AgentRunId,
                 "plan_hash_validation",
                 "计划哈希不一致",
-                "构建会继续使用公开计划快照；应用前请复核计划来源。",
+                "BuildFromPlan 已拒绝继续，未生成工作流产物；请复核计划来源。",
                 new
                 {
                     warningCode = "plan_hash_mismatch",
@@ -76,11 +76,20 @@ public sealed class BuildPlanContextLoader
         validatedAnswers.RequirementAnswers.TryGetValue(
             VisionAgentPlanAnswerFields.TaskType,
             out var answerTaskType);
-        var taskType = VisionTaskRouteContractRegistry.NormalizeTaskType(
-            VisionAgentBuildSupport.FirstNonEmpty(
-                effectiveRequirement.Maturity.TaskType,
+        var taskTypeConflict = validatedAnswers.ConflictedFields.Contains(
+            VisionAgentPlanAnswerFields.TaskType,
+            StringComparer.OrdinalIgnoreCase);
+        var taskTypeCandidate = taskTypeConflict
+            ? AiVisionTaskTypes.Unknown
+            : VisionAgentBuildSupport.FirstNonEmpty(
+                validatedAnswers.CanonicalTaskType,
                 answerTaskType,
-                plan?.SemanticExtraction?.TaskType));
+                effectiveRequirement.Maturity.TaskType,
+                plan?.RequirementMaturity?.TaskType,
+                plan?.SemanticExtraction?.TaskType);
+        var taskType = AiVisionTaskCatalog.TryNormalizePrimary(taskTypeCandidate, out var canonicalTaskType)
+            ? canonicalTaskType
+            : VisionAgentBuildSupport.Clean(taskTypeCandidate);
         var payload = new BuildPlanLoad
         {
             PlanId = VisionAgentBuildSupport.Clean(plan?.PlanId) is { Length: > 0 } planId
@@ -142,6 +151,16 @@ public sealed class BuildPlanContextLoader
                 resolvedFields = payload.ResolvedFields,
                 remainingFields = payload.RemainingFields,
                 answerSetFingerprint = payload.AnswerSetFingerprint,
+                canonicalTaskType = payload.ValidatedPlanAnswers.CanonicalTaskType,
+                taskTypeNormalizationAudit = payload.ValidatedPlanAnswers.TaskTypeNormalizationAudit
+                    .Select(item => new
+                    {
+                        source = item.Source,
+                        rawValue = item.RawValue,
+                        canonicalValue = item.CanonicalValue,
+                        explicitUserChoice = item.ExplicitUserChoice
+                    })
+                    .ToList(),
                 requirementMode = payload.RequirementMode,
                 acceptedDefaultCount = payload.AcceptedDefaults.Count,
                 hasCurrentFlow = payload.HasCurrentFlow,

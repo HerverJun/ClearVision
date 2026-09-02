@@ -25,6 +25,23 @@ public sealed record WorkflowArtifactRepair(
     string FromValue = "",
     string ToValue = "");
 
+public sealed record WorkflowArtifactRouteEvidence
+{
+    public string TaskType { get; init; } = string.Empty;
+    public string ContractVersion { get; init; } = string.Empty;
+    public bool Supported { get; init; }
+    public bool Satisfied { get; init; }
+    public List<string> RequiredCapabilities { get; init; } = [];
+    public List<string> MatchedCapabilities { get; init; } = [];
+    public List<string> MissingCapabilities { get; init; } = [];
+    public List<string> RequiredResultSemantics { get; init; } = [];
+    public List<string> ReachableResultSemantics { get; init; } = [];
+    public List<string> MissingResultSemantics { get; init; } = [];
+    public List<string> LegalTerminals { get; init; } = [];
+    public List<string> ReachedTerminals { get; init; } = [];
+    public List<string> Evidence { get; init; } = [];
+}
+
 public sealed record WorkflowQuarantineReport
 {
     public string ReportId { get; init; } = string.Empty;
@@ -38,7 +55,10 @@ public sealed record WorkflowQuarantineReport
     public bool CanSyncStation { get; init; }
     public bool PreviewOnly { get; init; }
     public List<WorkflowArtifactDiagnostic> Diagnostics { get; init; } = [];
+    public WorkflowArtifactDiagnostic? PrimaryDiagnostic { get; init; }
+    public List<WorkflowArtifactDiagnostic> SecondaryDiagnostics { get; init; } = [];
     public List<WorkflowArtifactRepair> Repairs { get; init; } = [];
+    public WorkflowArtifactRouteEvidence? RouteEvidence { get; init; }
 
     public string PublicMessage => Disposition switch
     {
@@ -110,6 +130,9 @@ public static class WorkflowArtifactAdmissionFailures
 {
     public static WorkflowArtifactAdmissionException GateUnavailable(string source)
     {
+        var diagnostic = new WorkflowArtifactDiagnostic(
+            "workflow_artifact_admission_gate_unavailable",
+            "The workflow artifact admission gate is unavailable; the operation was fail-closed.");
         var report = new WorkflowQuarantineReport
         {
             ReportId = $"admission_gate_unavailable_{Guid.NewGuid():N}",
@@ -121,10 +144,9 @@ public static class WorkflowArtifactAdmissionFailures
             CanSyncStation = false,
             Diagnostics =
             [
-                new WorkflowArtifactDiagnostic(
-                    "workflow_artifact_admission_gate_unavailable",
-                    "The workflow artifact admission gate is unavailable; the operation was fail-closed.")
-            ]
+                diagnostic
+            ],
+            PrimaryDiagnostic = diagnostic
         };
         return new WorkflowArtifactAdmissionException(report);
     }

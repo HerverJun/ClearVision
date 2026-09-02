@@ -376,33 +376,73 @@ public sealed class VisionAgentOrchestrator : IVisionAgentOrchestrator
         var explicitPromptAnswers = VisionAgentRequirementMaturityGate.ExtractExplicitPlanAnswers(
             maturityRequest,
             semantic);
-        var rawConfirmed = (request.ConfirmedPlanAnswers ?? [])
-            .Where(answer => VisionAgentPlanFieldPolicy.IsAuthoritativeConfirmationOrigin(answer.Origin))
+        var allTaskEvidence = (request.ConfirmedPlanAnswers ?? [])
             .Concat(explicitPromptAnswers)
+            .ToList();
+        var taskResolution = VisionAgentTaskTypeResolver.Resolve(
+            new VisionAgentPlanModeResult
+            {
+                OriginalUserPrompt = originalPrompt,
+                SemanticExtraction = semantic,
+                RequirementMaturity = maturity
+            },
+            allTaskEvidence);
+        if (taskResolution.ExplicitOverride && !string.IsNullOrWhiteSpace(taskResolution.CanonicalValue))
+        {
+            maturity = maturity with { TaskType = taskResolution.CanonicalValue };
+        }
+        var rawConfirmed = allTaskEvidence
+            .Where(answer => VisionAgentPlanFieldPolicy.IsAuthoritativeConfirmationOrigin(answer.Origin))
             .ToList();
         var normalizedConfirmed = new List<VisionAgentPlanAnswer>();
         var groupedAnswers = rawConfirmed
             .Select(a =>
             {
                 var normField = VisionAgentPlanFieldPolicy.NormalizeField(a.Field);
-                return a with { Field = normField };
+                var normalizedValue = string.Equals(normField, VisionAgentPlanAnswerFields.TaskType, StringComparison.OrdinalIgnoreCase) &&
+                                      AiVisionTaskCatalog.TryNormalizePrimary(a.Value, out var canonicalTaskType)
+                    ? canonicalTaskType
+                    : a.Value;
+                return a with { Field = normField, Value = normalizedValue };
             })
             .Where(a => !string.IsNullOrWhiteSpace(a.Field) &&
                         !string.IsNullOrWhiteSpace(a.Value) &&
-                        !VisionAgentPlanFieldPolicy.IsPlaceholderValue(a.Value))
+                        !VisionAgentPlanFieldPolicy.IsPlaceholderValue(a.Value) &&
+                        (!string.Equals(a.Field, VisionAgentPlanAnswerFields.TaskType, StringComparison.OrdinalIgnoreCase) ||
+                         AiVisionTaskCatalog.TryNormalizePrimary(a.Value, out _)))
             .GroupBy(a => a.Field, StringComparer.OrdinalIgnoreCase);
 
         foreach (var group in groupedAnswers)
         {
-            var bestAnswer = group.OrderBy(a => GetOriginPriority(a.Origin)).First();
+            var bestAnswer = group
+                .OrderByDescending(a => VisionAgentPlanFieldPolicy.AnswerOriginPriority(a.Origin))
+                .First();
             normalizedConfirmed.Add(bestAnswer);
+        }
+        if (taskResolution.BlockingConflict)
+        {
+            normalizedConfirmed.RemoveAll(answer =>
+                string.Equals(answer.Field, VisionAgentPlanAnswerFields.TaskType, StringComparison.OrdinalIgnoreCase));
         }
 
         var confirmedSet = normalizedConfirmed.Select(a => a.Field).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var inferredResolvedFields = explicitPromptAnswers
+            .Where(answer => answer.Origin is VisionAgentPlanAnswerOrigins.RuleInferred or VisionAgentPlanAnswerOrigins.LegacyInferred)
+            .Select(answer => VisionAgentPlanFieldPolicy.NormalizeField(answer.Field))
+            .Where(field => !string.IsNullOrWhiteSpace(field) &&
+                            (!string.Equals(field, VisionAgentPlanAnswerFields.TaskType, StringComparison.OrdinalIgnoreCase) ||
+                             (!taskResolution.BlockingConflict && !string.IsNullOrWhiteSpace(taskResolution.CanonicalValue))))
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        if (!taskResolution.BlockingConflict && !string.IsNullOrWhiteSpace(taskResolution.CanonicalValue))
+        {
+            inferredResolvedFields.Add(VisionAgentPlanAnswerFields.TaskType);
+        }
 
-        // 2. ResolvedPlanFields: only authoritative, concrete answers. Semantic and maturity
-        // evidence remain visible as inference, but never masquerade as user confirmation.
-        var resolvedSet = confirmedSet.ToHashSet(StringComparer.OrdinalIgnoreCase);
+        // 2. ResolvedPlanFields may include aligned low-trust inference, but only authoritative
+        // answers are retained in ConfirmedPlanAnswers. Conflicting task evidence remains blocked.
+        var resolvedSet = confirmedSet
+            .Concat(inferredResolvedFields)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
         var resolvedPlanFields = resolvedSet.ToList();
 
@@ -410,6 +450,7 @@ public sealed class VisionAgentOrchestrator : IVisionAgentOrchestrator
         var inferredReviewFields = BuildUnconfirmedHighImpactFields(maturity, semantic);
         var remainingPlanFields = maturity.MissingFields
             .Concat(inferredReviewFields)
+            .Concat(taskResolution.BlockingConflict ? [VisionAgentPlanAnswerFields.TaskType] : [])
             .Select(VisionAgentPlanFieldPolicy.NormalizeField)
             .Where(f => !string.IsNullOrWhiteSpace(f) && !resolvedSet.Contains(f))
             .Distinct(StringComparer.OrdinalIgnoreCase)
@@ -420,16 +461,21 @@ public sealed class VisionAgentOrchestrator : IVisionAgentOrchestrator
                 ? VisionAgentPlanFieldPolicy.IsDraftBlocking(field, maturity.TaskType, maturity)
                 : VisionAgentPlanFieldPolicy.IsStrictBlocking(field, maturity.TaskType, maturity));
 
-        var canBuild = !hasBlockingMissing && maturity.CanBuild;
+        var canBuild = !taskResolution.BlockingConflict && !hasBlockingMissing && maturity.CanBuild;
 
         var updatedMaturity = maturity with
         {
             MissingFields = remainingPlanFields,
-            CanBuild = canBuild
+            CanPlan = maturity.CanPlan && !taskResolution.BlockingConflict,
+            CanBuild = canBuild,
+            BlockingReasons = maturity.BlockingReasons
+                .Concat(taskResolution.BlockingConflict ? ["task_type_conflict"] : [])
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList()
         };
 
         var scenario = updatedMaturity.CanPlan
-            ? VisionAgentRequirementMaturityGate.ToPlanIntent(updatedMaturity)
+            ? ResolvePlanScenario(updatedMaturity, description)
             : updatedMaturity.TaskType == AiVisionTaskTypes.AbstractGoal ? "abstract_goal" : "requirement_clarification";
         var route = updatedMaturity.CanPlan
             ? BuildRoute(scenario, templateSelection)
@@ -463,7 +509,7 @@ public sealed class VisionAgentOrchestrator : IVisionAgentOrchestrator
                 : VisionAgentPlanPhases.ClarificationOnly,
             Goal = description.Length > 160 ? description[..160] : description,
             Intent = updatedMaturity.CanPlan ? scenario : updatedMaturity.Maturity,
-            Confidence = canBuild && scenario != "general_inspection" ? "high" : updatedMaturity.CanPlan ? "low" : "medium",
+            Confidence = canBuild ? "high" : updatedMaturity.CanPlan ? "low" : "medium",
             RequirementUnderstanding =
             [
                 updatedMaturity.PublicReason,
@@ -540,9 +586,10 @@ public sealed class VisionAgentOrchestrator : IVisionAgentOrchestrator
                 : "metadata-template-catalog.v1",
             TemplateSelection = templateSelection,
             StationBoundarySummary = "仅元数据工站边界；规划阶段不会触碰相机、PLC、文件系统或网络资源。",
-            PlcOutputPolicy = scenario == "plc_output"
+            PlcOutputPolicy = ContainsAny(description.ToLowerInvariant(), "plc", "输出信号", "握手", "地址")
                 ? "PLC 输出先作为待确认元数据规划，直到 OK/NG 地址、握手和失效保护策略确认。"
                 : "优先本地结果输出；构建就绪复核前保持 PLC 写入禁用。",
+            PlanWarnings = taskResolution.Warnings.ToList(),
             PublicEvents = semanticEvents?.ToList() ?? [],
             MetadataOnly = true
         };
@@ -909,6 +956,29 @@ public sealed class VisionAgentOrchestrator : IVisionAgentOrchestrator
             executablePlan = NormalizeList(plan.ExecutablePlan),
             canBuild = plan.CanBuild,
             blockingReasons = NormalizeList(plan.BlockingReasons),
+            planFidelity = new
+            {
+                contractVersion = Clean(plan.PlanFidelity.ContractVersion),
+                taskType = Clean(plan.PlanFidelity.TaskType),
+                satisfied = plan.PlanFidelity.Satisfied,
+                repaired = plan.PlanFidelity.Repaired,
+                requiredCapabilities = (plan.PlanFidelity.RequiredCapabilities ?? [])
+                    .OrderBy(item => item.Id, StringComparer.OrdinalIgnoreCase)
+                    .Select(item => new
+                    {
+                        id = Clean(item.Id),
+                        operatorType = Clean(item.OperatorType),
+                        parameterName = Clean(item.ParameterName),
+                        requiredValue = Clean(item.RequiredValue),
+                        source = Clean(item.Source),
+                        strong = item.Strong
+                    })
+                    .ToList(),
+                requiredOutputSemantics = NormalizeList(plan.PlanFidelity.RequiredOutputSemantics),
+                missingCapabilities = NormalizeList(plan.PlanFidelity.MissingCapabilities),
+                missingOutputSemantics = NormalizeList(plan.PlanFidelity.MissingOutputSemantics),
+                blockingReasons = NormalizeList(plan.PlanFidelity.BlockingReasons)
+            },
             requirementMaturity = plan.RequirementMaturity == null
                 ? null
                 : new
@@ -991,49 +1061,6 @@ public sealed class VisionAgentOrchestrator : IVisionAgentOrchestrator
             });
     }
 
-    private static string DetectScenario(string description, AiTemplateSelectionInfo? templateSelection)
-    {
-        var text = description.ToLowerInvariant();
-        if (ContainsAny(text, "wire", "terminal", "harness", "sequence", "线序", "端子", "线束", "排线", "插线"))
-        {
-            return "wire_sequence";
-        }
-
-        if (ContainsAny(text, "plc", "plc输出", "输出信号", "握手", "地址"))
-        {
-            return "plc_output";
-        }
-
-        if (ContainsAny(text, "barcode", "qr", "datamatrix", "code", "二维码", "条码", "读码", "扫码"))
-        {
-            return "code_recognition";
-        }
-
-        if (ContainsAny(text, "measure", "distance", "diameter", "width", "hole", "calibration", "测量", "孔距", "直径", "宽度", "尺寸", "标定", "距离"))
-        {
-            return "measurement";
-        }
-
-        if (ContainsAny(text, "template", "align", "position", "locate", "matching", "模板", "定位", "匹配", "对位", "找正") ||
-            string.Equals(templateSelection?.Mode, "template_fill", StringComparison.OrdinalIgnoreCase) ||
-            string.Equals(templateSelection?.Mode, "template_adapt", StringComparison.OrdinalIgnoreCase))
-        {
-            return "template_location";
-        }
-
-        if (ContainsAny(text, "remote", "button", "keypad", "key press", "遥控器", "按键", "按钮", "键盘"))
-        {
-            return "button_inspection";
-        }
-
-        if (ContainsAny(text, "scratch", "metal", "surface", "defect", "crack", "dent", "划痕", "刮伤", "金属", "表面", "缺陷", "裂纹", "凹坑"))
-        {
-            return "surface_defect";
-        }
-
-        return "general_inspection";
-    }
-
     private static VisionAgentRecommendedRoute BuildClarificationRoute(AiRequirementMaturityResult maturity)
     {
         return new VisionAgentRecommendedRoute
@@ -1081,7 +1108,7 @@ public sealed class VisionAgentOrchestrator : IVisionAgentOrchestrator
                 RouteId = "measurement_with_calibration",
                 Title = "带标定的尺寸测量路线",
                 Summary = "加载标定信息、定位几何特征、测量尺寸并比较容差。",
-                Operators = ["ImageAcquisition", "CircleMeasurement", "CircleMeasurement", "Measurement", "UnitConvert", "ResultJudgment", "ResultOutput"],
+                Operators = ["ImageAcquisition", "CircleMeasurement", "CircleMeasurement", "Measurement", "UnitConvert", "Aggregator", "ResultJudgment", "ResultOutput"],
                 TemplateDecision = templateDecision
             },
             "template_location" => new VisionAgentRecommendedRoute
@@ -1100,12 +1127,12 @@ public sealed class VisionAgentOrchestrator : IVisionAgentOrchestrator
                 Operators = ["ImageAcquisition", "TemplateMatching", "RoiManager", "DeepLearning", "ResultJudgment", "ResultOutput"],
                 TemplateDecision = templateDecision
             },
-            "plc_output" => new VisionAgentRecommendedRoute
+            "object_detection" => new VisionAgentRecommendedRoute
             {
-                RouteId = "inspection_with_plc_pending",
-                Title = "PLC 输出待确认的检测路线",
-                Summary = "生成检测草稿，并在地址策略确认前把 PLC OK/NG 输出保留为元数据。",
-                Operators = ["ImageAcquisition", "InspectionOperator", "ResultJudgment", "ResultOutput"],
+                RouteId = "object_detection",
+                Title = "目标检测路线",
+                Summary = "采集图像、检测目标位置与类别，并发布检测列表和 OK/NG 结果。",
+                Operators = ["ImageAcquisition", "DeepLearning", "ResultJudgment", "ResultOutput"],
                 TemplateDecision = templateDecision
             },
             "presence_absence" => new VisionAgentRecommendedRoute
@@ -1133,6 +1160,21 @@ public sealed class VisionAgentOrchestrator : IVisionAgentOrchestrator
                 TemplateDecision = templateDecision
             }
         };
+    }
+
+    private static string ResolvePlanScenario(
+        AiRequirementMaturityResult maturity,
+        string description)
+    {
+        if (maturity.TaskType is AiVisionTaskTypes.SurfaceDefect or
+            AiVisionTaskTypes.PresenceAbsence or
+            AiVisionTaskTypes.AttributeClassification &&
+            ContainsAny(description, "remote", "button", "keypad", "key press", "遥控器", "按键", "按钮", "键盘"))
+        {
+            return "button_inspection";
+        }
+
+        return VisionAgentRequirementMaturityGate.ToPlanIntent(maturity);
     }
 
     private static List<VisionAgentClarificationQuestion> BuildQuestions(string scenario)
@@ -1216,19 +1258,6 @@ public sealed class VisionAgentOrchestrator : IVisionAgentOrchestrator
                     Option("plc_pending", "PLC 输出待确认", false, "保留 PLC 输出为待补工程项。", "不会猜测地址、握手或失效保护。")
                 ])
             ],
-            "plc_output" =>
-            [
-                Question("plc_policy", "PLC OK/NG 输出如何表示？", "PLC 地址和网络细节在确认前必须保持脱敏。", "metadata_pending", "创建 ResultOutput，并把 PLC 策略保留为待确认。", "避免不安全的地址猜测。", [
-                    Option("metadata_pending", "PLC 待确认", true, "把 PLC 地址和握手策略暴露为待确认项。", "最安全的路径。"),
-                    Option("local_first", "先本地输出", false, "PLC 集成前先本地输出。", "适合实验室验证。"),
-                    Option("station_profile", "工站配置", false, "使用已选工站配置元数据。", "需要确认配置。")
-                ]),
-                Question("failsafe", "输出失败时采用什么失效保护？", "失效保护策略属于发布就绪条件。", "ng_on_failure", "输出失败时按 NG 或待人工介入处理。", "保守默认值。", [
-                    Option("ng_on_failure", "失败判 NG", true, "输出失败默认判 NG。", "更安全的生产行为。"),
-                    Option("hold_last", "保持上一信号", false, "保持上一次信号。", "需要 PLC 握手复核。"),
-                    Option("block_release", "阻断发布", false, "确认前阻断部署。", "最保守。")
-                ])
-            ],
             "presence_absence" =>
             [
                 Question("presence_target", "主要检查哪类有无状态？", "有无/漏装目标决定 ROI 和分类标签。", "target_present", "检查目标存在、缺失或漏装。", "目标定义会影响 OK/NG 判定。", [
@@ -1242,7 +1271,7 @@ public sealed class VisionAgentOrchestrator : IVisionAgentOrchestrator
                     Option("manual_review", "人工复核", false, "缺失疑似时转人工复核。", "需要操作流程。")
                 ])
             ],
-            "classification" or "attribute_classification" =>
+            "attribute_classification" =>
             [
                 Question("classification_strategy", "类型识别采用哪条实现路线？", "分类模型与传统特征规则会显著改变算子链、样本要求和资源契约。", "model_strategy", "优先规划分类模型，模型文件作为独立待补资源。", "适合类别边界和外观变化较大的对象。", [
                     Option("model_strategy", "分类模型", true, "使用分类模型输出类别与置信度。", "需要后续绑定模型资源和标签表。"),
@@ -1365,15 +1394,11 @@ public sealed class VisionAgentOrchestrator : IVisionAgentOrchestrator
             "相机、模型、模板、标定和 PLC 资源在确认前保持为仅元数据。",
             "工站兼容性可能阻断发布，但画布草稿仍可编辑。"
         };
-        if (scenario == "plc_output")
-        {
-            common.Add("PLC OK/NG 输出在地址、握手和失效保护复核前不得启用。");
-        }
         if (scenario == "measurement")
         {
             common.Add("测量精度依赖标定和镜头畸变控制。");
         }
-        if (scenario is "classification" or "attribute_classification")
+        if (scenario == "attribute_classification")
         {
             common.Add("属性分类边界需要样本、光照和 OK/NG 标签复核。");
         }
@@ -1457,10 +1482,9 @@ public sealed class VisionAgentOrchestrator : IVisionAgentOrchestrator
             "measurement" => "尺寸测量",
             "template_location" => "模板定位",
             "button_inspection" => "按键检测",
-            "plc_output" => "带 PLC 输出的检测",
             "presence_absence" => "有无 / 漏装检测",
-            "classification" => "分类识别",
             "attribute_classification" => "属性分类 / OK-NG 判别",
+            "object_detection" => "目标检测",
             "surface_defect" => "表面缺陷检测",
             _ => "通用视觉检测"
         };
@@ -1552,22 +1576,6 @@ public sealed class VisionAgentOrchestrator : IVisionAgentOrchestrator
             : SafeTemplateToken(value, unsafeFallback);
     }
 
-    private static int GetOriginPriority(string? origin)
-    {
-        if (string.IsNullOrWhiteSpace(origin))
-            return 99;
-        var clean = origin.Trim().ToLowerInvariant();
-        if (clean == "explicit_user_text" || clean == "explicit_user_selection" || clean == "user_explicit")
-            return 1;
-        if (clean == "resource_bound")
-            return 2;
-        if (clean == "model_inferred")
-            return 3;
-        if (clean == "accepted_recommended_default" || clean == "accepted_default")
-            return 4;
-        return 5;
-    }
-
     private static IEnumerable<string> BuildUnconfirmedHighImpactFields(
         AiRequirementMaturityResult maturity,
         VisionAgentSemanticExtractionResult? semantic)
@@ -1600,18 +1608,15 @@ public sealed class VisionAgentOrchestrator : IVisionAgentOrchestrator
         }
 
         if (maturity.TaskType is AiVisionTaskTypes.CodeRecognition or
-            AiVisionTaskTypes.BarcodeQr or
-            AiVisionTaskTypes.Classification or
             AiVisionTaskTypes.AttributeClassification or
-            AiVisionTaskTypes.PlcOutput)
+            AiVisionTaskTypes.ObjectDetection)
         {
             yield return VisionAgentPlanAnswerFields.OutputTarget;
         }
 
-        if (maturity.TaskType is AiVisionTaskTypes.Classification or
-            AiVisionTaskTypes.AttributeClassification or
+        if (maturity.TaskType is AiVisionTaskTypes.AttributeClassification or
             AiVisionTaskTypes.SurfaceDefect or
-            AiVisionTaskTypes.SurfaceOrPoseDefect)
+            AiVisionTaskTypes.ObjectDetection)
         {
             yield return VisionAgentPlanAnswerFields.AlgorithmStrategy;
         }

@@ -132,6 +132,29 @@ public class ResultOutputOperatorTests
     }
 
     [Fact]
+    public async Task ExecuteAsync_WithAllBusinessPorts_ShouldPassThroughWithoutOverwriting()
+    {
+        var op = new Operator("test", OperatorType.ResultOutput, 0, 0);
+        var image = new object();
+        var data = new Dictionary<string, object> { ["area"] = 12.5, ["unit"] = "mm2" };
+        var inputs = new Dictionary<string, object>
+        {
+            ["Image"] = image,
+            ["Result"] = "OK",
+            ["Text"] = "CODE-42",
+            ["Data"] = data
+        };
+
+        var result = await _operator.ExecuteAsync(op, inputs);
+
+        result.IsSuccess.Should().BeTrue();
+        result.OutputData.Should().ContainKey("Image").WhoseValue.Should().BeSameAs(image);
+        result.OutputData.Should().ContainKey("Result").WhoseValue.Should().Be("OK");
+        result.OutputData.Should().ContainKey("Text").WhoseValue.Should().Be("CODE-42");
+        result.OutputData.Should().ContainKey("Data").WhoseValue.Should().BeSameAs(data);
+    }
+
+    [Fact]
     public async Task ExecuteAsync_ByDefault_ShouldNotWriteTempFile()
     {
         var op = new Operator("test", OperatorType.ResultOutput, 0, 0);

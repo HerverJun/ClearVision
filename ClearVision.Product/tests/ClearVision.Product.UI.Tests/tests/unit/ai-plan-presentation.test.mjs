@@ -8,6 +8,11 @@ import {
   deriveAiClarificationPresentation,
   renderAiClarification,
 } from '../../../../src/ClearVision.Product.Desktop/wwwroot/src/features/ai/aiPanelClarificationPresentation.js';
+import {
+  AI_PRIMARY_TASKS,
+  normalizeAiPrimaryTask,
+  planAnswerOriginPriority,
+} from '../../../../src/ClearVision.Product.Desktop/wwwroot/src/features/ai/aiTaskContract.js';
 
 function createQuestion(overrides = {}) {
   return {
@@ -145,6 +150,38 @@ test('task understanding presents canonical answer labels instead of internal en
 
   assert.equal(imageSource.value, '工业相机');
   assert.notEqual(imageSource.value, 'industrial_camera');
+});
+
+test('task contract normalizes aliases and keeps unknown task values unresolved', () => {
+  assert.equal(AI_PRIMARY_TASKS.length, 8);
+  assert.equal(normalizeAiPrimaryTask('classification'), 'attribute_classification');
+  assert.equal(normalizeAiPrimaryTask('barcode_qr'), 'code_recognition');
+  assert.equal(normalizeAiPrimaryTask('surface_or_pose_defect'), 'surface_defect');
+  assert.equal(normalizeAiPrimaryTask('general_inspection'), '');
+  assert.equal(normalizeAiPrimaryTask('custom_task'), '');
+
+  const panel = createPanel({
+    confirmed: {
+      task_type: { field: 'task_type', value: 'general_inspection', origin: 'explicit_user_selection' },
+    },
+  });
+  const presentation = deriveAiPlanPresentation(panel, createPlan({
+    semanticExtraction: { ...createPlan().semanticExtraction, taskType: 'unknown' },
+  }));
+  const taskType = presentation.understanding.find(item => item.field === 'task_type');
+  assert.equal(taskType.value, '待确认');
+  assert.equal(taskType.status, 'pending');
+});
+
+test('frontend answer source priority matches the backend trust order', () => {
+  assert.equal(planAnswerOriginPriority('explicit_user_text'), 6);
+  assert.equal(planAnswerOriginPriority('explicit_user_selection'), 6);
+  assert.equal(planAnswerOriginPriority('resource_bound'), 5);
+  assert.equal(planAnswerOriginPriority('model_inferred'), 4);
+  assert.equal(planAnswerOriginPriority('accepted_recommended_default'), 3);
+  assert.equal(planAnswerOriginPriority('rule_inferred'), 2);
+  assert.equal(planAnswerOriginPriority('legacy_inferred'), 2);
+  assert.equal(planAnswerOriginPriority('default_assumption'), 1);
 });
 
 test('single canonical question exposes recommended and ordinary choices with impact copy', () => {

@@ -1334,35 +1334,11 @@
     ],
     "MitsubishiMcCommunication": [
       {
-        "parameter": "IpAddress",
-        "requiredPolicy": "metadata",
-        "requiredWhen": {
-          "all": [
-            {
-              "parameter": "UseGlobalFallback",
-              "comparison": "equals",
-              "value": false
-            }
-          ]
-        },
+        "parameter": "ProfileId",
+        "requiredPolicy": "required",
         "deprecated": false,
-        "resourceKind": "plc_endpoint",
-        "reasonCode": "MITSUBISHI_OPERATOR_IP_REQUIRED_WITHOUT_GLOBAL_FALLBACK"
-      },
-      {
-        "parameter": "Port",
-        "requiredPolicy": "metadata",
-        "requiredWhen": {
-          "all": [
-            {
-              "parameter": "UseGlobalFallback",
-              "comparison": "equals",
-              "value": false
-            }
-          ]
-        },
-        "deprecated": false,
-        "reasonCode": "MITSUBISHI_OPERATOR_PORT_REQUIRED_WITHOUT_GLOBAL_FALLBACK"
+        "resourceKind": "plc_profile",
+        "reasonCode": "MITSUBISHI_PLC_PROFILE_REQUIRED"
       },
       {
         "parameter": "Address",
@@ -1370,6 +1346,12 @@
         "deprecated": false,
         "resourceKind": "plc_address",
         "reasonCode": "MITSUBISHI_PLC_ADDRESS_REQUIRED"
+      },
+      {
+        "parameter": "Operation",
+        "requiredPolicy": "required",
+        "deprecated": false,
+        "reasonCode": "MITSUBISHI_PLC_OPERATION_REQUIRED"
       },
       {
         "parameter": "Length",
@@ -1500,171 +1482,10 @@
     "TcpCommunication": [
       {
         "parameter": "ProfileId",
-        "requiredPolicy": "optional",
-        "requiredWhen": {
-          "any": [
-            {
-              "parameter": "UseGlobalProfile",
-              "comparison": "equals",
-              "value": true
-            },
-            {
-              "parameter": "Mode",
-              "comparison": "equals",
-              "value": "Server"
-            }
-          ]
-        },
+        "requiredPolicy": "required",
         "deprecated": false,
         "resourceKind": "tcp_profile",
-        "reasonCode": "TCP_PROFILE_REQUIRED_FOR_GLOBAL_OR_SERVER_MODE"
-      },
-      {
-        "parameter": "Mode",
-        "requiredPolicy": "metadata",
-        "disabledWhen": {
-          "all": [
-            {
-              "parameter": "ProfileId",
-              "comparison": "not-empty"
-            }
-          ]
-        },
-        "deprecated": false,
-        "reasonCode": "TCP_MODE_IGNORED_WHEN_PROFILE_CONFIGURED"
-      },
-      {
-        "parameter": "IpAddress",
-        "requiredPolicy": "metadata",
-        "requiredWhen": {
-          "all": [
-            {
-              "parameter": "ProfileId",
-              "comparison": "empty"
-            },
-            {
-              "parameter": "UseGlobalProfile",
-              "comparison": "equals",
-              "value": false
-            },
-            {
-              "parameter": "Mode",
-              "comparison": "equals",
-              "value": "Client"
-            }
-          ]
-        },
-        "enabledWhen": {
-          "all": [
-            {
-              "parameter": "ProfileId",
-              "comparison": "empty"
-            },
-            {
-              "parameter": "UseGlobalProfile",
-              "comparison": "equals",
-              "value": false
-            },
-            {
-              "parameter": "Mode",
-              "comparison": "equals",
-              "value": "Client"
-            }
-          ]
-        },
-        "deprecated": false,
-        "resourceKind": "network_endpoint",
-        "reasonCode": "TCP_LEGACY_CLIENT_HOST_REQUIRED"
-      },
-      {
-        "parameter": "Port",
-        "requiredPolicy": "metadata",
-        "requiredWhen": {
-          "all": [
-            {
-              "parameter": "ProfileId",
-              "comparison": "empty"
-            },
-            {
-              "parameter": "UseGlobalProfile",
-              "comparison": "equals",
-              "value": false
-            },
-            {
-              "parameter": "Mode",
-              "comparison": "equals",
-              "value": "Client"
-            }
-          ]
-        },
-        "enabledWhen": {
-          "all": [
-            {
-              "parameter": "ProfileId",
-              "comparison": "empty"
-            },
-            {
-              "parameter": "UseGlobalProfile",
-              "comparison": "equals",
-              "value": false
-            },
-            {
-              "parameter": "Mode",
-              "comparison": "equals",
-              "value": "Client"
-            }
-          ]
-        },
-        "deprecated": false,
-        "reasonCode": "TCP_LEGACY_CLIENT_PORT_REQUIRED"
-      },
-      {
-        "parameter": "Timeout",
-        "requiredPolicy": "metadata",
-        "enabledWhen": {
-          "all": [
-            {
-              "parameter": "ProfileId",
-              "comparison": "empty"
-            },
-            {
-              "parameter": "UseGlobalProfile",
-              "comparison": "equals",
-              "value": false
-            },
-            {
-              "parameter": "Mode",
-              "comparison": "equals",
-              "value": "Client"
-            }
-          ]
-        },
-        "deprecated": false,
-        "reasonCode": "TCP_LEGACY_CLIENT_TIMEOUT_ONLY_WITHOUT_PROFILE"
-      },
-      {
-        "parameter": "Encoding",
-        "requiredPolicy": "metadata",
-        "enabledWhen": {
-          "all": [
-            {
-              "parameter": "ProfileId",
-              "comparison": "empty"
-            },
-            {
-              "parameter": "UseGlobalProfile",
-              "comparison": "equals",
-              "value": false
-            },
-            {
-              "parameter": "Mode",
-              "comparison": "equals",
-              "value": "Client"
-            }
-          ]
-        },
-        "deprecated": false,
-        "reasonCode": "TCP_LEGACY_CLIENT_ENCODING_ONLY_WITHOUT_PROFILE"
+        "reasonCode": "TCP_PROFILE_REQUIRED"
       },
       {
         "parameter": "UseFixedSendData",
@@ -2692,9 +2513,7 @@
       "caseId": "mitsubishi_write_disables_read_and_polling_values",
       "operatorType": "MitsubishiMcCommunication",
       "parameters": {
-        "UseGlobalFallback": false,
-        "IpAddress": "192.168.3.39",
-        "Port": 5002,
+        "ProfileId": "line-plc-profile",
         "Address": "D100",
         "Operation": "Write",
         "Length": 99,
@@ -2703,15 +2522,15 @@
         "WriteValue": "1"
       },
       "uiStates": {
-        "IpAddress": {
-          "effectiveRequired": true,
-          "effectiveDisabled": false
-        },
-        "Port": {
+        "ProfileId": {
           "effectiveRequired": true,
           "effectiveDisabled": false
         },
         "Address": {
+          "effectiveRequired": true,
+          "effectiveDisabled": false
+        },
+        "Operation": {
           "effectiveRequired": true,
           "effectiveDisabled": false
         },
@@ -2739,9 +2558,7 @@
       "caseId": "mitsubishi_wait_for_value_enables_polling_fields",
       "operatorType": "MitsubishiMcCommunication",
       "parameters": {
-        "UseGlobalFallback": false,
-        "IpAddress": "192.168.3.39",
-        "Port": 5002,
+        "ProfileId": "line-plc-profile",
         "Address": "D100",
         "Operation": "Read",
         "PollingMode": "WaitForValue"
@@ -2776,29 +2593,15 @@
       "deploymentPrecheckMissingParameters": []
     },
     {
-      "caseId": "tcp_global_profile_requires_profile_id",
+      "caseId": "tcp_requires_profile_id",
       "operatorType": "TcpCommunication",
       "parameters": {
-        "UseGlobalProfile": true,
-        "ProfileId": "",
-        "Mode": "Client"
+        "ProfileId": ""
       },
       "uiStates": {
         "ProfileId": {
           "effectiveRequired": true,
           "effectiveDisabled": false
-        },
-        "IpAddress": {
-          "effectiveRequired": false,
-          "effectiveDisabled": true
-        },
-        "Port": {
-          "effectiveRequired": false,
-          "effectiveDisabled": true
-        },
-        "Timeout": {
-          "effectiveRequired": false,
-          "effectiveDisabled": true
         }
       },
       "flowValidationMissingParameters": [
@@ -2809,39 +2612,15 @@
       ]
     },
     {
-      "caseId": "tcp_profile_disables_legacy_endpoint",
+      "caseId": "tcp_profile_is_required_and_active",
       "operatorType": "TcpCommunication",
       "parameters": {
-        "ProfileId": "robot-profile",
-        "UseGlobalProfile": false,
-        "Mode": "Client",
-        "IpAddress": "127.0.0.1",
-        "Port": 8080
+        "ProfileId": "robot-profile"
       },
       "uiStates": {
         "ProfileId": {
-          "effectiveRequired": false,
+          "effectiveRequired": true,
           "effectiveDisabled": false
-        },
-        "Mode": {
-          "effectiveRequired": false,
-          "effectiveDisabled": true
-        },
-        "IpAddress": {
-          "effectiveRequired": false,
-          "effectiveDisabled": true
-        },
-        "Port": {
-          "effectiveRequired": false,
-          "effectiveDisabled": true
-        },
-        "Timeout": {
-          "effectiveRequired": false,
-          "effectiveDisabled": true
-        },
-        "Encoding": {
-          "effectiveRequired": false,
-          "effectiveDisabled": true
         }
       },
       "flowValidationMissingParameters": [],
@@ -2851,7 +2630,7 @@
       "caseId": "tcp_no_response_ignores_stale_regex_values",
       "operatorType": "TcpCommunication",
       "parameters": {
-        "IpAddress": "127.0.0.1",
+        "ProfileId": "robot-profile",
         "WaitResponse": false,
         "ResponseParseMode": "Regex",
         "ResponseRegexPattern": "<pending-regex>",
@@ -2911,7 +2690,7 @@
       "caseId": "tcp_regex_parse_requires_pattern",
       "operatorType": "TcpCommunication",
       "parameters": {
-        "IpAddress": "127.0.0.1",
+        "ProfileId": "robot-profile",
         "WaitResponse": true,
         "ResponseParseMode": "Regex",
         "ResponseRegexPattern": ""
@@ -2945,7 +2724,7 @@
       "caseId": "tcp_delimited_mode_ignores_stale_fixed_width_values",
       "operatorType": "TcpCommunication",
       "parameters": {
-        "IpAddress": "127.0.0.1",
+        "ProfileId": "robot-profile",
         "WaitResponse": true,
         "ResponseParseMode": "Delimited",
         "ResponseDelimiter": ",",
@@ -2980,7 +2759,7 @@
       "caseId": "tcp_key_value_requires_delimiter_groups",
       "operatorType": "TcpCommunication",
       "parameters": {
-        "IpAddress": "127.0.0.1",
+        "ProfileId": "robot-profile",
         "WaitResponse": true,
         "ResponseParseMode": "KeyValue",
         "ResponseKeyValuePairDelimiter": "",

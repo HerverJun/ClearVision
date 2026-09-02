@@ -67,7 +67,7 @@ public sealed class OperatorPipelineSelector
             {
                 repaired.Add(new VisionAgentOperatorPipelineStep
                 {
-                    TempId = TempIdFor(type, repaired.Count + 1),
+                    TempId = string.Empty,
                     OperatorType = type,
                     Source = source,
                     Status = "selected"
@@ -84,29 +84,49 @@ public sealed class OperatorPipelineSelector
             publicWarnings.Add("operator_pipeline_repaired_to_minimum");
             repaired =
             [
-                new() { TempId = "op_cam", OperatorType = "ImageAcquisition", Source = "repair", Status = "selected", RepairNote = "minimum_pipeline_added" },
-                new() { TempId = "op_judge", OperatorType = "ResultJudgment", Source = "repair", Status = "selected", RepairNote = "minimum_pipeline_added" },
-                new() { TempId = "op_out", OperatorType = "ResultOutput", Source = "repair", Status = "selected", RepairNote = "minimum_pipeline_added" }
+                new() { TempId = string.Empty, OperatorType = "ImageAcquisition", Source = "repair", Status = "selected", RepairNote = "minimum_pipeline_added" },
+                new() { TempId = string.Empty, OperatorType = "ResultJudgment", Source = "repair", Status = "selected", RepairNote = "minimum_pipeline_added" },
+                new() { TempId = string.Empty, OperatorType = "ResultOutput", Source = "repair", Status = "selected", RepairNote = "minimum_pipeline_added" }
             ];
         }
 
-        var terminalOutputAdded = false;
+        var draftResultChainAdded = false;
+        var hasBusinessProcessor = repaired.Any(step =>
+            !step.OperatorType.Equals("ImageAcquisition", StringComparison.OrdinalIgnoreCase) &&
+            !step.OperatorType.Equals("ResultJudgment", StringComparison.OrdinalIgnoreCase) &&
+            !step.OperatorType.Equals("ResultOutput", StringComparison.OrdinalIgnoreCase));
         if (load.RequirementMode.Equals(AiRequirementModes.Draft, StringComparison.OrdinalIgnoreCase) &&
-            repaired.Any(step =>
-                !step.OperatorType.Equals("ImageAcquisition", StringComparison.OrdinalIgnoreCase) &&
-                !step.OperatorType.Equals("ResultOutput", StringComparison.OrdinalIgnoreCase)) &&
+            hasBusinessProcessor &&
+            repaired.All(step => !step.OperatorType.Equals("ResultJudgment", StringComparison.OrdinalIgnoreCase)))
+        {
+            var outputIndex = repaired.FindIndex(step =>
+                step.OperatorType.Equals("ResultOutput", StringComparison.OrdinalIgnoreCase));
+            repaired.Insert(outputIndex < 0 ? repaired.Count : outputIndex, new VisionAgentOperatorPipelineStep
+            {
+                TempId = string.Empty,
+                OperatorType = "ResultJudgment",
+                Source = "repair",
+                Status = "selected",
+                RepairNote = "draft_result_chain_added"
+            });
+            publicWarnings.Add("draft_result_judgment_added");
+            draftResultChainAdded = true;
+        }
+
+        if (load.RequirementMode.Equals(AiRequirementModes.Draft, StringComparison.OrdinalIgnoreCase) &&
+            hasBusinessProcessor &&
             repaired.All(step => !step.OperatorType.Equals("ResultOutput", StringComparison.OrdinalIgnoreCase)))
         {
             publicWarnings.Add("draft_terminal_output_added");
             repaired.Add(new VisionAgentOperatorPipelineStep
             {
-                TempId = "op_out",
+                TempId = string.Empty,
                 OperatorType = "ResultOutput",
                 Source = "repair",
                 Status = "selected",
-                RepairNote = "draft_terminal_output_added"
+                RepairNote = "draft_result_chain_added"
             });
-            terminalOutputAdded = true;
+            draftResultChainAdded = true;
         }
 
         if (invalid.Count > 0)
@@ -119,6 +139,8 @@ public sealed class OperatorPipelineSelector
                     : step.RepairNote
             }).ToList();
         }
+
+        repaired = AllocateTempIds(repaired);
 
         var resolution = new OperatorPipelineResolution(repaired, invalid);
         return VisionAgentBuildSupport.StepResult(
@@ -139,12 +161,12 @@ public sealed class OperatorPipelineSelector
             },
             warningCode: invalid.Count > 0
                 ? "invalid_operator_removed"
-                : terminalOutputAdded ? "draft_terminal_output_added" : string.Empty,
+                : draftResultChainAdded ? "draft_result_chain_added" : string.Empty,
             repairAction: invalid.Count > 0
                 ? "removed_invalid_operators"
-                : terminalOutputAdded ? "appended_result_output" : string.Empty,
+                : draftResultChainAdded ? "appended_result_judgment_and_output" : string.Empty,
             applyImpact: "editable_draft_allowed",
-            deploymentImpact: invalid.Count > 0 || terminalOutputAdded
+            deploymentImpact: invalid.Count > 0 || draftResultChainAdded
                 ? "operator_contract_repaired"
                 : "no_deployment_blocker");
     }
@@ -170,9 +192,41 @@ public sealed class OperatorPipelineSelector
         }
     }
 
-    private static string TempIdFor(string operatorType, int ordinal)
+    private static List<VisionAgentOperatorPipelineStep> AllocateTempIds(
+        IReadOnlyList<VisionAgentOperatorPipelineStep> steps)
     {
-        return operatorType switch
+        var ordinals = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+        var used = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var allocated = new List<VisionAgentOperatorPipelineStep>(steps.Count);
+        foreach (var step in steps)
+        {
+            ordinals.TryGetValue(step.OperatorType, out var ordinal);
+            ordinal++;
+            ordinals[step.OperatorType] = ordinal;
+
+            var preferred = PreferredTempId(step.OperatorType, ordinal);
+            var candidate = preferred;
+            var collisionOrdinal = 2;
+            while (!used.Add(candidate))
+            {
+                candidate = $"{preferred}_{collisionOrdinal++}";
+            }
+
+            allocated.Add(step with { TempId = candidate });
+        }
+
+        if (allocated.Any(step => string.IsNullOrWhiteSpace(step.TempId)) ||
+            allocated.Select(step => step.TempId).Distinct(StringComparer.OrdinalIgnoreCase).Count() != allocated.Count)
+        {
+            throw new InvalidOperationException("operator_pipeline_duplicate_temp_id");
+        }
+
+        return allocated;
+    }
+
+    private static string PreferredTempId(string operatorType, int typeOrdinal)
+    {
+        var firstId = operatorType switch
         {
             "ImageAcquisition" => "op_cam",
             "RoiManager" => "op_roi",
@@ -182,13 +236,26 @@ public sealed class OperatorPipelineSelector
             "TemplateMatching" => "op_match",
             "BlobAnalysis" => "op_blob",
             "Thresholding" => "op_threshold",
-            "CircleMeasurement" => ordinal <= 2 ? "op_circle_a" : "op_circle_b",
+            "CircleMeasurement" => "op_circle_a",
             "Measurement" => "op_distance",
             "UnitConvert" => "op_calibration",
+            "Aggregator" => "op_aggregate",
             "DetectionSequenceJudge" => "op_sequence",
             "ResultJudgment" => "op_judge",
             "ResultOutput" => "op_out",
-            _ => $"op_{new string(operatorType.ToLowerInvariant().Where(char.IsLetterOrDigit).ToArray())}_{ordinal}"
+            _ => $"op_{new string(operatorType.ToLowerInvariant().Where(char.IsLetterOrDigit).ToArray())}"
         };
+
+        if (operatorType.Equals("CircleMeasurement", StringComparison.OrdinalIgnoreCase))
+        {
+            return typeOrdinal switch
+            {
+                1 => "op_circle_a",
+                2 => "op_circle_b",
+                _ => $"op_circle_{typeOrdinal}"
+            };
+        }
+
+        return typeOrdinal == 1 ? firstId : $"{firstId}_{typeOrdinal}";
     }
 }

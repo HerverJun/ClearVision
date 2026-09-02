@@ -69,8 +69,15 @@ public sealed class ResultJudgmentOperator : OperatorBase
         inputs ??= new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase);
         var actualValue = ResolveActualValue(inputs, fieldName);
 
-        if (TryParseDoubleInvariant(GetInputValue(inputs, "Confidence"), out var confidence)
-            && confidence < minConfidence)
+        var confidenceInput = GetInputValue(inputs, "Confidence");
+        if (minConfidence > 0 && !TryParseDoubleInvariant(confidenceInput, out var confidence))
+        {
+            var missingConfidenceOutput = CreateOutput(false, "MinConfidenceGate", "Confidence is missing or invalid", actualValue);
+            return Task.FromResult(OperatorExecutionOutput.Success(missingConfidenceOutput));
+        }
+
+        if (TryParseDoubleInvariant(confidenceInput, out var parsedConfidence) &&
+            parsedConfidence < minConfidence)
         {
             var lowConfidenceOutput = CreateOutput(false, "MinConfidenceGate", "Confidence below MinConfidence", actualValue);
             return Task.FromResult(OperatorExecutionOutput.Success(lowConfidenceOutput));
@@ -177,6 +184,11 @@ public sealed class ResultJudgmentOperator : OperatorBase
         double absTol,
         double relTol)
     {
+        if (actualValue == null)
+        {
+            return (false, "Actual value is missing.");
+        }
+
         var actualText = actualValue?.ToString() ?? string.Empty;
         var actualIsNumeric = TryParseDoubleInvariant(actualText, out var actualNum);
         var expectIsNumeric = TryParseDoubleInvariant(expectValue, out var expectNum);
@@ -186,6 +198,13 @@ public sealed class ResultJudgmentOperator : OperatorBase
         switch (condition.Trim().ToLowerInvariant())
         {
             case "equal":
+                if (TryParseBoolean(actualValue, out var actualBooleanEqual) &&
+                    TryParseBoolean(expectValue, out var expectedBooleanEqual))
+                {
+                    var ok = actualBooleanEqual == expectedBooleanEqual;
+                    return (ok, $"{actualBooleanEqual} == {expectedBooleanEqual} => {ok}");
+                }
+
                 if (actualIsNumeric && expectIsNumeric)
                 {
                     var ok = NearlyEqual(actualNum, expectNum, absTol, relTol);
@@ -194,6 +213,13 @@ public sealed class ResultJudgmentOperator : OperatorBase
 
                 return (string.Equals(actualText, expectValue, StringComparison.Ordinal), $"{actualText} == {expectValue}");
             case "notequal":
+                if (TryParseBoolean(actualValue, out var actualBooleanNotEqual) &&
+                    TryParseBoolean(expectValue, out var expectedBooleanNotEqual))
+                {
+                    var ok = actualBooleanNotEqual != expectedBooleanNotEqual;
+                    return (ok, $"{actualBooleanNotEqual} != {expectedBooleanNotEqual} => {ok}");
+                }
+
                 if (actualIsNumeric && expectIsNumeric)
                 {
                     var ok = !NearlyEqual(actualNum, expectNum, absTol, relTol);
@@ -264,5 +290,44 @@ public sealed class ResultJudgmentOperator : OperatorBase
                     CultureInfo.InvariantCulture,
                     out value);
         }
+    }
+
+    private static bool TryParseBoolean(object? raw, out bool value)
+    {
+        switch (raw)
+        {
+            case bool boolean:
+                value = boolean;
+                return true;
+            case byte number when number is 0 or 1:
+                value = number == 1;
+                return true;
+            case int number when number is 0 or 1:
+                value = number == 1;
+                return true;
+        }
+
+        var text = raw?.ToString()?.Trim();
+        if (bool.TryParse(text, out value))
+        {
+            return true;
+        }
+
+        if (string.Equals(text, "1", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(text, "yes", StringComparison.OrdinalIgnoreCase))
+        {
+            value = true;
+            return true;
+        }
+
+        if (string.Equals(text, "0", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(text, "no", StringComparison.OrdinalIgnoreCase))
+        {
+            value = false;
+            return true;
+        }
+
+        value = false;
+        return false;
     }
 }

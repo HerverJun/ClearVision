@@ -281,11 +281,11 @@ public class WireSequenceScenarioPackageTests
 
     private static string ResolveScenarioPackageRoot(string repoRoot)
     {
-        var packageRoot = EnumerateDirectoriesSafe(repoRoot, "scenario-package-wire-sequence")
-            .SingleOrDefault();
+        var packageRoot = Path.Combine(repoRoot, "线序检测", "scenario-package-wire-sequence");
 
-        packageRoot.Should().NotBeNullOrWhiteSpace();
-        return packageRoot!;
+        Directory.Exists(packageRoot).Should().BeTrue(
+            "the tests must read the tracked canonical package, not an ignored publish copy");
+        return packageRoot;
     }
 
     private static string ResolveRepoRoot()

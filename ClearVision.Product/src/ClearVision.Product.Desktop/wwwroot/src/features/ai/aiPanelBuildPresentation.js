@@ -141,6 +141,41 @@ function getDiagnosticSeverity(item) {
     return 'info';
 }
 
+function deriveFailureSummary(panel, ...sources) {
+    let raw = {};
+    for (const source of sources) {
+        const candidate = asObject(read(source, 'failureSummary', 'FailureSummary'));
+        if (Object.keys(candidate).length > 0) {
+            raw = candidate;
+            break;
+        }
+    }
+
+    if (Object.keys(raw).length === 0) return {
+        available: false,
+        category: '',
+        code: '',
+        message: '',
+        repairTarget: '',
+        secondaryDiagnosticCodes: []
+    };
+
+    const secondaryDiagnosticCodes = toArray(read(
+        raw,
+        'secondaryDiagnosticCodes',
+        'SecondaryDiagnosticCodes'))
+        .map(code => sanitize(panel, code, 120))
+        .filter(Boolean);
+    return {
+        available: true,
+        category: sanitize(panel, read(raw, 'category', 'Category'), 120),
+        code: sanitize(panel, read(raw, 'code', 'Code'), 120),
+        message: sanitize(panel, read(raw, 'message', 'Message'), 260),
+        repairTarget: sanitize(panel, read(raw, 'repairTarget', 'RepairTarget'), 220),
+        secondaryDiagnosticCodes
+    };
+}
+
 function getDiagnosticScope(item, inheritedSource = '') {
     const candidates = [
         read(item, 'stage', 'Stage'),
@@ -367,8 +402,24 @@ function deriveActionItems(panel, context) {
         validation,
         gateBlocked,
         gateBlockers,
-        diff
+        diff,
+        failureSummary
     } = context;
+
+    if (failureSummary?.available) {
+        items.push({
+            key: 'failure',
+            priority: 'blocking',
+            title: failureSummary.code
+                ? `构建已阻断：${failureSummary.code}`
+                : '构建已被具体诊断阻断',
+            summary: failureSummary.message || failureSummary.code || '构建未通过。',
+            impact: failureSummary.repairTarget || '按主诊断修复后重新构建。',
+            status: '主诊断',
+            target: 'ai-build-validation-section',
+            action: '查看诊断'
+        });
+    }
 
     if (parameters.remainingToFill > 0 || parameters.awaitingConfirmation) {
         const firstGroup = parameters.groups[0];
@@ -659,6 +710,7 @@ export function deriveAiBuildPresentation(panel) {
     const gateBlocked = readBoolean(gate, 'blocked', 'Blocked') === true;
     const canvasReady = readBoolean(gate, 'canvasApplyReady', 'CanvasApplyReady') === true;
     const validation = deriveValidation(panel, sourceForPending, gate);
+    const failureSummary = deriveFailureSummary(panel, sourceForPending, currentResult, eventPayload, buildResult);
     const rawDiff = deriveDiff(getWorkflowDiff(buildResult, sourceForPending));
     const diff = {
         ...rawDiff,
@@ -692,7 +744,8 @@ export function deriveAiBuildPresentation(panel) {
         validation,
         gateBlocked,
         gateBlockers,
-        diff
+        diff,
+        failureSummary
     });
     const overall = deriveOverallState({
         workbenchState,
@@ -731,6 +784,7 @@ export function deriveAiBuildPresentation(panel) {
             blockers: gateBlockers
         },
         diff,
+        failureSummary,
         actionItems,
         inputSource,
         outputTarget,
@@ -1143,6 +1197,7 @@ export const aiPanelBuildPresentationTestApi = {
     deriveParameterState,
     getDiagnosticScope,
     flattenDiagnostics,
+    deriveFailureSummary,
     diagnosticScopeBySource: DIAGNOSTIC_SCOPE_BY_SOURCE,
     formatGateStatus,
     renderValidationSummary

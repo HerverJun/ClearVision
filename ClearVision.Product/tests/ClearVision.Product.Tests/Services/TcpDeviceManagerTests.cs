@@ -5,6 +5,7 @@ using System.Text;
 using ClearVision.Product.Core.Entities;
 using ClearVision.Product.Core.Interfaces;
 using ClearVision.Product.Infrastructure.Services;
+using ClearVision.Product.Tests.Runtime;
 using FluentAssertions;
 using Microsoft.Extensions.Logging;
 using NSubstitute;
@@ -12,6 +13,7 @@ using NSubstitute;
 namespace ClearVision.Product.Tests.Services;
 
 [TestClassification(TestDomain.General, TestPurpose.Regression, TestLane.Pr, TestEvidenceType.Contract, TestOracleType.Contract, TestResourceRequirement.None, TestExpectedDuration.Fast, TestFlakyPolicy.Blocking, "product", Suites = "ServicesRegression,ServicesCoverageSensitive")]
+[Collection(RuntimeConcurrencyCollection.Name)]
 public class TcpDeviceManagerTests
 {
     [Fact]

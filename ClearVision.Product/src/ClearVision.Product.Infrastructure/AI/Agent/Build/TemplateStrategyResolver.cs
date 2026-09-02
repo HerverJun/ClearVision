@@ -172,22 +172,10 @@ public sealed class TemplateStrategyResolver
 
     private static string NormalizeScenario(string? value)
     {
-        return VisionAgentBuildSupport.Clean(value).ToLowerInvariant() switch
-        {
-            "barcode_qr" => "code_recognition",
-            "code_recognition" => "code_recognition",
-            "geometry_measurement" => "measurement",
-            "measurement" => "measurement",
-            "template_matching" => "template_location",
-            "template_location" => "template_location",
-            "classification" => "attribute_classification",
-            "attribute_classification" => "attribute_classification",
-            "surface_or_pose_defect" => "surface_defect",
-            "surface_defect" => "surface_defect",
-            "wire_sequence" => "wire_sequence",
-            "presence_absence" => "presence_absence",
-            var other => other
-        };
+        var normalized = VisionAgentBuildSupport.Clean(value).ToLowerInvariant();
+        return AiVisionTaskCatalog.GetPlanIntent(normalized) is { Length: > 0 } intent
+            ? intent
+            : normalized;
     }
 
     private static bool IsTemplateNotFound(VisionAgentToolResult result)

@@ -83,13 +83,13 @@ public sealed class OperatorLibraryReadOnlyAuditTests
         artifacts.Report.ReviewEntries.Should().HaveCountGreaterOrEqualTo(15);
         artifacts.Summary.Review.ReviewedCount.Should().BeGreaterOrEqualTo(15);
         artifacts.Summary.Review.Categories.Should().HaveCountGreaterOrEqualTo(6);
-        artifacts.Summary.Review.StaticDifferenceCount.Should().Be(10);
-        artifacts.Summary.Review.ResolvedDifferenceCount.Should().Be(5);
+        artifacts.Summary.Review.StaticDifferenceCount.Should().Be(4);
+        artifacts.Summary.Review.ResolvedDifferenceCount.Should().Be(11);
         artifacts.Summary.Review.ProductionReachableCount.Should().Be(11);
-        artifacts.Summary.Review.FixedProductionDefectCount.Should().Be(5);
-        artifacts.Summary.Review.OpenProductionDefectCount.Should().Be(1);
-        artifacts.Summary.Review.CandidateCount.Should().Be(2);
-        artifacts.Summary.Review.IntentionalDifferenceCount.Should().Be(6);
+        artifacts.Summary.Review.FixedProductionDefectCount.Should().Be(6);
+        artifacts.Summary.Review.OpenProductionDefectCount.Should().Be(0);
+        artifacts.Summary.Review.CandidateCount.Should().Be(0);
+        artifacts.Summary.Review.IntentionalDifferenceCount.Should().Be(3);
         artifacts.Summary.Review.AuditFalsePositiveCount.Should().Be(1);
         artifacts.Report.ReviewEntries.Should().OnlyContain(entry =>
             !string.IsNullOrWhiteSpace(entry.StaticDifferenceStatus) &&
@@ -107,10 +107,10 @@ public sealed class OperatorLibraryReadOnlyAuditTests
         artifacts.Json.Should().NotContain("generatedAtUtc");
         artifacts.Json.Should().NotContain("generatedAt");
         artifacts.Markdown.Should().Contain("| Static confirmed findings |");
-        artifacts.Markdown.Should().Contain("| Accepted intentional differences | 6 |");
-        artifacts.Markdown.Should().Contain("| Open production defects | 1 |");
+        artifacts.Markdown.Should().Contain("| Accepted intentional differences | 3 |");
+        artifacts.Markdown.Should().Contain("| Open production defects | 0 |");
         artifacts.Markdown.Should().Contain("| New confirmed gate | pass (0) |");
-        artifacts.Markdown.Should().Contain("- Open production defects: 1");
+        artifacts.Markdown.Should().Contain("- Open production defects: 0");
         artifacts.Summary.SchemaValid.Should().BeTrue();
     }
 

@@ -739,18 +739,19 @@ public sealed class WorkflowArtifactAdmissionGate : IWorkflowArtifactAdmissionGa
                 scan.Repairs);
         }
 
-        var routeDiagnostics = AssessRoute(admitted, context);
-        if (routeDiagnostics.Count > 0)
+        var routeInspection = AssessRoute(admitted, context);
+        if (routeInspection.Diagnostics.Count > 0)
         {
-            var previewOnly = IsSafeScaffold(admitted, routeDiagnostics);
+            var previewOnly = IsSafeScaffold(admitted, routeInspection.Diagnostics);
             return Quarantine(
                 source,
                 original,
                 originalHash,
-                routeDiagnostics,
+                routeInspection.Diagnostics,
                 scan.Repairs,
                 previewOnly ? admitted : null,
-                previewOnly);
+                previewOnly,
+                routeInspection.Evidence);
         }
 
         var admittedJson = JsonSerializer.Serialize(admitted, JsonOptions);
@@ -768,7 +769,8 @@ public sealed class WorkflowArtifactAdmissionGate : IWorkflowArtifactAdmissionGa
             canExport: true,
             canSyncStation: true,
             diagnostics: [],
-            repairs: scan.Repairs);
+            repairs: scan.Repairs,
+            routeEvidence: routeInspection.Evidence);
         PreserveIfNeeded(source, original, report);
         return new WorkflowArtifactAdmissionResult
         {
@@ -844,7 +846,8 @@ public sealed class WorkflowArtifactAdmissionGate : IWorkflowArtifactAdmissionGa
         IReadOnlyList<WorkflowArtifactDiagnostic> diagnostics,
         IReadOnlyList<WorkflowArtifactRepair> repairs,
         OperatorFlowDto? previewFlow = null,
-        bool previewOnly = false)
+        bool previewOnly = false,
+        WorkflowArtifactRouteEvidence? routeEvidence = null)
     {
         var report = BuildReport(
             source,
@@ -857,7 +860,8 @@ public sealed class WorkflowArtifactAdmissionGate : IWorkflowArtifactAdmissionGa
             canSyncStation: false,
             diagnostics,
             repairs,
-            previewOnly);
+            previewOnly,
+            routeEvidence);
         PreserveIfNeeded(source, original, report);
         return new WorkflowArtifactAdmissionResult
         {
@@ -900,7 +904,7 @@ public sealed class WorkflowArtifactAdmissionGate : IWorkflowArtifactAdmissionGa
         });
     }
 
-    private IReadOnlyList<WorkflowArtifactDiagnostic> AssessRoute(
+    private RouteInspection AssessRoute(
         OperatorFlowDto flow,
         WorkflowArtifactAdmissionContext? context)
     {
@@ -921,7 +925,7 @@ public sealed class WorkflowArtifactAdmissionGate : IWorkflowArtifactAdmissionGa
                                           "artifactFingerprint")));
         if (!hasArtifactEvidence)
         {
-            return [];
+            return new RouteInspection([], null);
         }
 
         var diagnostics = new List<WorkflowArtifactDiagnostic>();
@@ -1015,11 +1019,22 @@ public sealed class WorkflowArtifactAdmissionGate : IWorkflowArtifactAdmissionGa
             diagnostics.Add(new(
                 "unsupported_task_route_contract",
                 "AI workflow artifact does not carry a verifiable task route contract."));
-            return diagnostics;
+            return new RouteInspection(
+                diagnostics,
+                new WorkflowArtifactRouteEvidence
+                {
+                    ContractVersion = VisionAgentPlanContractVersions.V2,
+                    Supported = false,
+                    Satisfied = false,
+                    Evidence = ["task_type_missing"]
+                });
         }
 
         var graph = BuildRouteGraph(flow);
-        var assessment = _routeContracts.Assess(taskType, graph);
+        var requiredResults = ReadConsistentMetadataValue(flow, "agentRouteRequiredResults")
+            .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .ToList();
+        var assessment = _routeContracts.Assess(taskType, graph, requiredResults);
         if (!assessment.Supported || !assessment.Satisfied)
         {
             foreach (var reason in assessment.BlockingReasons.DefaultIfEmpty("route_semantics_blocked"))
@@ -1030,8 +1045,25 @@ public sealed class WorkflowArtifactAdmissionGate : IWorkflowArtifactAdmissionGa
             }
         }
 
-        return diagnostics;
+        return new RouteInspection(diagnostics, ToRouteEvidence(assessment));
     }
+
+    private static WorkflowArtifactRouteEvidence ToRouteEvidence(VisionTaskRouteAssessment assessment) => new()
+    {
+        TaskType = assessment.TaskType,
+        ContractVersion = assessment.ContractVersion,
+        Supported = assessment.Supported,
+        Satisfied = assessment.Satisfied,
+        RequiredCapabilities = assessment.RequiredCapabilities.ToList(),
+        MatchedCapabilities = assessment.MatchedCapabilities.ToList(),
+        MissingCapabilities = assessment.MissingCapabilities.ToList(),
+        RequiredResultSemantics = assessment.RequiredResultSemantics.ToList(),
+        ReachableResultSemantics = assessment.ReachableResultSemantics.ToList(),
+        MissingResultSemantics = assessment.MissingResultSemantics.ToList(),
+        LegalTerminals = assessment.LegalTerminals.ToList(),
+        ReachedTerminals = assessment.ReachedTerminals.ToList(),
+        Evidence = assessment.Evidence.ToList()
+    };
 
     private static CanonicalWorkflowGraph BuildRouteGraph(OperatorFlowDto flow)
     {
@@ -1143,8 +1175,25 @@ public sealed class WorkflowArtifactAdmissionGate : IWorkflowArtifactAdmissionGa
         bool canSyncStation,
         IReadOnlyList<WorkflowArtifactDiagnostic> diagnostics,
         IReadOnlyList<WorkflowArtifactRepair> repairs,
-        bool previewOnly = false) =>
-        new()
+        bool previewOnly = false,
+        WorkflowArtifactRouteEvidence? routeEvidence = null)
+    {
+        var orderedDiagnostics = diagnostics
+            .Select((diagnostic, index) => new
+            {
+                Diagnostic = diagnostic,
+                Index = index,
+                Priority = DiagnosticPriority(diagnostic.Code)
+            })
+            .OrderBy(item => item.Priority)
+            .ThenBy(item => item.Index)
+            .ToList();
+        var primary = orderedDiagnostics.FirstOrDefault();
+        List<WorkflowArtifactDiagnostic> secondary = primary == null
+            ? []
+            : diagnostics.Where((_, index) => index != primary.Index).ToList();
+
+        return new WorkflowQuarantineReport
         {
             ReportId = $"artifact_{Guid.NewGuid():N}",
             Source = source ?? string.Empty,
@@ -1157,8 +1206,39 @@ public sealed class WorkflowArtifactAdmissionGate : IWorkflowArtifactAdmissionGa
             CanSyncStation = canSyncStation,
             PreviewOnly = previewOnly,
             Diagnostics = diagnostics.ToList(),
-            Repairs = repairs.ToList()
+            PrimaryDiagnostic = primary?.Diagnostic,
+            SecondaryDiagnostics = secondary,
+            Repairs = repairs.ToList(),
+            RouteEvidence = routeEvidence
         };
+    }
+
+    private static int DiagnosticPriority(string? code)
+    {
+        var value = (code ?? string.Empty).Trim();
+        if (value.Equals("route_semantics_not_satisfied", StringComparison.OrdinalIgnoreCase)) return 1000;
+        if (value.Equals("route_graph_unverified", StringComparison.OrdinalIgnoreCase)) return 900;
+        if (value.Equals("minimum_scaffold_task_incomplete", StringComparison.OrdinalIgnoreCase)) return 800;
+        if (value.Equals("unsupported_task_route_contract", StringComparison.OrdinalIgnoreCase)) return 700;
+        if (value.StartsWith("route_required_result_unreachable_", StringComparison.OrdinalIgnoreCase) ||
+            value.Equals("route_task_processor_not_on_result_path", StringComparison.OrdinalIgnoreCase) ||
+            value.Equals("route_missing_task_processor", StringComparison.OrdinalIgnoreCase) ||
+            value.Equals("route_missing_judgment", StringComparison.OrdinalIgnoreCase) ||
+            value.Equals("route_missing_result_output", StringComparison.OrdinalIgnoreCase) ||
+            value.Equals("route_result_not_reachable_from_source", StringComparison.OrdinalIgnoreCase) ||
+            value.Equals("route_judgment_not_on_result_path", StringComparison.OrdinalIgnoreCase) ||
+            value.Equals("route_required_input_unbound", StringComparison.OrdinalIgnoreCase))
+        {
+            return 100;
+        }
+
+        if (value.StartsWith("route_", StringComparison.OrdinalIgnoreCase)) return 300;
+        return 0;
+    }
+
+    private sealed record RouteInspection(
+        IReadOnlyList<WorkflowArtifactDiagnostic> Diagnostics,
+        WorkflowArtifactRouteEvidence? Evidence);
 
     private static string ComputeHash(string value)
     {

@@ -180,13 +180,9 @@ public sealed class VisionAgentPlanRequirementOverlay
 
     private static string NormalizeTaskType(string? taskType)
     {
-        return Clean(taskType).ToLowerInvariant() switch
-        {
-            "" => string.Empty,
-            AiVisionTaskTypes.Unknown => string.Empty,
-            AiVisionTaskTypes.AbstractGoal => string.Empty,
-            var value => value
-        };
+        return AiVisionTaskCatalog.TryNormalizePrimary(taskType, out var canonical)
+            ? canonical
+            : string.Empty;
     }
 
     private static string FirstNonEmpty(params string?[] values)

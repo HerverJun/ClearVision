@@ -462,8 +462,10 @@ public class FlowExecutionServiceIntegrationTests
         // Arrange - 采集 -> 边缘检测 -> 结果输出
         var flow = new OperatorFlow();
         var acquisitionOp = CreateOperatorWithPorts("图像采集", OperatorType.ImageAcquisition, 0, 0);
-        var cannyOp = CreateOperatorWithPorts("边缘检测", OperatorType.EdgeDetection, 100, 100);
-        var outputOp = CreateOperatorWithPorts("结果输出", OperatorType.ResultOutput, 200, 100);
+        var cannyOp = CreateOperatorWithPorts(
+            "边缘检测", OperatorType.EdgeDetection, 100, 100, outputPortName: "Edges");
+        var outputOp = CreateOperatorWithPorts(
+            "结果输出", OperatorType.ResultOutput, 200, 100, inputPortName: "Edges");
 
         flow.AddOperator(acquisitionOp);
         flow.AddOperator(cannyOp);
@@ -489,8 +491,10 @@ public class FlowExecutionServiceIntegrationTests
         // Arrange - 采集 -> ROI管理 -> 结果输出
         var flow = new OperatorFlow();
         var acquisitionOp = CreateOperatorWithPorts("图像采集", OperatorType.ImageAcquisition, 0, 0);
-        var roiOp = CreateOperatorWithPorts("ROI管理", OperatorType.RoiManager, 100, 100);
-        var outputOp = CreateOperatorWithPorts("结果输出", OperatorType.ResultOutput, 200, 100);
+        var roiOp = CreateOperatorWithPorts(
+            "ROI管理", OperatorType.RoiManager, 100, 100, outputPortName: "Mask");
+        var outputOp = CreateOperatorWithPorts(
+            "结果输出", OperatorType.ResultOutput, 200, 100, inputPortName: "Mask");
 
         roiOp.AddParameter(new Parameter(Guid.NewGuid(), "Shape", "形状", "", "string", "Rectangle", null, null, true));
         roiOp.AddParameter(new Parameter(Guid.NewGuid(), "Operation", "操作", "", "string", "Crop", null, null, true));
@@ -596,17 +600,23 @@ public class FlowExecutionServiceIntegrationTests
         return flow;
     }
 
-    private static Operator CreateOperatorWithPorts(string name, OperatorType type, int x, int y)
+    private static Operator CreateOperatorWithPorts(
+        string name,
+        OperatorType type,
+        int x,
+        int y,
+        string inputPortName = "Image",
+        string outputPortName = "Image")
     {
         var op = new Operator(name, type, x, y);
 
         // 添加默认端口
         if (type != OperatorType.ImageAcquisition)
         {
-            op.AddInputPort("Input", PortDataType.Image, true);
+            op.AddInputPort(inputPortName, PortDataType.Image, true);
         }
 
-        op.AddOutputPort("Output", PortDataType.Image);
+        op.AddOutputPort(outputPortName, PortDataType.Image);
 
         return op;
     }
@@ -618,7 +628,7 @@ public class FlowExecutionServiceIntegrationTests
 
         if (targetPort == null)
         {
-            target.AddInputPort("Input", PortDataType.Image, true);
+            target.AddInputPort("Image", PortDataType.Image, true);
             targetPort = target.InputPorts.First();
         }
 

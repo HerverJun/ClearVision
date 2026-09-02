@@ -671,7 +671,9 @@ public static class VisionAgentPlanFieldPolicy
 
     private static string InferLegacyAnswerEffect(string? value)
     {
-        return IsPlaceholderValue(value)
+        var normalized = Clean(value).ToLowerInvariant();
+        return IsPlaceholderValue(value) ||
+               normalized is "general_inspection" or "custom_task"
             ? VisionAgentClarificationAnswerEffects.Defer
             : VisionAgentClarificationAnswerEffects.ResolveField;
     }
@@ -699,5 +701,22 @@ public static class VisionAgentPlanFieldPolicy
                    VisionAgentPlanAnswerOrigins.ExplicitUserText or
                    VisionAgentPlanAnswerOrigins.AcceptedRecommendedDefault or
                    VisionAgentPlanAnswerOrigins.ResourceBound;
+    }
+
+    public static int AnswerOriginPriority(string? origin)
+    {
+        return Clean(origin).ToLowerInvariant() switch
+        {
+            VisionAgentPlanAnswerOrigins.ExplicitUserText or
+                VisionAgentPlanAnswerOrigins.ExplicitUserSelection or
+                "user_explicit" => 6,
+            VisionAgentPlanAnswerOrigins.ResourceBound => 5,
+            VisionAgentPlanAnswerOrigins.ModelInferred => 4,
+            VisionAgentPlanAnswerOrigins.AcceptedRecommendedDefault or "accepted_default" => 3,
+            VisionAgentPlanAnswerOrigins.RuleInferred or
+                VisionAgentPlanAnswerOrigins.LegacyInferred => 2,
+            VisionAgentPlanAnswerOrigins.DefaultAssumption => 1,
+            _ => 0
+        };
     }
 }

@@ -113,8 +113,10 @@ public sealed class VisionAgentBuildOrchestratorTests
             .Should()
             .Contain(["ImageAcquisition", "SurfaceDefectDetection", "ResultJudgment", "ResultOutput"]);
         build.MissingResources.Should().Contain(item =>
-            item.ResourceType == "camera_binding" &&
-            item.ResourceKey == "op_cam.CameraId");
+            item.ResourceType == "image_source" &&
+            item.ResourceKey == "op_cam.SourceType");
+        build.MissingResources.Should().NotContain(item =>
+            item.ResourceType == "camera_binding" || item.ResourceType == "image_file");
         build.ApplyGate.CanvasApplyReady.Should().BeTrue();
         build.ApplyGate.DeploymentReady.Should().BeFalse();
     }
@@ -244,8 +246,8 @@ public sealed class VisionAgentBuildOrchestratorTests
         draft.BuildReadiness.RemainingFields.Should().Contain(VisionAgentPlanAnswerFields.AcceptanceCriteria);
         draft.BuildReadiness.Blockers.Should().ContainSingle(blocker =>
             blocker.Resource != null &&
-            blocker.Resource.ResourceType == "camera_binding" &&
-            blocker.Resource.ResourceKey == "imageacquisition#1.CameraBindingId" &&
+            blocker.Resource.ResourceType == "image_source" &&
+            blocker.Resource.ResourceKey == "imageacquisition#1.SourceType" &&
             blocker.Category == VisionAgentBuildBlockerCategories.ResourcePending &&
             blocker.BlocksBuild == false);
         draft.BuildBlockingConfirmationCount.Should().Be(0);
@@ -285,8 +287,8 @@ public sealed class VisionAgentBuildOrchestratorTests
         outcome.Result.BuildResult.PublicWarnings.Should().Contain("safe_scaffold_requires_user_review");
     }
 
-    [Fact(DisplayName = "Build application should admit a Blob-based robot guidance route")]
-    public async Task BuildAsync_BlobRobotGuidance_ShouldPassRouteAdmission()
+    [Fact(DisplayName = "Build application should reject a Blob-only template guidance route under route v2")]
+    public async Task BuildAsync_BlobRobotGuidance_ShouldFailClosedUnderRouteV2()
     {
         var applicationService = CreateBuildApplicationService(new CapturingAgentRunEventSink());
         var plan = Plan(
@@ -301,11 +303,11 @@ public sealed class VisionAgentBuildOrchestratorTests
                 persistResult: false),
             CancellationToken.None);
 
-        outcome.Result.Success.Should().BeTrue();
-        outcome.Result.Flow.Should().NotBeNull();
+        outcome.Result.Success.Should().BeFalse();
+        outcome.Result.Flow.Should().BeNull();
         outcome.Result.BuildResult.Should().NotBeNull();
-        outcome.Result.BuildResult!.RouteSemanticsSatisfied.Should().BeTrue();
-        outcome.Result.BuildResult.ApplyGate.ApplyBlockers.Should().NotContain("route_missing_task_processor");
+        outcome.Result.BuildResult!.RouteSemanticsSatisfied.Should().BeFalse();
+        outcome.Result.BuildResult.ApplyGate.ApplyBlockers.Should().Contain("route_missing_task_processor");
     }
 
     [Fact(DisplayName = "BuildFromPlan strawberry draft should append a safe terminal output and round-trip the canvas flow")]
@@ -352,16 +354,16 @@ public sealed class VisionAgentBuildOrchestratorTests
             "ImageAcquisition",
             "ColorConversion",
             "RoiManager",
-            "Thresholding",
-            "BlobAnalysis",
+            "DeepLearning",
+            "ResultJudgment",
             "ResultOutput"
         ]);
         build.EffectiveOperators.Should().Equal(finalOperators);
-        build.OperatorPipeline.Should().ContainSingle(step =>
-            step.OperatorType == "ResultOutput" &&
-            step.Source == "repair" &&
-            step.RepairNote == "draft_terminal_output_added");
+        build.OperatorPipeline.Where(step => step.Source == "repair")
+            .Should().Contain(step => step.OperatorType == "ResultJudgment" && step.RepairNote == "draft_result_chain_added")
+            .And.Contain(step => step.OperatorType == "ResultOutput" && step.RepairNote == "draft_result_chain_added");
         build.PublicWarnings.Should().Contain("draft_terminal_output_added");
+        build.PublicWarnings.Should().Contain("draft_result_judgment_added");
 
         var normalized = VisionAgentFlowDraftNormalizer.Normalize(
             JsonSerializer.SerializeToElement(new { flow = build.WorkflowDraft }),
@@ -405,9 +407,8 @@ public sealed class VisionAgentBuildOrchestratorTests
         build.ApplyGate.CanvasApplyReady.Should().BeTrue();
         build.ApplyGate.DeploymentReady.Should().BeFalse();
         build.MissingResources.Select(resource => resource.ResourceType).Should().BeEquivalentTo([
-            "camera_binding",
-            "threshold_parameter",
-            "area_range_parameter"
+            "image_source",
+            "model_resource"
         ]);
         var runAllowed = build.ApplyGate.RuntimeDraftReady && build.MissingResources.Count == 0;
         runAllowed.Should().BeFalse();
@@ -1009,7 +1010,7 @@ public sealed class VisionAgentBuildOrchestratorTests
                 confirmedAnswers:
                 [
                     PlanAnswer(string.Empty, VisionAgentPlanAnswerFields.InspectionObject, "logo area", VisionAgentPlanAnswerOrigins.ExplicitUserText),
-                    PlanAnswer(string.Empty, VisionAgentPlanAnswerFields.TaskType, AiVisionTaskTypes.SurfaceDefect, VisionAgentPlanAnswerOrigins.ExplicitUserText),
+                    PlanAnswer(string.Empty, VisionAgentPlanAnswerFields.TaskType, AiVisionTaskTypes.SurfaceDefect, VisionAgentPlanAnswerOrigins.ExplicitUserSelection),
                     PlanAnswer(string.Empty, VisionAgentPlanAnswerFields.ImageSource, "camera", VisionAgentPlanAnswerOrigins.ExplicitUserText),
                     PlanAnswer(string.Empty, VisionAgentPlanAnswerFields.AcceptanceCriteria, "scratch is NG", VisionAgentPlanAnswerOrigins.ExplicitUserText)
                 ],
@@ -1623,7 +1624,7 @@ public sealed class VisionAgentBuildOrchestratorTests
             item.ResourceKey == "op_detect.ModelPath");
     }
 
-    [Fact(DisplayName = "Build orchestrator should let user strategy override Planner attribute classification route")]
+    [Fact(DisplayName = "Build orchestrator should preserve user traditional strategy but fail closed when it lacks classification semantics")]
     public async Task BuildAsync_UserTraditionalRuleSelection_ShouldOverridePlannerDeepLearningRoute()
     {
         var sink = new CapturingAgentRunEventSink();
@@ -1684,11 +1685,49 @@ public sealed class VisionAgentBuildOrchestratorTests
         build.MissingResources.Should().Contain(item =>
             item.ResourceType == "area_range_parameter" &&
             item.ResourceKey == "op_blob.MinArea");
-        build.ApplyGate.CanvasApplyReady.Should().BeTrue();
+        build.ApplyGate.CanvasApplyReady.Should().BeFalse();
+        build.ApplyGate.ApplyBlockers.Should().Contain("route_missing_task_processor");
         build.ApplyGate.DeploymentReady.Should().BeFalse();
         build.ToolEvidenceTimeline.Should().Contain(item =>
             item.Stage == "plan_selection" &&
             item.ToolName == "plan_selection_resolver");
+    }
+
+    [Fact(DisplayName = "Build application should publish the specific admission reason before the generic route summary")]
+    public async Task BuildApplication_AdmissionFailure_ShouldUsePrimaryAndPreserveSecondaryDiagnostics()
+    {
+        var sink = new CapturingAgentRunEventSink();
+        var applicationService = CreateBuildApplicationService(sink);
+        var plan = PlanWithStrategyConfirmationBlocker();
+
+        var result = (await applicationService.BuildAsync(
+            BuildCommand.FromGenerationRequest(
+                Request(
+                    plan,
+                    userSelections: new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+                    {
+                        ["classification_ok_label"] = "expected class"
+                    },
+                    confirmedAnswers:
+                    [
+                        PlanAnswer(
+                            "model_or_rule_strategy",
+                            VisionAgentPlanAnswerFields.AlgorithmStrategy,
+                            "traditional_rule")
+                    ],
+                    acceptedRecommendedDefaults: false,
+                    requirementMode: AiRequirementModes.Draft),
+                transport: BuildCommandTransports.Internal,
+                persistResult: false),
+            CancellationToken.None)).Result;
+
+        result.Success.Should().BeFalse();
+        result.FailureSummary.Should().NotBeNull();
+        result.FailureSummary!.Category.Should().Be("workflow_artifact_admission");
+        result.FailureSummary.Code.Should().Be("route_missing_task_processor");
+        result.FailureSummary.Message.Should().Contain("route_missing_task_processor");
+        result.FailureSummary.SecondaryDiagnosticCodes.Should().Contain("route_semantics_not_satisfied");
+        result.BuildResult!.ApplyGate.ApplyBlockers.Should().Contain("route_missing_task_processor");
     }
 
     [Theory(DisplayName = "Confirmed task_type should drive attribute classification strategy routes")]
@@ -1719,7 +1758,7 @@ public sealed class VisionAgentBuildOrchestratorTests
                         string.Empty,
                         VisionAgentPlanAnswerFields.TaskType,
                         AiVisionTaskTypes.AttributeClassification,
-                        VisionAgentPlanAnswerOrigins.ExplicitUserText),
+                        VisionAgentPlanAnswerOrigins.ExplicitUserSelection),
                     PlanAnswer(
                         string.Empty,
                         VisionAgentPlanAnswerFields.TargetAttribute,
@@ -1767,7 +1806,7 @@ public sealed class VisionAgentBuildOrchestratorTests
         var orchestrator = CreateOrchestrator(sink);
         var plan = Plan(
             "measurement",
-            ["ImageAcquisition", "CircleMeasurement", "MeasureDistance", "UnitConvert", "ResultJudgment", "ResultOutput"],
+            ["ImageAcquisition", "CircleMeasurement", "MeasureDistance", "UnitConvert", "Aggregator", "ResultJudgment", "ResultOutput"],
             "hole distance measurement workflow");
 
         var result = await orchestrator.BuildAsync(
@@ -1786,7 +1825,7 @@ public sealed class VisionAgentBuildOrchestratorTests
         build.ParameterStrategy.Should().BeEmpty();
         build.OperatorPipeline.Select(item => item.OperatorType)
             .Should()
-            .Contain(["Measurement", "UnitConvert", "ResultJudgment", "ResultOutput"])
+            .Contain(["Measurement", "UnitConvert", "Aggregator", "ResultJudgment", "ResultOutput"])
             .And
             .NotContain(["Thresholding", "BlobAnalysis", "DeepLearning"]);
     }
@@ -1798,7 +1837,7 @@ public sealed class VisionAgentBuildOrchestratorTests
         var orchestrator = CreateOrchestrator(sink);
         var plan = Plan(
             "measurement",
-            ["ImageAcquisition", "CircleMeasurement", "CircleMeasurement", "MeasureDistance", "UnitConvert", "ResultJudgment", "ResultOutput"],
+            ["ImageAcquisition", "CircleMeasurement", "CircleMeasurement", "MeasureDistance", "UnitConvert", "Aggregator", "ResultJudgment", "ResultOutput"],
             "hole center distance measurement workflow");
 
         var result = await orchestrator.BuildAsync(
@@ -1808,7 +1847,7 @@ public sealed class VisionAgentBuildOrchestratorTests
         result.Success.Should().BeTrue();
         result.BuildResult!.OperatorPipeline.Select(item => item.OperatorType)
             .Should()
-            .Contain(["ImageAcquisition", "CircleMeasurement", "Measurement", "UnitConvert", "ResultJudgment", "ResultOutput"]);
+            .Contain(["ImageAcquisition", "CircleMeasurement", "Measurement", "UnitConvert", "Aggregator", "ResultJudgment", "ResultOutput"]);
         result.BuildResult.ParameterMapping.Should().Contain(item =>
             item.OperatorType == "UnitConvert" &&
             item.ParameterName == "Scale" &&
@@ -1945,6 +1984,9 @@ public sealed class VisionAgentBuildOrchestratorTests
         sink.Events.Should().Contain(evt =>
             evt.Stage == "plan_hash_validation" &&
             evt.Summary.Contains("复核计划来源", StringComparison.OrdinalIgnoreCase));
+        sink.Events.Should().NotContain(evt =>
+            evt.Stage == "plan_hash_validation" &&
+            evt.Summary.Contains("构建会继续", StringComparison.OrdinalIgnoreCase));
     }
 
     [Fact(DisplayName = "Black-box template positioning Build should use template skeleton instead of surface defect route")]
@@ -1986,7 +2028,7 @@ public sealed class VisionAgentBuildOrchestratorTests
             CreateTemplateNotFoundRegistry("missing_optional_template"));
         var plan = Plan(
             "surface_defect",
-            ["ImageAcquisition", "SurfaceDefectDetection", "ResultOutput"],
+            ["ImageAcquisition", "SurfaceDefectDetection", "ResultJudgment", "ResultOutput"],
             "metal scratch inspection with optional catalog template");
 
         var result = await orchestrator.BuildAsync(Request(plan), CancellationToken.None);
@@ -2721,7 +2763,7 @@ public sealed class VisionAgentBuildOrchestratorTests
     {
         var baseline = Plan(
             AiVisionTaskTypes.AttributeClassification,
-            ["ImageAcquisition", "ColorConversion", "RoiManager", "Thresholding", "BlobAnalysis"],
+            ["ImageAcquisition", "ColorConversion", "RoiManager", "DeepLearning"],
             "构建一个检测果园中草莓成熟度的视觉检测应用。");
         var plan = baseline with
         {
@@ -2734,7 +2776,7 @@ public sealed class VisionAgentBuildOrchestratorTests
             RecommendedRoute = baseline.RecommendedRoute with
             {
                 RouteId = "strawberry_maturity_attribute_classification",
-                Operators = ["imageacquisition", "colorconversion", "roimanager", "thresholding", "blobanalysis"],
+                Operators = ["imageacquisition", "colorconversion", "roimanager", "deeplearning"],
                 TemplateDecision = "planner_route"
             },
             ClarificationQuestions =
