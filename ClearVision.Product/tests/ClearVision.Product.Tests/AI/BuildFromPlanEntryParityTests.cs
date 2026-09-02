@@ -707,6 +707,69 @@ public sealed class BuildFromPlanEntryParityTests : IDisposable
     }
 
     [Fact]
+    public async Task StartupRecovery_TerminalPlanWithDeletedSession_ShouldSkipWorkspaceProjection()
+    {
+        using var harness = CreateHarness();
+        const string sessionId = "session-deleted-before-plan-recovery";
+        var plan = BuildPlan();
+        var run = CreateRun(harness, "deleted session plan recovery", new
+        {
+            sessionId,
+            generationMode = "plan",
+            metadataOnly = true
+        });
+        harness.Conversation.TryInitializeWorkspaceSnapshot(
+            TestOwnerHash,
+            sessionId,
+            new VisionAgentWorkspaceSnapshotUpdate
+            {
+                ClientMutationId = $"plan-start:{run.RunId}",
+                LifecycleState = "planning",
+                PlanRunId = run.RunId,
+                PlanRunStatus = AgentRunEventStatuses.Running,
+                RequirementMode = AiRequirementModes.Strict
+            }).Success.Should().BeTrue();
+        harness.Stream.Append(run.RunId, new AgentRunEventDraft
+        {
+            EventType = AgentRunEventTypes.PlanCompleted,
+            Stage = "plan_ready",
+            Title = "Plan ready",
+            Summary = "Plan completed before its conversation was deleted.",
+            Status = AgentRunEventStatuses.Completed,
+            Payload = new
+            {
+                status = "plan_completed",
+                generationMode = "plan",
+                sessionId,
+                planRunId = run.RunId,
+                planResult = plan,
+                planModeResult = plan,
+                metadataOnly = true
+            }
+        }).Should().NotBeNull();
+        harness.Stream.Complete(run.RunId, "terminal before conversation deletion", new
+        {
+            sessionId,
+            planRunId = run.RunId,
+            metadataOnly = true
+        }).Should().NotBeNull();
+        harness.Conversation.DeleteSessionWithResult(TestOwnerHash, sessionId).Status
+            .Should().Be(ConversationSessionDeleteStatus.Deleted);
+        var eventCount = harness.Stream.ReplayRaw(run.RunId)!.Events.Count;
+        var recovery = new VisionAgentRunRecoveryReconciliationService(
+            harness.Store,
+            new AgentRunEventStreamService(harness.Store, harness.Redactor),
+            harness.Conversation,
+            Substitute.For<Microsoft.Extensions.Logging.ILogger<VisionAgentRunRecoveryReconciliationService>>());
+
+        var act = () => recovery.ReconcileAsync(CancellationToken.None);
+
+        await act.Should().NotThrowAsync();
+        harness.Conversation.GetSession(TestOwnerHash, sessionId).Should().BeNull();
+        harness.Stream.ReplayRaw(run.RunId)!.Events.Should().HaveCount(eventCount);
+    }
+
+    [Fact]
     public async Task StartupRecovery_CrossOwnerSessionReference_ShouldNotMutateForeignWorkspace()
     {
         using var harness = CreateHarness();

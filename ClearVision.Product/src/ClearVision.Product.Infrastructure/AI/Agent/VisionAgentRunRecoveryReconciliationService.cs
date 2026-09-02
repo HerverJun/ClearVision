@@ -250,14 +250,40 @@ public sealed class VisionAgentRunRecoveryReconciliationService : IHostedService
             CreatedAt = terminal.Timestamp,
             MetadataOnly = true
         };
-        var workspace = _conversationService.GetSessionForRecovery(sessionId)?.WorkspaceSnapshot;
+        var recoverySession = _conversationService.GetSessionForRecovery(sessionId);
+        if (recoverySession == null)
+        {
+            LogMissingRecoverySession(terminal.RunId, sessionId);
+            return;
+        }
+
+        if (!string.Equals(recoverySession.OwnerHash, replay.Summary.OwnerHash, StringComparison.Ordinal))
+        {
+            Microsoft.Extensions.Logging.LoggerExtensions.LogWarning(
+                _logger,
+                "Skipped AgentRun recovery with a mismatched conversation owner. RunId={RunId}, SessionId={SessionId}",
+                terminal.RunId,
+                sessionId);
+            return;
+        }
+
+        var workspace = recoverySession.WorkspaceSnapshot;
         var update = BuildPlanWorkspaceUpdate(terminal.RunId, terminalStatus, updateIntent, planEvent, workspace);
         if (update == null)
         {
             return;
         }
 
-        var projected = TryUpdateOwnedRecovery(sessionId, update);
+        var projected = _conversationService.TryUpdateWorkspaceSnapshotForRecovery(
+            replay.Summary.OwnerHash,
+            sessionId,
+            update);
+        if (string.Equals(projected.ErrorCode, "session_not_found", StringComparison.OrdinalIgnoreCase))
+        {
+            LogMissingRecoverySession(terminal.RunId, sessionId);
+            return;
+        }
+
         if (projected.Success)
         {
             ThrowIfPrimaryStoreFailed(projected, "plan terminal recovery", terminal.RunId, sessionId);
@@ -600,6 +626,15 @@ public sealed class VisionAgentRunRecoveryReconciliationService : IHostedService
             runType,
             status,
             conflictCode);
+    }
+
+    private void LogMissingRecoverySession(string runId, string sessionId)
+    {
+        Microsoft.Extensions.Logging.LoggerExtensions.LogWarning(
+            _logger,
+            "Skipped AgentRun workspace recovery because the conversation session no longer exists. RunId={RunId}, SessionId={SessionId}",
+            runId,
+            sessionId);
     }
 
     private static bool HasAppliedRecoveryConflict(
