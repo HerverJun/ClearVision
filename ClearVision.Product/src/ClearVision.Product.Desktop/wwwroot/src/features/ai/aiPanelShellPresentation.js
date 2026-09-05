@@ -1,3 +1,5 @@
+import { deriveAiBuildPresentation } from './aiPanelBuildPresentation.js';
+
 const AI_SHELL_PHASE_TEXT = Object.freeze({
     idle: '',
     routing: '正在判断请求类型',
@@ -101,11 +103,35 @@ function readStageLabel(projection, panel) {
     return AI_SHELL_PHASE_TEXT[clean(projection?.phase).toLowerCase()] || '';
 }
 
-function countReliableBlockers(projection) {
-    const queue = Array.isArray(projection?.clarificationQueue)
-        ? projection.clarificationQueue
-        : [];
-    return queue.filter(item => item?.blocksBuild === true && item?.answered !== true && item?.deferred !== true).length;
+function readTaskProgress(panel, state) {
+    const phase = clean(panel?._getAgentWorkspacePhase?.()).toLowerCase();
+    if (phase === 'build' || phase === 'applied') {
+        const build = deriveAiBuildPresentation(panel);
+        return {
+            blockerCount: build.blockerCount,
+            countText: build.blockerCount > 0 ? `待处理 ${build.blockerCount} 项` : '',
+            detail: build.overall.next,
+            phaseText: build.overall.label
+        };
+    }
+
+    const plan = panel?.pendingVisionPlan || state?.plan;
+    if (!plan) return { blockerCount: null, countText: '', detail: '' };
+    const previewStatus = state?.readinessStatus || 'idle';
+    const preview = panel?._getCurrentCanonicalPreview?.(plan);
+    if (panel?.workspaceRecoveryBlocked || !preview || !['ready', 'blocked'].includes(previewStatus)) {
+        return {
+            blockerCount: null,
+            countText: '',
+            detail: panel?._getPlanBuildActionState?.(plan)?.statusText || '等待校验构建条件'
+        };
+    }
+    const summary = panel?._buildPlanMissingSummary?.(plan);
+    return {
+        blockerCount: summary?.totalCount ?? null,
+        countText: summary?.totalCount > 0 ? `待补齐 ${summary.totalCount} 项` : '',
+        detail: summary?.summaryText || ''
+    };
 }
 
 function readNextStep(state, projection) {
@@ -125,13 +151,15 @@ export function deriveAiShellPresentation(panel) {
     const canonicalActive = hasCanonicalActivity(state, projection);
     const requestPending = hasPendingSubmittedRequest(panel);
     const restoreActive = runtime?.restoredContent === true;
+    const progress = readTaskProgress(panel, state);
 
     return {
         shellState: canonicalActive || requestPending || restoreActive ? 'active' : 'idle',
-        phaseText: readStageLabel(projection, panel),
+        phaseText: progress.phaseText || readStageLabel(projection, panel),
         taskTitle: readTaskTitle(panel, state, runtime),
-        blockerCount: countReliableBlockers(projection),
-        nextStep: readNextStep(state, projection),
+        blockerCount: progress.blockerCount,
+        countText: progress.countText,
+        nextStep: progress.detail || readNextStep(state, projection),
         canonicalActive,
         requestPending,
         restoreActive
@@ -255,12 +283,12 @@ export function syncAiPanelShell(panel) {
 
     const blockers = panel.container.querySelector('[data-ai-hook="task-blockers"]');
     if (blockers) {
-        blockers.hidden = presentation.blockerCount === 0;
-        blockers.textContent = presentation.blockerCount > 0 ? `${presentation.blockerCount} 项阻断` : '';
+        blockers.hidden = !presentation.countText;
+        blockers.textContent = presentation.countText;
     }
 
     setText(panel.container.querySelector('[data-ai-hook="task-next-step"]'), presentation.nextStep, { hideWhenEmpty: true });
-    const announcement = [presentation.phaseText, presentation.blockerCount > 0 ? `${presentation.blockerCount} 项阻断` : '', presentation.nextStep]
+    const announcement = [presentation.phaseText, presentation.countText, presentation.nextStep]
         .filter(Boolean)
         .join('。');
     if (announcement) panel._announceAccessibilityStatus?.(announcement);
@@ -430,13 +458,14 @@ export function installAiPanelShellPresentation(prototype) {
         '_renderHistoryList',
         '_displayResult',
         '_clearResultPane',
+        '_updatePlanBuildActionState',
         '_setWorkbenchState'
     ].forEach(methodName => wrapPresentationMethod(prototype, methodName));
 }
 
 export const aiPanelShellTestApi = {
     AI_SHELL_PHASE_TEXT,
-    countReliableBlockers,
+    readTaskProgress,
     hasCanonicalActivity,
     hasPendingSubmittedRequest,
     isMatchingSessionRestore,

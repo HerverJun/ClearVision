@@ -786,6 +786,7 @@ export function deriveAiBuildPresentation(panel) {
         diff,
         failureSummary,
         actionItems,
+        blockerCount: actionItems.filter(item => item.priority === 'blocking').length,
         inputSource,
         outputTarget,
         structureStatus: nodeCount > 0
@@ -807,7 +808,7 @@ function renderMetric(panel, label, value, hint = '') {
 
 function renderStatusSummary(panel, presentation) {
     const { overall, parameters, resources, validation, gate } = presentation;
-    const blockerCount = presentation.actionItems.filter(item => item.priority === 'blocking').length;
+    const blockerCount = presentation.blockerCount;
     const coreValidationFailed = validation.structural.status === 'failed' ||
         validation.dryRun.status === 'failed' ||
         validation.otherErrors.length > 0;

@@ -2608,8 +2608,8 @@ test('Plan workspace shows rule fallback as recoverable confirmation state', asy
   assert.match(planWorkspace.innerHTML, /暂无可回答的关键问题/);
   assert.doesNotMatch(planWorkspace.innerHTML, /还需确认 1 项/);
   assert.match(planWorkspace.innerHTML, /规则兜底/);
-  assert.match(actionState.statusText, /总计 1 项；构建前必须确认 1 项；可构建后补齐 0 项/);
-  assert.equal(actionState.label, '还需补充 1 项信息');
+  assert.match(actionState.statusText, /构建前必需 1 项/);
+  assert.equal(actionState.label, '开始构建');
   assert.match(planWorkspace.innerHTML, /id="ai-btn-start-build">开始构建/);
   assert.doesNotMatch(planWorkspace.innerHTML, /Plan 失败|规划失败|语义抽取失败/);
 
@@ -4571,7 +4571,7 @@ test('Readiness timeout exits validating and retry accepts only the matching aut
   await new Promise(resolve => setTimeout(resolve, 1100));
   assert.equal(panel.agentWorkspaceState.readinessStatus, 'timeout');
   assert.equal(panel.activePlanReadinessPreviewRequest, null);
-  assert.match(panel._getPlanBuildActionState(panel.pendingVisionPlan).label, /超时/);
+  assert.match(panel._getPlanBuildActionState(panel.pendingVisionPlan).statusText, /超时/);
 
   panel._requestBackendPlanReadinessPreview = async request => ({
     ...panel._buildTestPlanReadinessPreview(request),
@@ -4616,8 +4616,9 @@ test('Readiness abort returns to idle and missing canonical preview never masque
   assert.equal(panel.agentWorkspaceState.readinessStatus, 'idle');
   assert.equal(panel.activePlanReadinessPreviewRequest, null);
   const action = panel._getPlanBuildActionState(panel.pendingVisionPlan);
-  assert.match(action.label, /尚未获得权威校验结果/);
-  assert.doesNotMatch(action.label, /正在校验/);
+  assert.equal(action.label, '开始构建');
+  assert.match(action.statusText, /尚未获得.*权威校验结果/);
+  assert.doesNotMatch(action.statusText, /正在校验/);
   assert.equal(action.canRetryReadiness, true);
 });
 
@@ -5341,7 +5342,7 @@ test('Plan main CTA ignores model NextAction and uses canonical readiness', asyn
 
   assert.doesNotMatch(planWorkspace.innerHTML, /Deploy now from model advice/);
   assert.match(planWorkspace.innerHTML, /风险与工程详情/);
-  assert.match(panel._getPlanBuildActionState(plan).label, /^还需补充 \d+ 项信息$/);
+  assert.equal(panel._getPlanBuildActionState(plan).label, '开始构建');
   assert.notEqual(mainButton.textContent, 'Deploy now from model advice');
 });
 
@@ -8373,6 +8374,68 @@ test('Vision Agent source guard has no legacy ClarificationPlanCard production p
   assert.doesNotMatch(workspaceSource, /_renderClarificationPlanWorkspace/);
   assert.doesNotMatch(workspaceSource, /ClarificationPlanCard/);
   assert.doesNotMatch(workspaceSource, /clarification_\$\{index \+ 1\}|clarification_1/);
+});
+
+test('missing summary preserves authoritative zero counts without granting Build permission', async () => {
+  const { AiPanel } = await loadAiPanel();
+  const panel = createPanel(AiPanel, { developer: false, enabled: true });
+  const plan = panel._normalizeBackendPlanResult(strategyConfirmationPlanResult());
+  panel.pendingVisionPlan = plan;
+  panel._getCurrentCanonicalPreview = () => ({
+    buildReadiness: { canBuild: false, blockers: [{ id: 'resource_pending:image', category: 'resource_pending', blocksBuild: true }], remainingFields: ['image_source'] },
+    pendingConfirmationCount: 0, resourcePendingCount: 0,
+    mustConfirmBeforeBuildCount: 0, fillLaterCount: 0, totalIncompleteCount: 0
+  });
+  const summary = panel._buildPlanMissingSummary(plan);
+  assert.equal(summary.totalCount, 0);
+  assert.equal(summary.stats.pendingConfirmationCount, 0);
+  assert.equal(summary.stats.resourcePendingCount, 0);
+  assert.equal(panel._getPlanBuildActionState(plan).canStart, false);
+});
+
+test('historical readiness without count partitions deduplicates resource identities', async () => {
+  const { AiPanel } = await loadAiPanel();
+  const panel = createPanel(AiPanel, { developer: false, enabled: true });
+  const plan = panel._normalizeBackendPlanResult(strategyConfirmationPlanResult());
+  const preview = panel._normalizePlanReadinessPreviewResult({
+    buildReadiness: { canBuild: false, remainingFields: ['inspection_object', 'task_type'], blockers: [
+      { id: 'inspection_object', field: 'inspection_object', blocksBuild: true },
+      { id: 'task_type', field: 'task_type', blocksBuild: true },
+      { id: 'plan:image', category: 'resource_pending', blocksBuild: false, resource: { canonicalId: 'image:sample' } },
+      { id: 'audit:image', category: 'resource_pending', blocksBuild: false, resource: { canonicalId: 'image:sample' } }
+    ] }
+  });
+  assert.equal(preview.hasAuthoritativeCountPartition, false);
+  panel._getCurrentCanonicalPreview = () => preview;
+  const summary = panel._buildPlanMissingSummary(plan, ['inspection_object', 'task_type']);
+  assert.equal(summary.mustConfirmCount, 2);
+  assert.equal(summary.fillLaterCount, 1);
+  assert.equal(summary.totalCount, 3);
+  assert.equal(summary.summaryText, '构建前必需 2 项 · 可后补 1 项');
+});
+
+test('canonical counts require matching plan, answer, resource, and mode versions', async () => {
+  const { AiPanel } = await loadAiPanel();
+  const panel = createPanel(AiPanel, { developer: false, enabled: true });
+  const plan = panel._normalizeBackendPlanResult(strategyConfirmationPlanResult());
+  panel.pendingVisionPlan = plan;
+  const preview = { planId: plan.planId, planHash: plan.planHash,
+    answerRevision: panel.planAnswerRevision || 0,
+    resourceRevision: panel.agentWorkspaceState.resources.revision || 0,
+    requirementMode: panel.requirementMode, buildReadiness: plan.buildReadiness };
+  panel.agentWorkspaceState.readinessStatus = 'blocked';
+  panel.agentWorkspaceState.readinessPreview = preview;
+  assert.equal(panel._getCurrentCanonicalPreview(plan), preview);
+  for (const [key, value] of [['planId', 'old'], ['planHash', 'old'], ['answerRevision', 99], ['resourceRevision', 99], ['requirementMode', 'draft']]) {
+    panel.agentWorkspaceState.readinessPreview = { ...preview, [key]: value };
+    assert.equal(panel._getCurrentCanonicalPreview(plan), null, key);
+    assert.equal(panel._getPlanBuildActionState(plan).canStart, false, key);
+  }
+  panel.requirementMode = 'draft';
+  assert.equal(panel._getCurrentCanonicalPreview(plan), null);
+  panel.agentWorkspaceState.readinessStatus = 'blocked';
+  panel.agentWorkspaceState.readinessPreview = { ...preview, requirementMode: 'draft' };
+  assert.ok(panel._getCurrentCanonicalPreview(plan));
 });
 
 test('Vision Agent Plan source guard uses PlanRun only and has no ordinary Plan fallback route', () => {

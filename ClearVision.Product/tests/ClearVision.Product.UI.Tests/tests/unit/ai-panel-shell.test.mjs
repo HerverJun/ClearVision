@@ -200,15 +200,48 @@ test('AI shell reads task title and next step from canonical data before UI fall
   }), '请先确认图像来源');
 });
 
-test('AI shell blocker count only includes unresolved blocking projection items', () => {
-  assert.equal(aiPanelShellTestApi.countReliableBlockers({
-    clarificationQueue: [
-      { blocksBuild: true, answered: false, deferred: false },
-      { blocksBuild: true, answered: true, deferred: false },
-      { blocksBuild: true, answered: false, deferred: true },
-      { blocksBuild: false, answered: false, deferred: false },
-    ],
-  }), 1);
+test('AI shell uses the shared missing summary including resources and deferred items', () => {
+  const state = createIdleState({ plan: {}, readinessStatus: 'blocked' });
+  state.projection.clarificationQueue = [{ blocksBuild: true }, { blocksBuild: true }];
+  for (const [total, detail] of [[3, '构建前必需 3 项'], [3, '构建前必需 2 项 · 可后补 1 项'], [0, '构建前必需 0 项']]) {
+    const panel = {
+      agentWorkspaceState: state,
+      _getCurrentCanonicalPreview: () => ({}),
+      _buildPlanMissingSummary: () => ({ totalCount: total, summaryText: detail })
+    };
+    const presentation = deriveAiShellPresentation(panel);
+    assert.equal(presentation.blockerCount, total);
+    assert.equal(presentation.countText, total ? `待补齐 ${total} 项` : '');
+    assert.equal(presentation.nextStep, detail);
+    assert.equal(state.projection.buildAction.canBuild, false);
+  }
+});
+
+test('AI shell hides definite counts while validation is missing, stale, failed, or recovering', () => {
+  for (const status of ['idle', 'validating', 'timeout', 'failed', 'ready', 'blocked']) {
+    const panel = {
+      agentWorkspaceState: createIdleState({ plan: {}, readinessStatus: status }),
+      _getCurrentCanonicalPreview: () => null,
+      _getPlanBuildActionState: () => ({ statusText: `校验状态 ${status}` }),
+      _buildPlanMissingSummary: () => { throw new Error('stale count must not be read'); }
+    };
+    assert.equal(deriveAiShellPresentation(panel).blockerCount, null);
+    assert.equal(deriveAiShellPresentation(panel).nextStep, `校验状态 ${status}`);
+    panel.workspaceRecoveryBlocked = true;
+    panel._getCurrentCanonicalPreview = () => ({});
+    assert.equal(deriveAiShellPresentation(panel).countText, '');
+  }
+});
+
+test('AI shell stops reading Plan counts after entering Build', () => {
+  const panel = {
+    agentWorkspaceState: createIdleState({ plan: {} }),
+    _getAgentWorkspacePhase: () => 'build',
+    _buildPlanMissingSummary: () => { throw new Error('Plan count is no longer relevant'); }
+  };
+  const presentation = deriveAiShellPresentation(panel);
+  assert.equal(presentation.blockerCount, 0);
+  assert.equal(presentation.countText, '');
 });
 
 test('canonical phase text matrix is independent from workspace mode', () => {

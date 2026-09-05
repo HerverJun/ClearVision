@@ -4,6 +4,7 @@ import { AgentWorkspaceEventTypes } from './agentWorkspaceState.js';
 import { isPendingParameterSentinel } from '../../shared/parameterDependencyRules.js';
 import { normalizeCanonicalResource, serializeResourceDecision } from './aiResourceIdentity.js';
 import { normalizeAiPrimaryTask, planAnswerOriginPriority } from './aiTaskContract.js';
+import { deriveAiBuildPresentation } from './aiPanelBuildPresentation.js';
 
 export const AgentWorkspaceModes = Object.freeze({
     PLAN: 'plan',
@@ -1534,6 +1535,7 @@ export const aiPanelAgentWorkspaceMixin = {
                 inlineBuildBtn.title = blockedTitle;
             }
             inlineBuildBtn.setAttribute?.('aria-disabled', inlineBuildBtn.disabled ? 'true' : 'false');
+            inlineBuildBtn.setAttribute?.('aria-describedby', 'ai-plan-build-status');
         }
 
         const buildStatus = this.container?.querySelector('#ai-plan-build-status');
@@ -1546,9 +1548,11 @@ export const aiPanelAgentWorkspaceMixin = {
         const mainBuildButtons = this.container?.querySelectorAll?.('#ai-btn-start-build') || [];
         mainBuildButtons.forEach(mainBuildBtn => {
             mainBuildBtn.disabled = busy || !canBuild;
-            mainBuildBtn.textContent = actionState.label || 'Start Build';
+            mainBuildBtn.textContent = actionState.label || '开始构建';
             mainBuildBtn.dataset.acceptRecommended = actionState.acceptedRecommended ? 'true' : 'false';
-            mainBuildBtn.title = hasPlan ? actionState.statusText : 'Finish the plan first';
+            mainBuildBtn.title = hasPlan ? actionState.statusText : '请先完成规划';
+            mainBuildBtn.setAttribute?.('aria-label', '开始构建');
+            mainBuildBtn.setAttribute?.('aria-describedby', 'ai-plan-build-status');
             mainBuildBtn.setAttribute?.('aria-disabled', mainBuildBtn.disabled ? 'true' : 'false');
         });
 
@@ -3391,7 +3395,7 @@ export const aiPanelAgentWorkspaceMixin = {
                 mustConfirmCount: 0,
                 fillLaterCount: 0,
                 missingFields: [],
-                summaryText: '总计 0 项；构建前必须确认 0 项；可构建后补齐 0 项'
+                summaryText: '构建前必需 0 项'
             };
         }
 
@@ -3400,8 +3404,8 @@ export const aiPanelAgentWorkspaceMixin = {
         const readinessStats = this._getPlanReadinessStats({ ...plan, buildReadiness: readiness });
         const stats = {
             ...readinessStats,
-            pendingConfirmationCount: Number(preview?.pendingConfirmationCount) || readinessStats.pendingConfirmationCount,
-            resourcePendingCount: Number(preview?.resourcePendingCount) || readinessStats.resourcePendingCount,
+            pendingConfirmationCount: Number(preview?.pendingConfirmationCount ?? readinessStats.pendingConfirmationCount) || 0,
+            resourcePendingCount: Number(preview?.resourcePendingCount ?? readinessStats.resourcePendingCount) || 0,
             hardBlockerCount: Number(preview?.hardBlockerCount) || 0,
             buildBlockingConfirmationCount: Number(preview?.buildBlockingConfirmationCount) || 0,
             buildRequiredResourceCount: Number(preview?.buildRequiredResourceCount) || 0,
@@ -3458,7 +3462,7 @@ export const aiPanelAgentWorkspaceMixin = {
             fillLaterCount,
             missingFields: normalizedFields,
             stats,
-            summaryText: `总计 ${totalCount} 项；构建前必须确认 ${mustConfirmCount} 项；可构建后补齐 ${fillLaterCount} 项`
+            summaryText: `构建前必需 ${mustConfirmCount} 项${fillLaterCount > 0 ? ` · 可后补 ${fillLaterCount} 项` : ''}`
         };
     },
 
@@ -3476,7 +3480,7 @@ export const aiPanelAgentWorkspaceMixin = {
         if (this.workspaceRecoveryBlocked) {
             return {
                 canBuild: false, canAcceptRecommended: false, canStart: false, acceptedRecommended: false,
-                label: '工作台恢复待确认', statusText: '请重新加载会话确认恢复结果后再构建。',
+                label: '开始构建', statusText: '请重新加载会话确认恢复结果后再构建。',
                 stats: this._getPlanReadinessStats(plan)
             };
         }
@@ -3499,7 +3503,7 @@ export const aiPanelAgentWorkspaceMixin = {
                 canAcceptRecommended: false,
                 canStart: false,
                 acceptedRecommended: false,
-                label: '正在校验构建条件…',
+                label: '开始构建',
                 statusText: '正在校验构建条件…',
                 stats: this._getPlanReadinessStats(plan)
             };
@@ -3511,7 +3515,7 @@ export const aiPanelAgentWorkspaceMixin = {
                 canAcceptRecommended: false,
                 canStart: false,
                 acceptedRecommended: false,
-                label: timedOut ? '构建条件校验超时，请重试' : '构建条件校验失败，请重试',
+                label: '开始构建',
                 statusText: timedOut ? '构建条件校验超时，请重试' : '构建条件校验失败，请重试',
                 stats: this._getPlanReadinessStats(plan)
             };
@@ -3524,7 +3528,7 @@ export const aiPanelAgentWorkspaceMixin = {
                 canAcceptRecommended: false,
                 canStart: false,
                 acceptedRecommended: false,
-                label: '尚未获得权威校验结果',
+                label: '开始构建',
                 statusText: '尚未获得与当前方案、答案版本和模式匹配的权威校验结果，请重试。',
                 canRetryReadiness: true,
                 stats: this._getPlanReadinessStats(plan)
@@ -3539,26 +3543,24 @@ export const aiPanelAgentWorkspaceMixin = {
             hardBlockerCount: Number(preview.hardBlockerCount) || 0
         };
         const canBuild = readiness.canBuild === true;
+        const missingSummary = this._buildPlanMissingSummary(plan);
         if (canBuild) {
             return {
                 canBuild: true,
                 canAcceptRecommended: false,
                 canStart: true,
                 acceptedRecommended: false,
-                label: mode === 'draft' ? '按当前方案生成可编辑草稿' : '开始构建',
-                statusText: mode === 'draft'
+                label: '开始构建',
+                statusText: `${missingSummary.summaryText}。` + (mode === 'draft'
                     ? '可编辑草稿可先生成；当前不代表可部署。'
-                    : '当前确认项已满足构建条件。',
-                stats
+                    : '当前确认项已满足构建条件。'),
+                stats,
+                missingSummary
             };
         }
 
-        const missingSummary = this._buildPlanMissingSummary(plan);
         const deferredCount = this._toArray(preview.deferredQuestionIds).length;
         const blockedReason = this._getPlanBuildBlockedReason(plan);
-        const userBlockedText = missingSummary.totalCount > 0
-            ? `还需补充 ${missingSummary.totalCount} 项信息`
-            : '暂不能构建';
         const statusText = `${missingSummary.summaryText}。${blockedReason || '暂不能构建。'}`;
 
         return {
@@ -3566,7 +3568,7 @@ export const aiPanelAgentWorkspaceMixin = {
             canAcceptRecommended: false,
             canStart: false,
             acceptedRecommended: false,
-            label: userBlockedText,
+            label: '开始构建',
             statusText: mode === 'strict' && deferredCount > 0
                 ? `${missingSummary.summaryText}。当前选择要求构建前确认，暂缓项仍会阻止构建。`
                 : statusText,
@@ -7002,12 +7004,11 @@ export const aiPanelAgentWorkspaceMixin = {
         ) || 'strict';
         if (mode !== 'draft') return;
 
-        const preview = this._getCurrentCanonicalPreview?.(this.pendingVisionPlan);
-        const pendingCount = Number(preview?.pendingConfirmationCount) || 0;
-        const resourceCount = Number(preview?.resourcePendingCount) ||
-            this._toArray(result?.missingResources || result?.MissingResources).length;
+        const presentation = deriveAiBuildPresentation(this);
+        const pendingCount = presentation.parameters.remainingToFill;
+        const resourceCount = presentation.resources.unresolved;
         this._setResultStatusNote?.(
-            `可编辑草稿已生成。仍有 ${pendingCount} 项待确认、${resourceCount} 项资源待补。当前不具备部署条件。`,
+            `可编辑草稿已生成。待填参数 ${pendingCount} 项、待补资源 ${resourceCount} 项。${presentation.parameters.awaitingConfirmation ? '已填写参数待确认。' : ''}当前不具备部署条件。`,
             'warning'
         );
     },
