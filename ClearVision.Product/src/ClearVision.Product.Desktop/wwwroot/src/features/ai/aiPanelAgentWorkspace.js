@@ -69,7 +69,7 @@ const BUILD_STAGE_LABELS = {
     release_review: '发布复核',
     repair_loop: '自动修复',
     workflow_diff: '流程差异',
-    apply_gate: '应用门禁',
+    apply_gate: '应用条件',
     artifact: '结果产物',
     run: '运行',
     collecting_context: '收集上下文',
@@ -571,9 +571,9 @@ export const aiPanelAgentWorkspaceMixin = {
             status: 'running',
             phase,
             routerStatus: phase === 'understand' ? 'running' : 'waiting',
-            routerSummary: phase === 'understand' ? '正在理解需求，尚未标记完成。' : '',
+            routerSummary: phase === 'understand' ? '正在理解需求。' : '',
             currentSummary: phase === 'understand'
-                ? '正在理解需求，等待 Intent Router 返回。'
+                ? '正在理解需求。'
                 : '正在整理工程上下文。',
             slow: false,
             startedAt,
@@ -1662,7 +1662,7 @@ export const aiPanelAgentWorkspaceMixin = {
                     '需求理解已返回，正在整理工程上下文。',
                     {
                         routerStatus: 'completed',
-                        routerSummary: 'Intent Router 已返回真实结果。'
+                        routerSummary: '需求理解已完成。'
                     });
                 this._handleIntentRouterResult(result, {
                     routerRequestId,
@@ -2390,7 +2390,7 @@ export const aiPanelAgentWorkspaceMixin = {
             if (runId && this.cancelledPlanRequestId === planRequestId) {
                 await httpClient.post(`/ai/agent-runs/${encodeURIComponent(runId)}/cancel`).catch(() => undefined);
             }
-            throw new Error('Plan Run 已过期。');
+            throw new Error('本次规划已过期，请重新规划。');
         }
         const sessionId = String(createResult?.sessionId || createResult?.SessionId || '').trim();
         if (sessionId) {
@@ -2399,7 +2399,7 @@ export const aiPanelAgentWorkspaceMixin = {
         this._applyWorkspaceSnapshotSummary?.(createResult?.workspaceSnapshot || createResult?.WorkspaceSnapshot || null);
         this._handleWorkspacePersistenceStatus?.(createResult?.persistenceStatus || createResult?.PersistenceStatus || null);
         if (!runId) {
-            throw new Error('Plan Run 创建接口没有返回 runId。');
+            throw new Error('未能创建规划任务，请重试。');
         }
 
         this._dispatchAgentWorkspaceEvent?.({
@@ -2410,7 +2410,7 @@ export const aiPanelAgentWorkspaceMixin = {
         });
         this._advancePlanningLifecycle?.(
             'context',
-            'Plan Run 已创建，等待公开阶段事件接管进度。',
+            '规划已开始，正在整理工程上下文。',
             { requestId: runId });
         this.activePlanRunRequestId = planRequestId;
         this._resetPublicLiveEventState?.();
@@ -2580,7 +2580,7 @@ export const aiPanelAgentWorkspaceMixin = {
             null;
         if (!result) {
             if (evt.eventType === 'run.completed') {
-                this._rejectActivePlanRun(new Error('Plan Run 完成事件缺少 PlanModeResult。'));
+                this._rejectActivePlanRun(new Error('规划未返回完整方案，请重试。'));
             }
             return;
         }
@@ -3017,7 +3017,7 @@ export const aiPanelAgentWorkspaceMixin = {
                 questionId: '',
                 blocksBuild: true,
                 resolutionMode: PLAN_BUILD_RESOLUTION_MODES.NON_BLOCKING,
-                publicLabel: '后端未返回合法 readiness，前端不会推断可构建状态。'
+                publicLabel: '未能取得构建条件校验结果，请重试。'
             }],
             resolvedFields: [],
             remainingFields: this._toArray(plan.remainingPlanFields || plan.RemainingPlanFields),
@@ -3434,17 +3434,20 @@ export const aiPanelAgentWorkspaceMixin = {
         } else {
             const blockingKeys = new Set();
             const deferredKeys = new Set();
+            const resourceFields = new Set();
             this._toArray(readiness.blockers).forEach(blocker => {
                 if (blocker?.category === PLAN_BUILD_BLOCKER_CATEGORIES.CONTRACT_WARNING) return;
-                const resource = blocker?.resource;
+                const resource = blocker?.resource || (blocker?.category === PLAN_BUILD_BLOCKER_CATEGORIES.RESOURCE_PENDING ? blocker : null);
                 const resourceId = String(resource?.canonicalId || resource?.CanonicalId || '').trim().toLowerCase();
                 const field = this._inferPlanQuestionField?.(blocker?.field || blocker?.questionId || blocker?.id) ||
                     String(blocker?.field || blocker?.questionId || blocker?.id || '').trim().toLowerCase();
                 const key = resourceId ? `resource:${resourceId}` : (field ? `field:${field}` : '');
                 if (!key) return;
+                if (resourceId && field) resourceFields.add(field);
                 (blocker?.blocksBuild === true ? blockingKeys : deferredKeys).add(key);
             });
             normalizedFields.forEach(field => {
+                if (resourceFields.has(field)) return;
                 const key = `field:${field}`;
                 if (!blockingKeys.has(key) && !deferredKeys.has(key)) {
                     (readiness.canBuild === true ? deferredKeys : blockingKeys).add(key);
@@ -3529,7 +3532,7 @@ export const aiPanelAgentWorkspaceMixin = {
                 canStart: false,
                 acceptedRecommended: false,
                 label: '开始构建',
-                statusText: '尚未获得与当前方案、答案版本和模式匹配的权威校验结果，请重试。',
+                statusText: '当前方案尚未完成构建条件校验，请重试。',
                 canRetryReadiness: true,
                 stats: this._getPlanReadinessStats(plan)
             };
@@ -4708,7 +4711,7 @@ export const aiPanelAgentWorkspaceMixin = {
             operator_contract: '算子契约检查',
             release_review: '发布复核',
             workflow_diff: '流程差异',
-            apply_gate: '应用门禁'
+            apply_gate: '应用条件'
         };
         if (map[normalized]) return map[normalized];
         if (normalized.endsWith('_tool')) {
@@ -5062,7 +5065,7 @@ export const aiPanelAgentWorkspaceMixin = {
         const nextActions = missingCount > 0
             ? [
                 '补充缺失信息，或选择推荐默认值继续生成可编辑草稿。',
-                '确认后再开始 Build；部署和运行预览仍按权限门禁执行。'
+                '确认后开始构建；部署前仍需完成运行验证。'
             ]
             : [
                 plan.nextAction || '复核推荐流程后开始构建。',
@@ -5394,14 +5397,14 @@ export const aiPanelAgentWorkspaceMixin = {
             return `
                 <article class="ai-plan-question is-readonly" data-clarification-item="${this._escapeHtml(key)}">
                     <div class="ai-plan-question-title">${this._escapeHtml(item.title || key)}</div>
-                    <div class="ai-plan-question-why">该项由后端 readiness 判定，需按提示补充后重新校验。</div>
+                    <div class="ai-plan-question-why">请补充该项后重新校验构建条件。</div>
                 </article>
             `;
         }).join('');
         const remainingCount = queue.filter(item => !item?.answered && !item?.deferred).length;
         return `
             <div class="ai-unified-clarification-line" data-clarification-batch-size="${batch.length}">
-                <div class="ai-build-note">本轮最多 3 项，逐项确认；本批完成后一次提交后端 readiness 校验。剩余 ${remainingCount} 项。</div>
+                <div class="ai-build-note">本轮待确认 ${batch.length} 项，剩余 ${remainingCount} 项。</div>
                 ${rows || '<div class="ai-plan-maturity-empty">正在等待后端刷新澄清队列。</div>'}
             </div>
         `;
@@ -5434,7 +5437,6 @@ export const aiPanelAgentWorkspaceMixin = {
                     <div class="ai-plan-empty-title">规划模式</div>
                     <div class="ai-plan-empty-copy">${this._escapeHtml(progress?.currentLabel || '正在收集工程上下文。请输入检测目标，智能体会先形成视觉工程计划，再进入构建。')}</div>
                     ${liveStatus}
-                    <div class="ai-plan-empty-copy">问题、readiness 阻断和资源待绑定项会统一进入同一条澄清线。</div>
                 </div>
             `;
             this._renderPlanConfirmationGuidance?.(null, null);
@@ -5478,7 +5480,7 @@ export const aiPanelAgentWorkspaceMixin = {
             : previewFailed
                 ? `<div class="ai-plan-cta-assist">${readinessStatus === 'timeout' ? '构建条件校验超时' : '构建条件校验失败'}，请重试<button type="button" id="ai-btn-retry-readiness-preview">重试校验</button></div>`
                 : previewMissing
-                    ? `<div class="ai-plan-cta-assist">尚未获得与当前方案、答案版本和模式匹配的权威校验结果。<button type="button" id="ai-btn-retry-readiness-preview">重试校验</button></div>`
+                    ? `<div class="ai-plan-cta-assist">当前方案尚未完成构建条件校验。<button type="button" id="ai-btn-retry-readiness-preview">重试校验</button></div>`
                 : '';
         el.innerHTML = `
             <section class="ai-workspace-section">
@@ -6544,7 +6546,7 @@ export const aiPanelAgentWorkspaceMixin = {
                 compatibilityState.publicMessage;
             return `
                 <div class="ai-build-check is-blocked">
-                    <strong>应用门禁：已阻断</strong>
+                    <strong>暂不可应用</strong>
                     <span>${this._escapeHtml(publicMessage)}</span>
                 </div>
             `;
@@ -6552,7 +6554,6 @@ export const aiPanelAgentWorkspaceMixin = {
 
         const buildResult = this._getBuildResult(events);
         const applyGate = buildResult?.applyGate || buildResult?.ApplyGate || resultPayload?.applyGate;
-        const readiness = buildResult?.readinessReport || buildResult?.ReadinessReport || null;
         const firstFix = this._sanitizeAssistantFailureText?.(buildResult?.firstFixRecommendation || buildResult?.FirstFixRecommendation || resultPayload?.firstFixRecommendation || '', 240) || '';
         if (applyGate) {
             const gate = this._asObject?.(applyGate) || {};
@@ -6562,11 +6563,10 @@ export const aiPanelAgentWorkspaceMixin = {
             const blocked = this._readBooleanField(gate, 'blocked', 'Blocked');
             return `
                 <div class="ai-build-check is-${blocked ? 'blocked' : 'completed'}">
-                    <strong>应用门禁：${this._escapeHtml(this._formatGateStatus(gate.status || gate.Status || 'unknown'))}</strong>
+                    <strong>应用条件：${this._escapeHtml(this._formatGateStatus(gate.status || gate.Status || 'unknown'))}</strong>
                     <span>画布可应用：${canvasReady ? '是' : '否'} / 运行草稿：${runtimeReady ? '就绪' : '阻断'} / 部署：${deploymentReady ? '就绪' : '阻断'}</span>
                     ${firstFix ? `<em class="ai-first-fix">First Fix：${this._escapeHtml(this._localizeDisplayText(firstFix))}</em>` : ''}
                 </div>
-                ${readiness ? `<div class="ai-build-note">就绪门禁已写入可回放 BuildResult。</div>` : ''}
             `;
         }
 

@@ -454,7 +454,7 @@ function deriveActionItems(panel, context) {
             priority: 'blocking',
             title: `${unresolvedResources} 项资源待绑定`,
             summary: `${getResourceDisplayName(type, { fallback: '工程资源' })}尚未完成具体绑定。`,
-            impact: '可能阻断运行、部署验证或 Apply Gate。',
+            impact: '可能影响应用、运行或部署验证。',
             status: '等待人工绑定',
             target: 'ai-build-resources-section',
             action: '前往资源'
@@ -475,8 +475,8 @@ function deriveActionItems(panel, context) {
             key: 'validation',
             priority: 'blocking',
             title: `${Math.max(validationErrors.length, 1)} 项验证问题`,
-            summary: firstError || '静态验证或 DryRun 未通过。',
-            impact: '需要修复后重新进入现有验证链路。',
+            summary: firstError || '静态验证或元数据预演未通过。',
+            impact: '需要修复后重新验证。',
             status: '验证未通过',
             target: 'ai-build-validation-section',
             action: '查看验证'
@@ -500,12 +500,12 @@ function deriveActionItems(panel, context) {
         items.push({
             key: 'gate',
             priority: 'blocking',
-            title: '应用门禁尚未开放',
-            summary: gateBlockers[0] || '当前草稿仍受现有 Apply Gate 约束。',
+            title: '暂不可应用',
+            summary: gateBlockers[0] || '应用条件尚未满足，请检查验证结果。',
             impact: '阻断应用到画布。',
-            status: '应用门禁已阻断',
+            status: '暂不可应用',
             target: 'ai-build-apply-section',
-            action: '查看门禁'
+            action: '查看应用条件'
         });
     }
 
@@ -515,7 +515,7 @@ function deriveActionItems(panel, context) {
             priority: 'advisory',
             title: `${validation.warnings.length} 项非阻断建议`,
             summary: getDiagnosticMessage(panel, validation.warnings[0]) || '建议在应用前复核工程提示。',
-            impact: '不直接解除或改变现有 Gate。',
+            impact: '请在应用前复核这些建议。',
             status: '建议复核',
             target: 'ai-build-validation-section',
             action: '查看建议'
@@ -548,7 +548,7 @@ function deriveOverallState(context) {
             key: 'applying',
             tone: 'info',
             label: '正在应用',
-            result: '正在按现有 Apply Preview 和画布应用语义更新流程。',
+            result: '正在复核并应用流程变更。',
             next: '等待画布应用完成。',
             target: 'ai-build-apply-section'
         };
@@ -560,7 +560,7 @@ function deriveOverallState(context) {
             key: validating ? 'validating' : 'building',
             tone: 'info',
             label: validating ? '正在验证' : '正在构建',
-            result: validating ? '正在执行现有静态检查或 DryRun 链路。' : '正在生成并整理可编辑流程草稿。',
+            result: validating ? '正在执行静态检查与元数据预演。' : '正在生成并整理可编辑流程草稿。',
             next: '等待当前阶段完成，期间不会开放未满足条件的应用操作。',
             target: 'ai-build-validation-section'
         };
@@ -592,7 +592,7 @@ function deriveOverallState(context) {
             tone: 'danger',
             label: '验证失败',
             result: hasFlow ? `流程草稿已生成，但 ${Math.max(validation.errors.length, 1)} 项检查未通过。` : '构建结果未通过验证。',
-            next: '先修复最重要的验证问题，再重新执行现有验证链路。',
+            next: '先修复验证问题，再重新验证。',
             target: 'ai-build-validation-section'
         };
     }
@@ -618,9 +618,9 @@ function deriveOverallState(context) {
         return {
             key: 'gate_blocked',
             tone: 'warning',
-            label: '应用门禁已阻断',
-            result: hasFlow ? '流程草稿已生成，但当前应用门禁尚未开放。' : '当前构建结果仍受应用门禁约束。',
-            next: '查看应用门禁与部署检查，处理当前阻断项。',
+            label: '暂不可应用',
+            result: hasFlow ? '流程草稿已生成，应用条件尚未满足。' : '当前构建结果尚未满足应用条件。',
+            next: '查看应用条件与部署检查，处理待解决事项。',
             target: 'ai-build-apply-section'
         };
     }
@@ -629,8 +629,8 @@ function deriveOverallState(context) {
             key: 'ready_to_apply',
             tone: 'success',
             label: '可以应用',
-            result: `构建、工程补齐与当前门禁检查已完成，草稿包含 ${nodeCount} 个节点。`,
-            next: '复核 Workflow Diff 与应用预览后，应用到画布。',
+            result: `构建与应用条件检查已完成，草稿包含 ${nodeCount} 个节点。`,
+            next: '复核流程变更与应用预览后，应用到画布。',
             target: 'ai-build-apply-section'
         };
     }
@@ -640,7 +640,7 @@ function deriveOverallState(context) {
             tone: 'success',
             label: '验证通过',
             result: `流程草稿已通过当前验证，包含 ${nodeCount} 个节点和 ${connectionCount} 条连线。`,
-            next: '继续检查应用门禁与 Workflow Diff。',
+            next: '继续检查应用条件与流程变更。',
             target: 'ai-build-apply-section'
         };
     }
@@ -650,7 +650,7 @@ function deriveOverallState(context) {
             tone: 'info',
             label: '可以开始验证',
             result: `已生成 ${nodeCount} 个节点、${connectionCount} 条连线的流程草稿。`,
-            next: '复核参数与资源后，执行静态验证和 DryRun。',
+            next: '复核参数与资源后，执行静态验证和元数据预演。',
             target: 'ai-build-validation-section'
         };
     }
@@ -819,7 +819,7 @@ function renderStatusSummary(panel, presentation) {
             : validation.overall === 'running'
                 ? '验证进行中'
                 : gate.canvasReady && !gate.blocked
-                    ? '门禁已就绪'
+                    ? '应用条件已满足'
                     : '验证待执行';
     return `
         <div class="ai-build-v2-summary-copy">
@@ -905,8 +905,8 @@ function renderActionQueue(panel, presentation) {
 function renderValidationSummary(panel, presentation) {
     const checks = [
         { title: '静态与拓扑检查', state: presentation.validation.structural },
-        { title: 'DryRun', state: presentation.validation.dryRun },
-        { title: '应用门禁', state: presentation.validation.gate }
+        { title: '元数据预演', state: presentation.validation.dryRun },
+        { title: '应用条件', state: presentation.validation.gate }
     ];
     if (presentation.validation.other.status === 'failed') {
         checks.push({ title: '其他工程检查', state: presentation.validation.other });
@@ -922,14 +922,13 @@ function renderValidationSummary(panel, presentation) {
             1
         )} 项问题需要先处理。`
         : presentation.validation.gate.status === 'failed'
-            ? '静态检查与 DryRun 保持各自结果，当前由应用门禁阻断。'
+            ? '应用条件尚未满足，请查看具体原因。'
             : presentation.validation.overall === 'passed'
                 ? '当前验证证据已通过，继续复核应用预览。'
-                : '验证结果将直接消费现有静态检查、DryRun 与 Gate 状态。';
+                : '等待静态检查与元数据预演结果。';
     return `
         <div class="ai-build-v2-validation-copy">
             <strong>${escapeHtml(panel, summary)}</strong>
-            <span>验证状态仅来自既有 BuildResult、Validation Preview 与 Apply Gate。</span>
         </div>
         <div class="ai-build-v2-checks">
             ${checks.map(item => `
@@ -950,14 +949,14 @@ function renderApplySummary(panel, presentation) {
     const gateLabel = presentation.applied
         ? '已应用到画布'
         : presentation.gate.canvasReady && !presentation.gate.blocked
-            ? 'Apply 已准备完成'
-            : 'Apply 尚未准备完成';
+            ? '可应用到画布'
+            : '暂不可应用';
     return `
         <div class="ai-build-v2-apply-state">
             <div>
                 <span>应用状态</span>
                 <strong>${escapeHtml(panel, gateLabel)}</strong>
-                <small>${presentation.gate.blockers[0] ? escapeHtml(panel, presentation.gate.blockers[0]) : '按钮继续服从现有 Apply Gate。'}</small>
+                ${presentation.gate.blockers[0] ? `<small>${escapeHtml(panel, presentation.gate.blockers[0])}</small>` : ''}
             </div>
             ${diff.available ? `
                 <dl class="ai-build-v2-diff">
@@ -968,7 +967,7 @@ function renderApplySummary(panel, presentation) {
                     ${renderMetric(panel, '参数变化', diff.parameters)}
                     ${renderMetric(panel, '未解风险', diff.blockers.length)}
                 </dl>
-            ` : '<div class="ai-build-v2-empty">当前结果尚未提供 Workflow Diff 摘要。</div>'}
+            ` : '<div class="ai-build-v2-empty">当前结果尚未提供流程变更摘要。</div>'}
         </div>
     `;
 }
@@ -1040,7 +1039,6 @@ export function renderAiBuildWorkspaceScaffold() {
                                 <span>构建结果</span>
                                 <h3>流程草稿摘要</h3>
                             </div>
-                            <p>展示真实算子与当前工程结构，不展开内部节点 ID。</p>
                         </header>
                         <div id="ai-build-flow-summary"></div>
                     </section>
@@ -1051,7 +1049,6 @@ export function renderAiBuildWorkspaceScaffold() {
                                 <span>工程主线</span>
                                 <h3>待处理事项</h3>
                             </div>
-                            <p>汇总既有参数、资源、验证和 Apply 阻断，不创建第二套队列。</p>
                         </header>
                         <div id="ai-build-action-queue"></div>
                     </section>
@@ -1062,7 +1059,6 @@ export function renderAiBuildWorkspaceScaffold() {
                                 <span>工程补齐</span>
                                 <h3>参数工作区</h3>
                             </div>
-                            <p>保留现有编辑、人工确认和可选 AI 复核链路。</p>
                         </header>
                         <div class="ai-parameter-editor is-empty" id="ai-result-parameter-editor">
                             <div class="ai-followup-empty">当前没有待确认参数，暂无需补录。</div>
@@ -1075,7 +1071,6 @@ export function renderAiBuildWorkspaceScaffold() {
                                 <span>工程补齐</span>
                                 <h3>资源工作区</h3>
                             </div>
-                            <p>在 Build 中绑定具体相机、模型、模板或外部资源。</p>
                         </header>
                         <div class="ai-followup-panel is-empty" id="ai-result-followups">
                             <div class="ai-followup-empty">当前没有缺失资源或后续工程动作。</div>
@@ -1086,9 +1081,8 @@ export function renderAiBuildWorkspaceScaffold() {
                         <header class="ai-build-v2-section-header">
                             <div>
                                 <span>工程验证</span>
-                                <h3>验证与 DryRun</h3>
+                                <h3>验证与元数据预演</h3>
                             </div>
-                            <p>集中查看静态检查、拓扑验证、预演结果与修复建议。</p>
                         </header>
                         <div id="ai-build-validation-summary"></div>
                         <div class="validation-card" id="ai-result-validation-card" hidden>
@@ -1102,11 +1096,10 @@ export function renderAiBuildWorkspaceScaffold() {
                                 <span>画布变更</span>
                                 <h3>应用预览</h3>
                             </div>
-                            <p>继续复用 Workflow Diff、Apply Preview 与原 Apply Gate。</p>
                         </header>
                         <div id="ai-build-apply-summary"></div>
                         <details class="ai-build-v2-inline-details">
-                            <summary>查看完整 Workflow Diff 与门禁详情</summary>
+                            <summary>查看完整流程变更与应用条件</summary>
                             <div class="ai-build-checks" id="ai-build-checks"></div>
                             <div class="ai-build-compact" id="ai-build-final-draft"></div>
                         </details>

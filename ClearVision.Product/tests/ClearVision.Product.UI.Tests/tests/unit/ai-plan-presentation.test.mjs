@@ -223,7 +223,7 @@ test('optimistic answer remains visible as confirming until canonical confirmati
   const panel = createPanel({ queue: [question], batch: [question], optimistic, readinessStatus: 'validating' });
   let presentation = deriveAiClarificationPresentation(panel, createPlan());
   assert.equal(presentation.activeQuestion.confirming, true);
-  assert.match(renderAiClarification(panel, createPlan()), /正在等待权威 Readiness 确认/);
+  assert.match(renderAiClarification(panel, createPlan()), /正在校验构建条件/);
 
   panel.agentWorkspaceState.answers.optimisticByField = {};
   panel.agentWorkspaceState.answers.confirmedByField = {
@@ -397,10 +397,10 @@ test('first planning wait renders four honest phases with cancel feedback', () =
   });
 
   const html = aiPanelPlanPresentationTestApi.renderEmptyPlan(panel);
-  assert.match(html, /规划进行中工作台/);
+  assert.match(html, /任务规划/);
   assert.match(html, /检测连接器端子是否缺针/);
   assert.match(html, /当前工作/);
-  assert.match(html, /进度依据/);
+  assert.match(html, /<details>\s*<summary>技术详情<\/summary>\s*<strong>Router 请求状态/);
   assert.match(html, /尚未收到 Plan Run 流式事件/);
   assert.match(html, /data-planning-status="running"/);
   assert.match(html, /理解需求/);

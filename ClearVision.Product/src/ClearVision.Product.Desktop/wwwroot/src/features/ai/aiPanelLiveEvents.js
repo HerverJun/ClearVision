@@ -7,7 +7,7 @@ const PLAN_PUBLIC_EVENT_DEFINITIONS = {
         kind: 'status',
         phase: 'plan',
         title: '规划已创建',
-        summary: '已创建 Plan Run，公开进度将通过事件流更新。',
+        summary: '规划已开始。',
         status: 'completed',
         visibility: 'ephemeral',
         ttlMs: 1200
@@ -1217,7 +1217,7 @@ export const aiPanelLiveEventsMixin = {
             case 'release_review_blocked':
                 return '请先处理发布复核阻断项，再重新发起发布检查。';
             case 'workflow_draft_missing':
-                return '请查看事件回放，确认 BuildResult 是否包含可回放流程草稿。';
+                return '请检查构建结果是否包含完整的流程草稿。';
             default:
                 if (String(context.stage || '').includes('readiness')) {
                     return '请按就绪检查阻断项补齐资源、参数或运行包元数据。';

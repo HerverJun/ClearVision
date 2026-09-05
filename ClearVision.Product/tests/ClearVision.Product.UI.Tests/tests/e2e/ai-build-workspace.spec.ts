@@ -323,7 +323,7 @@ test('Build ready uses one primary action and keeps internal diagnostics collaps
   await seedBuild(page, 'ready');
 
   await expect(page.locator('#ai-build-status-summary')).toContainText('可以应用');
-  await expect(page.locator('#ai-build-status-summary')).toContainText('复核 Workflow Diff');
+  await expect(page.locator('#ai-build-status-summary')).toContainText('复核流程变更');
   await expect(page.locator('#ai-build-flow-summary')).toContainText('图像采集');
   await expect(page.locator('#ai-build-action-queue')).toContainText('当前没有需要处理的阻断');
   const applyMetric = page.locator('#ai-build-status-summary .ai-build-v2-metric').filter({ hasText: '应用状态' });
@@ -356,9 +356,9 @@ test('parameter workspace preserves the real fill and confirmation interaction',
   await expect(parameterMetric.locator('dd')).toHaveText('0');
   await expect(parameterMetric.locator('small')).toContainText('已确认');
   await expect(page.locator('#ai-build-action-queue')).not.toContainText('参数已填写，等待确认');
-  await expect(page.locator('#ai-build-action-queue')).toContainText('应用门禁尚未开放');
-  await expect(nextStep).toContainText('查看应用门禁');
-  await expect(page.locator('#ai-build-apply-summary')).toContainText('Apply 尚未准备完成');
+  await expect(page.locator('#ai-build-action-queue')).toContainText('暂不可应用');
+  await expect(nextStep).toContainText('查看应用条件');
+  await expect(page.locator('#ai-build-apply-summary')).toContainText('暂不可应用');
   await expect(page.locator('#ai-btn-apply')).toBeDisabled();
 });
 
@@ -378,8 +378,8 @@ test('resource workspace reuses the existing binding action and updates canonica
   await expect(resourceMetric.locator('dd')).toHaveText('0');
   await expect(page.locator('#ai-build-action-queue')).not.toContainText('资源待绑定');
   await expect(page.locator('#ai-build-action-queue')).toContainText('当前没有需要处理的阻断');
-  await expect(nextStep).toContainText('复核 Workflow Diff');
-  await expect(page.locator('#ai-build-apply-summary')).toContainText('Apply 已准备完成');
+  await expect(nextStep).toContainText('复核流程变更');
+  await expect(page.locator('#ai-build-apply-summary')).toContainText('可应用到画布');
   await expect(page.locator('#ai-btn-apply')).toBeEnabled();
   const remaining = await page.evaluate(() => (window as any).aiPanel.currentResult.missingResources.length);
   expect(remaining).toBe(0);
@@ -424,8 +424,8 @@ test('mixed ordinary and resource parameters stay partitioned through confirmati
   await expect(resourceMetric.locator('dd')).toHaveText('0');
   await expect(page.locator('#ai-build-action-queue')).not.toContainText('资源待绑定');
   await expect(page.locator('#ai-build-action-queue')).toContainText('当前没有需要处理的阻断');
-  await expect(nextStep).toContainText('复核 Workflow Diff');
-  await expect(page.locator('#ai-build-apply-summary')).toContainText('Apply 已准备完成');
+  await expect(nextStep).toContainText('复核流程变更');
+  await expect(page.locator('#ai-build-apply-summary')).toContainText('可应用到画布');
   await expect(page.locator('#ai-btn-apply')).toBeEnabled();
   await expect(parameterSection.locator('[data-draft-input="true"]')).toHaveCount(1);
   await expect(resourceSection.locator('[data-resource-action="pick_model_resource"]')).toHaveCount(0);
@@ -538,7 +538,7 @@ test('Apply Preview expires immediately when the authoritative gate changes', as
   });
   await page.locator('.ai-apply-preview-confirm').click();
   await expect(page.locator('.ai-apply-preview-overlay')).toHaveCount(0);
-  await expect(page.locator('#ai-result-status-note')).toContainText('Apply 门禁已变化');
+  await expect(page.locator('#ai-result-status-note')).toContainText('应用条件已变化');
   const state = await page.evaluate(() => {
     const panel = (window as any).aiPanel;
     return { workbenchState: panel.workbenchState, applied: panel.appliedResultVersion === panel.currentResultVersion };
@@ -552,7 +552,7 @@ test('DryRun failure stays distinct from static validation and keeps Apply block
   await focusBuildSection(page, '#ai-build-validation-section');
 
   const structuralCheck = page.locator('#ai-build-validation-summary .ai-build-v2-check').filter({ hasText: '静态与拓扑检查' });
-  const dryRunCheck = page.locator('#ai-build-validation-summary .ai-build-v2-check').filter({ hasText: 'DryRun' });
+  const dryRunCheck = page.locator('#ai-build-validation-summary .ai-build-v2-check').filter({ hasText: '元数据预演' });
   await expect(structuralCheck).toContainText('已通过');
   await expect(dryRunCheck).toContainText('未通过');
   await expect(page.locator('#ai-result-validation')).toContainText('未产生有效判定结果');

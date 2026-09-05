@@ -674,8 +674,17 @@ test('AiPanel apply preview risk summary includes unresolved launch items and co
   assert.deepEqual(risk.nonBlockingFields, ['roi', 'plc_address']);
   assert.equal(changes, 1);
 
-  const html = panel._renderApplyRiskSummary(risk);
+  const [, names] = panel._createApplyPreviewNames(null, { operators: [
+    { id: 'op_1', displayName: '表面检测' },
+    { id: 'op_2', displayName: '表面检测' }
+  ] });
+  const html = panel._renderApplyRiskSummary(risk, names);
   assert.match(html, /应用前检查/);
+  assert.match(html, /表面检测 #1：/);
+  assert.doesNotMatch(html.split('<details')[0], /op_1/);
+  assert.match(html, /应用前检查技术详情/);
+  assert.match(html, /op_1/);
+  assert.match(panel._formatApplyPendingItem({ operatorId: 'unknown' }, names), /^未识别算子：/);
   assert.match(html, /缺少检测模型文件/);
   assert.match(html, /ROI范围/);
   assert.match(html, /PLC地址/);
@@ -738,6 +747,56 @@ test('AiPanel apply diff reports display name, removed parameters, and concrete 
   assert.equal(diff.removedConnections.length, 1);
   assert.equal(
     panel._formatConnectionPreview(diff.addedConnections[0]),
-    'op_1.Image -> op_3.Image'
+    '未识别算子 · 未识别端口 → 未识别算子 · 未识别端口'
   );
+});
+
+test('connection preview resolves removed nodes from the old snapshot and rewired nodes from the new snapshot', async () => {
+  installDom();
+  const { AiPanel } = await import('../../../../src/ClearVision.Product.Desktop/wwwroot/src/features/ai/aiPanel.js');
+  const panel = Object.create(AiPanel.prototype);
+  const before = { operators: [
+    { id: 'camera', operatorType: 'ImageAcquisition', outputPorts: [{ id: 'out', name: 'Image' }] },
+    { id: 'roi-old', displayName: '旧 ROI', inputPorts: [{ id: 'old-in', name: 'Image' }] }
+  ], connections: [{ sourceOperatorId: 'camera', sourcePortId: 'out', targetOperatorId: 'roi-old', targetPortId: 'old-in' }] };
+  const after = { operators: [before.operators[0],
+    { id: 'roi-new', displayName: 'ROI 管理', inputPorts: [{ id: 'new-in', displayName: '图像输入' }] }
+  ], connections: [{ sourceOperatorId: 'camera', sourcePortId: 'out', targetOperatorId: 'roi-new', targetPortId: 'new-in' }] };
+  const diff = panel._computeFlowDiff(before, after);
+  const [oldNames, newNames] = panel._createApplyPreviewNames(before, after);
+  assert.equal(panel._formatConnectionPreview(diff.removedConnections[0], oldNames), '图像采集 · 图像 → 旧 ROI · 图像输入');
+  assert.equal(panel._formatConnectionPreview(diff.addedConnections[0], newNames), '图像采集 · 图像 → ROI 管理 · 图像输入');
+  assert.equal(diff.removed.length, 1);
+  assert.equal(diff.added.length, 1);
+});
+
+test('duplicate operator names keep preview numbers across reordered snapshots', async () => {
+  installDom();
+  const { AiPanel } = await import('../../../../src/ClearVision.Product.Desktop/wwwroot/src/features/ai/aiPanel.js');
+  const panel = Object.create(AiPanel.prototype);
+  const first = { id: 'first', displayName: '采集', outputPorts: [{ name: 'Image' }] };
+  const second = { id: 'second', displayName: '采集', inputPorts: [{ name: 'Image' }] };
+  const [oldNames, newNames] = panel._createApplyPreviewNames({ operators: [first, second] }, { operators: [second, first] });
+  const connection = { sourceId: 'first', sourcePort: 0, targetId: 'second', targetPort: 0 };
+  assert.equal(panel._formatConnectionPreview(connection, oldNames), '采集 #1 · 图像 → 采集 #2 · 图像输入');
+  assert.equal(panel._formatConnectionPreview(connection, oldNames), panel._formatConnectionPreview(connection, newNames));
+  assert.equal(newNames.byOperator.get(second), '采集 #2');
+});
+
+test('unknown ports are named honestly and every connection remains reviewable with escaped technical details', async () => {
+  installDom();
+  const { AiPanel } = await import('../../../../src/ClearVision.Product.Desktop/wwwroot/src/features/ai/aiPanel.js');
+  const panel = Object.create(AiPanel.prototype);
+  const longName = '检测'.repeat(120) + '<script>';
+  const [, names] = panel._createApplyPreviewNames(null, { operators: [{ id: 'a', displayName: longName }] });
+  const connections = Array.from({ length: 9 }, (_, index) => ({ sourceId: 'a', sourcePortId: `unknown-${index}`, targetId: `absent-${index}`, targetPortName: 'Image' }));
+  const text = panel._formatConnectionPreview(connections[0], names);
+  assert.equal(text, `${longName} · 未识别端口 → 未识别算子 · 未识别端口`);
+  const html = panel._renderApplyConnections(connections, names, 'add');
+  assert.match(html, /<details class="ai-apply-preview-more"><summary>展开全部（9 条连线）/);
+  assert.equal((html.match(/class="ai-apply-preview-item /g) || []).length, 9);
+  assert.match(html, /新增连线技术详情/);
+  assert.match(html, /unknown-8/);
+  assert.doesNotMatch(html, /<script>/);
+  assert.match(html, /&lt;script&gt;/);
 });

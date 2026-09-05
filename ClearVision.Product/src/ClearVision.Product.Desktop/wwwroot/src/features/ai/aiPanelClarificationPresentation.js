@@ -244,11 +244,11 @@ function renderActiveQuestion(panel, item, presentation) {
     const disabled = readOnly || item.confirming;
     const hasAnswerOptions = asArray(item.options).filter(option => clean(option?.value)).length >= 2;
     const status = item.confirming
-        ? '<div class="ai-clarification-v2-status is-confirming" role="status">已选择，正在等待权威 Readiness 确认…</div>'
+        ? '<div class="ai-clarification-v2-status is-confirming" role="status">已选择，正在校验构建条件…</div>'
         : item.failed
             ? `<div class="ai-clarification-v2-status is-error" role="alert">${escapeHtml(panel, presentation.readinessError || '确认失败，请重新选择或重试。')}</div>`
             : item.unconfirmed
-                ? '<div class="ai-clarification-v2-status is-error" role="status">该选择尚未被后端确认，请重新选择。</div>'
+                ? '<div class="ai-clarification-v2-status is-error" role="status">该选择尚未确认，请重新选择。</div>'
                 : '';
     return `
         <fieldset class="ai-clarification-v2-question" data-ai-hook="clarification-question" data-field="${escapeHtml(panel, item.field)}">
@@ -269,7 +269,7 @@ function renderActiveQuestion(panel, item, presentation) {
                     <button type="button" data-ai-action="clarification-manual-cancel">取消</button>
                 </div>
                 </div>
-            ` : '<div class="ai-clarification-v2-status" role="status">该项等待后端提供可回答选项，前端不会创建替代答案入口。</div>'}
+            ` : '<div class="ai-clarification-v2-status" role="status">该问题暂时没有可选答案，请重试规划。</div>'}
             ${status}
         </fieldset>
     `;
@@ -326,7 +326,7 @@ export function renderAiClarification(panel, plan) {
             return `
                 <div class="ai-plan-v2-clarification-gap" data-ai-hook="clarification-contract-gap" role="alert">
                     <strong>暂无可回答的关键问题</strong>
-                    <span>当前 Readiness 仍有需求阻断，但 Plan 没有提供可选问题；系统不会用资源项或前端临时问卷代替。</span>
+                    <span>构建条件尚未满足，当前方案没有提供可回答的问题，请重试规划。</span>
                     <button type="button" data-ai-action="planning-retry">重试规划</button>
                 </div>
             `;

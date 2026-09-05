@@ -4233,6 +4233,7 @@ body:has(#ai-view:not(.hidden)) .cv-toast-info {
 }
 .ai-apply-preview-dialog:focus-visible,
 .ai-apply-preview-dialog button:focus-visible,
+.ai-apply-preview-dialog summary:focus-visible,
 .ai-shell [role="tab"]:focus-visible,
 .ai-shell input:focus-visible,
 .ai-shell textarea:focus-visible,
@@ -4320,6 +4321,7 @@ body:has(#ai-view:not(.hidden)) .cv-toast-info {
 .ai-apply-preview-section-title.is-remove { color: #f87171; }
 .ai-apply-preview-section-title.is-modify { color: #fbbf24; }
 .ai-apply-preview-item {
+    overflow-wrap: anywhere;
     font-size: 12px;
     padding: 3px 8px;
     border-radius: 4px;
@@ -4328,6 +4330,17 @@ body:has(#ai-view:not(.hidden)) .cv-toast-info {
 .ai-apply-preview-item.is-add { background: rgba(52, 211, 153, 0.08); color: #34d399; }
 .ai-apply-preview-item.is-remove { background: rgba(248, 113, 113, 0.08); color: #f87171; }
 .ai-apply-preview-item.is-modify { background: rgba(251, 191, 36, 0.08); }
+.ai-apply-preview-more summary,
+.ai-apply-preview-technical summary {
+    cursor: pointer;
+    padding: 6px 0;
+    font-size: 12px;
+}
+.ai-apply-preview-technical pre {
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    font-size: 11px;
+}
 .ai-apply-preview-param {
     font-size: 11px;
     color: var(--text-muted, #888);

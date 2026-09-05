@@ -284,6 +284,82 @@ async function focusClarificationViewport(page: Page): Promise<void> {
   });
 }
 
+test('shared counts include questions and one canonical resource across strict, draft, and validation states', async ({ page }) => {
+  await openAi(page, { width: 1366, height: 768, theme: 'light' });
+  await seedPlan(page, { resourcePending: true });
+  const count = page.locator('[data-ai-hook="task-blockers"]');
+  await expect(count).toHaveText('待补齐 3 项');
+  await expect(page.locator('#ai-plan-build-status')).toContainText('构建前必需 3 项');
+  await expect(page.locator('.ai-clarification-v2-header')).toContainText('还需确认 2 项');
+  await expect(page.locator('.ai-clarification-v2-resources')).toContainText('待补资源 · 1 项');
+  await page.route('**/api/ai/agent-plan/readiness-preview', async route => {
+    const request = route.request().postDataJSON();
+    const readiness = await page.evaluate(() => (window as any).aiPanel.pendingVisionPlan.buildReadiness);
+    readiness.blockers = readiness.blockers.map((item: any) => ({ ...item,
+      blocksBuild: item.category === 'resource_pending' ? request.requirementMode === 'strict' : item.blocksBuild }));
+    await route.fulfill({ json: { ...request, buildReadiness: readiness,
+      pendingConfirmationCount: 2, resourcePendingCount: 1,
+      mustConfirmBeforeBuildCount: request.requirementMode === 'draft' ? 2 : 3,
+      fillLaterCount: request.requirementMode === 'draft' ? 1 : 0, totalIncompleteCount: 3 } });
+  });
+  await page.locator('[data-requirement-mode="draft"]').click();
+  await expect(count).toHaveText('待补齐 3 项');
+  await expect(page.locator('#ai-plan-build-status')).toContainText('构建前必需 2 项 · 可后补 1 项');
+  await expect(page.locator('#ai-btn-start-build')).toHaveText('开始构建');
+  await expect(page.locator('#ai-btn-start-build')).toBeDisabled();
+  for (const status of ['validating', 'timeout', 'failed']) {
+    await page.evaluate(status => {
+      const panel = (window as any).aiPanel;
+      panel.agentWorkspaceState.readinessStatus = status;
+      panel._renderPlanWorkspace(panel.pendingVisionPlan);
+    }, status);
+    await expect(count).toBeHidden();
+    await expect(page.locator('#ai-plan-build-status')).not.toContainText('构建前必需');
+    await expect(page.locator('#ai-btn-start-build')).toBeDisabled();
+  }
+  await page.locator('#ai-btn-retry-readiness-preview').click();
+  await expect(count).toHaveText('待补齐 3 项');
+  await page.locator('[data-requirement-mode="strict"]').click();
+  await expect(page.locator('#ai-plan-build-status')).toContainText('构建前必需 3 项');
+});
+
+test('application preview reveals every named connection and preserves cancellation and expiry', async ({ page }) => {
+  await openAi(page, { width: 1024, height: 768, theme: 'dark' });
+  await seedPlan(page, { ready: true });
+  await page.evaluate(() => {
+    const panel = (window as any).aiPanel;
+    const before = { operators: [{ id: 'old-source', displayName: '旧采集', outputPorts: [{ id: 'old-out', name: 'Image' }] },
+      { id: 'target', displayName: 'ROI 管理', inputPorts: [{ id: 'in', name: 'Image' }] }],
+      connections: [{ sourceOperatorId: 'old-source', sourcePortId: 'old-out', targetOperatorId: 'target', targetPortId: 'in' }] };
+    const flow = { operators: [before.operators[1], ...Array.from({ length: 8 }, (_, index) => ({ id: `source-${index}`,
+      displayName: '图像采集', outputPorts: [{ id: `out-${index}`, name: 'Image' }] }))],
+      connections: Array.from({ length: 8 }, (_, index) => ({ sourceOperatorId: `source-${index}`, sourcePortId: `out-${index}`, targetOperatorId: 'target', targetPortId: 'in' })) };
+    panel.currentResult = { flow };
+    (window as any).openReviewPreview = () => panel._showApplyPreview(panel._computeFlowDiff(before, flow), flow,
+      { beforeFlow: before, applyRisk: { hasWarnings: false, totalCount: 0 } });
+    (window as any).openReviewPreview();
+  });
+  const dialog = page.getByRole('dialog', { name: '应用预览' });
+  await expect(dialog).toBeVisible();
+  await expect(dialog.locator('[data-connection-change="add"]')).toContainText('图像采集 #1 · 图像 → ROI 管理 · 图像输入');
+  await expect(dialog.locator('[data-connection-change="remove"]')).toContainText('旧采集 · 图像 → ROI 管理 · 图像输入');
+  await expect(dialog.locator('[data-connection-change="add"] .ai-apply-preview-item:visible')).toHaveCount(6);
+  await dialog.getByText('展开全部（8 条连线）', { exact: true }).press('Enter');
+  await expect(dialog.locator('[data-connection-change="add"] .ai-apply-preview-item:visible')).toHaveCount(8);
+  await dialog.getByText('新增连线技术详情', { exact: true }).click();
+  await expect(dialog.locator('[data-connection-change="add"] pre')).toContainText('source-7');
+  await page.keyboard.press('Escape');
+  await expect(dialog).toHaveCount(0);
+  await page.evaluate(() => (window as any).openReviewPreview());
+  await dialog.getByRole('button', { name: '取消', exact: true }).click();
+  await expect(dialog).toHaveCount(0);
+  await page.evaluate(() => { (window as any).openReviewPreview(); (window as any).aiPanel.currentResultVersion += 1; });
+  await dialog.getByRole('button', { name: '确认应用到画布' }).click();
+  await expect(dialog).toHaveCount(0);
+  await expect(page.locator('#ai-result-status-note')).toContainText('旧预览已失效');
+  expect(await page.evaluate(() => (window as any).flowCanvas.nodes.size)).toBe(0);
+});
+
 test('Plan-ready workspace shows understanding and recommendation while preserving the canonical Build gate', async ({ page }) => {
   await openAi(page, { width: 1366, height: 768 });
   await seedPlan(page, { ready: true, questions: 'none' });
@@ -403,7 +479,7 @@ test('selection stays confirming until canonical readiness confirms it, then adv
 
   await page.locator('input[value="industrial_camera"]').check();
   await requested;
-  await expect(page.locator('[data-ai-hook="clarification-question"]')).toContainText('正在等待权威 Readiness 确认');
+  await expect(page.locator('[data-ai-hook="clarification-question"]')).toContainText('正在校验构建条件');
   await expect(page.locator('input[value="industrial_camera"]')).toBeDisabled();
   await expect(page.locator('#ai-btn-start-build')).toBeDisabled();
 
@@ -447,7 +523,7 @@ test('manual supplement uses explicit_user_text and does not copy the main Compo
   const answer = await page.evaluate(() => (window as any).aiPanel.agentWorkspaceState.answers.optimisticByField.image_source);
   expect(answer).toMatchObject({ value: '使用 GigE 工业相机', origin: 'explicit_user_text' });
   await expect(page.locator('#ai-input')).toHaveCount(1);
-  await expect(page.locator('[data-ai-hook="clarification-question"]')).toContainText('正在等待权威 Readiness 确认');
+  await expect(page.locator('[data-ai-hook="clarification-question"]')).toContainText('正在校验构建条件');
   release();
 });
 
@@ -600,7 +676,7 @@ test('keyboard path reaches options and keeps the current action unique', async 
   const firstRadio = page.locator('input[value="industrial_camera"]');
   await firstRadio.focus();
   await page.keyboard.press('Enter');
-  await expect(page.locator('[data-ai-hook="clarification-question"]')).toContainText('正在等待权威 Readiness 确认');
+  await expect(page.locator('[data-ai-hook="clarification-question"]')).toContainText('正在校验构建条件');
   await expect(page.locator('#ai-btn-start-build')).toHaveCount(1);
   release();
 });

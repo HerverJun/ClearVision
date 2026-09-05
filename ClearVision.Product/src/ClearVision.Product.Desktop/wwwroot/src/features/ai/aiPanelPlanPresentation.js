@@ -300,7 +300,7 @@ function renderEmptyPlan(panel) {
         canceled: { label: '已取消', tone: 'cancelled' },
         idle: { label: '等待需求', tone: 'waiting' }
     }[lifecycleStatus] || { label: '等待中', tone: 'waiting' });
-    const current = clean(progress?.currentLabel) || '发送需求后，这里会立即显示可信的规划阶段。';
+    const current = clean(progress?.currentLabel) || '等待检测需求';
     const taskSummary = clean(
         panel?.lastPlanningRequestContext?.userMessage ||
         panel?.lastPlanningRequestContext?.description ||
@@ -319,13 +319,13 @@ function renderEmptyPlan(panel) {
     const detailText = progress?.slow
         ? '响应时间较长，请求仍在运行。你可以继续等待，也可以取消后重试。'
         : lifecycleStatus === 'running'
-            ? `当前聚焦“${activePhase.label}”。未收到真实完成信号的阶段保持等待。`
+            ? `正在${activePhase.label}。`
             : current;
     return `
         <div class="ai-plan-v2-empty ai-planning-wait is-${escapeHtml(panel, statusPresentation.tone)}" data-ai-hook="planning-wait" data-planning-status="${escapeHtml(panel, lifecycleStatus)}" data-planning-event-count="${eventCount}" role="status" aria-live="polite">
             <div class="ai-planning-wait-heading">
                 <div class="ai-planning-task-summary">
-                    <span>规划进行中工作台</span>
+                    <span>任务规划</span>
                     <strong>${escapeHtml(panel, taskSummary)}</strong>
                     <p>${escapeHtml(panel, current)}</p>
                 </div>
@@ -333,7 +333,7 @@ function renderEmptyPlan(panel) {
                     <span class="ai-planning-status-indicator" aria-hidden="true"></span>
                     <div>
                         <strong>${escapeHtml(panel, statusPresentation.label)}</strong>
-                        <small>${progress?.slow ? '响应较慢，但仍在工作' : (eventCount ? `实时事件 ${eventCount}` : '等待真实事件')}</small>
+                        <small>${progress?.slow ? '响应较慢，但仍在工作' : escapeHtml(panel, activePhase.label)}</small>
                     </div>
                 </div>
             </div>
@@ -359,10 +359,12 @@ function renderEmptyPlan(panel) {
                     <p>${escapeHtml(panel, detailText)}</p>
                     <div class="ai-planning-processing-dots" aria-hidden="true"><i></i><i></i><i></i></div>
                 </section>
-                <aside class="ai-planning-truth-panel" aria-label="进度依据">
-                    <span>进度依据</span>
-                    <strong>${eventCount ? 'Plan Run 实时事件' : 'Router 请求状态'}</strong>
-                    <p>${escapeHtml(panel, sourceText)}</p>
+                <aside class="ai-planning-truth-panel" aria-label="规划状态">
+                    <details>
+                        <summary>技术详情</summary>
+                        <strong>${eventCount ? 'Plan Run 实时事件' : 'Router 请求状态'}</strong>
+                        <p>${escapeHtml(panel, sourceText)}</p>
+                    </details>
                     ${(progress?.canCancel || progress?.canRetry) ? `
                         <div class="ai-planning-actions">
                             ${progress?.canCancel ? '<button type="button" data-ai-action="planning-cancel">取消规划</button>' : ''}
@@ -371,9 +373,6 @@ function renderEmptyPlan(panel) {
                     ` : ''}
                 </aside>
             </div>
-            <p class="ai-planning-integrity-note">
-                真实 Plan Run 事件到达后会接管同一条进度；等待、失败、超时和取消不会被显示为完成。
-            </p>
         </div>
     `;
 }

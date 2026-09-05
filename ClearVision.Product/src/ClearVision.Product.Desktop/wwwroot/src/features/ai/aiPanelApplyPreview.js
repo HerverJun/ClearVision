@@ -111,7 +111,7 @@ export const aiPanelApplyPreviewMixin = {
             this._hydrateCurrentResultFollowupsFromBuildResult();
         }
         if (baseFlow && !(this._isCanvasApplyReadyForResult?.(this.currentResult) ?? true)) {
-            this._addMessage('system', '当前应用门禁阻止应用到画布，请先复核公开阻断项。');
+            this._addMessage('system', '暂不可应用到画布，请先检查未满足的应用条件。');
             return;
         }
         if (!this.currentResult?.flow) {
@@ -139,13 +139,13 @@ export const aiPanelApplyPreviewMixin = {
             const diff = this._computeFlowDiff(currentFlow, flow);
             const totalChanges = this._getApplyPreviewChangeCount(diff);
             if (totalChanges > 0 || applyRisk.hasWarnings) {
-                this._showApplyPreview(diff, flow, { applyRisk });
+                this._showApplyPreview(diff, flow, { applyRisk, beforeFlow: currentFlow });
                 return;
             }
         }
 
         if (applyRisk.hasWarnings) {
-            this._showApplyPreview(this._emptyFlowDiff(), flow, { applyRisk });
+            this._showApplyPreview(this._emptyFlowDiff(), flow, { applyRisk, beforeFlow: currentFlow });
             return;
         }
 
@@ -316,19 +316,22 @@ export const aiPanelApplyPreviewMixin = {
             text.slice(0, maxChars);
     },
 
-    _formatApplyPendingItem(item) {
-        const operatorLabel = item.actualOperatorId || item.operatorId || '未定位算子';
-        const names = item.parameterNames?.length > 0
+    _formatApplyPendingItem(item, names) {
+        const entry = [item.actualOperatorId, item.operatorId, item.tempId]
+            .map(id => names?.byId.get(String(id)))
+            .find(Boolean);
+        const operatorLabel = entry?.label || '未识别算子';
+        const parameterNames = item.parameterNames?.length > 0
             ? item.parameterNames.map(name => getParameterDisplayName(name, { fallback: name })).join('、')
             : '待确认参数';
-        return this._sanitizeApplyPreviewText(`${operatorLabel}：${names}`, 220);
+        return this._sanitizeApplyPreviewText(`${operatorLabel}：${parameterNames}`, 220);
     },
 
     _formatApplyOperatorLabel(op) {
         const rawType = op?.operatorType || op?.OperatorType || op?.type || op?.Type || '';
         const label = op?.displayName || op?.DisplayName || op?.name || op?.Name ||
             getOperatorTypeDisplayName(rawType, { fallback: '未命名算子' });
-        return this._sanitizeApplyPreviewText(label, 160);
+        return this._sanitizeApplyPreviewText(label, Math.max(String(label).length, 160));
     },
 
     _formatApplyChangeLabel(name) {
@@ -345,12 +348,12 @@ export const aiPanelApplyPreviewMixin = {
         return this._sanitizeApplyPreviewText(value ?? '--', 180);
     },
 
-    _renderApplyRiskSummary(applyRisk) {
+    _renderApplyRiskSummary(applyRisk, names) {
         if (!applyRisk?.hasWarnings) return '';
 
         const pendingItems = (applyRisk.pending || [])
             .slice(0, 4)
-            .map(item => `<li>${this._escapeHtml(this._formatApplyPendingItem(item))}</li>`)
+            .map(item => `<li>${this._escapeHtml(this._formatApplyPendingItem(item, names))}</li>`)
             .join('');
         const missingItems = (applyRisk.missing || [])
             .slice(0, 4)
@@ -361,6 +364,7 @@ export const aiPanelApplyPreviewMixin = {
             .map(field => `<li>${this._escapeHtml(this._sanitizeApplyPreviewText(this._getRequirementFieldLabel(field), 160))}</li>`)
             .join('');
 
+        const technical = JSON.stringify(applyRisk, null, 2);
         return `
             <section class="ai-apply-preview-risk">
                 <div class="ai-apply-preview-risk-title">应用前检查</div>
@@ -385,43 +389,71 @@ export const aiPanelApplyPreviewMixin = {
                         <ul>${nonBlockingItems}</ul>
                     </div>
                 ` : ''}
+                <details class="ai-apply-preview-technical"><summary>应用前检查技术详情</summary><pre>${this._escapeHtml(this._sanitizeApplyPreviewText(technical, technical.length))}</pre></details>
             </section>
         `;
     },
 
-    _formatConnectionPreview(connection) {
-        if (!connection) return '未知连线';
+    _createApplyPreviewNames(beforeFlow, newFlow) {
+        const groups = new Map();
+        const entries = [beforeFlow, newFlow].map((flow, side) => this._extractOperators(flow || {}).map((op, index) => {
+            const ids = [op.tempId, op.TempId, op.id, op.Id].filter(value => value !== undefined && value !== null && value !== '').map(String);
+            const key = ids[0] || `${side}:${index}`;
+            const name = this._formatApplyOperatorLabel(op);
+            if (!groups.has(name)) groups.set(name, new Set());
+            groups.get(name).add(key);
+            return { op, ids, key, name };
+        }));
+        // Number the union of both snapshots so a surviving node keeps its number.
+        return entries.map(items => {
+            const byId = new Map();
+            const byOperator = new Map();
+            items.forEach(item => {
+                const peers = [...groups.get(item.name)];
+                const label = peers.length > 1 ? `${item.name} #${peers.indexOf(item.key) + 1}` : item.name;
+                const entry = { op: item.op, label };
+                item.ids.forEach(id => byId.set(id, entry));
+                byOperator.set(item.op, label);
+            });
+            return { byId, byOperator };
+        });
+    },
 
-        const source = connection.sourceTempId
-            || connection.SourceTempId
-            || connection.sourceOperatorId
-            || connection.SourceOperatorId
-            || connection.sourceId
-            || connection.SourceId
-            || '?';
-        const sourcePort = connection.sourcePortName
-            || connection.SourcePortName
-            || connection.sourcePortId
-            || connection.SourcePortId
-            || connection.sourcePort
-            || connection.SourcePort
-            || 'Output';
-        const target = connection.targetTempId
-            || connection.TargetTempId
-            || connection.targetOperatorId
-            || connection.TargetOperatorId
-            || connection.targetId
-            || connection.TargetId
-            || '?';
-        const targetPort = connection.targetPortName
-            || connection.TargetPortName
-            || connection.targetPortId
-            || connection.TargetPortId
-            || connection.targetPort
-            || connection.TargetPort
-            || 'Input';
+    _formatConnectionPreview(connection, names = { byId: new Map() }) {
+        const endpoint = role => {
+            const pascal = role === 'source' ? 'Source' : 'Target';
+            const read = suffix => connection?.[`${role}${suffix}`] ?? connection?.[`${pascal}${suffix}`];
+            const id = read('TempId') || read('OperatorId') || read('Id') || read('') || '';
+            const entry = names.byId.get(String(id));
+            const ports = entry?.op?.[role === 'source' ? 'outputPorts' : 'inputPorts']
+                || entry?.op?.[role === 'source' ? 'OutputPorts' : 'InputPorts']
+                || entry?.op?.[role === 'source' ? 'outputs' : 'inputs'] || [];
+            const portId = read('PortId');
+            const portName = read('PortName');
+            const portRef = portId ?? portName ?? read('Port');
+            const port = ports.find(candidate => [candidate.id, candidate.Id, candidate.name, candidate.Name]
+                .some(value => value !== undefined && String(value) === String(portRef)))
+                || (typeof portRef === 'number' ? ports[portRef] : null);
+            const rawName = port?.displayName || port?.DisplayName || port?.name || port?.Name
+                || (!portId ? portName : '') || '';
+            const portLabels = { Image: role === 'source' ? '图像' : '图像输入', Input: '输入', Output: '输出', Result: '结果', Mask: '掩膜', ROI: 'ROI', Regions: '区域' };
+            const portLabel = entry && rawName ? (portLabels[rawName] || rawName) : '未识别端口';
+            return `${entry?.label || '未识别算子'} · ${this._sanitizeApplyPreviewText(portLabel, Math.max(String(portLabel).length, 160))}`;
+        };
+        return `${endpoint('source')} → ${endpoint('target')}`;
+    },
 
-        return this._sanitizeApplyPreviewText(`${source}.${sourcePort} -> ${target}.${targetPort}`, 220);
+    _renderApplyConnections(connections, names, kind) {
+        if (!connections?.length) return '';
+        const label = kind === 'add' ? '新增连线' : '删除连线';
+        const render = items => items.map(conn => `<div class="ai-apply-preview-item is-${kind}">${kind === 'add' ? '+' : '-'} ${this._escapeHtml(this._formatConnectionPreview(conn, names))}</div>`).join('');
+        const technical = JSON.stringify(connections, null, 2);
+        return `<section class="ai-apply-preview-section" data-connection-change="${kind}">
+            <div class="ai-apply-preview-section-title is-${kind}">${label} (${connections.length})</div>
+            ${render(connections.slice(0, 6))}
+            ${connections.length > 6 ? `<details class="ai-apply-preview-more"><summary>展开全部（${connections.length} 条连线）</summary>${render(connections.slice(6))}</details>` : ''}
+            <details class="ai-apply-preview-technical"><summary>${label}技术详情</summary><pre>${this._escapeHtml(this._sanitizeApplyPreviewText(technical, technical.length))}</pre></details>
+        </section>`;
     },
 
     _showApplyPreview(diff, newFlow, options = {}) {
@@ -437,6 +469,7 @@ export const aiPanelApplyPreviewMixin = {
             ? document.activeElement
             : this.container.querySelector?.('#ai-btn-apply');
         const previewIdentity = this._createApplyPreviewIdentity(newFlow);
+        const [beforeNames, newNames] = this._createApplyPreviewNames(options.beforeFlow, newFlow);
 
         const overlay = document.createElement('div');
         overlay.className = 'ai-apply-preview-overlay';
@@ -448,17 +481,17 @@ export const aiPanelApplyPreviewMixin = {
                     <button class="ai-apply-preview-close" type="button" aria-label="关闭应用预览">&times;</button>
                 </div>
                 <div class="ai-apply-preview-body">
-                    ${this._renderApplyRiskSummary(applyRisk)}
+                    ${this._renderApplyRiskSummary(applyRisk, newNames)}
                     ${diff.added.length > 0 ? `
                         <div class="ai-apply-preview-section">
                             <div class="ai-apply-preview-section-title is-add">新增算子 (${diff.added.length})</div>
-                            ${diff.added.map(op => `<div class="ai-apply-preview-item is-add" title="${this._escapeHtml(this._sanitizeApplyPreviewText(op.operatorType || op.OperatorType || op.type || op.Type || '', 120))}">+ ${this._escapeHtml(this._formatApplyOperatorLabel(op))}</div>`).join('')}
+                            ${diff.added.map(op => `<div class="ai-apply-preview-item is-add">+ ${this._escapeHtml(newNames.byOperator.get(op) || this._formatApplyOperatorLabel(op))}</div>`).join('')}
                         </div>
                     ` : ''}
                     ${diff.removed.length > 0 ? `
                         <div class="ai-apply-preview-section">
                             <div class="ai-apply-preview-section-title is-remove">删除算子 (${diff.removed.length})</div>
-                            ${diff.removed.map(op => `<div class="ai-apply-preview-item is-remove" title="${this._escapeHtml(this._sanitizeApplyPreviewText(op.operatorType || op.OperatorType || op.type || op.Type || '', 120))}">- ${this._escapeHtml(this._formatApplyOperatorLabel(op))}</div>`).join('')}
+                            ${diff.removed.map(op => `<div class="ai-apply-preview-item is-remove">- ${this._escapeHtml(beforeNames.byOperator.get(op) || this._formatApplyOperatorLabel(op))}</div>`).join('')}
                         </div>
                     ` : ''}
                     ${diff.modified.length > 0 ? `
@@ -466,24 +499,14 @@ export const aiPanelApplyPreviewMixin = {
                             <div class="ai-apply-preview-section-title is-modify">参数变更 (${diff.modified.length})</div>
                             ${diff.modified.map(m => `
                                 <div class="ai-apply-preview-item is-modify">
-                                    ${this._escapeHtml(this._formatApplyOperatorLabel(m.op))}
+                                    ${this._escapeHtml(newNames.byOperator.get(m.op) || this._formatApplyOperatorLabel(m.op))}
                                     ${m.changes.map(c => `<div class="ai-apply-preview-param" title="${this._escapeHtml(this._sanitizeApplyPreviewText(`${this._formatApplyChangeLabel(c.name)}: ${this._formatApplyChangeValue(c, c.old)} -> ${this._formatApplyChangeValue(c, c.new)}`, 260))}">${this._escapeHtml(this._formatApplyChangeLabel(c.name))}: ${this._escapeHtml(this._formatApplyChangeValue(c, c.old))} &rarr; ${this._escapeHtml(this._formatApplyChangeValue(c, c.new))}</div>`).join('')}
                                 </div>
                             `).join('')}
                         </div>
                     ` : ''}
-                    ${diff.addedConnections.length > 0 ? `
-                        <div class="ai-apply-preview-section">
-                            <div class="ai-apply-preview-section-title is-add">新增连线 (${diff.addedConnections.length})</div>
-                            ${diff.addedConnections.slice(0, 6).map(conn => `<div class="ai-apply-preview-item is-add">+ ${this._escapeHtml(this._formatConnectionPreview(conn))}</div>`).join('')}
-                        </div>
-                    ` : ''}
-                    ${diff.removedConnections.length > 0 ? `
-                        <div class="ai-apply-preview-section">
-                            <div class="ai-apply-preview-section-title is-remove">删除连线 (${diff.removedConnections.length})</div>
-                            ${diff.removedConnections.slice(0, 6).map(conn => `<div class="ai-apply-preview-item is-remove">- ${this._escapeHtml(this._formatConnectionPreview(conn))}</div>`).join('')}
-                        </div>
-                    ` : ''}
+                    ${this._renderApplyConnections(diff.addedConnections, newNames, 'add')}
+                    ${this._renderApplyConnections(diff.removedConnections, beforeNames, 'remove')}
                 </div>
                 <div class="ai-apply-preview-actions">
                     <button class="ai-apply-preview-cancel" type="button">取消</button>
@@ -505,7 +528,8 @@ export const aiPanelApplyPreviewMixin = {
                 return;
             }
             if (event.key !== 'Tab') return;
-            const focusable = Array.from(dialog?.querySelectorAll?.('button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])') || []);
+            const focusable = Array.from(dialog?.querySelectorAll?.('button:not([disabled]), summary, [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])') || [])
+                .filter(element => !element.checkVisibility || element.checkVisibility());
             if (!focusable.length) {
                 event.preventDefault();
                 dialog?.focus?.();
@@ -530,7 +554,7 @@ export const aiPanelApplyPreviewMixin = {
             if (!this._isApplyPreviewIdentityCurrent(previewIdentity, newFlow)) {
                 this._closeApplyPreview({ restoreFocus: true, setReady: false });
                 this._setWorkbenchState?.(AiWorkbenchStates.FAILED);
-                this._setResultStatusNote('预览打开后画布、AI 结果或 Apply 门禁已变化，旧预览已失效。请重新打开应用预览。', 'warning');
+                this._setResultStatusNote('预览打开后画布、AI 结果或应用条件已变化，旧预览已失效。请重新打开应用预览。', 'warning');
                 this._announceAccessibilityStatus?.('应用预览已失效，请重新预览。', 'assertive');
                 return;
             }

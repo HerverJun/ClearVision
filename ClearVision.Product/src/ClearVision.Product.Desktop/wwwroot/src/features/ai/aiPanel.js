@@ -561,7 +561,7 @@ export class AiPanel {
                                 <svg viewBox="0 0 24 24" width="18" height="18" fill="white" aria-hidden="true"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
                             </button>
                         </div>
-                        <p class="sr-only" id="ai-input-help">输入需求后按 Ctrl+Enter 发送。生成完成后可切换 Plan 与 Build 并继续验证和应用。</p>
+                        <p class="sr-only" id="ai-input-help">输入检测需求，按 Ctrl+Enter 发送。</p>
                         <div class="ai-attachments" id="ai-attachments"></div>
                         <div class="ai-manual-retry-banner" id="ai-manual-retry-banner"></div>
                         <div class="ai-followup-hint-banner" id="ai-followup-hint-banner"></div>
@@ -1527,7 +1527,6 @@ export class AiPanel {
                 <div class="ai-followup-section">
                     <div class="ai-followup-section-header">
                         <div class="ai-followup-section-label">待绑定资源</div>
-                        <div class="ai-followup-section-tip">复用现有资源绑定与门禁刷新链路</div>
                     </div>
                     <div class="ai-followup-list">
                         ${missing.map((item, index) => this._renderResourceAuditTaskCard(
@@ -1562,7 +1561,6 @@ export class AiPanel {
         container.innerHTML = `
             <div class="ai-resource-audit-intro">
                 <strong>具体资源在 Build 中完成绑定。</strong>
-                <span>绑定结果继续进入现有参数草稿、Readiness、验证与 Apply Gate 刷新机制，不在前端建立平行状态。</span>
             </div>
             ${recommendedHtml}
             ${missingHtml}

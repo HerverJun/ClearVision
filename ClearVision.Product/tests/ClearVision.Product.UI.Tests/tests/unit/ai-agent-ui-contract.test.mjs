@@ -2883,7 +2883,7 @@ test('Plan workspace does not fall back to the Composer when canonical options a
   panel._renderPlanWorkspace(panel.pendingVisionPlan);
 
   assert.equal(input.focused, false);
-  assert.match(planWorkspace.innerHTML, /不会用资源项或前端临时问卷代替/);
+  assert.match(planWorkspace.innerHTML, /当前方案没有提供可回答的问题/);
   assert.doesNotMatch(planWorkspace.innerHTML, /id="ai-plan-focus-confirmation"/);
 });
 
@@ -3771,7 +3771,7 @@ test('Plan Mode streams public Plan progress into the assistant message', async 
   assert.equal(accepted, true);
   assert.ok(turn);
   assert.match(turn.replyBody.textContent, /详细阶段和当前工作见左侧工作台/);
-  assert.match(plan.innerHTML, /规划进行中工作台/);
+  assert.match(plan.innerHTML, /任务规划/);
   assert.doesNotMatch(plan.innerHTML, /data-planning-phase="context"[^]*已完成/);
   await waitFor(() => panel.pendingVisionPlan?.planId === 'plan_backend_1', 'streamed plan result');
 
@@ -4491,7 +4491,7 @@ test('Contract-invalid empty-option questions fail closed instead of creating a 
   panel._renderPlanWorkspace(plan);
   assert.equal(panel.agentWorkspaceState.projection.buildAction.canStart, false);
   assert.doesNotMatch(planWorkspace.innerHTML, /ai-plan-custom-input-field|data-ai-plan-option=/);
-  assert.match(planWorkspace.innerHTML, /前端不会创建替代答案入口/);
+  assert.match(planWorkspace.innerHTML, /该问题暂时没有可选答案/);
 });
 test('Draft Plan can start Build with legal Planner route without accepting strategy', async () => {
   const { AiPanel } = await loadAiPanel();
@@ -4617,7 +4617,7 @@ test('Readiness abort returns to idle and missing canonical preview never masque
   assert.equal(panel.activePlanReadinessPreviewRequest, null);
   const action = panel._getPlanBuildActionState(panel.pendingVisionPlan);
   assert.equal(action.label, '开始构建');
-  assert.match(action.statusText, /尚未获得.*权威校验结果/);
+  assert.match(action.statusText, /尚未完成构建条件校验/);
   assert.doesNotMatch(action.statusText, /正在校验/);
   assert.equal(action.canRetryReadiness, true);
 });
@@ -4716,7 +4716,7 @@ test('Empty backend readiness fails closed without legacy compatibility inferenc
   assert.equal(plan.authoritativeBuildReadiness, null);
   assert.equal(panel.agentWorkspaceState.projection.readiness.canBuild, false);
   assert.equal(panel._getPlanBuildActionState(plan).canStart, false);
-  assert.match(panel._getPlanBuildBlockedReason(plan), /后端未返回合法 readiness/);
+  assert.match(panel._getPlanBuildBlockedReason(plan), /未能取得构建条件校验结果/);
 });
 test('V2 answer overlay does not invent blockers from stale legacy strings', async () => {
   const { AiPanel } = await loadAiPanel();
@@ -6245,7 +6245,7 @@ test('BuildResult replay payload renders Build Workspace and apply gate without 
     '元数据预演',
     '运行包就绪',
     '流程差异',
-    '应用门禁'
+    '应用条件'
   ]) {
     assert.match(timelineHtml, new RegExp(label));
   }
@@ -6625,7 +6625,7 @@ test('Build resource workspace exposes existing binding controls and redacts uns
   assert.doesNotMatch(html, /data-missing-resource-action/);
   assert.match(html, /data-resource-action="pick_model_resource"/);
   assert.match(html, /选择模型文件/);
-  assert.match(html, /模型文件选择器|当前 Plan 工作台/);
+  assert.match(html, /模型文件选择器|当前方案/);
 });
 test('apply hint separates canvas apply from DeploymentReady gate', async () => {
   const source = [
@@ -6634,7 +6634,7 @@ test('apply hint separates canvas apply from DeploymentReady gate', async () => 
   ].map(file => fs.readFileSync(path.resolve(getRepoRoot(), file), 'utf8')).join('\n');
 
   assert.match(source, /按钮继续服从现有 CanvasApplyReady、ApplyGate 与画布应用语义/);
-  assert.match(source, /不在前端建立平行状态/);
+  assert.doesNotMatch(source, /不在前端建立平行状态|复用现有资源绑定与门禁刷新链路/);
 });
 
 test('confirmed manual parameters are written when applying to canvas', async () => {
@@ -6951,7 +6951,7 @@ test('AgentRun completed payload without canonical flow fails closed despite Wor
   assert.doesNotMatch(elements['#ai-result-summary'].innerHTML, /该方案包含 <span class="result-count">0<\/span> 个算子/);
   assert.match(elements['#ai-build-event-timeline'].innerHTML, /Build 工具证据/);
   assert.match(elements['#ai-build-parameters'].innerHTML, /模型资源/);
-  assert.match(elements['#ai-build-checks'].innerHTML, /应用门禁：已阻断/);
+  assert.match(elements['#ai-build-checks'].innerHTML, /暂不可应用/);
   assert.match(elements['#ai-build-checks'].innerHTML, /请基于原计划重新构建/);
   assert.match(elements['#ai-build-final-draft'].innerHTML, /无法应用构建结果/);
   assert.match(elements['#ai-build-final-draft'].innerHTML, /legacy_build_artifact_missing_canonical_flow/);
@@ -7042,7 +7042,7 @@ test('AgentRun failed readiness blocker with BuildResult keeps real blocker and 
   assert.equal(panel._getBuildArtifactFlowCompatibilityState(payload, [failedEvent]).status, 'terminal_failed_without_flow');
   panel._renderBuildWorkspaceFromAgentRun();
 
-  assert.match(elements['#ai-build-checks'].innerHTML, /应用门禁/);
+  assert.match(elements['#ai-build-checks'].innerHTML, /应用条件/);
   assert.match(elements['#ai-build-checks'].innerHTML, /画布可应用：否/);
   assert.match(elements['#ai-build-checks'].innerHTML, /First Fix/);
   assert.match(elements['#ai-build-checks'].innerHTML, /模型资源/);
@@ -8401,13 +8401,13 @@ test('historical readiness without count partitions deduplicates resource identi
     buildReadiness: { canBuild: false, remainingFields: ['inspection_object', 'task_type'], blockers: [
       { id: 'inspection_object', field: 'inspection_object', blocksBuild: true },
       { id: 'task_type', field: 'task_type', blocksBuild: true },
-      { id: 'plan:image', category: 'resource_pending', blocksBuild: false, resource: { canonicalId: 'image:sample' } },
+      { id: 'plan:image', field: 'model_resource', category: 'resource_pending', blocksBuild: false, resource: { canonicalId: 'image:sample' } },
       { id: 'audit:image', category: 'resource_pending', blocksBuild: false, resource: { canonicalId: 'image:sample' } }
     ] }
   });
   assert.equal(preview.hasAuthoritativeCountPartition, false);
   panel._getCurrentCanonicalPreview = () => preview;
-  const summary = panel._buildPlanMissingSummary(plan, ['inspection_object', 'task_type']);
+  const summary = panel._buildPlanMissingSummary(plan, ['inspection_object', 'task_type', 'model_resource']);
   assert.equal(summary.mustConfirmCount, 2);
   assert.equal(summary.fillLaterCount, 1);
   assert.equal(summary.totalCount, 3);

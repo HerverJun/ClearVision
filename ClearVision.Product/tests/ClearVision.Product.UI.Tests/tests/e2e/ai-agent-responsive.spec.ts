@@ -1636,7 +1636,7 @@ test('AI agent workbench default Plan view hides raw semantic trace until diagno
   await expect(page.locator('#ai-agent-workspace-overview')).not.toContainText('可构建：否');
   await expect(page.locator('.ai-agent-overview-card')).toHaveClass(/is-warning/);
   await expect(page.locator('.ai-agent-overview-card')).not.toHaveClass(/is-danger/);
-  await expect(page.locator('[data-ai-hook="task-blockers"]')).toBeHidden();
+  await expect(page.locator('[data-ai-hook="task-blockers"]')).toHaveText('待补齐 2 项');
   const visibleRawSnippets = await page.evaluate(() => {
     const root = document.querySelector('#ai-plan-workspace');
     const snippets = ['semantic.taskType', 'semantic.failureCode', 'objectSignals', 'metadataOnly'];

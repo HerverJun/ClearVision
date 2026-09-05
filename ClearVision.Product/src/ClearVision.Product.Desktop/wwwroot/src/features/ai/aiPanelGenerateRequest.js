@@ -708,7 +708,7 @@ export const aiPanelGenerateRequestMixin = {
                 message: '正在取消规划...',
                 phase: 'cancelling'
             });
-            this._addMessage('system', '已发送 Plan Run 取消请求，正在等待事件流确认。');
+            this._addMessage('system', '正在取消规划，请稍候。');
             this._setGeneratingState(this.isGenerating);
             return;
         }

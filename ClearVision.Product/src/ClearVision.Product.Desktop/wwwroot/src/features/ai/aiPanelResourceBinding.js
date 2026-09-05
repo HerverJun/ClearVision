@@ -1,4 +1,5 @@
 import {
+    getOperatorTypeDisplayName,
     getParameterDisplayName,
     getResourceDisplayName
 } from '../../shared/operatorDisplayNames.js';
@@ -170,12 +171,18 @@ export const aiPanelResourceBindingMixin = {
             ? '阻止构建'
             : normalizedItem.blockingScope === 'build_deploy_run' ? '阻止构建、部署和运行' : '允许草稿；阻止部署和运行';
         const sourceLabel = (normalizedItem.sources || [normalizedItem.source]).filter(Boolean).join(' / ') || '权威 Readiness';
-        const resolutionLabel = this._formatResourceResolutionTarget?.(normalizedItem.resolutionTarget) || normalizedItem.resolutionTarget || '当前 Plan 工作台';
+        const resolutionLabel = this._formatResourceResolutionTarget?.(normalizedItem.resolutionTarget) || normalizedItem.resolutionTarget || '当前方案';
+        const flow = this.currentResult?.flow || this.currentResult?.Flow;
+        const operator = (this._extractOperators?.(flow || {}) || []).find(op =>
+            [op.id, op.Id, op.tempId, op.TempId].some(id => id && String(id) === String(operatorIdRaw)));
+        const operatorLabel = operator ? this._formatApplyOperatorLabel?.(operator)
+            : getOperatorTypeDisplayName(normalizedItem.operatorType, { fallback: '待识别算子' });
         const technical = [
             resourceType ? `resourceType=${resourceType}` : '',
             normalizedItem.resourceKey ? `resourceRef=${this._sanitizeResourceAuditDisplayText(normalizedItem.resourceKey, 160)}` : '',
             operatorId ? `operator=${operatorId}` : '',
-            parameterName ? `parameter=${parameterName}` : ''
+            parameterName ? `parameter=${parameterName}` : '',
+            `来源=${sourceLabel}`
         ].filter(Boolean).join('；');
 
         return `
@@ -183,16 +190,15 @@ export const aiPanelResourceBindingMixin = {
                 <div class="ai-resource-audit-card-head">
                     <div>
                         <div class="ai-followup-item-title" title="${this._escapeHtml(resourceType)}">${this._escapeHtml(resourceLabel)}</div>
-                        <div class="ai-followup-item-body">${this._escapeHtml(normalizedItem.resourceKey || normalizedItem.canonicalId || '资源任务')}</div>
+                        <div class="ai-followup-item-body">${this._escapeHtml(normalizedItem.resourceName || resourceLabel)}</div>
                     </div>
                     <span class="ai-resource-audit-badge">${this._escapeHtml(statusLabel)}</span>
                 </div>
                 <div class="ai-resource-audit-grid">
                     <span><small>资源</small><b>${this._escapeHtml(`${resourceLabel}${normalizedItem.resourceName && normalizedItem.resourceName !== resourceLabel ? ` · ${normalizedItem.resourceName}` : ''}`)}</b></span>
-                    <span><small>影响算子</small><b>${this._escapeHtml(operatorId || '待识别')}</b></span>
+                    <span><small>影响算子</small><b>${this._escapeHtml(operatorLabel || '待识别算子')}</b></span>
                     <span><small>影响参数</small><b>${this._escapeHtml(parameterLabel)}</b></span>
                     <span><small>阻断范围</small><b>${this._escapeHtml(scopeLabel)}</b></span>
-                    <span><small>来源</small><b>${this._escapeHtml(sourceLabel)}</b></span>
                     <span><small>解决位置</small><b>${this._escapeHtml(resolutionLabel)}</b></span>
                     <span><small>阻断原因</small><b>${this._escapeHtml(this._sanitizeAuditText(blockerReason))}</b></span>
                     <span><small>AI 建议</small><b>${this._escapeHtml(suggestion)}</b></span>
@@ -209,8 +215,7 @@ export const aiPanelResourceBindingMixin = {
 
     _getResourceAuditSuggestion(item = {}, actionModel = {}) {
         const type = String(item?.resourceType || '').trim().toLowerCase();
-        const parameterName = this._sanitizeResourceAuditDisplayText(actionModel?.parameterName || item?.parameterName || '', 120);
-        if (type.includes('model')) return `请人工核对模型资源与 ${parameterName || '模型参数'} 的适配性，AI 建议仅作参考。`;
+        if (type.includes('model')) return '请核对模型与检测任务的适配性。';
         if (type.includes('template')) return '请人工选择模板资源并确认版本，AI 不会替用户选择模板文件。';
         if (type.includes('measurement') || type.includes('calibration')) return '请人工填写标定或像素比例，并确认单位来源。';
         if (type.includes('camera')) return '请人工选择已登记的相机绑定，系统不会访问真实相机。';
@@ -227,7 +232,7 @@ export const aiPanelResourceBindingMixin = {
         if (target === 'settings:calibration') return '标定设置';
         if (target === 'settings:communication') return '设置 → 通信';
         if (target === 'replan') return '重新规划';
-        return '当前 Plan 工作台';
+        return '当前方案';
     },
 
     _getPendingResourceDraftKey(item = {}) {
@@ -406,7 +411,7 @@ export const aiPanelResourceBindingMixin = {
         const risk = this._buildApplyRiskSummary?.(result) || { hasWarnings: true, totalCount: 0 };
         const note = risk.hasWarnings
             ? `已记录${actionModel.inputLabel || '资源'}元数据，仍有 ${risk.totalCount} 项部署前待补。`
-            : '资源元数据已补齐，应用门禁已更新为 metadata-only 就绪。';
+            : '资源信息已补齐，已满足元数据检查的应用条件；尚未运行真实样本。';
         this._setResultStatusNote(note, risk.hasWarnings ? 'info' : 'success');
         this._addMessage('system', note);
         return true;
@@ -915,7 +920,7 @@ export const aiPanelResourceBindingMixin = {
                     </div>
                 `;
             }).join('')
-            : '<div class="ai-followup-empty">暂无人工确认记录。BuildResult replay 后如包含记录，将在此恢复。</div>';
+            : '<div class="ai-followup-empty">当前构建结果暂无人工确认记录。</div>';
 
         return `
             <details class="ai-manual-confirmation-panel" ${merged.length ? 'open' : ''}>
