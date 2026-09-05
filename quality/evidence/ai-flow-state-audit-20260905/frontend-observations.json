@@ -1,0 +1,121 @@
+[
+  {
+    "id": "lifecycle-restore",
+    "observed": [
+      {
+        "lifecycleState": "planning",
+        "trusted": false,
+        "reason": "invalid_lifecycle",
+        "revision": 0,
+        "buildRunId": ""
+      },
+      {
+        "lifecycleState": "plan_ready",
+        "trusted": true,
+        "reason": "invalid_plan",
+        "revision": 7,
+        "buildRunId": "build-run"
+      },
+      {
+        "lifecycleState": "build_completed",
+        "trusted": false,
+        "reason": "invalid_lifecycle",
+        "revision": 0,
+        "buildRunId": ""
+      },
+      {
+        "lifecycleState": "build_failed",
+        "trusted": true,
+        "reason": "invalid_plan",
+        "revision": 7,
+        "buildRunId": "build-run"
+      },
+      {
+        "lifecycleState": "recovery_conflict",
+        "trusted": false,
+        "reason": "invalid_lifecycle",
+        "revision": 0,
+        "buildRunId": ""
+      }
+    ]
+  },
+  {
+    "id": "save-retry",
+    "observed": {
+      "posts": 1,
+      "dirty": true,
+      "boundaries": [
+        {
+          "boundary": "before_build",
+          "allowed": false
+        },
+        {
+          "boundary": "history_switch",
+          "allowed": false
+        },
+        {
+          "boundary": "new_conversation",
+          "allowed": false
+        }
+      ]
+    }
+  },
+  {
+    "id": "running-history-reconnect",
+    "observed": {
+      "subscriptions": 0,
+      "replayed": [
+        "run.started"
+      ],
+      "activeRunId": "live-build"
+    }
+  },
+  {
+    "id": "cancel-after-plan-history",
+    "observed": {
+      "cancellations": [
+        "/ai/agent-runs/completed-plan-run/cancel"
+      ],
+      "currentBuild": "current-build-run",
+      "cancellationLocked": true
+    }
+  },
+  {
+    "id": "late-plan-create",
+    "observed": {
+      "sessionId": "audit-session",
+      "revision": 8,
+      "error": "Plan Run 已过期。"
+    }
+  },
+  {
+    "id": "late-build-create",
+    "observed": {
+      "disposed": true,
+      "sessionId": "audit-session",
+      "revision": 8,
+      "subscriptions": [
+        "late-build-run"
+      ]
+    }
+  },
+  {
+    "id": "new-plan-old-build-lock",
+    "observed": {
+      "newPlanId": "new-plan",
+      "previousBuildId": "previous-build",
+      "readOnly": true,
+      "save": {
+        "skipped": true,
+        "readOnly": true
+      }
+    }
+  },
+  {
+    "id": "draft-mode-restore",
+    "observed": {
+      "planMode": "draft",
+      "effectiveMode": "strict"
+    }
+  }
+]

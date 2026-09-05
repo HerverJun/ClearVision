@@ -1,0 +1,1286 @@
+[
+  {
+    "path": "/api/ai/agent-runs",
+    "status": 200,
+    "data": {
+      "runId": "ar_2ddbb10bf5c94ce2a2414ff599d3a5dd",
+      "sessionId": "isolated-state-audit",
+      "brief": "I will turn this request into a safe Vision Agent workflow draft and stream each public progress step: start build from confirmed plan",
+      "events": [
+        {
+          "runId": "ar_2ddbb10bf5c94ce2a2414ff599d3a5dd",
+          "sequence": 1,
+          "timestamp": "2026-09-05T08:07:34.7363491\u002B00:00",
+          "eventType": "run.started",
+          "stage": "run",
+          "title": "Vision Agent run started",
+          "summary": "Received the request and opened a metadata-only event stream.",
+          "status": "running",
+          "payload": {
+            "runKind": "build",
+            "mode": "new",
+            "useVisionAgentGenerateFlow": true,
+            "agentGenerateFlowMode": "scripted",
+            "sessionId": "isolated-state-audit",
+            "attachmentCount": 0,
+            "planId": "plan-agent-run-entry",
+            "planHash": "sha256:a657adbb6ee2789c952f852d08ccd64b1b7e85a0b707c7bc5ceeb6bea1353eea",
+            "hasPlanSnapshot": true,
+            "hasCurrentFlowSnapshot": false,
+            "metadataOnly": true
+          },
+          "metadataOnly": true,
+          "redactionPass": true
+        },
+        {
+          "runId": "ar_2ddbb10bf5c94ce2a2414ff599d3a5dd",
+          "sequence": 2,
+          "timestamp": "2026-09-05T08:07:34.7481009\u002B00:00",
+          "eventType": "assistant.brief",
+          "stage": "brief",
+          "title": "Task summary",
+          "summary": "I will turn this request into a safe Vision Agent workflow draft and stream each public progress step: start build from confirmed plan",
+          "status": "completed",
+          "payload": {
+            "brief": "I will turn this request into a safe Vision Agent workflow draft and stream each public progress step: start build from confirmed plan",
+            "publicDiagnosticsOnly": true,
+            "metadataOnly": true
+          },
+          "metadataOnly": true,
+          "redactionPass": true
+        }
+      ],
+      "workspaceSnapshot": {
+        "schemaVersion": 1,
+        "revision": 2,
+        "projectId": null,
+        "lifecycleState": "building",
+        "pendingPlanSnapshot": {
+          "planContractVersion": "",
+          "planId": "plan-agent-run-entry",
+          "planHash": "sha256:a657adbb6ee2789c952f852d08ccd64b1b7e85a0b707c7bc5ceeb6bea1353eea",
+          "planSource": "",
+          "currentPhase": "planning",
+          "fallbackReason": "",
+          "plannerFailureStage": "",
+          "plannerFailureCode": "",
+          "sanitizedErrorKind": "",
+          "sanitizedErrorMessage": "",
+          "originalUserPrompt": "start build from confirmed plan",
+          "goal": "logo surface defect inspection",
+          "intent": "unknown",
+          "confidence": "low",
+          "requirementUnderstanding": [
+            "Legacy snapshot was captured before confirmed answers were applied."
+          ],
+          "confirmedPlanAnswers": [],
+          "resolvedPlanFields": [],
+          "remainingPlanFields": [],
+          "recommendedRoute": {
+            "routeId": "surface_defect_route",
+            "title": "Surface defect route",
+            "summary": "Acquisition, defect detection, judgment, and output.",
+            "operators": [
+              "ImageAcquisition",
+              "SurfaceDefectDetection",
+              "ResultJudgment",
+              "ResultOutput"
+            ],
+            "templateDecision": "planner_route"
+          },
+          "clarificationQuestions": [],
+          "recommendedDefaults": [],
+          "risks": [],
+          "acceptanceCriteria": [],
+          "executablePlan": [],
+          "canBuild": false,
+          "blockingReasons": [
+            "hard_requirement:inspection_object_missing",
+            "hard_requirement:task_type_missing",
+            "hard_requirement:image_source_missing",
+            "hard_requirement:acceptance_criteria_missing"
+          ],
+          "buildReadiness": {
+            "canBuild": false,
+            "blockers": [],
+            "resolvedFields": [],
+            "remainingFields": [],
+            "primaryMessage": "",
+            "contractVersion": "v2",
+            "missingResources": []
+          },
+          "semanticExtraction": {
+            "isVisionRequest": true,
+            "intent": "new_flow",
+            "taskType": "unknown",
+            "confidence": 0,
+            "taskTypeConfidence": 0,
+            "inspectionObject": "",
+            "targetAttribute": "",
+            "defectType": "",
+            "measurementTarget": "",
+            "imageSource": "",
+            "okCondition": "",
+            "ngCondition": "",
+            "outputTarget": "",
+            "suggestedRoute": "",
+            "canPlanCandidate": false,
+            "canBuildCandidate": false,
+            "objectSignals": [],
+            "taskSignals": [],
+            "missingFields": [],
+            "clarificationQuestions": [],
+            "source": "rule_fallback",
+            "failureCode": "",
+            "sanitizedErrorMessage": "",
+            "metadataOnly": true
+          },
+          "requirementMaturity": {
+            "maturity": "ambiguous",
+            "taskType": "unknown",
+            "canPlan": false,
+            "canBuild": false,
+            "objectSignals": [],
+            "taskSignals": [],
+            "missingFields": [
+              "inspection_object",
+              "task_type",
+              "image_source",
+              "acceptance_criteria"
+            ],
+            "blockingReasons": [
+              "inspection_object_missing",
+              "task_type_missing",
+              "image_source_missing",
+              "acceptance_criteria_missing"
+            ],
+            "publicReason": "Legacy snapshot was not buildable before answers.",
+            "metadataOnly": true
+          },
+          "decisionTrace": null,
+          "nextAction": "",
+          "contextSummary": {
+            "hasCurrentFlow": false,
+            "hasCurrentResult": false,
+            "attachmentCount": 0,
+            "templateSelectionMode": "",
+            "templateId": "",
+            "contextKinds": [],
+            "operatorCatalogTools": []
+          },
+          "operatorCatalogVersion": "",
+          "templateCatalogVersion": "",
+          "templateSelection": null,
+          "stationBoundarySummary": "",
+          "plcOutputPolicy": "",
+          "planWarnings": [],
+          "contractRepairNotes": [],
+          "planFidelity": {
+            "contractVersion": "v2",
+            "taskType": "",
+            "satisfied": true,
+            "repaired": false,
+            "requiredCapabilities": [],
+            "requiredOutputSemantics": [],
+            "satisfiedCapabilities": [],
+            "availableOutputSemantics": [],
+            "missingCapabilities": [],
+            "missingOutputSemantics": [],
+            "blockingReasons": [],
+            "evidence": []
+          },
+          "publicEvents": [],
+          "metadataOnly": true
+        },
+        "planQuestionSelections": {},
+        "confirmedPlanAnswers": [
+          {
+            "questionId": "",
+            "field": "inspection_object",
+            "value": "logo area",
+            "origin": "explicit_user_text",
+            "evidenceText": "",
+            "confidence": 1,
+            "resolved": true
+          },
+          {
+            "questionId": "",
+            "field": "task_type",
+            "value": "surface_defect",
+            "origin": "explicit_user_text",
+            "evidenceText": "",
+            "confidence": 1,
+            "resolved": true
+          },
+          {
+            "questionId": "",
+            "field": "image_source",
+            "value": "camera",
+            "origin": "explicit_user_text",
+            "evidenceText": "",
+            "confidence": 1,
+            "resolved": true
+          },
+          {
+            "questionId": "",
+            "field": "acceptance_criteria",
+            "value": "scratch is NG",
+            "origin": "explicit_user_text",
+            "evidenceText": "",
+            "confidence": 1,
+            "resolved": true
+          }
+        ],
+        "optimisticPlanAnswers": [],
+        "answerRevision": 0,
+        "readinessPreview": null,
+        "missingResources": [],
+        "resourceDecisions": {},
+        "resourceRevision": 0,
+        "requirementMode": "strict",
+        "workspaceViewMode": "plan",
+        "planAcceptedRecommendedDefaults": false,
+        "planRunId": null,
+        "planRunStatus": "completed",
+        "planTerminalSequence": null,
+        "buildRunId": "ar_2ddbb10bf5c94ce2a2414ff599d3a5dd",
+        "buildRunStatus": "running",
+        "buildTerminalSequence": null,
+        "submittedBuildFingerprint": "sha256:a469113db139e61015cb63ab6d4b94e9b44f7a99b7c3b482cfefb5da63718896",
+        "updatedAtUtc": "2026-09-05T08:07:34.7567743Z"
+      },
+      "persistenceStatus": {
+        "primaryStoreSaved": true,
+        "recoveryBackupSaved": true,
+        "errorCode": "",
+        "publicMessage": ""
+      }
+    }
+  },
+  {
+    "path": "/api/ai/agent-runs",
+    "status": 200,
+    "data": {
+      "runId": "ar_08314fc58c7f4a258716a608300f7a26",
+      "sessionId": "isolated-state-audit",
+      "brief": "I will turn this request into a safe Vision Agent workflow draft and stream each public progress step: start build from confirmed plan",
+      "events": [
+        {
+          "runId": "ar_08314fc58c7f4a258716a608300f7a26",
+          "sequence": 1,
+          "timestamp": "2026-09-05T08:07:34.7907684\u002B00:00",
+          "eventType": "run.started",
+          "stage": "run",
+          "title": "Vision Agent run started",
+          "summary": "Received the request and opened a metadata-only event stream.",
+          "status": "running",
+          "payload": {
+            "runKind": "build",
+            "mode": "new",
+            "useVisionAgentGenerateFlow": true,
+            "agentGenerateFlowMode": "scripted",
+            "sessionId": "isolated-state-audit",
+            "attachmentCount": 0,
+            "planId": "plan-agent-run-entry",
+            "planHash": "sha256:a657adbb6ee2789c952f852d08ccd64b1b7e85a0b707c7bc5ceeb6bea1353eea",
+            "hasPlanSnapshot": true,
+            "hasCurrentFlowSnapshot": false,
+            "metadataOnly": true
+          },
+          "metadataOnly": true,
+          "redactionPass": true
+        },
+        {
+          "runId": "ar_08314fc58c7f4a258716a608300f7a26",
+          "sequence": 2,
+          "timestamp": "2026-09-05T08:07:34.7915871\u002B00:00",
+          "eventType": "assistant.brief",
+          "stage": "brief",
+          "title": "Task summary",
+          "summary": "I will turn this request into a safe Vision Agent workflow draft and stream each public progress step: start build from confirmed plan",
+          "status": "completed",
+          "payload": {
+            "brief": "I will turn this request into a safe Vision Agent workflow draft and stream each public progress step: start build from confirmed plan",
+            "publicDiagnosticsOnly": true,
+            "metadataOnly": true
+          },
+          "metadataOnly": true,
+          "redactionPass": true
+        }
+      ],
+      "workspaceSnapshot": {
+        "schemaVersion": 1,
+        "revision": 3,
+        "projectId": null,
+        "lifecycleState": "building",
+        "pendingPlanSnapshot": {
+          "planContractVersion": "",
+          "planId": "plan-agent-run-entry",
+          "planHash": "sha256:a657adbb6ee2789c952f852d08ccd64b1b7e85a0b707c7bc5ceeb6bea1353eea",
+          "planSource": "",
+          "currentPhase": "planning",
+          "fallbackReason": "",
+          "plannerFailureStage": "",
+          "plannerFailureCode": "",
+          "sanitizedErrorKind": "",
+          "sanitizedErrorMessage": "",
+          "originalUserPrompt": "start build from confirmed plan",
+          "goal": "logo surface defect inspection",
+          "intent": "unknown",
+          "confidence": "low",
+          "requirementUnderstanding": [
+            "Legacy snapshot was captured before confirmed answers were applied."
+          ],
+          "confirmedPlanAnswers": [],
+          "resolvedPlanFields": [],
+          "remainingPlanFields": [],
+          "recommendedRoute": {
+            "routeId": "surface_defect_route",
+            "title": "Surface defect route",
+            "summary": "Acquisition, defect detection, judgment, and output.",
+            "operators": [
+              "ImageAcquisition",
+              "SurfaceDefectDetection",
+              "ResultJudgment",
+              "ResultOutput"
+            ],
+            "templateDecision": "planner_route"
+          },
+          "clarificationQuestions": [],
+          "recommendedDefaults": [],
+          "risks": [],
+          "acceptanceCriteria": [],
+          "executablePlan": [],
+          "canBuild": false,
+          "blockingReasons": [
+            "hard_requirement:inspection_object_missing",
+            "hard_requirement:task_type_missing",
+            "hard_requirement:image_source_missing",
+            "hard_requirement:acceptance_criteria_missing"
+          ],
+          "buildReadiness": {
+            "canBuild": false,
+            "blockers": [],
+            "resolvedFields": [],
+            "remainingFields": [],
+            "primaryMessage": "",
+            "contractVersion": "v2",
+            "missingResources": []
+          },
+          "semanticExtraction": {
+            "isVisionRequest": true,
+            "intent": "new_flow",
+            "taskType": "unknown",
+            "confidence": 0,
+            "taskTypeConfidence": 0,
+            "inspectionObject": "",
+            "targetAttribute": "",
+            "defectType": "",
+            "measurementTarget": "",
+            "imageSource": "",
+            "okCondition": "",
+            "ngCondition": "",
+            "outputTarget": "",
+            "suggestedRoute": "",
+            "canPlanCandidate": false,
+            "canBuildCandidate": false,
+            "objectSignals": [],
+            "taskSignals": [],
+            "missingFields": [],
+            "clarificationQuestions": [],
+            "source": "rule_fallback",
+            "failureCode": "",
+            "sanitizedErrorMessage": "",
+            "metadataOnly": true
+          },
+          "requirementMaturity": {
+            "maturity": "ambiguous",
+            "taskType": "unknown",
+            "canPlan": false,
+            "canBuild": false,
+            "objectSignals": [],
+            "taskSignals": [],
+            "missingFields": [
+              "inspection_object",
+              "task_type",
+              "image_source",
+              "acceptance_criteria"
+            ],
+            "blockingReasons": [
+              "inspection_object_missing",
+              "task_type_missing",
+              "image_source_missing",
+              "acceptance_criteria_missing"
+            ],
+            "publicReason": "Legacy snapshot was not buildable before answers.",
+            "metadataOnly": true
+          },
+          "decisionTrace": null,
+          "nextAction": "",
+          "contextSummary": {
+            "hasCurrentFlow": false,
+            "hasCurrentResult": false,
+            "attachmentCount": 0,
+            "templateSelectionMode": "",
+            "templateId": "",
+            "contextKinds": [],
+            "operatorCatalogTools": []
+          },
+          "operatorCatalogVersion": "",
+          "templateCatalogVersion": "",
+          "templateSelection": null,
+          "stationBoundarySummary": "",
+          "plcOutputPolicy": "",
+          "planWarnings": [],
+          "contractRepairNotes": [],
+          "planFidelity": {
+            "contractVersion": "v2",
+            "taskType": "",
+            "satisfied": true,
+            "repaired": false,
+            "requiredCapabilities": [],
+            "requiredOutputSemantics": [],
+            "satisfiedCapabilities": [],
+            "availableOutputSemantics": [],
+            "missingCapabilities": [],
+            "missingOutputSemantics": [],
+            "blockingReasons": [],
+            "evidence": []
+          },
+          "publicEvents": [],
+          "metadataOnly": true
+        },
+        "planQuestionSelections": {},
+        "confirmedPlanAnswers": [
+          {
+            "questionId": "",
+            "field": "inspection_object",
+            "value": "logo area",
+            "origin": "explicit_user_text",
+            "evidenceText": "",
+            "confidence": 1,
+            "resolved": true
+          },
+          {
+            "questionId": "",
+            "field": "task_type",
+            "value": "surface_defect",
+            "origin": "explicit_user_text",
+            "evidenceText": "",
+            "confidence": 1,
+            "resolved": true
+          },
+          {
+            "questionId": "",
+            "field": "image_source",
+            "value": "camera",
+            "origin": "explicit_user_text",
+            "evidenceText": "",
+            "confidence": 1,
+            "resolved": true
+          },
+          {
+            "questionId": "",
+            "field": "acceptance_criteria",
+            "value": "scratch is NG",
+            "origin": "explicit_user_text",
+            "evidenceText": "",
+            "confidence": 1,
+            "resolved": true
+          }
+        ],
+        "optimisticPlanAnswers": [],
+        "answerRevision": 0,
+        "readinessPreview": null,
+        "missingResources": [],
+        "resourceDecisions": {},
+        "resourceRevision": 0,
+        "requirementMode": "strict",
+        "workspaceViewMode": "plan",
+        "planAcceptedRecommendedDefaults": false,
+        "planRunId": null,
+        "planRunStatus": "completed",
+        "planTerminalSequence": null,
+        "buildRunId": "ar_08314fc58c7f4a258716a608300f7a26",
+        "buildRunStatus": "running",
+        "buildTerminalSequence": null,
+        "submittedBuildFingerprint": "sha256:a469113db139e61015cb63ab6d4b94e9b44f7a99b7c3b482cfefb5da63718896",
+        "updatedAtUtc": "2026-09-05T08:07:34.793533Z"
+      },
+      "persistenceStatus": {
+        "primaryStoreSaved": true,
+        "recoveryBackupSaved": true,
+        "errorCode": "",
+        "publicMessage": ""
+      }
+    }
+  },
+  {
+    "id": "overlapping-builds",
+    "firstRunId": "ar_2ddbb10bf5c94ce2a2414ff599d3a5dd",
+    "secondRunId": "ar_08314fc58c7f4a258716a608300f7a26",
+    "calls": 2,
+    "firstStatus": "running",
+    "secondStatus": "running",
+    "snapshotBuild": "ar_08314fc58c7f4a258716a608300f7a26"
+  },
+  {
+    "id": "after-overlap",
+    "snapshot": {
+      "schemaVersion": 1,
+      "revision": 4,
+      "projectId": null,
+      "lifecycleState": "build_completed",
+      "pendingPlanSnapshot": {
+        "planContractVersion": "",
+        "planId": "plan-agent-run-entry",
+        "planHash": "sha256:a657adbb6ee2789c952f852d08ccd64b1b7e85a0b707c7bc5ceeb6bea1353eea",
+        "planSource": "",
+        "currentPhase": "planning",
+        "fallbackReason": "",
+        "plannerFailureStage": "",
+        "plannerFailureCode": "",
+        "sanitizedErrorKind": "",
+        "sanitizedErrorMessage": "",
+        "originalUserPrompt": "start build from confirmed plan",
+        "goal": "logo surface defect inspection",
+        "intent": "unknown",
+        "confidence": "low",
+        "requirementUnderstanding": [
+          "Legacy snapshot was captured before confirmed answers were applied."
+        ],
+        "confirmedPlanAnswers": [],
+        "resolvedPlanFields": [],
+        "remainingPlanFields": [],
+        "recommendedRoute": {
+          "routeId": "surface_defect_route",
+          "title": "Surface defect route",
+          "summary": "Acquisition, defect detection, judgment, and output.",
+          "operators": [
+            "ImageAcquisition",
+            "SurfaceDefectDetection",
+            "ResultJudgment",
+            "ResultOutput"
+          ],
+          "templateDecision": "planner_route"
+        },
+        "clarificationQuestions": [],
+        "recommendedDefaults": [],
+        "risks": [],
+        "acceptanceCriteria": [],
+        "executablePlan": [],
+        "canBuild": false,
+        "blockingReasons": [
+          "hard_requirement:inspection_object_missing",
+          "hard_requirement:task_type_missing",
+          "hard_requirement:image_source_missing",
+          "hard_requirement:acceptance_criteria_missing"
+        ],
+        "buildReadiness": {
+          "canBuild": false,
+          "blockers": [],
+          "resolvedFields": [],
+          "remainingFields": [],
+          "primaryMessage": "",
+          "contractVersion": "v2",
+          "missingResources": []
+        },
+        "semanticExtraction": {
+          "isVisionRequest": true,
+          "intent": "new_flow",
+          "taskType": "unknown",
+          "confidence": 0,
+          "taskTypeConfidence": 0,
+          "inspectionObject": "",
+          "targetAttribute": "",
+          "defectType": "",
+          "measurementTarget": "",
+          "imageSource": "",
+          "okCondition": "",
+          "ngCondition": "",
+          "outputTarget": "",
+          "suggestedRoute": "",
+          "canPlanCandidate": false,
+          "canBuildCandidate": false,
+          "objectSignals": [],
+          "taskSignals": [],
+          "missingFields": [],
+          "clarificationQuestions": [],
+          "source": "rule_fallback",
+          "failureCode": "",
+          "sanitizedErrorMessage": "",
+          "metadataOnly": true
+        },
+        "requirementMaturity": {
+          "maturity": "ambiguous",
+          "taskType": "unknown",
+          "canPlan": false,
+          "canBuild": false,
+          "objectSignals": [],
+          "taskSignals": [],
+          "missingFields": [
+            "inspection_object",
+            "task_type",
+            "image_source",
+            "acceptance_criteria"
+          ],
+          "blockingReasons": [
+            "inspection_object_missing",
+            "task_type_missing",
+            "image_source_missing",
+            "acceptance_criteria_missing"
+          ],
+          "publicReason": "Legacy snapshot was not buildable before answers.",
+          "metadataOnly": true
+        },
+        "decisionTrace": null,
+        "nextAction": "",
+        "contextSummary": {
+          "hasCurrentFlow": false,
+          "hasCurrentResult": false,
+          "attachmentCount": 0,
+          "templateSelectionMode": "",
+          "templateId": "",
+          "contextKinds": [],
+          "operatorCatalogTools": []
+        },
+        "operatorCatalogVersion": "",
+        "templateCatalogVersion": "",
+        "templateSelection": null,
+        "stationBoundarySummary": "",
+        "plcOutputPolicy": "",
+        "planWarnings": [],
+        "contractRepairNotes": [],
+        "planFidelity": {
+          "contractVersion": "v2",
+          "taskType": "",
+          "satisfied": true,
+          "repaired": false,
+          "requiredCapabilities": [],
+          "requiredOutputSemantics": [],
+          "satisfiedCapabilities": [],
+          "availableOutputSemantics": [],
+          "missingCapabilities": [],
+          "missingOutputSemantics": [],
+          "blockingReasons": [],
+          "evidence": []
+        },
+        "publicEvents": [],
+        "metadataOnly": true
+      },
+      "planQuestionSelections": {},
+      "confirmedPlanAnswers": [
+        {
+          "questionId": "",
+          "field": "inspection_object",
+          "value": "logo area",
+          "origin": "explicit_user_text",
+          "evidenceText": "",
+          "confidence": 1,
+          "resolved": true
+        },
+        {
+          "questionId": "",
+          "field": "task_type",
+          "value": "surface_defect",
+          "origin": "explicit_user_text",
+          "evidenceText": "",
+          "confidence": 1,
+          "resolved": true
+        },
+        {
+          "questionId": "",
+          "field": "image_source",
+          "value": "camera",
+          "origin": "explicit_user_text",
+          "evidenceText": "",
+          "confidence": 1,
+          "resolved": true
+        },
+        {
+          "questionId": "",
+          "field": "acceptance_criteria",
+          "value": "scratch is NG",
+          "origin": "explicit_user_text",
+          "evidenceText": "",
+          "confidence": 1,
+          "resolved": true
+        }
+      ],
+      "optimisticPlanAnswers": [],
+      "answerRevision": 0,
+      "readinessPreview": null,
+      "missingResources": [],
+      "resourceDecisions": {},
+      "resourceRevision": 0,
+      "requirementMode": "strict",
+      "workspaceViewMode": "plan",
+      "planAcceptedRecommendedDefaults": false,
+      "planRunId": null,
+      "planRunStatus": "completed",
+      "planTerminalSequence": null,
+      "buildRunId": "ar_08314fc58c7f4a258716a608300f7a26",
+      "buildRunStatus": "completed",
+      "buildTerminalSequence": 5,
+      "submittedBuildFingerprint": "sha256:a469113db139e61015cb63ab6d4b94e9b44f7a99b7c3b482cfefb5da63718896",
+      "updatedAtUtc": "2026-09-05T08:07:34.9216152Z"
+    }
+  },
+  {
+    "id": "real-success-snapshot",
+    "snapshot": {
+      "schemaVersion": 1,
+      "revision": 2,
+      "projectId": null,
+      "lifecycleState": "build_completed",
+      "pendingPlanSnapshot": null,
+      "planQuestionSelections": {},
+      "confirmedPlanAnswers": [],
+      "optimisticPlanAnswers": [],
+      "answerRevision": 0,
+      "readinessPreview": null,
+      "missingResources": [],
+      "resourceDecisions": {},
+      "resourceRevision": 0,
+      "requirementMode": "strict",
+      "workspaceViewMode": "plan",
+      "planAcceptedRecommendedDefaults": false,
+      "planRunId": null,
+      "planRunStatus": null,
+      "planTerminalSequence": null,
+      "buildRunId": "ar_d521ed869cc048d0929e87e3b6994aad",
+      "buildRunStatus": "completed",
+      "buildTerminalSequence": 5,
+      "submittedBuildFingerprint": "sha256:78fa2b74f42544286146181a272c8a7a0fda62c4e92522b6604091d28fba0055",
+      "updatedAtUtc": "2026-09-05T08:07:34.9844583Z"
+    }
+  },
+  {
+    "path": "/api/ai/agent-plan-runs",
+    "status": 200,
+    "data": {
+      "runId": "ar_plan_5f33eeafaaf8d9237061fa7dd4c8ca27",
+      "sessionId": "isolated-success-audit",
+      "brief": "I will turn this request into a safe Vision Agent workflow draft and stream each public progress step: Detect scratches on a metal part from a file image and output OK NG",
+      "events": [
+        {
+          "runId": "ar_plan_5f33eeafaaf8d9237061fa7dd4c8ca27",
+          "sequence": 1,
+          "timestamp": "2026-09-05T08:07:35.0313604\u002B00:00",
+          "eventType": "run.started",
+          "stage": "run",
+          "title": "Vision Agent run started",
+          "summary": "Received the request and opened a metadata-only event stream.",
+          "status": "running",
+          "payload": {
+            "runKind": "plan",
+            "mode": "plan",
+            "sessionId": "isolated-success-audit",
+            "hasCurrentFlowSnapshot": false,
+            "hasCurrentResultSnapshot": false,
+            "attachmentCount": 0,
+            "templateSelectionMode": "",
+            "templateId": "",
+            "historySummaryIncluded": false,
+            "requirementMode": "strict",
+            "terminalExpectedRevision": 3,
+            "metadataOnly": true
+          },
+          "metadataOnly": true,
+          "redactionPass": true
+        },
+        {
+          "runId": "ar_plan_5f33eeafaaf8d9237061fa7dd4c8ca27",
+          "sequence": 2,
+          "timestamp": "2026-09-05T08:07:35.0321094\u002B00:00",
+          "eventType": "assistant.brief",
+          "stage": "brief",
+          "title": "Task summary",
+          "summary": "I will turn this request into a safe Vision Agent workflow draft and stream each public progress step: Detect scratches on a metal part from a file image and output OK NG",
+          "status": "completed",
+          "payload": {
+            "brief": "I will turn this request into a safe Vision Agent workflow draft and stream each public progress step: Detect scratches on a metal part from a file image and output OK NG",
+            "publicDiagnosticsOnly": true,
+            "metadataOnly": true
+          },
+          "metadataOnly": true,
+          "redactionPass": true
+        },
+        {
+          "runId": "ar_plan_5f33eeafaaf8d9237061fa7dd4c8ca27",
+          "sequence": 3,
+          "timestamp": "2026-09-05T08:07:35.0337717\u002B00:00",
+          "eventType": "plan.created",
+          "stage": "plan",
+          "title": "\u89C4\u5212\u5DF2\u521B\u5EFA",
+          "summary": "\u5DF2\u521B\u5EFA Plan Run\uFF0C\u516C\u5F00\u8FDB\u5EA6\u5C06\u901A\u8FC7\u4E8B\u4EF6\u6D41\u66F4\u65B0\u3002",
+          "status": "completed",
+          "payload": {
+            "sessionId": "isolated-success-audit",
+            "mode": "plan",
+            "metadataOnly": true
+          },
+          "metadataOnly": true,
+          "redactionPass": true
+        },
+        {
+          "runId": "ar_plan_5f33eeafaaf8d9237061fa7dd4c8ca27",
+          "sequence": 4,
+          "timestamp": "2026-09-05T08:07:35.0345816\u002B00:00",
+          "eventType": "plan.started",
+          "stage": "plan",
+          "title": "\u89C4\u5212\u5DF2\u542F\u52A8",
+          "summary": "\u6B63\u5728\u8FDB\u5165\u89C4\u5212\u9636\u6BB5\u3002",
+          "status": "running",
+          "payload": {
+            "sessionId": "isolated-success-audit",
+            "mode": "plan",
+            "metadataOnly": true
+          },
+          "metadataOnly": true,
+          "redactionPass": true
+        }
+      ],
+      "workspaceSnapshot": {
+        "schemaVersion": 1,
+        "revision": 3,
+        "projectId": null,
+        "lifecycleState": "planning",
+        "pendingPlanSnapshot": null,
+        "planQuestionSelections": {},
+        "confirmedPlanAnswers": [],
+        "optimisticPlanAnswers": [],
+        "answerRevision": 0,
+        "readinessPreview": null,
+        "missingResources": [],
+        "resourceDecisions": {},
+        "resourceRevision": 0,
+        "requirementMode": "strict",
+        "workspaceViewMode": "plan",
+        "planAcceptedRecommendedDefaults": false,
+        "planRunId": "ar_plan_5f33eeafaaf8d9237061fa7dd4c8ca27",
+        "planRunStatus": "running",
+        "planTerminalSequence": null,
+        "buildRunId": "ar_d521ed869cc048d0929e87e3b6994aad",
+        "buildRunStatus": "completed",
+        "buildTerminalSequence": 5,
+        "submittedBuildFingerprint": "sha256:78fa2b74f42544286146181a272c8a7a0fda62c4e92522b6604091d28fba0055",
+        "updatedAtUtc": "2026-09-05T08:07:35.0152408Z"
+      },
+      "persistenceStatus": {
+        "primaryStoreSaved": true,
+        "recoveryBackupSaved": true,
+        "errorCode": "",
+        "publicMessage": ""
+      },
+      "idempotentReplay": false
+    }
+  },
+  {
+    "id": "real-new-plan-inherits-build",
+    "snapshot": {
+      "schemaVersion": 1,
+      "revision": 4,
+      "projectId": null,
+      "lifecycleState": "plan_blocked",
+      "pendingPlanSnapshot": {
+        "planContractVersion": "v2",
+        "planId": "plan_86a0b910702b433ea051b60c87b04be1",
+        "planHash": "sha256:cf799556aacf6d39cd91c9b5d663be5bff540503e24847b17a9e1fe91a79deca",
+        "planSource": "rule_fallback",
+        "currentPhase": "planning",
+        "fallbackReason": "planner_service_not_registered",
+        "plannerFailureStage": "",
+        "plannerFailureCode": "",
+        "sanitizedErrorKind": "",
+        "sanitizedErrorMessage": "",
+        "originalUserPrompt": "Detect scratches on a metal part from a file image and output OK NG",
+        "goal": "Detect scratches on a metal part from a file image and output OK NG",
+        "intent": "surface_defect",
+        "confidence": "low",
+        "requirementUnderstanding": [
+          "\u9700\u6C42\u5DF2\u660E\u786E\u5230\u53EF\u89C4\u5212\u89C6\u89C9\u6D41\u7A0B\u3002",
+          "taskType=surface_defect",
+          "objectSignals=part,metal",
+          "taskSignals=scratch",
+          "\u68C0\u6D4B\u610F\u56FE\uFF1A\u8868\u9762\u7F3A\u9677\u68C0\u6D4B\u3002",
+          "\u53EF\u4F5C\u4E3A\u65B0\u7684\u6D41\u7A0B\u8349\u7A3F\u5F00\u59CB\u6784\u5EFA\u3002",
+          "\u6A21\u677F\u9009\u62E9\u5C06\u5728\u6784\u5EFA\u9636\u6BB5\u6839\u636E\u5143\u6570\u636E\u51B3\u5B9A\u3002",
+          "\u672A\u63D0\u4F9B\u9644\u4EF6\u5143\u6570\u636E\u3002"
+        ],
+        "confirmedPlanAnswers": [
+          {
+            "questionId": "",
+            "field": "image_source",
+            "value": "file_sample",
+            "origin": "explicit_user_text",
+            "evidenceText": "image",
+            "confidence": 1,
+            "resolved": true
+          },
+          {
+            "questionId": "",
+            "field": "acceptance_criteria",
+            "value": "Detect scratches on a metal part from a file image and output OK NG",
+            "origin": "explicit_user_text",
+            "evidenceText": "Detect scratches on a metal part from a file image and output OK NG",
+            "confidence": 1,
+            "resolved": true
+          }
+        ],
+        "resolvedPlanFields": [
+          "image_source",
+          "acceptance_criteria",
+          "inspection_object",
+          "task_type"
+        ],
+        "remainingPlanFields": [
+          "algorithm_strategy"
+        ],
+        "recommendedRoute": {
+          "routeId": "surface_defect_detection",
+          "title": "\u8868\u9762\u7F3A\u9677\u68C0\u6D4B\u8DEF\u7EBF",
+          "summary": "\u5F52\u4E00\u5316\u5149\u7167\u3001\u589E\u5F3A\u7F3A\u9677\u3001\u5206\u5272\u5019\u9009\u533A\u57DF\uFF0C\u5E76\u6309\u9762\u79EF/\u5BF9\u6BD4\u5EA6\u5224\u5B9A\u3002",
+          "operators": [
+            "ImageAcquisition",
+            "SurfaceDefectDetection",
+            "BlobAnalysis",
+            "ResultJudgment",
+            "ResultOutput"
+          ],
+          "templateDecision": "\u6784\u5EFA\u9636\u6BB5\u4F1A\u4ECE\u5143\u6570\u636E\u4E2D\u5339\u914D\u6A21\u677F\uFF1B\u6CA1\u6709\u6A21\u677F\u65F6\u4E5F\u53EF\u751F\u6210\u53EF\u7F16\u8F91\u8349\u7A3F\u3002"
+        },
+        "clarificationQuestions": [
+          {
+            "id": "q_fallback_algorithm_strategy",
+            "field": "algorithm_strategy",
+            "title": "\u7B97\u6CD5\u7B56\u7565\u8BF4\u660E",
+            "why": "\u6D41\u7A0B\u89C4\u5212\u9700\u8981\u660E\u786E \u7B97\u6CD5\u7B56\u7565\u8BF4\u660E\u3002",
+            "defaultValue": "strategy_pending",
+            "defaultAssumption": "\u6682\u65E0\u5B89\u5168\u9ED8\u8BA4\u7B97\u6CD5\u7B56\u7565\uFF0C\u63A8\u8350\u4FDD\u6301\u5F85\u786E\u8BA4\uFF1B\u8BE5\u9009\u62E9\u4E0D\u89C6\u4E3A\u5DF2\u89E3\u51B3\u5B57\u6BB5\u3002",
+            "impact": "\u7F3A\u5C11\u6B64\u5B57\u6BB5\u5C06\u963B\u788D\u6D41\u7A0B\u7684\u81EA\u52A8\u6784\u5EFA\u3002",
+            "options": [
+              {
+                "value": "strategy_pending",
+                "label": "\u4FDD\u6301\u7B97\u6CD5\u7B56\u7565\u5F85\u786E\u8BA4",
+                "recommended": true,
+                "answerEffect": "defer",
+                "recommendationReason": "This option keeps the field pending until a user or engineer confirms it.",
+                "description": "\u4E0D\u9ED8\u8BA4\u9009\u62E9\u89C4\u5219\u3001\u6A21\u677F\u6216\u6A21\u578B\uFF0C\u5148\u4FDD\u7559\u7B56\u7565\u786E\u8BA4\u3002",
+                "impact": "\u4E0D\u4F1A\u89E3\u9664\u6784\u5EFA\u963B\u65AD\u3002"
+              },
+              {
+                "value": "traditional_rule",
+                "label": "\u4F18\u5148\u89C4\u5219/\u51E0\u4F55\u7B97\u6CD5",
+                "recommended": false,
+                "answerEffect": "resolve_field",
+                "recommendationReason": "",
+                "description": "\u76EE\u6807\u7279\u5F81\u7A33\u5B9A\u3001\u53EF\u6D4B\u91CF\u4E14\u7528\u6237\u786E\u8BA4\u65F6\u4F7F\u7528\u3002",
+                "impact": "\u4E0D\u9002\u5408\u5916\u89C2\u53D8\u5316\u5927\u6216\u9700\u6A21\u578B\u8BC6\u522B\u7684\u4EFB\u52A1\u3002"
+              },
+              {
+                "value": "model_pending",
+                "label": "\u6A21\u578B\u8D44\u6E90\u5F85\u786E\u8BA4",
+                "recommended": false,
+                "answerEffect": "defer",
+                "recommendationReason": "",
+                "description": "\u89C4\u5212\u6A21\u578B\u7B97\u5B50\uFF0C\u4F46\u6A21\u578B\u8D44\u6E90\u4ECD\u5F85\u7ED1\u5B9A\u3002",
+                "impact": "\u6784\u5EFA\u6216\u90E8\u7F72\u524D\u9700\u8981\u6A21\u578B\u5143\u6570\u636E\u3002"
+              }
+            ]
+          }
+        ],
+        "recommendedDefaults": [
+          {
+            "id": "metadata_only",
+            "label": "\u4EC5\u516C\u5F00\u8BCA\u65AD",
+            "value": "redacted_metadata",
+            "impact": "\u4E0D\u4F1A\u66B4\u9732\u539F\u59CB\u672C\u5730\u8DEF\u5F84\u3001\u56FE\u50CF\u5B57\u8282\u3001\u5DE5\u7AD9\u7F51\u7EDC\u7EC6\u8282\u3001\u4EE4\u724C\u6216\u63D0\u793A\u8BCD\u3002"
+          },
+          {
+            "id": "draft_policy",
+            "label": "\u53EF\u7F16\u8F91\u6D41\u7A0B\u8349\u7A3F",
+            "value": "allow_editable_draft_when_not_deploy_ready",
+            "impact": "\u5373\u4F7F\u90E8\u7F72\u5C31\u7EEA\u88AB\u963B\u65AD\uFF0C\u4E5F\u53EF\u5148\u5E94\u7528\u5230\u753B\u5E03\u7EE7\u7EED\u7F16\u8F91\u3002"
+          },
+          {
+            "id": "resource_policy",
+            "label": "\u7F3A\u5931\u8D44\u6E90\u4FDD\u6301\u5F85\u786E\u8BA4",
+            "value": "pending_parameters",
+            "impact": "\u6A21\u578B\u3001\u6A21\u677F\u3001\u76F8\u673A\u3001\u6807\u5B9A\u548C PLC \u5143\u6570\u636E\u4F1A\u663E\u793A\u4E3A\u5F85\u8865\u9879\uFF0C\u800C\u4E0D\u662F\u88AB\u731C\u6D4B\u3002"
+          }
+        ],
+        "risks": [
+          "\u91CF\u4EA7\u524D\u9700\u8981\u4EE3\u8868\u6027\u56FE\u50CF\u786E\u8BA4\u73B0\u573A\u9608\u503C\u3002",
+          "\u76F8\u673A\u3001\u6A21\u578B\u3001\u6A21\u677F\u3001\u6807\u5B9A\u548C PLC \u8D44\u6E90\u5728\u786E\u8BA4\u524D\u4FDD\u6301\u4E3A\u4EC5\u5143\u6570\u636E\u3002",
+          "\u5DE5\u7AD9\u517C\u5BB9\u6027\u53EF\u80FD\u963B\u65AD\u53D1\u5E03\uFF0C\u4F46\u753B\u5E03\u8349\u7A3F\u4ECD\u53EF\u7F16\u8F91\u3002"
+        ],
+        "acceptanceCriteria": [
+          "\u6D41\u7A0B\u8349\u7A3F\u5305\u542B\u91C7\u96C6\u3001\u68C0\u6D4B\u3001\u5224\u5B9A\u548C\u8F93\u51FA\u9636\u6BB5\u3002",
+          "\u8BA1\u5212\u5FEB\u7167\u3001\u7528\u6237\u9009\u62E9\u3001\u9ED8\u8BA4\u503C\u548C\u6784\u5EFA\u8F93\u5165\u6458\u8981\u53EF\u4ECE AgentRun \u56DE\u653E\u3002",
+          "\u5C31\u7EEA\u3001\u9884\u6F14\u3001\u8FD0\u884C\u5305\u3001\u5DE5\u7AD9\u3001\u5951\u7EA6\u548C\u53D1\u5E03\u590D\u6838\u4E8B\u4EF6\u53EF\u56DE\u653E\u3002",
+          "\u5E94\u7528\u6216\u90E8\u7F72\u524D\u53EF\u4EE5\u770B\u5230\u5F85\u786E\u8BA4\u53C2\u6570\u548C\u7F3A\u5931\u8D44\u6E90\u3002"
+        ],
+        "executablePlan": [
+          "\u786E\u8BA4\u63A8\u8350\u5047\u8BBE\uFF0C\u6216\u53EA\u56DE\u7B54\u9AD8\u5F71\u54CD\u95EE\u9898\u3002",
+          "\u7528\u8BA1\u5212\u5FEB\u7167\u3001\u7528\u6237\u9009\u62E9\u3001\u5F53\u524D\u6D41\u7A0B\u3001\u6A21\u677F\u3001\u9644\u4EF6\u548C\u5DE5\u7AD9\u8FB9\u754C\u6458\u8981\u51C6\u5907\u6784\u5EFA\u8F93\u5165\u3002",
+          "\u4ECE\u4EC5\u5143\u6570\u636E\u76EE\u5F55\u4E2D\u9009\u62E9\u6A21\u677F\u7B56\u7565\u548C\u7B97\u5B50\u94FE\u3002",
+          "\u6620\u5C04\u53C2\u6570\uFF0C\u5E76\u628A\u672A\u89E3\u51B3\u8D44\u6E90\u4FDD\u7559\u4E3A\u5F85\u786E\u8BA4\u53C2\u6570\u6216\u7F3A\u5931\u8D44\u6E90\u3002",
+          "\u8FD0\u884C\u7ED3\u6784\u6821\u9A8C\u3001\u9884\u6F14\u3001\u8FD0\u884C\u5305\u5C31\u7EEA\u3001\u5DE5\u7AD9\u517C\u5BB9\u3001\u7B97\u5B50\u5951\u7EA6\u548C\u53D1\u5E03\u590D\u6838\u68C0\u67E5\u3002",
+          "\u5E94\u7528\u524D\u8FD4\u56DE\u53EF\u7F16\u8F91\u6D41\u7A0B\u8349\u7A3F\u548C\u9996\u8981\u4FEE\u590D\u5EFA\u8BAE\u3002"
+        ],
+        "canBuild": false,
+        "blockingReasons": [
+          "inspection_goal_missing"
+        ],
+        "buildReadiness": {
+          "canBuild": false,
+          "blockers": [
+            {
+              "id": "contract_warning:inspection_goal",
+              "category": "contract_warning",
+              "field": "",
+              "questionId": "",
+              "blocksBuild": false,
+              "resolutionMode": "non_blocking",
+              "publicLabel": "\u89C4\u5212\u8FD4\u56DE\u4E86\u65E0\u6CD5\u6620\u5C04\u7684\u963B\u65AD\u9879\uFF0C\u5DF2\u4F5C\u4E3A\u8BCA\u65AD\u4FDD\u7559\u3002",
+              "resource": null
+            },
+            {
+              "id": "hard_requirement:algorithm_strategy_missing",
+              "category": "hard_requirement",
+              "field": "algorithm_strategy",
+              "questionId": "",
+              "blocksBuild": true,
+              "resolutionMode": "answer_question",
+              "publicLabel": "\u8FD8\u7F3A\uFF1A\u6784\u5EFA\u7B56\u7565",
+              "resource": null
+            },
+            {
+              "id": "resource_pending:resource:v1image_fileimageacquisition1filepath",
+              "category": "resource_pending",
+              "field": "image_source",
+              "questionId": "",
+              "blocksBuild": true,
+              "resolutionMode": "provide_resource",
+              "publicLabel": "\u56FE\u50CF\u6587\u4EF6\u5FC5\u987B\u5728\u6784\u5EFA\u524D\u8865\u9F50\u3002",
+              "resource": {
+                "canonicalId": "resource:v1|image_file|imageacquisition#1|filepath",
+                "resourceType": "image_file",
+                "resourceName": "\u56FE\u50CF\u6587\u4EF6",
+                "resourceKey": "imageacquisition#1.FilePath",
+                "operatorKey": "imageacquisition#1",
+                "operatorId": "",
+                "operatorType": "ImageAcquisition",
+                "operatorIndex": 0,
+                "parameterName": "FilePath",
+                "status": "pending",
+                "blockingScope": "build",
+                "source": "plan_route",
+                "resolutionTarget": "picker:image_file",
+                "draftPolicy": "draft_allowed",
+                "description": "\u56FE\u50CF\u6587\u4EF6\u5C1A\u672A\u7ED1\u5B9A\u3002",
+                "aliases": [
+                  "resource:v1|image_file|imageacquisition#1|filepath",
+                  "resourcev1image_fileimageacquisition1filepath",
+                  "image_file",
+                  "imageacquisition#1",
+                  "imageacquisition1",
+                  "FilePath"
+                ]
+              }
+            }
+          ],
+          "resolvedFields": [
+            "acceptance_criteria",
+            "image_source",
+            "inspection_object",
+            "task_type"
+          ],
+          "remainingFields": [
+            "algorithm_strategy"
+          ],
+          "primaryMessage": "\u8FD8\u7F3A\uFF1A\u6784\u5EFA\u7B56\u7565",
+          "contractVersion": "v2",
+          "missingResources": [
+            {
+              "canonicalId": "resource:v1|image_file|imageacquisition#1|filepath",
+              "resourceType": "image_file",
+              "resourceName": "\u56FE\u50CF\u6587\u4EF6",
+              "resourceKey": "imageacquisition#1.FilePath",
+              "operatorKey": "imageacquisition#1",
+              "operatorId": "",
+              "operatorType": "ImageAcquisition",
+              "operatorIndex": 0,
+              "parameterName": "FilePath",
+              "status": "pending",
+              "blockingScope": "build",
+              "source": "plan_route",
+              "resolutionTarget": "picker:image_file",
+              "draftPolicy": "draft_allowed",
+              "description": "\u56FE\u50CF\u6587\u4EF6\u5C1A\u672A\u7ED1\u5B9A\u3002",
+              "aliases": [
+                "resource:v1|image_file|imageacquisition#1|filepath",
+                "resourcev1image_fileimageacquisition1filepath",
+                "image_file",
+                "imageacquisition#1",
+                "imageacquisition1",
+                "FilePath"
+              ]
+            }
+          ]
+        },
+        "semanticExtraction": null,
+        "requirementMaturity": {
+          "maturity": "actionable",
+          "taskType": "surface_defect",
+          "canPlan": true,
+          "canBuild": false,
+          "objectSignals": [
+            "part",
+            "metal"
+          ],
+          "taskSignals": [
+            "scratch"
+          ],
+          "missingFields": [
+            "algorithm_strategy"
+          ],
+          "blockingReasons": [],
+          "publicReason": "\u9700\u6C42\u5DF2\u660E\u786E\u5230\u53EF\u89C4\u5212\u89C6\u89C9\u6D41\u7A0B\u3002",
+          "metadataOnly": true
+        },
+        "decisionTrace": {
+          "rawUserText": "Detect scratches on a metal part from a file image and output OK NG",
+          "turnIntent": "actionable_vision_plan",
+          "interactionState": "planning",
+          "businessSignalsHit": [
+            "detect"
+          ],
+          "newFlowSignalsHit": [],
+          "taskTypeSignalsHit": [
+            "scratch"
+          ],
+          "objectSignalsHit": [
+            "part",
+            "metal"
+          ],
+          "maturityLevel": "actionable",
+          "taskType": "surface_defect",
+          "canPlan": true,
+          "canBuild": false,
+          "fallbackReason": "",
+          "blockingReasons": [],
+          "metadataOnly": true
+        },
+        "nextAction": "\u53EF\u5148\u590D\u6838\u4F4E\u7F6E\u4FE1\u89C4\u5212\u8349\u6848\uFF1B\u5F00\u59CB\u6784\u5EFA\u524D\u9700\u8865\u9F50\u7F3A\u5931\u69FD\u4F4D\u3002",
+        "contextSummary": {
+          "hasCurrentFlow": false,
+          "hasCurrentResult": false,
+          "attachmentCount": 0,
+          "templateSelectionMode": "",
+          "templateId": "",
+          "contextKinds": [
+            "user_requirement",
+            "new_flow",
+            "no_current_result",
+            "template_catalog",
+            "operator_catalog",
+            "station_boundary"
+          ],
+          "operatorCatalogTools": []
+        },
+        "operatorCatalogVersion": "vision-agent-tools:0:e3b0c44298fc",
+        "templateCatalogVersion": "metadata-template-catalog.v1",
+        "templateSelection": null,
+        "stationBoundarySummary": "\u4EC5\u5143\u6570\u636E\u5DE5\u7AD9\u8FB9\u754C\uFF1B\u89C4\u5212\u9636\u6BB5\u4E0D\u4F1A\u89E6\u78B0\u76F8\u673A\u3001PLC\u3001\u6587\u4EF6\u7CFB\u7EDF\u6216\u7F51\u7EDC\u8D44\u6E90\u3002",
+        "plcOutputPolicy": "\u4F18\u5148\u672C\u5730\u7ED3\u679C\u8F93\u51FA\uFF1B\u6784\u5EFA\u5C31\u7EEA\u590D\u6838\u524D\u4FDD\u6301 PLC \u5199\u5165\u7981\u7528\u3002",
+        "planWarnings": [
+          "Planner \u670D\u52A1\u672A\u6CE8\u518C\uFF0C\u5DF2\u4F7F\u7528\u89C4\u5219\u515C\u5E95\u65B9\u6848\u3002"
+        ],
+        "contractRepairNotes": [],
+        "planFidelity": {
+          "contractVersion": "v2",
+          "taskType": "",
+          "satisfied": true,
+          "repaired": false,
+          "requiredCapabilities": [],
+          "requiredOutputSemantics": [],
+          "satisfiedCapabilities": [],
+          "availableOutputSemantics": [],
+          "missingCapabilities": [],
+          "missingOutputSemantics": [],
+          "blockingReasons": [],
+          "evidence": []
+        },
+        "publicEvents": [
+          {
+            "stage": "collecting_context",
+            "status": "completed",
+            "title": "\u4E0A\u4E0B\u6587\u6536\u96C6\u5B8C\u6210",
+            "summary": "\u5DF2\u6536\u96C6\u516C\u5F00\u9700\u6C42\u3001\u6D41\u7A0B\u3001\u6A21\u677F\u3001\u9644\u4EF6\u3001\u7B97\u5B50\u548C\u5DE5\u7AD9\u8FB9\u754C\u5143\u6570\u636E\u3002",
+            "metadata": {},
+            "metadataOnly": true
+          },
+          {
+            "stage": "rule_fallback_used",
+            "status": "completed",
+            "title": "\u5DF2\u542F\u7528\u89C4\u5219\u515C\u5E95",
+            "summary": "Planner \u670D\u52A1\u672A\u6CE8\u518C\uFF0C\u5DF2\u4F7F\u7528\u89C4\u5219\u515C\u5E95\u65B9\u6848\u3002",
+            "metadata": {
+              "fallbackReason": "planner_service_not_registered"
+            },
+            "metadataOnly": true
+          },
+          {
+            "stage": "plan_ready",
+            "status": "completed",
+            "title": "\u515C\u5E95\u89C4\u5212\u5DF2\u5C31\u7EEA",
+            "summary": "\u89C4\u5219\u515C\u5E95\u89C4\u5212\u5DF2\u5C31\u7EEA\uFF0C\u7B49\u5F85\u7528\u6237\u786E\u8BA4\u3002",
+            "metadata": {},
+            "metadataOnly": true
+          }
+        ],
+        "metadataOnly": true
+      },
+      "planQuestionSelections": {},
+      "confirmedPlanAnswers": [
+        {
+          "questionId": "",
+          "field": "image_source",
+          "value": "file_sample",
+          "origin": "explicit_user_text",
+          "evidenceText": "image",
+          "confidence": 1,
+          "resolved": true
+        },
+        {
+          "questionId": "",
+          "field": "acceptance_criteria",
+          "value": "Detect scratches on a metal part from a file image and output OK NG",
+          "origin": "explicit_user_text",
+          "evidenceText": "Detect scratches on a metal part from a file image and output OK NG",
+          "confidence": 1,
+          "resolved": true
+        }
+      ],
+      "optimisticPlanAnswers": [],
+      "answerRevision": 0,
+      "readinessPreview": null,
+      "missingResources": [],
+      "resourceDecisions": {},
+      "resourceRevision": 0,
+      "requirementMode": "strict",
+      "workspaceViewMode": "plan",
+      "planAcceptedRecommendedDefaults": false,
+      "planRunId": "ar_plan_5f33eeafaaf8d9237061fa7dd4c8ca27",
+      "planRunStatus": "completed",
+      "planTerminalSequence": 14,
+      "buildRunId": "ar_d521ed869cc048d0929e87e3b6994aad",
+      "buildRunStatus": "completed",
+      "buildTerminalSequence": 5,
+      "submittedBuildFingerprint": "sha256:78fa2b74f42544286146181a272c8a7a0fda62c4e92522b6604091d28fba0055",
+      "updatedAtUtc": "2026-09-05T08:07:36.0681851Z"
+    }
+  }
+]
