@@ -788,3 +788,6 @@ details.settings-modern-card > summary.settings-card-header {
         grid-template-columns: 1fr;
     }
 }
+.settings-ai-identity-fields > .settings-fieldset {
+    min-width: min(140px, 100%);
+}

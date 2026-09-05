@@ -773,12 +773,12 @@ export function installAiTab(SettingsView) {
                                 : `<button class="cv-btn settings-btn-light" style="padding:2px 8px; font-size:12px; height:24px;" data-action="activate" data-id="${id}" ${activateDisabled}>设为激活</button>`}
                         </td>
                         <td>
-                            <button class="action-icon-btn" data-action="edit" data-id="${id}" title="编辑">
+                            <button class="action-icon-btn" data-action="edit" data-id="${id}" title="编辑" aria-label="编辑模型 ${name}">
                                 <svg viewBox="0 0 24 24"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25z"/></svg>
                             </button>
                             <button class="cv-btn settings-btn-light" style="padding:2px 8px; font-size:12px; height:24px;" data-action="default-planner" data-id="${id}" ${defaultDisabled}>Planner</button>
                             <button class="cv-btn settings-btn-light" style="padding:2px 8px; font-size:12px; height:24px;" data-action="default-shadow-eval" data-id="${id}" ${defaultDisabled}>Shadow</button>
-                            <button class="action-icon-btn" data-action="delete" data-id="${id}" title="删除" ${deleteDisabled} style="color:var(--cinnabar);">
+                            <button class="action-icon-btn" data-action="delete" data-id="${id}" title="删除" aria-label="删除模型 ${name}" ${deleteDisabled} style="color:var(--cinnabar);">
                                 <svg viewBox="0 0 24 24"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>
                             </button>
                         </td>
@@ -821,7 +821,7 @@ export function installAiTab(SettingsView) {
             const lastTestLatency = Number.isFinite(Number(m.lastTestLatencyMs)) ? `${m.lastTestLatencyMs} ms` : '-';
 
             formContainer.innerHTML = `
-                <div style="display:flex; gap:16px; margin-bottom:16px;">
+                <div class="settings-ai-identity-fields" style="display:flex; flex-wrap:wrap; gap:16px; margin-bottom:16px;">
                      <div class="settings-fieldset" style="flex:1;">
                          <label>Model Name</label>
                          <input type="text" class="cv-input" id="cfg-ai-name" value="${nameValue}" placeholder="Local alias">
@@ -835,7 +835,7 @@ export function installAiTab(SettingsView) {
                          <select class="cv-input" id="cfg-ai-provider">
                              <option value="OpenAI API" ${m.provider==='OpenAI API'?'selected':''}>OpenAI API</option>
                              <option value="Anthropic Claude" ${m.provider==='Anthropic Claude'?'selected':''}>Anthropic Claude</option>
-                             <option value="OpenAI Compatible" ${m.provider==='OpenAI Compatible'?'selected':''}>本地模型 / OpenAI 兼容 (Ollama, vLLM, GLM等)</option>
+                             <option value="OpenAI Compatible" ${m.provider==='OpenAI Compatible'?'selected':''}>OpenAI 兼容服务</option>
                          </select>
                      </div>
                      <div class="settings-fieldset" style="flex:1;">
@@ -1238,33 +1238,25 @@ export function installAiTab(SettingsView) {
             const createDisabled = this.hasCapability(Capabilities.AI_MODELS_CREATE) ? '' : 'disabled aria-disabled="true"';
             return `
                 <div class="settings-section-title">
-                    <h2>AI & LLM 模型管理</h2>
-                    <p>集成深度学习本地模型与云端大语言模型 API 配置。</p>
+                    <h2>AI 模型配置</h2>
                 </div>
                 ${this.renderScopeNotice('ai')}
-                <!-- Block 1: Model Tab & List -->
+                <!-- Model list -->
                 <div class="settings-modern-card">
-                    <div class="settings-card-header" style="background:var(--bg-surface); border-bottom:1px solid var(--border-color); padding:0; display:flex;">
-                        <div style="display:flex; padding-top:16px;">
-                            <div style="padding:0 24px 12px; color:#94a3b8; font-weight:600; font-size:14px; cursor:pointer;">
-                                <svg viewBox="0 0 24 24" style="width:16px; height:16px; vertical-align:text-bottom; margin-right:4px; fill:currentColor;"><path d="M19.14,12.94c0.04-0.3,0.06-0.61,0.06-0.94c0-0.32-0.02-0.64-0.06-0.94l2.03-1.58c0.18-0.14,0.23-0.41,0.12-0.61 l-1.92-3.32c-0.12-0.22-0.37-0.29-0.59-0.22l-2.39,0.96c-0.5-0.38-1.03-0.7-1.62-0.94L14.4,2.81c-0.04-0.24-0.24-0.41-0.48-0.41 h-3.84c-0.24,0-0.43,0.17-0.47,0.41L9.25,5.35C8.66,5.59,8.12,5.92,7.63,6.29L5.24,5.33c-0.22-0.08-0.47,0-0.59,0.22L2.73,8.87 C2.62,9.08,2.66,9.34,2.86,9.48l2.03,1.58C4.84,11.36,4.8,11.69,4.8,12s0.02,0.64,0.06,0.94l-2.03,1.58 c-0.18,0.14-0.23,0.41-0.12,0.61l1.92,3.32c0.12,0.22,0.37,0.29,0.59,0.22l2.39-0.96c0.5,0.38,1.03,0.7,1.62,0.94l0.36,2.54 c0.05,0.24,0.24,0.41,0.48,0.41h3.84c0.24,0,0.43-0.17,0.47-0.41l0.36-2.54c0.59-0.24,1.13-0.56,1.62-0.94l2.39,0.96 c0.22,0.08,0.47,0,0.59-0.22l1.92-3.32c0.12-0.22,0.07-0.49-0.12-0.61L19.14,12.94z M12,15.6c-1.98,0-3.6-1.62-3.6-3.6 s1.62-3.6,3.6-3.6s3.6,1.62,3.6,3.6S13.98,15.6,12,15.6z"/></svg> 本地模型
-                            </div>
-                            <div style="padding:0 24px 12px; color:var(--cinnabar); font-weight:600; font-size:14px; border-bottom:2px solid var(--cinnabar); cursor:pointer;">
-                                <svg viewBox="0 0 24 24" style="width:16px; height:16px; vertical-align:text-bottom; margin-right:4px; fill:currentColor;"><path d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM14 13v4h-4v-4H7l5-5 5 5h-3z"/></svg> 大语言模型 (LLM)
-                            </div>
-                        </div>
-                        <div style="margin-left:auto; padding:12px 24px;">
-                            <button class="cv-btn settings-btn-light" style="height:32px;" id="btn-add-llm" ${createDisabled}>+ 添加 LLM</button>
+                    <div class="settings-card-header" style="background:var(--bg-surface); border-bottom:1px solid var(--border-color); display:flex; flex-wrap:wrap; gap:12px;">
+                        <h3 id="ai-models-heading" style="margin:0; font-size:14px; font-weight:600;">大语言模型</h3>
+                        <div style="margin-left:auto;">
+                            <button type="button" class="cv-btn settings-btn-light" style="height:32px;" id="btn-add-llm" aria-label="添加模型" ${createDisabled}>+ 添加模型</button>
                         </div>
                     </div>
                     <div class="settings-card-table-wrapper">
-                        <table class="settings-modern-table" id="ai-models-table">
+                        <table class="settings-modern-table" id="ai-models-table" aria-labelledby="ai-models-heading">
                             <thead>
                                 <tr>
                                     <th>名称</th>
                                     <th>协议</th>
                                     <th>模型标识</th>
-                                    <th>Roles</th>
+                                    <th>角色</th>
                                     <th>状态</th>
                                     <th>操作</th>
                                 </tr>
@@ -1282,7 +1274,7 @@ export function installAiTab(SettingsView) {
                         <div class="settings-card-header" style="background:var(--bg-surface);">
                             <div class="settings-header-left">
                                 <svg viewBox="0 0 24 24" class="settings-header-icon"><path d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM14 13v4h-4v-4H7l5-5 5 5h-3z" fill="var(--text-muted)"/></svg>
-                                <span>配置所选模型 (Editing)</span>
+                                <span>配置所选模型</span>
                             </div>
                         </div>
                         <div class="settings-card-body" id="ai-detail-form">
