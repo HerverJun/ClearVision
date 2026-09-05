@@ -237,6 +237,7 @@ public static class AgentRunEndpoints
             ClientMutationId = BuildPlanInitialMutationId(request.ClientMutationId),
             MutationPayloadFingerprint = requestFingerprint,
             RequireExpectedRevisionWhenWorkspaceExists = true,
+            RequireNoRunningAgentRun = true,
             LifecycleState = "planning",
             PlanRunId = runId,
             PlanRunStatus = AgentRunEventStatuses.Running,

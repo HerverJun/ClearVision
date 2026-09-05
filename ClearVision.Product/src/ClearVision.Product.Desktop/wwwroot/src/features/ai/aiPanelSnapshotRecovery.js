@@ -4,6 +4,7 @@ const SAFE_LIFECYCLE_STATES = new Set([
     'routing',
     'clarifying',
     'plan_running',
+    'planning',
     'plan_ready',
     'plan_blocked',
     'plan_failed',
@@ -11,11 +12,12 @@ const SAFE_LIFECYCLE_STATES = new Set([
     'plan',
     'build',
     'building',
+    'build_completed',
     'build_failed',
     'build_cancelled',
     'applied'
 ]);
-const SAFE_RUN_STATUSES = new Set(['idle', 'running', 'completed', 'failed', 'cancelled', 'canceled']);
+const SAFE_RUN_STATUSES = new Set(['idle', 'pending', 'running', 'completed', 'failed', 'cancelled', 'canceled']);
 
 function read(snapshot, camel, pascal = '') {
     return snapshot?.[camel] ?? snapshot?.[pascal || `${camel[0].toUpperCase()}${camel.slice(1)}`];
@@ -88,7 +90,11 @@ export function normalizeWorkspaceSnapshotForRestore(raw) {
 
     const snapshot = {
         schemaVersion: versionSupported ? schemaVersion : 0,
-        revision: trusted ? finiteNonNegative(read(raw, 'revision')) : 0,
+        revision: finiteNonNegative(read(raw, 'revision')),
+        recoveryRunIds: {
+            plan: String(read(raw, 'planRunId') || '').trim(),
+            build: String(read(raw, 'buildRunId') || '').trim()
+        },
         lifecycleState: safeLifecycle,
         pendingPlanSnapshot: hasPlanIdentity ? pendingPlanSnapshot : null,
         planQuestionSelections: trusted ? safeObject(read(raw, 'planQuestionSelections')) : {},
@@ -117,7 +123,8 @@ export function normalizeWorkspaceSnapshotForRestore(raw) {
         appliedDowngraded,
         degradationReason: !versionSupported
             ? (Number.isFinite(schemaVersion) && schemaVersion > 0 ? 'unsupported_version' : 'missing_version')
-            : (!lifecycleSupported ? 'invalid_lifecycle' : 'invalid_plan')
+            : (lifecycleState === 'recovery_conflict' ? 'recovery_conflict'
+                : (!lifecycleSupported ? 'invalid_lifecycle' : 'invalid_plan'))
     };
 
     return {

@@ -545,6 +545,8 @@ export const aiPanelSessionHistoryMixin = {
         }
 
         if (snapshot.degraded || snapshot.trusted !== true) {
+            this.workspaceRecoveryBlocked = true;
+            this.workspaceRecoveryRunIds = snapshot.recoveryRunIds;
             this._dispatchAgentWorkspaceEvent?.({
                 type: 'workspace/session-restored',
                 payload: {
@@ -558,24 +560,28 @@ export const aiPanelSessionHistoryMixin = {
                         plan: { runId: '', status: 'idle', events: [], eventKeys: {}, terminalSequence: null },
                         build: { runId: '', status: 'idle', events: [], eventKeys: {}, terminalSequence: null }
                     },
-                    persistence: { snapshotRevision: 0, buildRunId: '', submittedBuildFingerprint: '' },
+                    persistence: { snapshotRevision: snapshot.revision, buildRunId: '', submittedBuildFingerprint: '' },
                     requirementMode: 'strict',
                     ui: { workspaceMode: AgentWorkspaceModes.PLAN, viewMode: AgentWorkspaceModes.PLAN }
                 }
             });
-            this.workspaceSnapshotRevision = 0;
+            this.workspaceSnapshotRevision = snapshot.revision;
             this.workspaceBuildRunId = '';
             this.workspaceSubmittedBuildFingerprint = '';
             this.activeAgentRunId = null;
             this.activePlanRunId = null;
             this._setWorkspaceViewMode?.(AgentWorkspaceModes.PLAN, { render: false });
             this._addMessage?.('system', '工作台快照版本缺失、过新或内容损坏，已仅保留安全的对话摘要；Build、Apply Ready 与 Applied 状态未恢复。');
+            if (snapshot.degradationReason === 'recovery_conflict') {
+                this._addMessage?.('system', '运行恢复存在冲突，已保留工作台版本和运行编号。请重新加载会话确认恢复结果后再构建。');
+            }
             this._renderAgentWorkspaceOverview?.();
             this._renderPlanWorkspace?.(this.pendingVisionPlan);
             this._renderBuildWorkspaceFromAgentRun?.();
             return false;
         }
 
+        this.workspaceRecoveryBlocked = false;
         this._applyWorkspaceSnapshotSummary?.(snapshot);
         const planSnapshot = snapshot.pendingPlanSnapshot;
         let normalizedPlan = null;
@@ -586,6 +592,9 @@ export const aiPanelSessionHistoryMixin = {
         if (snapshot.appliedDowngraded) {
             normalizedPlan = downgradeRestoredAppliedPlan(normalizedPlan);
         }
+        this._rememberRequirementModeForPlan?.(normalizedPlan, snapshot.requirementMode);
+        this._setGeneratingState?.([snapshot.planRunStatus, snapshot.buildRunStatus]
+            .some(status => ['pending', 'running'].includes(status)));
         this.planAcceptedRecommendedDefaults = snapshot.planAcceptedRecommendedDefaults === true;
         this.activePlanRunRequestId = snapshot.planRunId ? `session-restore-plan-${snapshot.planRunId}` : null;
         this.activePlanRunCompletion = null;
@@ -646,7 +655,8 @@ export const aiPanelSessionHistoryMixin = {
         this._renderBuildWorkspaceFromAgentRun?.();
         this._updatePlanBuildActionState?.();
 
-        if (snapshot.readinessStale && this.pendingVisionPlan) {
+        if (snapshot.readinessStale && this.pendingVisionPlan && !snapshot.buildRunId &&
+            !['pending', 'running'].includes(snapshot.planRunStatus)) {
             this._requestPlanReadinessPreview?.(this.pendingVisionPlan, { reason: 'session_restore_stale' });
         }
 

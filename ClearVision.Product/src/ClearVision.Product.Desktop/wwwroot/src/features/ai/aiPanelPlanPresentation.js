@@ -396,6 +396,10 @@ export function renderAiPlanWorkspace(panel, plan = panel?.pendingVisionPlan) {
     }
 
     const presentation = deriveAiPlanPresentation(panel, plan);
+    const canRetryReadiness = !panel?._isPlanSnapshotReadOnly?.() && !panel?.isGenerating &&
+        ['idle', 'failed', 'timeout'].includes(panel?.agentWorkspaceState?.readinessStatus || 'idle');
+    const canRetrySave = panel?.workspaceSnapshotDirty && !panel?.workspacePendingMutationCount &&
+        !panel?.workspaceBoundaryInProgress && !panel?._isPlanSnapshotReadOnly?.();
     root.innerHTML = `
         <div class="ai-plan-v2" data-ai-hook="plan-workspace-v2">
             ${renderUnderstanding(panel, presentation.understanding)}
@@ -407,12 +411,22 @@ export function renderAiPlanWorkspace(panel, plan = panel?.pendingVisionPlan) {
             <div class="ai-plan-actions">
                 <span class="ai-plan-action-status" id="ai-plan-build-status"></span>
                 <button class="ai-plan-action is-primary" type="button" id="ai-btn-start-build">开始构建</button>
+                ${canRetryReadiness ? '<button class="ai-plan-action" type="button" id="ai-btn-retry-readiness-preview">重试校验</button>' : ''}
+                ${canRetrySave ? '<button class="ai-plan-action" type="button" id="ai-btn-retry-workspace-save">重试保存</button>' : ''}
                 ${presentation.canViewDraft ? '<button class="ai-plan-v2-view-draft" type="button" data-ai-action="plan-view-draft">查看构建草稿</button>' : ''}
             </div>
         </div>
     `;
 
     bindAiClarificationInteractions(panel, root, plan);
+    root.querySelector('#ai-btn-retry-readiness-preview')?.addEventListener('click', () => {
+        panel?._requestPlanReadinessPreview?.(panel.pendingVisionPlan, { reason: 'retry' });
+        panel?._renderPlanWorkspace?.(panel.pendingVisionPlan);
+    });
+    root.querySelector('#ai-btn-retry-workspace-save')?.addEventListener('click', async () => {
+        await panel?._flushWorkspaceSnapshotBeforeBoundary?.('save_retry');
+        panel?._renderPlanWorkspace?.(panel.pendingVisionPlan);
+    });
     root.querySelectorAll('[data-requirement-mode]').forEach(button => {
         button.addEventListener('click', () => panel?._setRequirementMode?.(button.dataset.requirementMode || 'strict'));
     });

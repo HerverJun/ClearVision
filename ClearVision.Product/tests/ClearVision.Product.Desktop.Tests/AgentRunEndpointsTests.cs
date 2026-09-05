@@ -31,6 +31,137 @@ namespace ClearVision.Product.Desktop.Tests;
 
 public sealed class AgentRunEndpointsTests
 {
+    [Fact]
+    public async Task CreateRun_BuildFromPlanWithLatestRevisionWhileRunning_ShouldRejectSecondExecution()
+    {
+        var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        await using var host = await AgentRunEndpointTestHost.CreateAsync(async (_, ct) =>
+        {
+            entered.TrySetResult();
+            await release.Task.WaitAsync(ct);
+            return AgentRunEndpointTestHost.SuccessResult();
+        });
+        const string sessionId = "build-plan-running-regression";
+        var plan = LegacyBlockedAgentRunBuildFromPlanSnapshot();
+        var initial = host.InitializeWorkspaceSnapshot(sessionId, new VisionAgentWorkspaceSnapshotUpdate
+        {
+            LifecycleState = "plan_ready", PendingPlanSnapshot = plan
+        });
+        AgentRunCreateRequest Request(long revision) => new()
+        {
+            Description = "start build from confirmed plan", SessionId = sessionId,
+            Mode = "new", RequirementMode = AiRequirementModes.Strict,
+            UseVisionAgentGenerateFlow = true, AgentGenerateFlowMode = AiAgentGenerateFlowModes.Scripted,
+            BuildFromPlan = new VisionAgentBuildFromPlanRequest
+            {
+                PlanId = plan.PlanId, PlanHash = plan.PlanHash, PlanSnapshot = plan,
+                ConfirmedAnswers = ConfirmedAgentRunBuildFromPlanAnswers(),
+                OriginalUserPrompt = plan.OriginalUserPrompt, WorkspaceExpectedRevision = revision, MetadataOnly = true
+            }
+        };
+        try
+        {
+            using var first = await host.Client.PostAsJsonAsync("/api/ai/agent-runs", Request(initial.Revision));
+            first.StatusCode.Should().Be(HttpStatusCode.OK);
+            using var firstJson = JsonDocument.Parse(await first.Content.ReadAsStringAsync());
+            var runId = firstJson.RootElement.GetProperty("runId").GetString()!;
+            await entered.Task.WaitAsync(TimeSpan.FromSeconds(5));
+            var current = host.GetSession(sessionId)!.WorkspaceSnapshot!;
+            using var second = await host.Client.PostAsJsonAsync("/api/ai/agent-runs", Request(current.Revision));
+            second.StatusCode.Should().Be(HttpStatusCode.Conflict);
+            using var secondJson = JsonDocument.Parse(await second.Content.ReadAsStringAsync());
+            secondJson.RootElement.GetProperty("errorCode").GetString().Should().Be("agent_run_already_running");
+            host.Generation.BuildCallCount.Should().Be(1);
+            host.GetSession(sessionId)!.WorkspaceSnapshot!.BuildRunId.Should().Be(runId);
+            host.GetSession(sessionId)!.WorkspaceSnapshot!.Revision.Should().Be(current.Revision);
+            release.TrySetResult();
+            await host.WaitForTerminalAsync(runId);
+            await host.WaitForWorkspaceBuildStatusAsync(sessionId, AgentRunEventStatuses.Completed);
+
+            var completed = new ConversationalFlowService(Path.Combine(host.RootDirectory, "sessions"))
+                .GetSession(host.OwnerHash, sessionId)!;
+            completed.WorkspaceSnapshot!.BuildRunId.Should().Be(runId);
+            completed.CurrentFlowJson.Should().NotBeNullOrWhiteSpace();
+            using var replan = await host.Client.PostAsJsonAsync("/api/ai/agent-plan-runs", new VisionAgentPlanModeRequest
+            {
+                Description = "Detect scratches on a metal part from a file image and output OK NG",
+                SessionId = sessionId, WorkspaceExpectedRevision = completed.WorkspaceSnapshot.Revision,
+                ClientMutationId = "replan-after-restored-build"
+            });
+            replan.StatusCode.Should().Be(HttpStatusCode.OK);
+            using var replanJson = JsonDocument.Parse(await replan.Content.ReadAsStringAsync());
+            await host.WaitForTerminalAsync(replanJson.RootElement.GetProperty("runId").GetString()!);
+            var fresh = host.GetSession(sessionId)!.WorkspaceSnapshot!;
+            fresh.BuildRunId.Should().BeNullOrEmpty();
+            plan = fresh.PendingPlanSnapshot!;
+            var saved = host.ConversationService.TryUpdateWorkspaceSnapshot(host.OwnerHash, sessionId, new VisionAgentWorkspaceSnapshotUpdate
+            {
+                ExpectedRevision = fresh.Revision, ClientMutationId = "confirmed-new-plan-answers",
+                ConfirmedPlanAnswers = ConfirmedAgentRunBuildFromPlanAnswers()
+            });
+            saved.Success.Should().BeTrue();
+            using var next = await host.Client.PostAsJsonAsync("/api/ai/agent-runs", Request(saved.Revision));
+            next.StatusCode.Should().Be(HttpStatusCode.OK);
+            using var nextJson = JsonDocument.Parse(await next.Content.ReadAsStringAsync());
+            await host.WaitForTerminalAsync(nextJson.RootElement.GetProperty("runId").GetString()!);
+            host.Generation.BuildCallCount.Should().Be(2);
+        }
+        finally
+        {
+            release.TrySetResult();
+        }
+    }
+
+    [Theory]
+    [InlineData("completed")]
+    [InlineData("failed")]
+    [InlineData("cancelled")]
+    public async Task CreatePlanRun_AfterBuildTerminal_ShouldPersistFreshWritablePlan(string status)
+    {
+        await using var host = await AgentRunEndpointTestHost.CreateAsync();
+        const string sessionId = "replan-build-terminal-regression";
+        var initial = host.InitializeWorkspaceSnapshot(sessionId, new VisionAgentWorkspaceSnapshotUpdate
+        {
+            LifecycleState = $"build_{status}", BuildRunId = "previous-build", BuildRunStatus = status,
+            BuildTerminalSequence = 10, SubmittedBuildFingerprint = "previous-fingerprint",
+            PlanRunId = "previous-plan", PlanRunStatus = "completed", PlanTerminalSequence = 5,
+            PendingPlanSnapshot = LegacyBlockedAgentRunBuildFromPlanSnapshot(),
+            PlanQuestionSelections = new() { ["old-question"] = "old-answer" },
+            PlanAcceptedRecommendedDefaults = true, WorkspaceViewMode = "build"
+        });
+        using var response = await host.Client.PostAsJsonAsync("/api/ai/agent-plan-runs", new VisionAgentPlanModeRequest
+        {
+            Description = "Detect scratches on a metal part from a file image and output OK NG",
+            SessionId = sessionId, WorkspaceExpectedRevision = initial.Revision,
+            ClientMutationId = "new-plan-regression"
+        });
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        using var json = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        var runId = json.RootElement.GetProperty("runId").GetString()!;
+        await host.WaitForTerminalAsync(runId);
+        var snapshot = host.GetSession(sessionId)!.WorkspaceSnapshot!;
+        snapshot.BuildRunId.Should().BeNullOrEmpty();
+        snapshot.SubmittedBuildFingerprint.Should().BeNullOrEmpty();
+        snapshot.BuildTerminalSequence.Should().BeNull();
+        snapshot.PlanQuestionSelections.Should().NotContainKey("old-question");
+        snapshot.PlanAcceptedRecommendedDefaults.Should().BeFalse();
+        snapshot.WorkspaceViewMode.Should().Be("plan");
+        snapshot.PendingPlanSnapshot.Should().NotBeNull();
+        var save = host.ConversationService.TryUpdateWorkspaceSnapshot(host.OwnerHash, sessionId, new VisionAgentWorkspaceSnapshotUpdate
+        {
+            ExpectedRevision = snapshot.Revision, ClientMutationId = "new-plan-answer",
+            PlanQuestionSelections = new() { ["image_source"] = "file" }
+        });
+        save.Success.Should().BeTrue();
+        var restored = new ConversationalFlowService(Path.Combine(host.RootDirectory, "sessions"))
+            .GetSession(host.OwnerHash, sessionId)!.WorkspaceSnapshot!;
+        restored.Revision.Should().Be(save.Revision);
+        restored.BuildRunId.Should().BeNullOrEmpty();
+        restored.SubmittedBuildFingerprint.Should().BeNullOrEmpty();
+        restored.PlanQuestionSelections["image_source"].Should().Be("file");
+    }
+
     [Fact(DisplayName = "POST AgentRun creates run and returns started plus brief events")]
     public async Task CreateRun_ShouldReturnInitialEvents()
     {

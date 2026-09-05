@@ -677,6 +677,7 @@ export const aiPanelAgentWorkspaceMixin = {
     _cancelPendingPlanningRequest() {
         const lifecycle = this.planningLifecycle;
         if (!lifecycle || lifecycle.status !== 'running') return false;
+        this.cancelledPlanRequestId = this.activePlanRequestId;
         this.activeIntentRouterRequestId = null;
         this._clearActivePlanRequest?.();
         this._closeAgentRunEventSource?.();
@@ -690,6 +691,8 @@ export const aiPanelAgentWorkspaceMixin = {
     },
 
     _resetAgentWorkspace({ preservePlan = false } = {}) {
+        this.workspaceRecoveryBlocked = false;
+        this.workspaceRecoveryRunIds = null;
         this._clearPlanningLifecycleTimers?.();
         this.planningLifecycle = null;
         this.activeIntentRouterRequestId = null;
@@ -779,6 +782,7 @@ export const aiPanelAgentWorkspaceMixin = {
 
     _isPlanSnapshotReadOnly() {
         return Boolean(
+            this.workspaceRecoveryBlocked ||
             String(this.workspaceBuildRunId || this.activeAgentRunId || '').trim() ||
             String(this.workspaceSubmittedBuildFingerprint || '').trim()
         );
@@ -897,10 +901,17 @@ export const aiPanelAgentWorkspaceMixin = {
                             return { ignored: true, stale: true };
                         }
 
-                        this._applyWorkspaceSnapshotSummary?.(payload?.snapshot || payload?.Snapshot || null);
+                        const serverSnapshot = payload?.snapshot || payload?.Snapshot || null;
+                        const serverPlan = serverSnapshot?.pendingPlanSnapshot || serverSnapshot?.PendingPlanSnapshot;
+                        const serverPlanIdentity = this._getPlanIdentity(serverPlan);
+                        this._applyWorkspaceSnapshotSummary?.(serverSnapshot);
                         this._handleWorkspacePersistenceStatus?.(payload?.persistenceStatus || payload?.PersistenceStatus || null);
                         const currentPlanIdentity = this._getPlanIdentity?.(this.pendingVisionPlan) || '';
-                        const samePlan = Boolean(task.planIdentity && currentPlanIdentity && task.planIdentity === currentPlanIdentity);
+                        const samePlan = Boolean(task.planIdentity && currentPlanIdentity && task.planIdentity === currentPlanIdentity &&
+                            (!serverPlanIdentity || serverPlanIdentity === task.planIdentity));
+                        if (serverPlanIdentity && serverPlanIdentity !== task.planIdentity) {
+                            this.workspaceRecoveryBlocked = true;
+                        }
                         if (!rebased && samePlan && !this._isPlanSnapshotReadOnly()) {
                             rebased = true;
                             expectedRevision = Number(this.workspaceSnapshotRevision || 0);
@@ -933,6 +944,7 @@ export const aiPanelAgentWorkspaceMixin = {
                 this.workspacePendingMutationCount = Math.max(
                     0,
                     Number(this.workspacePendingMutationCount || 0) - 1);
+                if (this._isCurrentWorkspaceSaveTask(task)) this._renderPlanWorkspace?.(this.pendingVisionPlan);
             }
         };
 
@@ -952,16 +964,29 @@ export const aiPanelAgentWorkspaceMixin = {
             return true;
         }
 
-        const targetGeneration = Number(this.workspaceMutationGeneration || 0);
+        const identity = {
+            sessionId: this.sessionId,
+            sessionNavigationEpoch: Number(this.sessionNavigationEpoch || 0),
+            planIdentity: this._getPlanIdentity(this.pendingVisionPlan)
+        };
+        const isCurrent = () => !this._disposed && this.sessionId === identity.sessionId &&
+            Number(this.sessionNavigationEpoch || 0) === identity.sessionNavigationEpoch &&
+            this._getPlanIdentity(this.pendingVisionPlan) === identity.planIdentity;
         this.workspaceBoundaryInProgress = true;
         try {
-            await (this.workspaceSnapshotSaveQueue || Promise.resolve());
-            return Number(this.workspacePersistedGeneration || 0) >= targetGeneration;
+            await (this.workspaceSnapshotSaveQueue || Promise.resolve()).catch(() => undefined);
+            if (!isCurrent()) return false;
+            this._syncWorkspaceSnapshotDirty();
+            if (this.workspaceSnapshotDirty) {
+                await this._queueWorkspaceSnapshotFlush('boundary_retry');
+            }
+            return isCurrent() && !this.workspaceSnapshotDirty;
         } catch {
-            return Number(this.workspacePersistedGeneration || 0) >= targetGeneration;
+            return false;
         } finally {
             this.workspaceBoundaryInProgress = false;
             this._syncWorkspaceSnapshotDirty();
+            if (isCurrent()) this._renderPlanWorkspace?.(this.pendingVisionPlan);
         }
     },
 
@@ -976,9 +1001,10 @@ export const aiPanelAgentWorkspaceMixin = {
     },
 
     _getPlanIdentity(plan) {
-        const planId = String(plan?.planId || plan?.id || '').trim();
+        const planId = String(plan?.planId || plan?.PlanId || plan?.id || '').trim();
         const planHash = String(
             plan?.planHash ||
+            plan?.PlanHash ||
             plan?.rawPlanSnapshot?.planHash ||
             plan?.rawPlanSnapshot?.PlanHash ||
             ''
@@ -1014,7 +1040,9 @@ export const aiPanelAgentWorkspaceMixin = {
             this.planRequirementModes = new Map();
         }
         if (!this.planRequirementModes.has(identity)) {
-            this.planRequirementModes.set(identity, 'strict');
+            const persistedMode = plan?.requirementMode || plan?.rawPlanSnapshot?.requirementMode ||
+                plan?.rawPlanSnapshot?.RequirementMode || 'strict';
+            this.planRequirementModes.set(identity, this._normalizeRequirementMode?.(persistedMode) || 'strict');
         }
 
         const rememberedMode = this._normalizeRequirementMode?.(this.planRequirementModes.get(identity)) || 'strict';
@@ -1525,6 +1553,12 @@ export const aiPanelAgentWorkspaceMixin = {
         });
 
         this.container?.querySelectorAll?.('.ai-plan-action').forEach(button => {
+            if (button.id === 'ai-btn-retry-readiness-preview' || button.id === 'ai-btn-retry-workspace-save') {
+                button.disabled = busy || this._isPlanSnapshotReadOnly() ||
+                    (button.id === 'ai-btn-retry-workspace-save' && Boolean(this.workspaceBoundaryInProgress || this.workspacePendingMutationCount));
+                button.setAttribute?.('aria-disabled', button.disabled ? 'true' : 'false');
+                return;
+            }
             button.disabled = busy || !canBuild;
             if (!canBuild && hasPlan) {
                 button.title = blockedTitle;
@@ -2342,8 +2376,18 @@ export const aiPanelAgentWorkspaceMixin = {
     },
 
     async _requestBackendVisionPlanRun(request, { planRequestId, turn, fallbackDescription = '' } = {}) {
+        const requestSessionId = this.sessionId;
+        const navigationEpoch = Number(this.sessionNavigationEpoch || 0);
         const createResult = await httpClient.post('/ai/agent-plan-runs', request);
         const runId = String(createResult?.runId || createResult?.RunId || '').trim();
+        if (this._disposed || this.sessionId !== requestSessionId ||
+            Number(this.sessionNavigationEpoch || 0) !== navigationEpoch ||
+            !this._isActivePlanRequest(planRequestId)) {
+            if (runId && this.cancelledPlanRequestId === planRequestId) {
+                await httpClient.post(`/ai/agent-runs/${encodeURIComponent(runId)}/cancel`).catch(() => undefined);
+            }
+            throw new Error('Plan Run 已过期。');
+        }
         const sessionId = String(createResult?.sessionId || createResult?.SessionId || '').trim();
         if (sessionId) {
             this._adoptCanonicalSessionId?.(sessionId, { reason: 'plan_run_response' });
@@ -2352,10 +2396,6 @@ export const aiPanelAgentWorkspaceMixin = {
         this._handleWorkspacePersistenceStatus?.(createResult?.persistenceStatus || createResult?.PersistenceStatus || null);
         if (!runId) {
             throw new Error('Plan Run 创建接口没有返回 runId。');
-        }
-
-        if (!this._isActivePlanRequest(planRequestId)) {
-            throw new Error('Plan Run 已过期。');
         }
 
         this._dispatchAgentWorkspaceEvent?.({
@@ -2525,7 +2565,7 @@ export const aiPanelAgentWorkspaceMixin = {
 
     _resolveActivePlanRun(evt) {
         const completion = this.activePlanRunCompletion;
-        if (!completion || completion.runId !== evt.runId) return;
+        if (completion ? completion.runId !== evt.runId : this.activePlanRunId !== evt.runId) return;
         const payload = this._asObject?.(evt.payload) || evt.payload || {};
         const result = payload.planResult ||
             payload.PlanResult ||
@@ -2541,17 +2581,34 @@ export const aiPanelAgentWorkspaceMixin = {
             return;
         }
 
-        if (evt.eventType === 'run.completed') {
+        if (evt.eventType === 'run.completed' && (completion || this.activePlanRunRecovery)) {
             this._applyPlanRunTerminalPayload(evt, result);
         }
 
+        if (!completion && this.activePlanRunRecovery) {
+            const plan = this._normalizeBackendPlanResult(result, this.lastUserPrompt || '');
+            this._dispatchAgentWorkspaceEvent?.({
+                type: AgentWorkspaceEventTypes.PLAN_RECEIVED,
+                payload: { plan },
+                sessionId: this.sessionId
+            });
+            this._rememberRequirementModeForPlan?.(plan, this.requirementMode);
+            this._requestPlanReadinessPreview?.(plan, { reason: 'plan_recovered' });
+            this.isCancellingGenerate = false;
+            this._setGeneratingState?.(false);
+            this._clearActivePlanRequest?.(this.activePlanRunRequestId);
+            this._renderPlanWorkspace?.(plan);
+        }
+
         this._closeAgentRunEventSource?.();
-        if (this.activePlanRunId === completion.runId) {
+        if (this.activePlanRunId === evt.runId) {
             this.activePlanRunId = null;
             this.activePlanRunRequestId = null;
         }
         this.activePlanRunCompletion = null;
-        completion.resolve(result);
+        this.activePlanRunRecovery = false;
+        if (!completion) this._clearActivePlanRequest?.();
+        completion?.resolve(result);
     },
 
     _getPlanRunTerminalPayload(evt) {
@@ -2620,16 +2677,25 @@ export const aiPanelAgentWorkspaceMixin = {
 
     _rejectActivePlanRun(error, { cancelled = false } = {}) {
         const completion = this.activePlanRunCompletion;
+        const requestId = this.activePlanRunRequestId;
+        const recovering = this.activePlanRunRecovery;
         const runId = String(completion?.runId || '').trim();
         this._closeAgentRunEventSource?.();
         this.activePlanRunCompletion = null;
+        this.activePlanRunRecovery = false;
+        this.isCancellingGenerate = false;
         if (!runId || this.activePlanRunId === runId) {
             this.activePlanRunId = null;
             this.activePlanRunRequestId = null;
         }
         this._setGeneratingState?.(false);
+        if (recovering && !completion && !cancelled) {
+            this._clearActivePlanRequest?.(requestId);
+            this._setWorkbenchState?.(AiWorkbenchStates.FAILED);
+            this._setResultStatusNote?.(this._sanitizePlanDiagnosticText?.(error?.message || '规划失败。', 260) || '规划失败。', 'warning');
+        }
         if (cancelled) {
-            this._clearActivePlanRequest(this.activePlanRunRequestId);
+            this._clearActivePlanRequest(requestId);
             this._setWorkbenchState(AiWorkbenchStates.CANCELLED);
             this._setAssistantTurnStatus(this.activeAssistantTurn, '已取消', 'cancelled');
             this._setAssistantSectionText(this.activeAssistantTurn, 'reply', '规划已取消。');
@@ -2926,7 +2992,7 @@ export const aiPanelAgentWorkspaceMixin = {
         const rawCanBuild = plan.canBuild ?? plan.CanBuild;
         const rawCanPlan = plan.canPlan ?? plan.CanPlan;
         const maturityCanPlan = requirementMaturity?.canPlan === true;
-        const requirementMode = 'strict';
+        const requirementMode = this._normalizeRequirementMode?.(plan.requirementMode || plan.RequirementMode) || 'strict';
         const blockingReasons = this._toArray(plan.blockingReasons || plan.BlockingReasons)
             .map(item => this._sanitizePlanDisplayText(item))
             .filter(reason => !this._isDraftableImageSourceBlockingReason(reason, route, requirementMode));
@@ -3407,6 +3473,13 @@ export const aiPanelAgentWorkspaceMixin = {
     },
 
     _getPlanBuildActionState(plan) {
+        if (this.workspaceRecoveryBlocked) {
+            return {
+                canBuild: false, canAcceptRecommended: false, canStart: false, acceptedRecommended: false,
+                label: '工作台恢复待确认', statusText: '请重新加载会话确认恢复结果后再构建。',
+                stats: this._getPlanReadinessStats(plan)
+            };
+        }
         if (!plan) {
             return {
                 canBuild: false,

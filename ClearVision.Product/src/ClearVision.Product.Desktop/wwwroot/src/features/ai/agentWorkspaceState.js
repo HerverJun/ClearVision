@@ -518,6 +518,12 @@ export function agentWorkspaceReducer(state, event) {
             return withProjection({
                 ...state,
                 plan,
+                run: samePlan ? state.run : { ...state.run, build: createAgentWorkspaceState().run.build },
+                persistence: samePlan ? state.persistence : { ...state.persistence, buildRunId: '', submittedBuildFingerprint: '' },
+                resources: samePlan ? state.resources : {
+                    ...createAgentWorkspaceState().resources,
+                    revision: Number(read(read(plan, 'effectiveReadiness'), 'resourceRevision')) || 0
+                },
                 identity: {
                     ...state.identity,
                     sessionId: clean(event.sessionId || payload.sessionId) || state.identity.sessionId,
@@ -529,6 +535,7 @@ export function agentWorkspaceReducer(state, event) {
                     ...state.answers,
                     confirmedByField: { ...(samePlan ? state.answers.confirmedByField : {}), ...backendAnswers },
                     optimisticByField: samePlan ? state.answers.optimisticByField : {},
+                    selectionByQuestion: samePlan ? state.answers.selectionByQuestion : {},
                     answerRevision: samePlan ? state.answers.answerRevision : incomingAnswerRevision
                 },
                 readiness: normalizeReadiness(read(plan, 'buildReadiness')),
@@ -544,6 +551,8 @@ export function agentWorkspaceReducer(state, event) {
             return withProjection({
                 ...state,
                 plan: null,
+                run: { ...state.run, build: createAgentWorkspaceState().run.build },
+                persistence: { ...state.persistence, buildRunId: '', submittedBuildFingerprint: '' },
                 identity: { ...state.identity, planId: '', planHash: '', planRevision: 0 },
                 answers: { confirmedByField: {}, optimisticByField: {}, selectionByQuestion: {}, answerRevision: state.answers.answerRevision + 1, lastSubmittedBatch: [] },
                 readiness: createAgentWorkspaceState().readiness,

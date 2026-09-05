@@ -142,6 +142,7 @@ public sealed class VisionAgentWorkspaceSnapshotUpdate
     public string? UserTurnId { get; set; }
     public string? UserMessage { get; set; }
     public bool RequireExpectedRevisionWhenWorkspaceExists { get; set; }
+    public bool RequireNoRunningAgentRun { get; set; }
 }
 
 public sealed class ConversationPersistenceStatus
@@ -745,7 +746,8 @@ public class ConversationalFlowService : IConversationalFlowService
             ComputeWorkspaceMutationFingerprint(update),
             candidate => ApplyWorkspaceUpdateLocked(candidate, update),
             update.RequireExpectedRevisionWhenWorkspaceExists,
-            allowCreate: false)
+            allowCreate: false,
+            requireNoRunningAgentRun: update.RequireNoRunningAgentRun)
             .ToWorkspaceMutationResult();
     }
 
@@ -763,7 +765,8 @@ public class ConversationalFlowService : IConversationalFlowService
             ComputeWorkspaceMutationFingerprint(update),
             candidate => ApplyWorkspaceUpdateLocked(candidate, update),
             update.RequireExpectedRevisionWhenWorkspaceExists,
-            allowCreate: true)
+            allowCreate: true,
+            requireNoRunningAgentRun: update.RequireNoRunningAgentRun)
             .ToWorkspaceMutationResult();
     }
 
@@ -1009,7 +1012,8 @@ public class ConversationalFlowService : IConversationalFlowService
         string payloadFingerprint,
         Action<ConversationSession> mutator,
         bool requireExpectedRevisionWhenWorkspaceExists = false,
-        bool allowCreate = false)
+        bool allowCreate = false,
+        bool requireNoRunningAgentRun = false)
     {
         var normalizedOwnerHash = NormalizeOwnerHash(ownerHash);
         var normalizedSessionId = NormalizeSessionId(sessionId);
@@ -1052,6 +1056,15 @@ public class ConversationalFlowService : IConversationalFlowService
                         idempotentReplay: true,
                         appliedRevision: receipt.AppliedRevision);
                 }
+            }
+
+            if (requireNoRunningAgentRun && HasRunningAgentRun(current.WorkspaceSnapshot))
+            {
+                return SessionMutationCommitResult.Conflicted(
+                    "agent_run_already_running",
+                    "The same conversation already has an Agent run in progress.",
+                    current.WorkspaceSnapshot,
+                    _lastPersistenceStatus);
             }
 
             var currentRevision = current.WorkspaceSnapshot?.Revision ?? 0;
@@ -1821,6 +1834,29 @@ public class ConversationalFlowService : IConversationalFlowService
         snapshot.SchemaVersion = Math.Max(1, snapshot.SchemaVersion);
         snapshot.Revision++;
         snapshot.UpdatedAtUtc = DateTime.UtcNow;
+
+        // A new Plan owns a fresh workspace; completed builds remain in conversation history.
+        if (string.Equals(update.PlanRunStatus, AgentRunEventStatuses.Running, StringComparison.OrdinalIgnoreCase) &&
+            !string.IsNullOrWhiteSpace(update.PlanRunId) &&
+            !string.Equals(snapshot.PlanRunId, update.PlanRunId, StringComparison.OrdinalIgnoreCase))
+        {
+            snapshot.PendingPlanSnapshot = null;
+            snapshot.PlanTerminalSequence = null;
+            snapshot.BuildRunId = null;
+            snapshot.BuildRunStatus = null;
+            snapshot.BuildTerminalSequence = null;
+            snapshot.SubmittedBuildFingerprint = null;
+            snapshot.PlanQuestionSelections = new();
+            snapshot.ConfirmedPlanAnswers = new();
+            snapshot.OptimisticPlanAnswers = new();
+            snapshot.AnswerRevision = 0;
+            snapshot.ReadinessPreview = null;
+            snapshot.MissingResources = new();
+            snapshot.ResourceDecisions = new();
+            snapshot.ResourceRevision = 0;
+            snapshot.PlanAcceptedRecommendedDefaults = false;
+            snapshot.WorkspaceViewMode = "plan";
+        }
 
         if (update.ProjectId != null)
             snapshot.ProjectId = NormalizeOptionalSnapshotString(update.ProjectId);

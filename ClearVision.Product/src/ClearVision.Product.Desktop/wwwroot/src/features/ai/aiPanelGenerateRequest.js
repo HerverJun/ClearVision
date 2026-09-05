@@ -680,13 +680,29 @@ export const aiPanelGenerateRequestMixin = {
 
         this.isCancellingGenerate = true;
 
+        const buildStatus = this.agentWorkspaceState?.run?.build?.status;
+        if (this.activeAgentRunId && ['pending', 'running'].includes(buildStatus) && this._cancelActiveAgentRun) {
+            this._cancelActiveAgentRun();
+            this._updateProgress({ message: '正在取消生成...', phase: 'cancelling' });
+            this._setGeneratingState(this.isGenerating);
+            return;
+        }
+
+        if (this.pendingBuildCreateIdentity) {
+            this.pendingBuildCreateIdentity.cancelRequested = true;
+            this._updateProgress({ message: '正在等待创建响应以取消生成...', phase: 'cancelling' });
+            return;
+        }
+
         if ((this.activeIntentRouterRequestId || this.activePlanRequestId) &&
             !this.activePlanRunId && this._cancelPendingPlanningRequest) {
             this._cancelPendingPlanningRequest();
             return;
         }
 
-        if (this.activePlanRunId && this._cancelActivePlanRun) {
+        if (this.activePlanRunId &&
+            !['completed', 'failed', 'cancelled'].includes(this.agentWorkspaceState?.run?.plan?.status) &&
+            this._cancelActivePlanRun) {
             this._cancelActivePlanRun();
             this._updateProgress({
                 message: '正在取消规划...',

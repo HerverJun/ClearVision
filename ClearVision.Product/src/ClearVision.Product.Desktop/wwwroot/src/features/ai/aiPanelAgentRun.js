@@ -544,7 +544,29 @@ export const aiPanelAgentRunMixin = {
     },
 
     async _dispatchAgentRunGenerateRequest(payload, { clearInput = true, input = null } = {}) {
-        const createResult = await httpClient.post('/ai/agent-runs', payload);
+        const requestSessionId = this.sessionId;
+        const navigationEpoch = Number(this.sessionNavigationEpoch || 0);
+        const requestIdentity = {};
+        this.pendingBuildCreateIdentity = requestIdentity;
+        const isCurrent = () => !this._disposed && this.sessionId === requestSessionId &&
+            Number(this.sessionNavigationEpoch || 0) === navigationEpoch &&
+            this.pendingBuildCreateIdentity === requestIdentity;
+        let createResult;
+        try {
+            createResult = await httpClient.post('/ai/agent-runs', payload);
+        } catch (error) {
+            if (!isCurrent()) return false;
+            this.pendingBuildCreateIdentity = null;
+            throw error;
+        }
+        if (!isCurrent()) {
+            const lateRunId = String(createResult?.runId || createResult?.RunId || '').trim();
+            if (lateRunId && requestIdentity.cancelRequested) {
+                await httpClient.post(`/ai/agent-runs/${encodeURIComponent(lateRunId)}/cancel`).catch(() => undefined);
+            }
+            return false;
+        }
+        this.pendingBuildCreateIdentity = null;
         const runId = String(createResult?.runId || createResult?.RunId || '').trim();
         if (!runId) {
             throw new Error('AgentRun 创建接口没有返回 runId。');
@@ -587,7 +609,10 @@ export const aiPanelAgentRunMixin = {
         }
 
         const lastSequence = this._getAgentRunLastSequence();
-        this._startAgentRunEventSource(runId, { lastSequence });
+        if (!this._isAgentRunTerminalSeen(runId)) {
+            this._startAgentRunEventSource(runId, { lastSequence });
+            if (requestIdentity.cancelRequested || this.isCancellingGenerate) await this._cancelActiveAgentRun();
+        }
         this.nextHintDraft = '';
         this.nextTemplateSelection = null;
         this._renderQueuedHintBanner();
@@ -1317,6 +1342,8 @@ export const aiPanelAgentRunMixin = {
     async _replayAgentRunPublicEventsById(runId, { kind = '', statusText = '回放 AgentRun', identity = null } = {}) {
         const normalizedRunId = String(runId || '').trim();
         if (!normalizedRunId) return false;
+        const recoveringPlan = kind === 'plan' &&
+            ['pending', 'running'].includes(this.agentWorkspaceState?.run?.plan?.status);
 
         const replay = await httpClient.get(`/ai/agent-runs/${encodeURIComponent(normalizedRunId)}`);
         if (this._disposed || (identity && !this._isSessionNavigationIdentityCurrent?.(identity))) return false;
@@ -1325,12 +1352,14 @@ export const aiPanelAgentRunMixin = {
             .map(evt => this._normalizeAgentRunEvent(evt))
             .filter(Boolean)
             .sort((a, b) => a.sequence - b.sequence);
-        if (!normalizedEvents.length) return false;
-
         const hasPlanEvents = kind === 'plan' ||
             normalizedEvents.some(evt => String(evt.eventType || '').startsWith('plan.'));
+        const status = String(replay?.summary?.status || replay?.Summary?.Status || '').toLowerCase();
+        const running = ['running', 'pending'].includes(status) &&
+            !normalizedEvents.some(evt => ['run.completed', 'run.failed', 'run.cancelled'].includes(evt.eventType));
         const replayRequestId = `agent-run-replay-${normalizedRunId}`;
         if (hasPlanEvents) {
+            this.activePlanRunRecovery = running || recoveringPlan;
             this.activePlanRunId = normalizedRunId;
             this.activePlanRequestId = replayRequestId;
             this.activePlanRunRequestId = replayRequestId;
@@ -1343,7 +1372,12 @@ export const aiPanelAgentRunMixin = {
         }
 
         this._setResultStatusNote?.(`${statusText}：${normalizedRunId}`, 'info');
+        if (running) this._setGeneratingState?.(true);
         normalizedEvents.forEach(evt => this._handleAgentRunEvent(evt));
+        if (running && !this._isAgentRunTerminalSeen(normalizedRunId)) {
+            const lastSequence = normalizedEvents.reduce((last, evt) => Math.max(last, evt.sequence), 0);
+            this._startAgentRunEventSource(normalizedRunId, { lastSequence });
+        }
         this._renderAgentWorkspaceOverview?.();
         this._renderPlanWorkspace?.(this.pendingVisionPlan);
         this._renderBuildWorkspaceFromAgentRun?.();

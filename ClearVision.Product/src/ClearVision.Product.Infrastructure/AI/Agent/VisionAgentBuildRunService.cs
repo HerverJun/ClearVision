@@ -70,6 +70,7 @@ public sealed class VisionAgentBuildRunService : IVisionAgentBuildRunService
         {
             ExpectedRevision = build.WorkspaceExpectedRevision,
             RequireExpectedRevisionWhenWorkspaceExists = true,
+            RequireNoRunningAgentRun = true,
             ClientMutationId = $"build-association:{runId}",
             LifecycleState = "building",
             BuildRunId = runId,
