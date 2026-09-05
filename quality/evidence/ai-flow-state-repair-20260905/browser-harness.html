@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="dark">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AI Flow Recovery Regression</title>
+<style>
+html, body { margin: 0; height: 100%; }
+body { display: flex; flex-direction: column; }
+#controls { padding: 8px; display: flex; flex-wrap: wrap; gap: 10px; font: 13px sans-serif; }
+#panel { flex: 1; min-height: 0; }
+#observation { white-space: pre-wrap; margin: 0; }
+</style>
+<div id="controls">
+  <select id="scenario" aria-label="Scenario">
+    <option value="timeout">Readiness timeout</option>
+    <option value="draft">Restored draft</option>
+    <option value="success">Successful Build restore</option>
+  </select>
+  <button id="load">Load</button>
+  <pre id="observation"></pre>
+</div>
+<div id="panel"></div>
+<script type="module" src="./browser-harness.mjs"></script>
+</html>
