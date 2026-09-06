@@ -402,7 +402,17 @@ test('batched shell sync keeps a rebuilt primary button unique and preserves its
   assert.equal(harness.slot.children[0], newButton);
 });
 
-test('repeated initialization binds shell and recent-task clicks once', () => {
+test('repeated initialization binds shell and recent-task clicks once', t => {
+  const previousDocument = globalThis.document;
+  const drawerListeners = new Set();
+  globalThis.document = {
+    addEventListener: (type, listener) => { if (type === 'keydown') drawerListeners.add(listener); },
+    removeEventListener: (type, listener) => { if (type === 'keydown') drawerListeners.delete(listener); },
+  };
+  t.after(() => {
+    if (previousDocument === undefined) delete globalThis.document;
+    else globalThis.document = previousDocument;
+  });
   const harness = createShellHarness();
   let switches = 0;
   const panel = {
@@ -421,10 +431,13 @@ test('repeated initialization binds shell and recent-task clicks once', () => {
   syncAiPanelShell(panel);
   assert.equal(harness.recentList.listeners.get('click').length, 1);
   assert.equal(harness.moreButton.listeners.get('click').length, 1);
+  assert.equal(drawerListeners.size, 1);
 
   const button = { dataset: { sessionId: 'history-1' } };
   harness.recentList.contains = candidate => candidate === button;
   const target = { closest: () => button };
   harness.recentList.listeners.get('click')[0]({ target });
   assert.equal(switches, 1);
+  panel._disposeAiShell();
+  assert.equal(drawerListeners.size, 0);
 });

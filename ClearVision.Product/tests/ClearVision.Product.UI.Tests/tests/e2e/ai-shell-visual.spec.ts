@@ -194,10 +194,10 @@ async function expectNoPageOverflow(page: Page): Promise<void> {
 }
 
 async function switchCompactPane(page: Page, pane: 'workbench' | 'conversation'): Promise<void> {
-  const tab = page.locator(`[data-ai-shell-pane="${pane}"]`);
+  const tab = page.locator(pane === 'conversation' ? '[data-ai-hook="conversation-toggle"]' : '[data-ai-hook="conversation-close"]');
   await expect(tab).toBeVisible();
   await tab.click();
-  await expect(tab).toHaveAttribute('aria-selected', 'true');
+  await expect(page.locator('[data-ai-hook="shell"]')).toHaveAttribute('data-ai-conversation', pane === 'conversation' ? 'open' : 'closed');
 }
 
 async function restoreLegacySession(page: Page, options: { messageOnly?: boolean } = {}): Promise<void> {
@@ -575,8 +575,8 @@ test('real Plan Run events take over the same first-round planning lifecycle', a
   releasePlanStream();
   await expect(page.locator('[data-ai-hook="plan-recommendation"]')).toContainText('DataMatrix 读取流程');
   await expect(page.locator('[data-ai-hook="clarification-question"]')).toContainText('图像从哪里获取');
-  await expect(page.locator('[data-ai-hook="clarification-resources"]')).toContainText('待补资源');
-  await expect(page.locator('[data-ai-hook="clarification-workspace"] .ai-clarification-v2-header')).toContainText('还需确认 3 项');
+  await expect(page.locator('[data-ai-hook="clarification-resources"]')).toContainText('待绑定');
+  await expect(page.locator('[data-ai-hook="clarification-workspace"] .ai-clarification-v2-header')).toContainText('待补齐 4 项');
   const confirmationFields = await page.evaluate(() =>
     (window as any).aiPanel.agentWorkspaceState.projection.confirmedAnswers.map((answer: any) => answer.field));
   expect(confirmationFields).toEqual(expect.arrayContaining(['inspection_object', 'task_type']));
@@ -696,10 +696,10 @@ test('fruit classification scene shows only route and judgment questions while m
     panel._renderPlanWorkspace(plan);
   }, { prompt });
 
-  await expect(page.locator('.ai-clarification-v2-header')).toContainText('还需确认 2 项');
+  await expect(page.locator('.ai-clarification-v2-header')).toContainText('待补齐 3 项');
   await expect(page.locator('[data-ai-hook="clarification-question"]')).toContainText('类型识别采用哪条实现路线');
-  await expect(page.locator('[data-ai-hook="clarification-resources"]')).toContainText('待补资源 · 1 项');
-  await expect(page.locator('[data-ai-hook="clarification-resources"]')).toContainText('水果分类模型待绑定');
+  await expect(page.locator('[data-ai-hook="clarification-resources"]')).toContainText('待绑定');
+  await expect(page.locator('[data-ai-hook="clarification-resources"]')).toContainText('模型资源');
   await focusPlanningClarification(page);
   await capturePlanningEvidence(page, 'fruit-plan-light-1366.png');
 });
@@ -1001,7 +1001,7 @@ for (const viewport of [
     await expect(page.locator('#ai-btn-start-build')).toBeVisible();
 
     if (viewport.width < 1180) {
-      await expect(page.locator('[data-ai-hook="compact-tabs"]')).toBeVisible();
+      await expect(page.locator('[data-ai-hook="conversation-toggle"]')).toBeVisible();
       await switchCompactPane(page, 'conversation');
     }
     await expect(page.locator('#ai-input')).toBeVisible();
@@ -1012,6 +1012,91 @@ for (const viewport of [
 test('idle dark visual baseline at 1366', async ({ page }) => {
   await openAi(page, { width: 1366, height: 768, theme: 'dark' });
   await expect(page.locator('#ai-view')).toHaveScreenshot('idle-dark-1366.png');
+});
+
+test('conversation preference survives reload while compact drawer and unread stay independent', async ({ page }) => {
+  await openAi(page, { width: 1366, height: 768 });
+  await seedActivePlan(page);
+  const toggle = page.locator('[data-ai-hook="conversation-toggle"]');
+  const unread = page.locator('[data-ai-hook="conversation-unread"]');
+  await toggle.click();
+  await expect(toggle).toHaveAttribute('aria-expanded', 'false');
+  expect(await page.evaluate(() => localStorage.getItem('cv_ai_conversation_collapsed'))).toBe('true');
+  await page.evaluate(() => (window as any).aiPanel._renderPlanWorkspace((window as any).aiPanel.pendingVisionPlan));
+  await expect(unread).toBeHidden();
+  await page.evaluate(() => (window as any).aiPanel._addMessage('ai', '请复核更新后的检测结果。'));
+  await expect(unread).toBeVisible();
+  await toggle.click();
+  await expect(unread).toBeHidden();
+  await toggle.click();
+  await page.reload();
+  await page.locator('.nav-btn[data-view="ai"]').click();
+  await page.waitForFunction(() => Boolean((window as any).aiPanel));
+  await seedActivePlan(page);
+  await expect(toggle).toHaveAttribute('aria-expanded', 'false');
+  await page.setViewportSize({ width: 1024, height: 768 });
+  await toggle.click();
+  await expect(page.locator('[data-ai-hook="conversation-pane"]')).toHaveAttribute('aria-modal', 'true');
+  await expect(page.locator('[data-ai-hook="workbench-pane"]')).toHaveAttribute('inert', '');
+  await page.evaluate(() => (document.activeElement as HTMLElement)?.blur());
+  await page.keyboard.press('Escape');
+  await expect(toggle).toBeFocused();
+  await page.setViewportSize({ width: 1366, height: 768 });
+  await expect(toggle).toHaveAttribute('aria-expanded', 'false');
+});
+
+test('active task text and primary action meet contrast in both themes', async ({ page }) => {
+  await openAi(page, { width: 1366, height: 768 });
+  await seedActivePlan(page);
+  for (const theme of ['dark', 'light']) {
+    await page.evaluate(value => { document.documentElement.dataset.theme = value; }, theme);
+    const ratios = await page.evaluate(() => {
+      const luminance = (color: string) => {
+        const channels = color.match(/[\d.]+/g)!.slice(0, 3).map(Number).map(value => {
+          const channel = value / 255;
+          return channel <= .04045 ? channel / 12.92 : ((channel + .055) / 1.055) ** 2.4;
+        });
+        return channels[0] * .2126 + channels[1] * .7152 + channels[2] * .0722;
+      };
+      return ['#ai-btn-start-build', '.ai-task-context h2', '.ai-plan-v2-summary'].map(selector => {
+        const element = document.querySelector(selector)!;
+        const style = getComputedStyle(element);
+        let parent: Element | null = element;
+        let background = style.backgroundColor;
+        while (parent && background === 'rgba(0, 0, 0, 0)') {
+          parent = parent.parentElement;
+          if (parent) background = getComputedStyle(parent).backgroundColor;
+        }
+        const foregroundLuminance = luminance(style.color), backgroundLuminance = luminance(background);
+        return { selector, ratio: (Math.max(foregroundLuminance, backgroundLuminance) + .05) / (Math.min(foregroundLuminance, backgroundLuminance) + .05) };
+      });
+    });
+    for (const result of ratios) expect(result.ratio, `${theme} ${result.selector}`).toBeGreaterThanOrEqual(4.5);
+  }
+});
+
+test('composer caps height and preserves IME submission and tool positions', async ({ page }) => {
+  await openAi(page, { width: 1366, height: 768 });
+  await seedActivePlan(page);
+  const input = page.locator('#ai-input');
+  await input.fill('检测中文长文本并输出明确结果。\n'.repeat(30));
+  const height = await input.evaluate(element => ({ height: element.clientHeight, scroll: element.scrollHeight }));
+  expect(height.height).toBeLessThanOrEqual(160);
+  expect(height.scroll).toBeGreaterThan(height.height);
+  await page.evaluate(() => {
+    const panel = (window as any).aiPanel;
+    panel.__submitCount = 0;
+    panel._handleGenerate = () => { panel.__submitCount += 1; };
+    document.querySelector('#ai-input')!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', ctrlKey: true, isComposing: true, bubbles: true }));
+  });
+  expect(await page.evaluate(() => (window as any).aiPanel.__submitCount)).toBe(0);
+  await input.press('Control+Enter');
+  expect(await page.evaluate(() => (window as any).aiPanel.__submitCount)).toBe(1);
+  const send = await page.locator('#ai-btn-gen').boundingBox();
+  await page.evaluate(() => document.querySelector('#ai-btn-cancel')!.classList.add('is-visible'));
+  const cancel = await page.locator('#ai-btn-cancel').boundingBox();
+  expect(cancel?.x).toBe(send?.x);
+  expect(cancel?.y).toBe(send?.y);
 });
 
 test('active dark visual baseline at 1366', async ({ page }) => {
@@ -1039,7 +1124,7 @@ test('active light visual baseline at 1366', async ({ page }) => {
 test('compact dark visual baseline at 1024', async ({ page }) => {
   await openAi(page, { width: 1024, height: 768, theme: 'dark' });
   await seedActivePlan(page);
-  await expect(page.locator('[data-ai-hook="compact-tabs"]')).toBeVisible();
+  await expect(page.locator('[data-ai-hook="conversation-toggle"]')).toBeVisible();
   await expect(page.locator('#ai-view')).toHaveScreenshot('compact-dark-1024.png');
 });
 

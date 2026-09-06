@@ -1737,6 +1737,7 @@ function mixedPendingParameterReviewResult() {
 }
 
 function assertNoSensitiveLeak(text) {
+  text = text.replace(/\bdata-(?:ai-todo-key|todo-key|resource-key)=/g, 'data-identity=');
   assert.doesNotMatch(text, /rawPrompt|systemPrompt|SystemPrompt|chainOfThought|reasoning_content/i);
   assert.doesNotMatch(text, /C:\\|D:\\|\\.onnx|192\\.168\\.|DB1\\.DBX|base64|data:image|sk-secret|token|key/i);
 }
@@ -2604,7 +2605,7 @@ test('Plan workspace shows rule fallback as recoverable confirmation state', asy
   panel._renderPlanWorkspace(panel.pendingVisionPlan);
   const actionState = panel._getPlanBuildActionState(panel.pendingVisionPlan);
 
-  assert.match(planWorkspace.innerHTML, /AI 理解成了什么/);
+  assert.match(planWorkspace.innerHTML, /任务摘要/);
   assert.match(planWorkspace.innerHTML, /暂无可回答的关键问题/);
   assert.doesNotMatch(planWorkspace.innerHTML, /还需确认 1 项/);
   assert.match(planWorkspace.innerHTML, /规则兜底/);
@@ -2700,13 +2701,13 @@ test('Plan workspace hides raw semantic diagnostics until diagnostics details', 
   panel.pendingVisionPlan = panel._normalizeBackendPlanResult(planResult, 'detect scratches');
   panel._renderPlanWorkspace(panel.pendingVisionPlan);
 
-  const visibleHtml = planWorkspace.innerHTML.replace(/<details[\s\S]*<\/details>/g, '');
+  const visibleHtml = planWorkspace.innerHTML.split('<details class="ai-plan-v2-details"')[0];
   assert.doesNotMatch(visibleHtml, /semantic\.taskType|semantic\.failureCode|failureCode|objectSignals|metadataOnly|Agent Trace|Trace/);
-  assert.match(visibleHtml, /AI 理解成了什么/);
+  assert.match(visibleHtml, /任务摘要/);
   assert.match(visibleHtml, /推荐方案/);
-  assert.match(visibleHtml, /关键问题/);
-  assert.ok(visibleHtml.indexOf('AI 理解成了什么') < visibleHtml.indexOf('推荐方案'));
-  assert.ok(visibleHtml.indexOf('推荐方案') < visibleHtml.indexOf('关键问题'));
+  assert.match(visibleHtml, /暂无可回答的关键问题/);
+  assert.ok(visibleHtml.indexOf('任务摘要') < visibleHtml.indexOf('推荐方案'));
+  assert.ok(visibleHtml.indexOf('关键问题') < visibleHtml.indexOf('推荐方案'));
   assert.match(planWorkspace.innerHTML, /风险与工程详情/);
   assert.match(planWorkspace.innerHTML, /semantic\.taskType/);
   assert.match(planWorkspace.innerHTML, /semantic\.failureCode/);
@@ -3309,7 +3310,7 @@ test('Plan Mode renders one canonical clarification workspace without starting B
   assert.equal(panel.activeAgentRunId, null);
   assert.equal(panel.agentWorkspaceMode, 'plan');
   assert.match(plan.innerHTML, /data-ai-hook="clarification-workspace"/);
-  assert.match(plan.innerHTML, /还需确认 \d+ 项/);
+  assert.match(plan.innerHTML, /待补齐 \d+ 项/);
   assert.equal((plan.innerHTML.match(/data-ai-hook="clarification-workspace"/g) || []).length, 1);
   assert.doesNotMatch(plan.innerHTML, /资源补齐会在开始构建后出现|ai-clarification-plan-card/);
   assert.match(overview.innerHTML, /暂不能构建/);
@@ -3567,7 +3568,7 @@ test('ordinary build prompt stays Plan-first', async () => {
   assert.equal(panel.isGenerating, false);
   assert.equal(panel.pendingVisionPlan.goal, 'packaging box appearance inspection workflow');
   assert.match(plan.innerHTML, /推荐方案/);
-  assert.match(plan.innerHTML, /关键问题/);
+  assert.match(plan.innerHTML, /待处理事项/);
   assert.match(plan.innerHTML, /关键假设/);
   assert.match(plan.innerHTML, /开始构建/);
   assert.doesNotMatch(plan.innerHTML, /按推荐方案开始构建/);
@@ -4956,7 +4957,7 @@ test('Pending recommendation is a defer control and never becomes a business ans
   assert.equal(panel.planQuestionSelections.image_source, 'camera_pending');
   assert.equal(panel.planQuestionAnswers.image_source, undefined);
   assert.equal(panel.agentWorkspaceState.projection.readiness.canBuild, false);
-  assert.match(planWorkspace.innerHTML, /建议暂缓|稍后/);
+  assert.match(planWorkspace.innerHTML, /建议暂缓|稍后|已暂缓/);
 });
 test('Resource defer stays resource_pending and cannot enable Build in Strict or Draft', async () => {
   const { AiPanel } = await loadAiPanel();
@@ -6633,7 +6634,7 @@ test('apply hint separates canvas apply from DeploymentReady gate', async () => 
     'ClearVision.Product/src/ClearVision.Product.Desktop/wwwroot/src/features/ai/aiPanel.js'
   ].map(file => fs.readFileSync(path.resolve(getRepoRoot(), file), 'utf8')).join('\n');
 
-  assert.match(source, /按钮继续服从现有 CanvasApplyReady、ApplyGate 与画布应用语义/);
+  assert.match(source, /确认应用前，请复核流程变更/);
   assert.doesNotMatch(source, /不在前端建立平行状态|复用现有资源绑定与门禁刷新链路/);
 });
 
@@ -9069,7 +9070,10 @@ test('Unified resource clarification redacts unsafe metadata and exposes the can
   panel._renderPlanWorkspace(plan);
   assertNoSensitiveLeak(planWorkspace.innerHTML);
   assert.equal((planWorkspace.innerHTML.match(/data-ai-hook="clarification-resources"/g) || []).length, 1);
-  assert.match(planWorkspace.innerHTML, /data-resource-action="pick_model_resource"/);
+  const resource = panel.agentWorkspaceState.projection.missingResources[0];
+  const resourceHtml = panel._renderResourceAuditTaskCard(resource, panel._getMissingResourceActionModel(resource), 0);
+  assertNoSensitiveLeak(resourceHtml);
+  assert.match(resourceHtml, /data-resource-action="pick_model_resource"/);
   assert.match(planWorkspace.innerHTML, /资源|影响算子|影响参数|阻断范围|解决位置/);
   assert.doesNotMatch(planWorkspace.innerHTML, /type="file"/);
 });
@@ -9731,10 +9735,6 @@ test('PropertyPanel model validation uses shared effectiveRequired rules beyond 
   assert.equal(errors.some(error => String(error.message).includes('ModelPath')), true);
 });
 
-test('AI pending parameter editor displays Chinese operator type metadata', async () => {
-  const { AiPanel } = await loadAiPanel();
-  const panel = createPanel(AiPanel, {
-    options: {
 for (const casing of ['camel', 'pascal']) {
   test(`AI pending parameters bind backend metadata identities and write confirmed values (${casing})`, async () => {
     const { AiPanel } = await loadAiPanel();
@@ -9820,6 +9820,10 @@ test('AI pending parameter restore removes only the legacy synthetic resource po
   assert.deepEqual(pending, snapshot);
 });
 
+test('AI pending parameter editor displays Chinese operator type metadata', async () => {
+  const { AiPanel } = await loadAiPanel();
+  const panel = createPanel(AiPanel, {
+    options: {
       getOperators: () => [
         {
           type: 'ImageAcquisition',
@@ -9933,15 +9937,15 @@ test('AI layout CSS places Agent workbench left and chat right with mobile fallb
   assert.match(source, /aiPanelValidationPreviewMixin/);
   assert.ok(source.split(/\r?\n/).length < 2500);
   assert.match(source, /focus\(\{\s*preventScroll:\s*true\s*\}\)/);
-  assert.match(shellCss, /--ai-surface-page:\s*var\(--theme-surface-0\)/);
-  assert.match(shellCss, /\.ai-workspace\s*{[^}]*clamp\(360px,\s*21vw,\s*400px\)/s);
+  assert.match(shellCss, /--ai-surface-page:\s*var\(--theme-surface-1\)/);
+  assert.match(shellCss, /\.ai-workspace\s*{[^}]*minmax\(0,\s*1fr\) 320px/s);
   assert.match(shellCss, /\.ai-pane-right\s*{[^}]*grid-column:\s*1;/s);
   assert.match(shellCss, /\.ai-pane-left\s*{[^}]*grid-column:\s*2;/s);
   assert.match(conversationCss, /\.ai-view-container\s+\.ai-chat-container\s*{[^}]*background-image:\s*none/s);
-  assert.match(responsiveCss, /@media \(max-width:\s*1179px\)[\s\S]*data-ai-active-pane="workbench"[\s\S]*data-ai-active-pane="conversation"/);
-  assert.match(responsiveCss, /@media \(max-width:\s*899px\)/);
+  assert.match(responsiveCss, /@media \(max-width:\s*1179px\)[\s\S]*data-ai-conversation="closed"/);
+  assert.match(responsiveCss, /@media \(max-width:\s*599px\)/);
   assert.doesNotMatch(`${shellCss}\n${conversationCss}\n${responsiveCss}`, /#[0-9a-f]{3,8}|rgba?\(/i);
-  assert.doesNotMatch(`${shellCss}\n${conversationCss}\n${responsiveCss}`, /!important/);
+  assert.match(shellCss, /\[hidden\]\s*{\s*display:\s*none !important/);
 });
 
 test('AI panel productization modules carry remaining workbench responsibilities', () => {

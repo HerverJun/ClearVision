@@ -292,6 +292,7 @@ test('production renderer exposes working readiness and save retries', async () 
   let retried;
   value._requestPlanReadinessPreview = (plan, options) => { retried = { plan, options }; };
   value.workspaceMutationGeneration = 1;
+  value.workspaceSaveErrorGeneration = 1;
   value._syncWorkspaceSnapshotDirty();
   renderAiPlanWorkspace(value, plan);
   buttons.get('#ai-btn-retry-readiness-preview').click();

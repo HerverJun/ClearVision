@@ -1,3 +1,5 @@
+import { aiIcon } from './aiIcons.js';
+
 const clarificationRuntimeByPanel = new WeakMap();
 
 const unsafeRecommendationCategories = new Set([
@@ -26,7 +28,12 @@ function getRuntime(panel) {
             pendingFields: new Set(),
             focusField: '',
             awaitingNextFocus: false,
-            lastActiveField: ''
+            lastActiveField: '',
+            selectedKey: '',
+            manualDrafts: new Map(),
+            manualOpen: new Set(),
+            resourceDrafts: new Map(),
+            planIdentity: ''
         };
         clarificationRuntimeByPanel.set(panel, runtime);
     }
@@ -110,6 +117,12 @@ export function deriveAiClarificationPresentation(panel, plan) {
     const state = panel?.agentWorkspaceState || null;
     const projection = state?.projection || null;
     const runtime = getRuntime(panel);
+    const identity = `${panel?.sessionId || ''}:${plan?.planId || ''}`;
+    if (runtime.planIdentity && runtime.planIdentity !== identity) {
+        clarificationRuntimeByPanel.delete(panel);
+        return deriveAiClarificationPresentation(panel, plan);
+    }
+    runtime.planIdentity = identity;
     const projectedQueue = asArray(projection?.clarificationQueue);
     const queue = projectedQueue.length ? projectedQueue : asArray(plan?.questions);
     const projectedBatch = asArray(projection?.clarificationBatch);
@@ -154,16 +167,21 @@ export function deriveAiClarificationPresentation(panel, plan) {
     });
 
     for (const item of items) {
-        if (item.confirmed && runtime.pendingFields.has(item.field)) {
+        if (item.confirmed && runtime.pendingFields.has(item.field) && !panel?.workspaceSnapshotDirty) {
             runtime.pendingFields.delete(item.field);
             runtime.editingFields.delete(item.field);
             runtime.focusField = '';
+            runtime.manualDrafts.delete(item.field);
+            runtime.manualOpen.delete(item.field);
+            if (runtime.selectedKey === `question:${item.field}`) runtime.selectedKey = '';
         }
     }
 
-    const activeQuestion = items.find(item =>
+    const selectedQuestion = items.find(item => !item.resource && runtime.selectedKey === `question:${item.field}`);
+    const activeQuestion = selectedQuestion || items.find(item =>
         !item.resource && !item.deferred &&
-        (item.confirming || item.failed || item.unconfirmed || item.editing)
+        (item.confirming || item.failed || item.unconfirmed || item.editing ||
+            (runtime.pendingFields.has(item.field) && panel?.workspaceSnapshotDirty))
     ) || items.find(item =>
         !item.resource && !item.deferred && !item.confirmed
     ) || null;
@@ -190,8 +208,24 @@ export function deriveAiClarificationPresentation(panel, plan) {
         planRecommendedQuestions.every(question => safeQuestionIds.has(clean(question.id)) ||
             Boolean(readConfirmedAnswer(state, panel?._inferPlanQuestionFieldForQuestion?.(question, plan))));
 
+    const questionItems = items.filter(item => !item.resource).map(item => ({
+        ...item, key: `question:${item.field}`, blocksBuild: !item.deferred && item.blocksBuild !== false
+    }));
+    const resourceTodos = resourceItems.map((item, index) => ({
+        ...item, resourceIndex: index,
+        key: `resource:${item.canonicalId || item.resourceKey || index}`
+    }));
+    const todoItems = [...questionItems, ...resourceTodos];
+    if (!todoItems.some(item => item.key === runtime.selectedKey)) runtime.selectedKey = '';
+    const defaultTodo = todoItems.find(item => !item.confirmed && !item.deferred && item.blocksBuild) ||
+        todoItems.find(item => !item.confirmed && !item.deferred) || null;
+    const activeKey = runtime.selectedKey || (activeQuestion ? `question:${activeQuestion.field}` : defaultTodo?.key) || '';
+    const summary = panel?._buildPlanMissingSummary?.(plan);
     return {
-        activeQuestion,
+        activeQuestion: activeKey.startsWith('resource:') ? null : activeQuestion,
+        activeKey,
+        todoItems,
+        totalCount: summary?.totalCount ?? unresolved.length + resourceItems.length,
         confirmedItems,
         deferredItems,
         resourceItems,
@@ -259,13 +293,13 @@ function renderActiveQuestion(panel, item, presentation) {
                     ${asArray(item.options).slice(0, 4).map(option => renderOption(panel, item, option, disabled)).join('')}
                 </div>
                 <button type="button" class="ai-clarification-v2-other" data-ai-action="clarification-other" ${disabled ? 'disabled' : ''}>其他 / 补充说明</button>
-                <div class="ai-clarification-v2-manual" data-ai-hook="clarification-manual" hidden>
+                <div class="ai-clarification-v2-manual" data-ai-hook="clarification-manual" ${getRuntime(panel).manualOpen.has(item.field) ? '' : 'hidden'}>
                 <label>
                     <span>补充内容将用于「${escapeHtml(panel, item.title || item.field)}」</span>
-                    <textarea rows="3" data-ai-hook="clarification-manual-input" placeholder="输入你的补充说明"></textarea>
+                    <textarea rows="3" ${disabled ? 'disabled' : ''} data-ai-hook="clarification-manual-input" placeholder="输入你的补充说明">${escapeHtml(panel, getRuntime(panel).manualDrafts.get(item.field) || '')}</textarea>
                 </label>
                 <div>
-                    <button type="button" data-ai-action="clarification-manual-submit">提交</button>
+                    <button type="button" data-ai-action="clarification-manual-submit" ${disabled ? 'disabled' : ''}>提交</button>
                     <button type="button" data-ai-action="clarification-manual-cancel">取消</button>
                 </div>
                 </div>
@@ -275,48 +309,35 @@ function renderActiveQuestion(panel, item, presentation) {
     `;
 }
 
-function renderConfirmedSummary(panel, items) {
-    if (!items.length) return '';
-    return `
-        <div class="ai-clarification-v2-confirmed" data-ai-hook="clarification-confirmed">
-            <div class="ai-clarification-v2-subtitle">已确认</div>
-            ${items.map(item => `
-                <div class="ai-clarification-v2-confirmed-row">
-                    <span><strong>${escapeHtml(panel, item.title || item.field)}：</strong>${escapeHtml(panel, item.confirmedDisplayValue)}</span>
-                    <button type="button" data-ai-action="clarification-edit" data-field="${escapeHtml(panel, item.field)}">修改</button>
-                </div>
-            `).join('')}
-        </div>
-    `;
+
+function renderTodoRow(panel, item, presentation) {
+    const active = item.key === presentation.activeKey;
+    const status = item.confirming ? '校验中' : item.failed ? '确认失败' : item.unconfirmed ? '尚未确认'
+        : item.confirmed ? '已确认' : item.deferred ? '已暂缓' : item.resource ? '待绑定' : '待确认';
+    const content = !active ? '' : item.resource
+        ? panel?._renderResourceAuditTaskCard?.(item, panel?._getMissingResourceActionModel?.(item) || {}, item.resourceIndex) || ''
+        : renderActiveQuestion(panel, item, presentation);
+    const hook = item.resource ? 'clarification-resources' : item.confirmed ? 'clarification-confirmed' : item.deferred ? 'clarification-deferred' : 'clarification-pending';
+    return `<article class="ai-todo-row ${active ? 'is-active' : ''}" data-ai-hook="${hook}" data-ai-todo-key="${escapeHtml(panel, item.key)}">
+        <button type="button" class="ai-todo-toggle" data-ai-action="todo-select" data-todo-key="${escapeHtml(panel, item.key)}" aria-expanded="${active}">
+            ${aiIcon(item.confirmed ? 'check' : 'chevron-right')}
+            <span><strong>${escapeHtml(panel, item.title)}</strong>${item.confirmedDisplayValue ? `<small>${escapeHtml(panel, item.confirmedDisplayValue)}</small>` : ''}</span>
+            <small class="ai-todo-status">${status}</small>
+        </button>
+        ${active ? `<div class="ai-todo-content">${content}</div>` : ''}
+    </article>`;
 }
 
-function renderDeferredSummary(panel, items) {
-    if (!items.length) return '';
-    return `
-        <div class="ai-clarification-v2-confirmed is-deferred" data-ai-hook="clarification-deferred">
-            <div class="ai-clarification-v2-subtitle">已暂缓</div>
-            ${items.map(item => `
-                <div class="ai-clarification-v2-confirmed-row">
-                    <span><strong>${escapeHtml(panel, item.title || item.field)}：</strong>稍后确认，当前不会作为业务答案</span>
-                    <button type="button" data-ai-action="clarification-edit" data-field="${escapeHtml(panel, item.field)}">重新选择</button>
-                </div>
-            `).join('')}
-        </div>
-    `;
-}
-
-function renderResources(panel, items) {
-    if (!items.length) return '';
-    return `
-        <div class="ai-clarification-v2-resources" data-ai-hook="clarification-resources">
-            <div class="ai-clarification-v2-subtitle">待补资源 · ${items.length} 项</div>
-            ${items.map((item, index) => panel?._renderResourceAuditTaskCard?.(
-                item,
-                panel?._getMissingResourceActionModel?.(item) || {},
-                index
-            ) || '').join('')}
-        </div>
-    `;
+function renderTodoGroups(panel, presentation) {
+    const groups = [
+        ['构建前必需', presentation.todoItems.filter(item => !item.confirmed && item.blocksBuild)],
+        ['运行前必需', presentation.todoItems.filter(item => !item.confirmed && !item.blocksBuild)],
+        ['已确认', presentation.todoItems.filter(item => item.confirmed)]
+    ];
+    return groups.filter(([, items]) => items.length).map(([title, items]) => `<div class="ai-todo-group">
+        <h3>${title}<span>${items.length}</span></h3>
+        ${items.map(item => renderTodoRow(panel, item, presentation)).join('')}
+    </div>`).join('');
 }
 
 export function renderAiClarification(panel, plan) {
@@ -334,22 +355,17 @@ export function renderAiClarification(panel, plan) {
         return '<div class="ai-plan-v2-ready" data-ai-hook="clarification-ready"><strong>方案已就绪</strong><span>关键问题已确认，可复核后开始构建。</span></div>';
     }
     return `
-        <section class="ai-clarification-v2" data-ai-hook="clarification-workspace">
+        <section class="ai-clarification-v2" data-ai-hook="clarification-workspace" tabindex="-1">
             <div class="ai-clarification-v2-header">
                 <div>
-                    <span>关键问题</span>
-                    <strong>${presentation.unresolvedCount > 0
-                        ? `还需确认 ${presentation.unresolvedCount} 项${presentation.activeQuestion ? ' · 当前第 1 项' : ''}`
-                        : '当前没有待确认问题'}</strong>
+                    <strong>待处理事项</strong>
+                    <span>${presentation.totalCount > 0 ? `待补齐 ${presentation.totalCount} 项` : '当前事项已确认'}</span>
                 </div>
                 ${presentation.canAcceptAllRecommended
                     ? '<button type="button" data-ai-action="clarification-accept-recommended">采用全部推荐项</button>'
                     : ''}
             </div>
-            ${renderActiveQuestion(panel, presentation.activeQuestion, presentation)}
-            ${renderConfirmedSummary(panel, presentation.confirmedItems)}
-            ${renderDeferredSummary(panel, presentation.deferredItems)}
-            ${renderResources(panel, presentation.resourceItems)}
+            ${renderTodoGroups(panel, presentation)}
         </section>
     `;
 }
@@ -365,6 +381,27 @@ function requestConfirmation(panel, plan, field, reason) {
 export function bindAiClarificationInteractions(panel, root, plan) {
     if (!root) return;
     const presentation = deriveAiClarificationPresentation(panel, plan);
+    root.querySelectorAll('[data-ai-action="todo-select"]').forEach(button => {
+        button.addEventListener('click', () => {
+            const runtime = getRuntime(panel);
+            runtime.selectedKey = button.dataset.todoKey;
+            const selected = presentation.todoItems.find(item => item.key === runtime.selectedKey);
+            if (selected && !selected.resource) {
+                runtime.editingFields.clear();
+                if (selected.confirmed || selected.deferred) runtime.editingFields.add(selected.field);
+            }
+            panel._renderPlanWorkspace?.(plan);
+            const selectedButton = Array.from(root.querySelectorAll('[data-ai-action="todo-select"]')).find(item => item.dataset.todoKey === runtime.selectedKey);
+            selectedButton?.focus?.({ preventScroll: true });
+        });
+    });
+    root.querySelectorAll('[data-resource-input]').forEach(input => {
+        const key = input.closest('[data-ai-todo-key]')?.dataset.aiTodoKey;
+        const runtime = getRuntime(panel);
+        if (runtime.resourceDrafts.has(key)) input.value = runtime.resourceDrafts.get(key);
+        input.addEventListener('input', () => runtime.resourceDrafts.set(key, input.value));
+        input.addEventListener('change', () => runtime.resourceDrafts.set(key, input.value));
+    });
     root.querySelectorAll('[data-resource-action]').forEach(button => {
         button.addEventListener('click', () => {
             const index = Number.parseInt(button.dataset.resourceIndex || '-1', 10);
@@ -398,13 +435,18 @@ export function bindAiClarificationInteractions(panel, root, plan) {
         const manual = questionRoot?.querySelector('[data-ai-hook="clarification-manual"]');
         if (!manual) return;
         manual.hidden = false;
+        getRuntime(panel).manualOpen.add(questionRoot.dataset.field);
         manual.querySelector('[data-ai-hook="clarification-manual-input"]')?.focus?.();
     });
     root.querySelector('[data-ai-action="clarification-manual-cancel"]')?.addEventListener('click', () => {
         const manual = questionRoot?.querySelector('[data-ai-hook="clarification-manual"]');
         if (!manual) return;
         manual.hidden = true;
+        getRuntime(panel).manualOpen.delete(questionRoot.dataset.field);
         root.querySelector('[data-ai-action="clarification-other"]')?.focus?.();
+    });
+    questionRoot?.querySelector('[data-ai-hook="clarification-manual-input"]')?.addEventListener('input', event => {
+        getRuntime(panel).manualDrafts.set(questionRoot.dataset.field, event.target.value);
     });
     root.querySelector('[data-ai-action="clarification-manual-submit"]')?.addEventListener('click', () => {
         const input = questionRoot?.querySelector('[data-ai-hook="clarification-manual-input"]');
@@ -415,7 +457,7 @@ export function bindAiClarificationInteractions(panel, root, plan) {
         requestConfirmation(panel, plan, item.field, 'clarification_text');
     });
     questionRoot?.querySelector('[data-ai-hook="clarification-manual-input"]')?.addEventListener('keydown', event => {
-        if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') {
+        if ((event.ctrlKey || event.metaKey) && event.key === 'Enter' && !event.isComposing) {
             event.preventDefault();
             root.querySelector('[data-ai-action="clarification-manual-submit"]')?.click?.();
         }
@@ -425,6 +467,7 @@ export function bindAiClarificationInteractions(panel, root, plan) {
         button.addEventListener('click', () => {
             const runtime = getRuntime(panel);
             runtime.editingFields.add(button.dataset.field || '');
+            runtime.selectedKey = `question:${button.dataset.field || ''}`;
             runtime.focusField = button.dataset.field || '';
             panel._renderPlanWorkspace?.(plan);
         });
@@ -447,7 +490,12 @@ export function bindAiClarificationInteractions(panel, root, plan) {
     runtime.lastActiveField = activeField;
     if (shouldFocus) {
         const schedule = typeof requestAnimationFrame === 'function' ? requestAnimationFrame : callback => callback();
-        schedule(() => activeTitle.focus?.({ preventScroll: true }));
+        schedule(() => {
+            const current = typeof document !== 'undefined' ? document.activeElement : null;
+            if (!current || current === document.body || root.contains?.(current)) {
+                activeTitle.focus?.({ preventScroll: true });
+            }
+        });
         runtime.focusField = '';
         runtime.awaitingNextFocus = false;
     } else if (!activeField) {

@@ -1,4 +1,5 @@
 import webMessageBridge from '../../core/messaging/webMessageBridge.js';
+import { aiIcon } from './aiIcons.js';
 import httpClient from '../../core/messaging/httpClient.js';
 import { createSignal } from '../../core/state/store.js';
 import { buildWireSequenceFollowupHint } from '../flow-editor/wireSequenceAssist.js';
@@ -450,9 +451,7 @@ export class AiPanel {
                 ? (canvasApplyAllowed ? '应用到画布' : '当前草稿暂不可应用')
                 : '暂无可应用方案';
         button.innerHTML = `
-            <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" style="margin-right:6px;">
-                <path d="M9 16.2L4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4L9 16.2z"/>
-            </svg>
+            ${aiIcon('check')}
             ${this._escapeHtml(label)}
         `;
     }
@@ -472,41 +471,36 @@ export class AiPanel {
                     </div>
                     <div class="ai-task-context-actions">
                         <div class="ai-task-primary-action" data-ai-hook="task-primary-action"></div>
-                        <button class="ai-task-more-button" data-ai-hook="task-more" type="button" aria-expanded="false">
-                            更多
+                        <button class="ai-task-navigation-action" data-ai-hook="task-navigation-action" type="button" hidden></button>
+                        <div data-ai-hook="task-utilities"></div>
+                        <button class="ai-tool-button" data-ai-hook="conversation-toggle" type="button" title="收起对话" aria-label="收起对话" aria-controls="ai-conversation-pane" aria-expanded="true">
+                            ${aiIcon('panel-right')}<span class="ai-unread-dot" data-ai-hook="conversation-unread" hidden></span>
                         </button>
-                        <div class="ai-task-more-menu" data-ai-hook="task-more-menu" hidden></div>
+                        <button class="ai-tool-button ai-task-more-button" data-ai-hook="task-more" type="button" title="更多" aria-label="更多" aria-expanded="false" aria-controls="ai-task-more-menu">
+                            ${aiIcon('ellipsis')}
+                        </button>
+                        <div class="ai-task-more-menu" id="ai-task-more-menu" data-ai-hook="task-more-menu" hidden>
+                            <button type="button" data-ai-hook="model-settings">${aiIcon('settings')}<span>AI 模型设置</span></button>
+                        </div>
                     </div>
                 </header>
 
-                <nav class="ai-shell-tabs" data-ai-hook="compact-tabs" role="tablist" aria-label="AI 页面区域">
-                    <button type="button" role="tab" data-ai-hook="compact-tab" data-ai-shell-pane="workbench" aria-controls="ai-result-pane" aria-selected="true" tabindex="0">工作台</button>
-                    <button type="button" role="tab" data-ai-hook="compact-tab" data-ai-shell-pane="conversation" aria-controls="ai-conversation-pane" aria-selected="false" tabindex="-1">会话</button>
-                </nav>
-
                 <div class="ai-workspace" data-ai-hook="workspace">
-                <aside class="ai-pane-left" id="ai-conversation-pane" role="tabpanel" tabindex="0" data-ai-chat-pane="true" data-ai-hook="conversation-pane">
+                <button class="ai-conversation-backdrop" data-ai-hook="conversation-backdrop" type="button" aria-label="关闭对话" tabindex="-1" hidden></button>
+                <aside class="ai-pane-left" id="ai-conversation-pane" aria-label="智能体对话" tabindex="-1" data-ai-chat-pane="true" data-ai-hook="conversation-pane">
                     <div class="ai-pane-header">
                         <span class="pane-icon">
                             <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z"/></svg>
                         </span>
-                        <span class="pane-title">智能体对话</span>
+                        <span class="pane-title" id="ai-conversation-title">智能体对话</span>
+                        <button class="ai-tool-button ai-conversation-close" data-ai-hook="conversation-close" type="button" title="收起对话" aria-label="收起对话">${aiIcon('x')}</button>
                         <span class="status-badge online" id="ai-conn-status"><span class="status-dot connected"></span>在线</span>
                         <div class="ai-pane-actions" role="group" aria-label="AI 对话操作">
                             <button class="icon-btn ai-action-btn" id="ai-btn-new-session" type="button" title="新建对话" aria-label="新建对话">
-                                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                                    <path d="M12 5v14"></path>
-                                    <path d="M5 12h14"></path>
-                                </svg>
-                                <span>新对话</span>
+                                ${aiIcon('plus')}
                             </button>
                             <button class="icon-btn ai-action-btn ai-btn-history" id="ai-btn-history" type="button" title="历史会话" aria-label="历史会话" aria-expanded="false">
-                                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                                    <path d="M3 12a9 9 0 1 0 3-6.7"></path>
-                                    <path d="M3 4v5h5"></path>
-                                    <path d="M12 7v5l3 2"></path>
-                                </svg>
-                                <span>历史</span>
+                                ${aiIcon('history')}
                             </button>
                         </div>
                     </div>
@@ -514,9 +508,7 @@ export class AiPanel {
                     <section class="ai-idle-intro" data-ai-hook="idle-intro">
                         <div class="ai-idle-utility" data-ai-hook="idle-actions"></div>
                         <div class="ai-idle-copy">
-                            <span>ClearVision AI</span>
-                            <h2>描述你的视觉任务</h2>
-                            <p>从检测对象、图像来源和输出目标开始，AI 会沿用现有规划、构建与恢复链路。</p>
+                            <h2>AI 视觉 Agent</h2>
                         </div>
                         <div class="ai-idle-recent" data-ai-hook="idle-recent" hidden>
                             <div class="ai-idle-recent-heading">最近任务</div>
@@ -537,9 +529,6 @@ export class AiPanel {
                     </div>
 
                     <div class="ai-chat-container" id="ai-chat-container">
-                        <div class="ai-message ai">
-                            <div class="ai-bubble">您好！我是您的视觉工程助手。请描述您想要检测的缺陷，我将为您构建流水线。</div>
-                        </div>
                     </div>
 
                     <div class="ai-input-section">
@@ -553,12 +542,12 @@ export class AiPanel {
                         ${this._renderAgentDeveloperControls()}
                         <div class="ai-input-box">
                             <button class="icon-btn" id="ai-btn-attach" type="button" title="添加附件" aria-label="添加附件">
-                                <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" aria-hidden="true"><path d="M16.5 6v11.5c0 2.21-1.79 4-4 4s-4-1.79-4-4V5a2.5 2.5 0 015 0v10.5c0 .55-.45 1-1 1s-1-.45-1-1V6H10v9.5a2.5 2.5 0 005 0V5c0-1.38-1.12-2.5-2.5-2.5S8 3.62 8 5v11.5c0 3.04 2.46 5.5 5.5 5.5s5.5-2.46 5.5-5.5V6h-1.5z"/></svg>
+                                ${aiIcon('paperclip')}
                             </button>
-                            <textarea class="ai-textarea" id="ai-input" aria-label="视觉任务需求" aria-describedby="ai-input-help" placeholder="描述检测目标、缺陷或流程修改..."></textarea>
-                            <button class="ai-btn-cancel" id="ai-btn-cancel" type="button" title="取消生成">取消</button>
+                            <textarea class="ai-textarea" id="ai-input" rows="1" aria-label="视觉任务需求" aria-describedby="ai-input-help" placeholder="描述检测需求..."></textarea>
+                            <button class="ai-btn-cancel" id="ai-btn-cancel" type="button" title="取消生成" aria-label="取消生成">${aiIcon('square')}</button>
                             <button class="ai-btn-send" id="ai-btn-gen" type="button" title="发送" aria-label="发送">
-                                <svg viewBox="0 0 24 24" width="18" height="18" fill="white" aria-hidden="true"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
+                                ${aiIcon('arrow-up')}
                             </button>
                         </div>
                         <p class="sr-only" id="ai-input-help">输入检测需求，按 Ctrl+Enter 发送。</p>
@@ -568,13 +557,13 @@ export class AiPanel {
                         <div class="ai-quick-examples">
                             <button class="examples-header" id="examples-toggle" type="button" aria-expanded="true" aria-controls="ai-example-tags">
                                 <span>快捷示例</span>
-                                <svg class="examples-chevron" viewBox="0 0 24 24" width="14" height="14" fill="currentColor" aria-hidden="true"><path d="M7 10l5 5 5-5z"/></svg>
+                                ${aiIcon('chevron-right')}
                             </button>
                             <div class="ai-example-tags" id="ai-example-tags">
-                                <button class="ai-tag" type="button" data-text="读取产品上的DataMatrix二维码。">条码读取</button>
-                                <button class="ai-tag" type="button" data-text="检测金属零件表面的划痕缺陷。先进行高斯滤波去噪，然后使用Canny边缘检测，最后通过Blob分析计算划痕面积。">缺陷检测</button>
-                                <button class="ai-tag" type="button" data-text="测量两个圆形孔位的圆心距离。">孔距测量</button>
-                                <button class="ai-tag" type="button" data-text="识别线束端子颜色顺序，并输出线序是否正确。">线序检测</button>
+                                <button class="ai-tag" type="button" data-text="读取产品上的 DataMatrix 二维码，输出码值和读取状态。"><strong>条码读取</strong><span>读取产品二维码，输出码值与状态</span></button>
+                                <button class="ai-tag" type="button" data-text="检测金属零件表面的划痕，输出缺陷位置和 OK/NG 判定。"><strong>缺陷检测</strong><span>检测表面划痕，输出位置与判定</span></button>
+                                <button class="ai-tag" type="button" data-text="测量两个圆形孔位的圆心距离，输出距离与公差判定。"><strong>孔距测量</strong><span>测量孔心距离，输出距离与公差判定</span></button>
+                                <button class="ai-tag" type="button" data-text="识别线束端子颜色顺序，并输出线序是否正确。"><strong>线序检测</strong><span>识别端子颜色顺序，输出线序判定</span></button>
                             </div>
                         </div>
                     </div>
@@ -633,7 +622,8 @@ export class AiPanel {
 
         const aiInput = this.container.querySelector('#ai-input');
         aiInput.addEventListener('keydown', (e) => {
-            if (e.ctrlKey && e.key === 'Enter') {
+            if (e.ctrlKey && e.key === 'Enter' && !e.isComposing) {
+                e.preventDefault();
                 this._handleGenerate();
             }
         });
@@ -641,7 +631,7 @@ export class AiPanel {
         // 自动扩展高度
         aiInput.addEventListener('input', () => {
             aiInput.style.height = 'auto';
-            aiInput.style.height = (aiInput.scrollHeight) + 'px';
+            aiInput.style.height = Math.min(aiInput.scrollHeight, 160) + 'px';
         });
 
         initializeAiPanelShell(this);

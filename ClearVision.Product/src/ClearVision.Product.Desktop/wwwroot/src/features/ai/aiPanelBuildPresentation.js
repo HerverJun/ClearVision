@@ -470,13 +470,15 @@ function deriveActionItems(panel, context) {
         validation.dryRun.status === 'failed' ||
         validation.otherErrors.length > 0;
     if (hasValidationFailure) {
-        const firstError = validationErrors.map(item => getDiagnosticMessage(panel, item)).find(Boolean);
+        const firstDiagnostic = validationErrors.find(item => getDiagnosticMessage(panel, item));
+        const firstError = getDiagnosticMessage(panel, firstDiagnostic);
+        const repairHint = sanitize(panel, read(firstDiagnostic, 'repairHint', 'RepairHint', 'repairTarget', 'RepairTarget'), 220);
         items.push({
             key: 'validation',
             priority: 'blocking',
             title: `${Math.max(validationErrors.length, 1)} 项验证问题`,
             summary: firstError || '静态验证或元数据预演未通过。',
-            impact: '需要修复后重新验证。',
+            impact: repairHint || '需要修复后重新验证。',
             status: '验证未通过',
             target: 'ai-build-validation-section',
             action: '查看验证'
@@ -561,7 +563,7 @@ function deriveOverallState(context) {
             tone: 'info',
             label: validating ? '正在验证' : '正在构建',
             result: validating ? '正在执行静态检查与元数据预演。' : '正在生成并整理可编辑流程草稿。',
-            next: '等待当前阶段完成，期间不会开放未满足条件的应用操作。',
+            next: '等待当前阶段完成。',
             target: 'ai-build-validation-section'
         };
     }
@@ -658,8 +660,8 @@ function deriveOverallState(context) {
         key: 'waiting',
         tone: 'neutral',
         label: '等待构建结果',
-        result: 'Build 已进入工程工作区，尚未收到完整流程草稿。',
-        next: '等待后端 AgentRun 发布构建结果。',
+        result: '尚未收到完整流程草稿。',
+        next: '等待构建结果。',
         target: 'ai-build-status-section'
     };
 }
@@ -809,6 +811,9 @@ function renderMetric(panel, label, value, hint = '') {
 function renderStatusSummary(panel, presentation) {
     const { overall, parameters, resources, validation, gate } = presentation;
     const blockerCount = presentation.blockerCount;
+    const issue = presentation.actionItems.find(item => item.key === 'failure') ||
+        presentation.actionItems.find(item => item.key === 'validation') || presentation.actionItems[0];
+    const failure = ['failed', 'validation_failed', 'gate_blocked'].includes(overall.key);
     const coreValidationFailed = validation.structural.status === 'failed' ||
         validation.dryRun.status === 'failed' ||
         validation.otherErrors.length > 0;
@@ -828,7 +833,7 @@ function renderStatusSummary(panel, presentation) {
                 <h2>${escapeHtml(panel, overall.label)}</h2>
                 <span class="ai-build-v2-status is-${escapeHtml(panel, overall.tone)}">${escapeHtml(panel, validationLabel)}</span>
             </div>
-            <p>${escapeHtml(panel, overall.result)}</p>
+            <p>${escapeHtml(panel, failure && issue ? issue.summary : overall.result)}</p>
         </div>
         <dl class="ai-build-v2-metrics">
             ${renderMetric(panel, '阻断', blockerCount, blockerCount ? '需要处理' : '当前无阻断')}
@@ -842,8 +847,8 @@ function renderStatusSummary(panel, presentation) {
         </dl>
         <div class="ai-build-v2-next">
             <span>下一步</span>
-            <strong>${escapeHtml(panel, overall.next)}</strong>
-            <button type="button" data-ai-build-target="${escapeHtml(panel, overall.target)}">前往处理区域</button>
+            <strong>${escapeHtml(panel, failure && issue ? issue.impact : overall.next)}</strong>
+            <button type="button" data-ai-build-target="${escapeHtml(panel, overall.target)}">${failure ? '查看问题' : overall.key === 'needs_input' ? '处理待办' : '查看详情'}</button>
         </div>
     `;
 }
@@ -878,7 +883,7 @@ function renderActionQueue(panel, presentation) {
         return `
             <div class="ai-build-v2-ready">
                 <strong>当前没有需要处理的阻断</strong>
-                <span>${presentation.gate.canvasReady ? '可以复核应用预览并应用到画布。' : '继续执行验证并等待现有 Gate 给出最终状态。'}</span>
+                <span>${presentation.gate.canvasReady ? '可以复核应用预览并应用到画布。' : '等待验证结果。'}</span>
             </div>
         `;
     }
@@ -906,6 +911,7 @@ function renderValidationSummary(panel, presentation) {
     const checks = [
         { title: '静态与拓扑检查', state: presentation.validation.structural },
         { title: '元数据预演', state: presentation.validation.dryRun },
+        { title: '真实样本验证', state: { status: 'pending', label: '未提供样本验证报告' } },
         { title: '应用条件', state: presentation.validation.gate }
     ];
     if (presentation.validation.other.status === 'failed') {
@@ -972,12 +978,21 @@ function renderApplySummary(panel, presentation) {
     `;
 }
 
+function markBuildNavigation(root, targetId) {
+    root.dataset.aiBuildNavTarget = targetId;
+    root.querySelectorAll?.('.ai-build-v2-nav [data-ai-build-target]').forEach(button => {
+        if (button.dataset.aiBuildTarget === targetId) button.setAttribute('aria-current', 'location');
+        else button.removeAttribute('aria-current');
+    });
+}
+
 function bindBuildNavigation(panel, root) {
     root?.querySelectorAll?.('[data-ai-build-target]').forEach(button => {
         button.onclick = () => {
             const targetId = button.dataset.aiBuildTarget || '';
             const target = targetId ? panel?.container?.querySelector?.(`#${targetId}`) : null;
             if (!target) return;
+            markBuildNavigation(root, targetId);
             const reduceMotion = globalThis.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches === true;
             target.scrollIntoView?.({ block: 'start', behavior: reduceMotion ? 'auto' : 'smooth' });
             target.focus?.({ preventScroll: true });
@@ -989,6 +1004,7 @@ export function renderAiBuildPresentation(panel) {
     const root = panel?.container?.querySelector?.('#ai-build-workspace');
     if (!root) return null;
     const presentation = deriveAiBuildPresentation(panel);
+    const previousState = root.dataset.aiBuildState;
     root.dataset.aiBuildState = presentation.overall.key;
 
     const status = root.querySelector('#ai-build-status-summary');
@@ -1008,10 +1024,25 @@ export function renderAiBuildPresentation(panel) {
     const completionNav = root.querySelector('[data-ai-build-nav="completion"]');
     if (completionNav) {
         completionNav.hidden = presentation.parameters.total === 0 && presentation.resources.total === 0;
-        completionNav.dataset.aiBuildTarget = presentation.parameters.total > 0
+        completionNav.dataset.aiBuildTarget = presentation.parameters.remainingToFill > 0 || presentation.parameters.awaitingConfirmation || presentation.resources.total === 0
             ? 'ai-build-parameters-section'
             : 'ai-build-resources-section';
     }
+    const body = root.querySelector('#ai-results-scroll');
+    const priority = ['failed', 'validation_failed'].includes(presentation.overall.key) ? 'validation'
+        : presentation.overall.key === 'needs_input' ? (presentation.parameters.remainingToFill > 0 || presentation.parameters.awaitingConfirmation ? 'parameters' : 'resources')
+        : ['ready_to_apply', 'applied', 'gate_blocked'].includes(presentation.overall.key) ? 'apply' : 'flow';
+    const order = [priority, 'actions', 'parameters', 'resources', 'flow', 'validation', 'apply'];
+    const sections = [...new Set(order)].map(key => root.querySelector(`#ai-build-${key}-section`)).filter(Boolean);
+    const first = body?.firstElementChild;
+    if (body && first !== sections[0]) {
+        const details = body.querySelector('[data-ai-hook="build-engineering-details"]');
+        sections.forEach(section => body.insertBefore(section, details || null));
+    }
+    const actionSection = root.querySelector('#ai-build-actions-section');
+    if (actionSection) actionSection.hidden = presentation.actionItems.length === 0;
+    markBuildNavigation(root, previousState !== presentation.overall.key || !root.dataset.aiBuildNavTarget
+        ? `ai-build-${priority}-section` : root.dataset.aiBuildNavTarget);
     bindBuildNavigation(panel, root);
     return presentation;
 }
@@ -1022,7 +1053,7 @@ export function renderAiBuildWorkspaceScaffold() {
             <div class="ai-build-v2" data-ai-hook="build-workspace-v3">
                 <section class="ai-build-v2-summary" id="ai-build-status-section" tabindex="-1">
                     <div id="ai-build-status-summary" role="status" aria-live="polite"></div>
-                    <div class="ai-result-status-note" id="ai-result-status-note" role="status" aria-live="polite"></div>
+                    <div class="ai-result-status-note" id="ai-result-status-note" role="status" aria-live="polite" hidden></div>
                 </section>
 
                 <nav class="ai-build-v2-nav" aria-label="构建工作区导航">
@@ -1110,7 +1141,7 @@ export function renderAiBuildWorkspaceScaffold() {
                                 </svg>
                                 应用到画布
                             </button>
-                            <div class="ai-apply-gate-hint">按钮继续服从现有 CanvasApplyReady、ApplyGate 与画布应用语义。</div>
+                            <div class="ai-apply-gate-hint">确认应用前，请复核流程变更。</div>
                         </div>
                     </section>
 
@@ -1174,13 +1205,111 @@ export function renderAiBuildWorkspaceScaffold() {
     `;
 }
 
+const buildEditorRuntime = new WeakMap();
+
+function readBuildEditorRuntime(panel) {
+    const identity = `${panel.sessionId || ''}:${panel.currentResultVersion || 0}`;
+    let runtime = buildEditorRuntime.get(panel);
+    if (!runtime || runtime.identity !== identity) {
+        runtime = { identity, selectedKey: null, userSelected: false, resourceValues: new Map(), confirmed: new Map() };
+        buildEditorRuntime.set(panel, runtime);
+    }
+    return runtime;
+}
+
+function decorateBuildEditors(panel) {
+    const root = panel.container?.querySelector('#ai-build-workspace');
+    if (!root?.querySelectorAll || typeof document === 'undefined') return;
+    const runtime = readBuildEditorRuntime(panel);
+    const fields = Array.from(root.querySelectorAll('.ai-parameter-field, .ai-resource-audit-card'));
+    const entries = fields.map(field => {
+        const input = field.querySelector('[data-draft-input], [data-resource-input]');
+        const resource = field.classList.contains('ai-resource-audit-card');
+        const key = resource ? `resource:${field.dataset.resourceKey}` : `parameter:${input?.id}`;
+        const label = resource ? field.querySelector('.ai-followup-item-title')?.textContent
+            : field.querySelector('.ai-parameter-field-label')?.childNodes[0]?.textContent;
+        const confirmed = resource ? field.querySelector('.ai-resource-audit-badge')?.textContent === '已绑定'
+            : field.querySelector('.ai-parameter-field-status')?.textContent.includes('已确认');
+        return { field, input, resource, key, label: clean(label) || '待补事项', confirmed };
+    });
+    if (!entries.length) return;
+    const selected = entries.find(entry => entry.key === runtime.selectedKey);
+    if (!runtime.userSelected || runtime.selectedKey === null || (runtime.selectedKey && !selected) ||
+        (selected?.confirmed && runtime.confirmed.get(selected.key) === false)) {
+        runtime.userSelected = false;
+        runtime.selectedKey = entries.find(entry => !entry.confirmed)?.key || '';
+    }
+    for (const entry of entries) {
+        runtime.confirmed.set(entry.key, entry.confirmed);
+        let details = entry.field.parentElement;
+        if (!details.classList.contains('ai-build-todo')) {
+            details = document.createElement('details');
+            details.className = 'ai-build-todo';
+            details.dataset.buildTodoKey = entry.key;
+            const summary = document.createElement('summary');
+            summary.innerHTML = '<span></span><small></small>';
+            details.appendChild(summary);
+            entry.field.before(details);
+            details.appendChild(entry.field);
+            summary.addEventListener('click', event => {
+                event.preventDefault();
+                const opening = !details.open;
+                runtime.selectedKey = opening ? entry.key : '';
+                runtime.userSelected = true;
+                root.querySelectorAll('.ai-build-todo').forEach(item => { item.open = opening && item === details; });
+            });
+        }
+        const summary = details.querySelector('summary');
+        summary.querySelector('span').textContent = entry.label;
+        summary.querySelector('small').textContent = entry.confirmed ? '已确认' : entry.resource ? '待绑定' : '待确认';
+        details.open = entry.key === runtime.selectedKey;
+        if (entry.input && entry.input.dataset.aiTodoFocusBound !== 'true') {
+            entry.input.dataset.aiTodoFocusBound = 'true';
+            entry.input.addEventListener('focus', () => {
+                runtime.selectedKey = entry.key;
+                runtime.userSelected = true;
+            });
+        }
+        if (entry.resource && entry.input && entry.input.dataset.aiDraftBound !== 'true') {
+            if (runtime.resourceValues.has(entry.key)) entry.input.value = runtime.resourceValues.get(entry.key);
+            entry.input.dataset.aiDraftBound = 'true';
+            entry.input.addEventListener('input', () => runtime.resourceValues.set(entry.key, entry.input.value));
+            entry.input.addEventListener('change', () => runtime.resourceValues.set(entry.key, entry.input.value));
+        }
+    }
+}
+
 export function installAiPanelBuildPresentation(prototype) {
     if (!prototype || prototype._renderBuildPresentation?.__aiBuildPresentationV3) return;
     const render = function () {
-        return renderAiBuildPresentation(this);
+        const result = renderAiBuildPresentation(this);
+        decorateBuildEditors(this);
+        return result;
     };
     render.__aiBuildPresentationV3 = true;
     prototype._renderBuildPresentation = render;
+    ['_renderParameterDraftEditor', '_renderFollowupChecklist'].forEach(name => {
+        const original = prototype[name];
+        if (typeof original !== 'function') return;
+        prototype[name] = function (...args) {
+            const root = this.container?.querySelector('#ai-build-workspace');
+            const active = typeof document !== 'undefined' && root?.contains?.(document.activeElement) ? document.activeElement : null;
+            const previousFocus = active ? { id: active.id, key: active.closest?.('[data-build-todo-key]')?.dataset.buildTodoKey, start: active.selectionStart, end: active.selectionEnd } : null;
+            const value = original.apply(this, args);
+            decorateBuildEditors(this);
+            if (previousFocus) {
+                const details = Array.from(root.querySelectorAll('[data-build-todo-key]')).find(item => item.dataset.buildTodoKey === previousFocus.key);
+                const target = previousFocus.id ? Array.from(root.querySelectorAll('[id]')).find(item => item.id === previousFocus.id) : details?.querySelector('[data-resource-input]');
+                if (target && !target.disabled && target.getClientRects().length) {
+                    target.focus({ preventScroll: true });
+                    if (previousFocus.start !== null && typeof target.setSelectionRange === 'function') {
+                        try { target.setSelectionRange(previousFocus.start, previousFocus.end); } catch { /* Non-text input. */ }
+                    }
+                }
+            }
+            return value;
+        };
+    });
 }
 
 export const aiPanelBuildPresentationTestApi = {

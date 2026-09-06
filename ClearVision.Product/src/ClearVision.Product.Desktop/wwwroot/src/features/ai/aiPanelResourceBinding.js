@@ -98,14 +98,15 @@ export const aiPanelResourceBindingMixin = {
     _renderMissingResourceActionControls(item, actionModel, index) {
         const draft = this._getPendingResourceDraft(item);
         const currentValue = draft?.value ?? '';
+        const disabled = this._isPlanSnapshotReadOnly?.() === true ? 'disabled' : '';
         const inputHtml = actionModel?.inputType === 'camera_select'
             ? `
                 <label class="ai-followup-resource-input">
                     <span>${this._escapeHtml(actionModel.inputLabel || '相机绑定')}</span>
-                    <select data-resource-input="true">
+                    <select data-resource-input="true" ${disabled}>
                         <option value="">请选择已登记相机</option>
                         ${(this.cameraBindingsCache || []).map(binding => `
-                            <option value="${this._escapeHtml(String(binding?.id || ''))}">${this._escapeHtml(`${binding?.displayName || binding?.id || '相机'}${binding?.serialNumber ? ` (${binding.serialNumber})` : ''}`)}</option>
+                            <option value="${this._escapeHtml(String(binding?.id || ''))}" ${String(binding?.id || '') === String(currentValue) ? 'selected' : ''}>${this._escapeHtml(`${binding?.displayName || binding?.id || '相机'}${binding?.serialNumber ? ` (${binding.serialNumber})` : ''}`)}</option>
                         `).join('')}
                     </select>
                 </label>
@@ -117,6 +118,7 @@ export const aiPanelResourceBindingMixin = {
                     <input
                         type="${this._escapeHtml(actionModel.inputType)}"
                         data-resource-input="true"
+                        ${disabled}
                         value="${this._escapeHtml(currentValue)}"
                         placeholder="${this._escapeHtml(actionModel.placeholder || '')}"
                     />
@@ -136,10 +138,10 @@ export const aiPanelResourceBindingMixin = {
             <div class="ai-followup-resource-controls">
                 ${inputHtml}
                 <div class="ai-followup-resource-actions">
-                    <button class="ai-followup-resource-action" type="button" data-resource-index="${this._escapeHtml(String(index))}" data-resource-action="${this._escapeHtml(actionModel.action)}">${this._escapeHtml(actionModel.primaryLabel)}</button>
+                    <button class="ai-followup-resource-action" type="button" ${disabled} data-resource-index="${this._escapeHtml(String(index))}" data-resource-action="${this._escapeHtml(actionModel.action)}">${this._escapeHtml(actionModel.primaryLabel)}</button>
                     ${String(item?.draftPolicy || '').toLowerCase() === 'build_required'
-                        ? `<button class="ai-followup-resource-action is-secondary" type="button" data-resource-index="${this._escapeHtml(String(index))}" data-resource-action="open_resource_location">前往解决位置</button>`
-                        : `<button class="ai-followup-resource-action is-secondary" type="button" data-resource-index="${this._escapeHtml(String(index))}" data-resource-action="switch_to_draft">切换为可编辑草稿</button>`}
+                        ? `<button class="ai-followup-resource-action is-secondary" type="button" ${disabled} data-resource-index="${this._escapeHtml(String(index))}" data-resource-action="open_resource_location">前往解决位置</button>`
+                        : `<button class="ai-followup-resource-action is-secondary" type="button" ${disabled} data-resource-index="${this._escapeHtml(String(index))}" data-resource-action="switch_to_draft">切换为可编辑草稿</button>`}
                 </div>
                 ${metadataNote}
                 ${resolvedNote}
@@ -181,32 +183,28 @@ export const aiPanelResourceBindingMixin = {
             normalizedItem.resourceKey ? `resourceRef=${this._sanitizeResourceAuditDisplayText(normalizedItem.resourceKey, 160)}` : '',
             operatorId ? `operator=${operatorId}` : '',
             parameterName ? `parameter=${parameterName}` : '',
-            `来源=${sourceLabel}`
+            `来源=${sourceLabel}`,
+            `影响参数=${parameterLabel}`,
+            `解决位置=${resolutionLabel}`,
+            `建议=${suggestion}`
         ].filter(Boolean).join('；');
 
         return `
-            <article class="ai-followup-item ai-followup-resource-task ai-resource-audit-card" data-resource-index="${this._escapeHtml(String(index))}">
+            <article class="ai-followup-item ai-followup-resource-task ai-resource-audit-card" data-resource-index="${this._escapeHtml(String(index))}" data-resource-key="${this._escapeHtml(this._getPendingResourceDraftKey(normalizedItem))}">
                 <div class="ai-resource-audit-card-head">
                     <div>
-                        <div class="ai-followup-item-title" title="${this._escapeHtml(resourceType)}">${this._escapeHtml(resourceLabel)}</div>
-                        <div class="ai-followup-item-body">${this._escapeHtml(normalizedItem.resourceName || resourceLabel)}</div>
+                        <div class="ai-followup-item-title">${this._escapeHtml(normalizedItem.resourceName || resourceLabel)}</div>
+                        <div class="ai-followup-item-body">${this._escapeHtml(operatorLabel)} · ${this._escapeHtml(scopeLabel)}</div>
                     </div>
                     <span class="ai-resource-audit-badge">${this._escapeHtml(statusLabel)}</span>
                 </div>
-                <div class="ai-resource-audit-grid">
-                    <span><small>资源</small><b>${this._escapeHtml(`${resourceLabel}${normalizedItem.resourceName && normalizedItem.resourceName !== resourceLabel ? ` · ${normalizedItem.resourceName}` : ''}`)}</b></span>
-                    <span><small>影响算子</small><b>${this._escapeHtml(operatorLabel || '待识别算子')}</b></span>
-                    <span><small>影响参数</small><b>${this._escapeHtml(parameterLabel)}</b></span>
-                    <span><small>阻断范围</small><b>${this._escapeHtml(scopeLabel)}</b></span>
-                    <span><small>解决位置</small><b>${this._escapeHtml(resolutionLabel)}</b></span>
-                    <span><small>阻断原因</small><b>${this._escapeHtml(this._sanitizeAuditText(blockerReason))}</b></span>
-                    <span><small>AI 建议</small><b>${this._escapeHtml(suggestion)}</b></span>
-                </div>
-                <div class="ai-resource-audit-manual-title">下一步</div>
+                <p class="ai-resource-reason">${this._escapeHtml(this._sanitizeAuditText(blockerReason))}</p>
+                ${this._getPendingResourceDraft(normalizedItem)?.value ? `<div class="ai-resource-current-value">当前值：${this._escapeHtml(this._sanitizeResourceAuditDisplayText(this._getPendingResourceDraft(normalizedItem).value, 180))}</div>` : ''}
                 ${this._renderMissingResourceActionControls(normalizedItem, actionModel, index)}
                 <details class="ai-resource-audit-details">
                     <summary>查看技术详情</summary>
                     <div>${this._escapeHtml(this._sanitizeAuditText(technical || '暂无技术详情'))}</div>
+                    <div>${this._escapeHtml(this._sanitizeResourceAuditDisplayText(normalizedItem.canonicalId || '', 180))}</div>
                 </details>
             </article>
         `;

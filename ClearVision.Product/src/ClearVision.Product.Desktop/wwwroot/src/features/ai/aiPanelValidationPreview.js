@@ -26,7 +26,7 @@ function formatCountLabel({ blocking, warnings, missing, executed, skipped, arti
         executed ? `${executed} 个已执行` : '',
         skipped ? `${skipped} 个已跳过` : '',
         artifacts ? `${artifacts} 份产物` : ''
-    ].filter(Boolean).join(' · ') || '暂无问题';
+    ].filter(Boolean).join(' · ') || '未提供问题明细';
 }
 
 export const aiPanelValidationPreviewMixin = {
@@ -522,7 +522,8 @@ export const aiPanelValidationPreviewMixin = {
         // Diagnostics list
         if (diagnostics.length > 0) {
             const issueItems = diagnostics.flatMap(d => {
-                const issues = d.issues || d.Issues || [];
+                const nested = d.issues || d.Issues || [];
+                const issues = nested.length ? nested : [d];
                 return issues.map(issue => ({
                     severity: issue.severity || issue.Severity || 'error',
                     category: this._sanitizeValidationPreviewText(issue.category || issue.Category || '', 120),

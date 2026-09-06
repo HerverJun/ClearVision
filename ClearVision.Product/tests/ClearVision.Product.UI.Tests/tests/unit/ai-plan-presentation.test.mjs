@@ -212,7 +212,9 @@ test('multiple questions highlight only the first and report remaining progress'
   assert.equal(presentation.activeQuestion.field, 'image_source');
   assert.equal(presentation.unresolvedCount, 2);
   assert.equal((html.match(/data-ai-hook="clarification-question"/g) || []).length, 1);
-  assert.match(html, /还需确认 2 项 · 当前第 1 项/);
+  assert.match(html, /待补齐 2 项/);
+  assert.match(html, /结果输出到哪里？/);
+  assert.equal((html.match(/data-ai-action="todo-select"/g) || []).length, 2);
 });
 
 test('optimistic answer remains visible as confirming until canonical confirmation arrives', () => {
@@ -368,9 +370,9 @@ test('resource pending renders one identifiable task with the existing resolutio
   };
   const panel = createPanel({ queue: [], batch: [], missingResources: [resource] });
   const html = renderAiClarification(panel, createPlan({ questions: [] }));
-  assert.match(html, /当前没有待确认问题/);
-  assert.match(html, /待补资源 · 1 项/);
-  assert.doesNotMatch(html, /还需确认 1 项/);
+  assert.match(html, /待补齐 1 项/);
+  assert.match(html, /待绑定/);
+  assert.doesNotMatch(html, /data-ai-hook="clarification-question"/);
   assert.match(html, /缺陷检测模型/);
   assert.match(html, /SurfaceDefectDetection#1/);
   assert.match(html, /ModelPath/);

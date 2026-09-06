@@ -3,6 +3,8 @@
        and separate industrial outcome colors. */
     --brand-red: #b6453c;
     --brand-red-hover: #9f3932;
+    --brand-red-solid: #b6453c;
+    --brand-red-solid-hover: #9f3932;
     --brand-on-red: #ffffff;
     --brand-red-soft: rgba(182, 69, 60, 0.1);
     --brand-red-border: rgba(182, 69, 60, 0.3);

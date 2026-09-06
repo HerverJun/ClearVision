@@ -1,4 +1,5 @@
 import { AiWorkbenchStates } from './aiPanelWorkbench.js';
+import { aiIcon } from './aiIcons.js';
 import {
     getOperatorTypeDisplayName,
     getParameterDisplayName
@@ -470,6 +471,24 @@ export const aiPanelApplyPreviewMixin = {
             : this.container.querySelector?.('#ai-btn-apply');
         const previewIdentity = this._createApplyPreviewIdentity(newFlow);
         const [beforeNames, newNames] = this._createApplyPreviewNames(options.beforeFlow, newFlow);
+        const operatorSection = (items, names, kind, title) => items.length ? `<section class="ai-apply-preview-section">
+            <h3 class="ai-apply-preview-section-title is-${kind}">${title} (${items.length})</h3>
+            ${items.map(op => `<div class="ai-apply-preview-item is-${kind}">${kind === 'remove' ? '-' : '+'} ${this._escapeHtml(names.byOperator.get(op) || this._formatApplyOperatorLabel(op))}</div>`).join('')}
+        </section>` : '';
+        const parameters = diff.modified.length ? `<section class="ai-apply-preview-section">
+            <h3 class="ai-apply-preview-section-title is-modify">参数变更 (${diff.modified.length})</h3>
+            ${diff.modified.map(m => `<div class="ai-apply-preview-item is-modify">
+                <strong>${this._escapeHtml(newNames.byOperator.get(m.op) || this._formatApplyOperatorLabel(m.op))}</strong>
+                <table class="ai-apply-parameter-table">
+                    <thead><tr><th scope="col">名称</th><th scope="col">原值</th><th scope="col">新值</th></tr></thead>
+                    <tbody>${m.changes.map(c => `<tr class="ai-apply-preview-param">
+                        <th scope="row">${this._escapeHtml(this._formatApplyChangeLabel(c.name))}</th>
+                        <td>${this._escapeHtml(this._formatApplyChangeValue(c, c.old))}</td>
+                        <td>${this._escapeHtml(this._formatApplyChangeValue(c, c.new))}</td>
+                    </tr>`).join('')}</tbody>
+                </table>
+            </div>`).join('')}
+        </section>` : '';
 
         const overlay = document.createElement('div');
         overlay.className = 'ai-apply-preview-overlay';
@@ -478,35 +497,15 @@ export const aiPanelApplyPreviewMixin = {
                 <div class="ai-apply-preview-header">
                     <span id="ai-apply-preview-title">应用预览</span>
                     <small id="ai-apply-preview-summary">${this._escapeHtml(String(totalChanges))} 项变更 · ${this._escapeHtml(String(applyRisk.totalCount || 0))} 项待复核</small>
-                    <button class="ai-apply-preview-close" type="button" aria-label="关闭应用预览">&times;</button>
+                    <button class="ai-apply-preview-close" type="button" aria-label="关闭应用预览" title="关闭应用预览">${aiIcon('x')}</button>
                 </div>
                 <div class="ai-apply-preview-body">
                     ${this._renderApplyRiskSummary(applyRisk, newNames)}
-                    ${diff.added.length > 0 ? `
-                        <div class="ai-apply-preview-section">
-                            <div class="ai-apply-preview-section-title is-add">新增算子 (${diff.added.length})</div>
-                            ${diff.added.map(op => `<div class="ai-apply-preview-item is-add">+ ${this._escapeHtml(newNames.byOperator.get(op) || this._formatApplyOperatorLabel(op))}</div>`).join('')}
-                        </div>
-                    ` : ''}
-                    ${diff.removed.length > 0 ? `
-                        <div class="ai-apply-preview-section">
-                            <div class="ai-apply-preview-section-title is-remove">删除算子 (${diff.removed.length})</div>
-                            ${diff.removed.map(op => `<div class="ai-apply-preview-item is-remove">- ${this._escapeHtml(beforeNames.byOperator.get(op) || this._formatApplyOperatorLabel(op))}</div>`).join('')}
-                        </div>
-                    ` : ''}
-                    ${diff.modified.length > 0 ? `
-                        <div class="ai-apply-preview-section">
-                            <div class="ai-apply-preview-section-title is-modify">参数变更 (${diff.modified.length})</div>
-                            ${diff.modified.map(m => `
-                                <div class="ai-apply-preview-item is-modify">
-                                    ${this._escapeHtml(newNames.byOperator.get(m.op) || this._formatApplyOperatorLabel(m.op))}
-                                    ${m.changes.map(c => `<div class="ai-apply-preview-param" title="${this._escapeHtml(this._sanitizeApplyPreviewText(`${this._formatApplyChangeLabel(c.name)}: ${this._formatApplyChangeValue(c, c.old)} -> ${this._formatApplyChangeValue(c, c.new)}`, 260))}">${this._escapeHtml(this._formatApplyChangeLabel(c.name))}: ${this._escapeHtml(this._formatApplyChangeValue(c, c.old))} &rarr; ${this._escapeHtml(this._formatApplyChangeValue(c, c.new))}</div>`).join('')}
-                                </div>
-                            `).join('')}
-                        </div>
-                    ` : ''}
-                    ${this._renderApplyConnections(diff.addedConnections, newNames, 'add')}
+                    ${operatorSection(diff.removed, beforeNames, 'remove', '删除算子')}
+                    ${parameters}
                     ${this._renderApplyConnections(diff.removedConnections, beforeNames, 'remove')}
+                    ${operatorSection(diff.added, newNames, 'add', '新增算子')}
+                    ${this._renderApplyConnections(diff.addedConnections, newNames, 'add')}
                 </div>
                 <div class="ai-apply-preview-actions">
                     <button class="ai-apply-preview-cancel" type="button">取消</button>

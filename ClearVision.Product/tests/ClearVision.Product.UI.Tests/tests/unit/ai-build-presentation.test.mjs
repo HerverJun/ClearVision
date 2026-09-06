@@ -138,7 +138,7 @@ test('Build presentation reports validation failure from structured diagnostics'
     structuralValidation: { passed: false, status: 'failed' },
     dryRun: { status: 'pending' }
   };
-  result.lastAttemptDiagnostics = [{ severity: 'error', message: '输出端口类型不兼容。' }];
+  result.lastAttemptDiagnostics = [{ severity: 'error', message: '输出端口类型不兼容。', repairHint: '检查结果输出算子的输入类型。' }];
 
   const presentation = deriveAiBuildPresentation(createPanel(result, { workbenchState: 'failed' }));
 
@@ -146,6 +146,7 @@ test('Build presentation reports validation failure from structured diagnostics'
   assert.equal(presentation.validation.overall, 'failed');
   assert.equal(presentation.actionItems[0].key, 'validation');
   assert.match(presentation.actionItems[0].summary, /输出端口类型不兼容/);
+  assert.equal(presentation.actionItems[0].impact, '检查结果输出算子的输入类型。');
 });
 
 test('failed Build presentation keeps the quarantined artifact summary and blocker visible', () => {
@@ -418,7 +419,6 @@ test('pure pending parameter partition assigns overlapping fields only to resour
   assert.equal(partition.resources.length, 1);
 });
 
-test('a new running Build Run does not project the previous Apply-ready result as current', () => {
 test('pending partition excludes legacy plan policy without hiding real parameter or resource work', () => {
   const partition = partitionPendingParameters([
     { OperatorId: 'plan_default', ParameterNames: ['resource_policy'] },
@@ -430,6 +430,7 @@ test('pending partition excludes legacy plan policy without hiding real paramete
   assert.equal(partition.resources.length, 1);
 });
 
+test('a new running Build Run does not project the previous Apply-ready result as current', () => {
   const previous = readyResult();
   const presentation = deriveAiBuildPresentation(createPanel(previous, {
     activeAgentRunId: 'run-new',

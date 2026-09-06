@@ -149,7 +149,7 @@ async function resetSmokeConversation(page, { clearSafety = false } = {}) {
 }
 
 async function captureLayout(page, label, theme) {
-  const conversationPane = page.locator('[data-ai-shell-pane="conversation"]:visible').first();
+  const conversationPane = page.locator('[data-ai-hook="conversation-toggle"][aria-expanded="false"]:visible').first();
   if (await conversationPane.count()) {
     await conversationPane.click();
   }

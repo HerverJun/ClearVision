@@ -356,7 +356,7 @@ test('parameter workspace preserves the real fill and confirmation interaction',
   await expect(parameterMetric.locator('small')).toContainText('已确认');
   await expect(page.locator('#ai-build-action-queue')).not.toContainText('参数已填写，等待确认');
   await expect(page.locator('#ai-build-action-queue')).toContainText('暂不可应用');
-  await expect(nextStep).toContainText('查看应用条件');
+  await expect(nextStep).toContainText('阻断应用到画布');
   await expect(page.locator('#ai-build-apply-summary')).toContainText('暂不可应用');
   await expect(page.locator('#ai-btn-apply')).toBeDisabled();
 });
@@ -382,6 +382,37 @@ test('resource workspace reuses the existing binding action and updates canonica
   await expect(page.locator('#ai-btn-apply')).toBeEnabled();
   const remaining = await page.evaluate(() => (window as any).aiPanel.currentResult.missingResources.length);
   expect(remaining).toBe(0);
+});
+
+test('multiple resources retain independent bindings with long Chinese names and paths', async ({ page }) => {
+  await openAi(page, { width: 390, height: 844, theme: 'light' });
+  await seedBuild(page, 'resources');
+  await page.evaluate(() => {
+    const panel = (window as any).aiPanel;
+    const first = panel.currentResult.missingResources[0];
+    panel.currentResult.missingResources = [
+      { ...first, resourceName: '生产线金属零件表面划痕检测模型'.repeat(6) },
+      { ...first, resourceKey: 'op_roi.ModelPath', operatorId: 'op_roi', resourceName: '定位区域检测模型' },
+    ];
+    for (const target of [panel.currentResult, panel.currentResult.buildResult]) {
+      target.applyGate.deploymentBlockers = ['missing_model_resource:op_threshold.ModelPath', 'missing_model_resource:op_roi.ModelPath'];
+      if (target.workflowDiff) target.workflowDiff.deploymentBlockers = [...target.applyGate.deploymentBlockers];
+    }
+    panel.pendingVisionPlan.goal = '多工位生产线金属零件外观缺陷检测与质量结果输出'.repeat(5);
+    panel._displayResult(panel.currentResult);
+    panel._renderBuildWorkspaceFromAgentRun();
+    panel._renderWorkbenchStateBar();
+  });
+  const pickers = page.locator('#ai-build-resources-section [data-resource-action="pick_model_resource"]');
+  await expect(pickers).toHaveCount(2);
+  const longPath = `C:\\Models\\${'生产线检测模型目录\\'.repeat(12)}surface-v3.onnx`;
+  await pickModelResource(page, pickers.first(), longPath);
+  await expect(pickers).toHaveCount(1);
+  expect(await page.evaluate(() => (window as any).aiPanel.currentResult.missingResources.map((item: any) => item.operatorId))).toEqual(['op_roi']);
+  expect(await page.evaluate(value => Object.values((window as any).aiPanel.pendingResourceDrafts).some((draft: any) => draft.value === value), longPath)).toBe(true);
+  await expectNoHorizontalOverflow(page);
+  await page.setViewportSize({ width: 1024, height: 768 });
+  await expectNoHorizontalOverflow(page);
 });
 
 for (const viewport of [{ width: 1366, theme: 'light' }, { width: 1024, theme: 'dark' }] as const) {
@@ -515,14 +546,14 @@ test('keyboard tabs switch conversation and Plan Build workspaces without pointe
   await openAi(page, { width: 1024, height: 768, theme: 'dark' });
   await seedBuild(page, 'ready');
 
-  const workbenchTab = page.locator('[data-ai-shell-pane="workbench"]');
-  const conversationTab = page.locator('[data-ai-shell-pane="conversation"]');
-  await workbenchTab.focus();
-  await page.keyboard.press('ArrowRight');
-  await expect(conversationTab).toHaveAttribute('aria-selected', 'true');
-  await expect(conversationTab).toBeFocused();
-  await page.keyboard.press('ArrowLeft');
-  await expect(workbenchTab).toHaveAttribute('aria-selected', 'true');
+  const conversationToggle = page.locator('[data-ai-hook="conversation-toggle"]');
+  await conversationToggle.focus();
+  await page.keyboard.press('Enter');
+  await expect(conversationToggle).toHaveAttribute('aria-expanded', 'true');
+  await expect(page.locator('#ai-input')).toBeFocused();
+  await page.keyboard.press('Escape');
+  await expect(conversationToggle).toHaveAttribute('aria-expanded', 'false');
+  await expect(conversationToggle).toBeFocused();
 
   const planTab = page.locator('[data-workspace-view-mode="plan"]');
   const buildTab = page.locator('[data-workspace-view-mode="build"]');
@@ -613,6 +644,33 @@ test('DryRun failure stays distinct from static validation and keeps Apply block
   await expect(page.locator('#ai-btn-apply')).toBeDisabled();
 });
 
+for (const width of [1366, 1024]) {
+  for (const theme of ['dark', 'light'] as const) {
+    test(`failure reason and repair are in the first viewport at ${width} ${theme}`, async ({ page }) => {
+      await openAi(page, { width, height: 768, theme });
+      await seedBuild(page, 'validation-failed');
+      const summary = page.locator('#ai-build-status-summary');
+      await expect(summary).toContainText('输出端口类型不兼容。');
+      await expect(summary).toContainText('检查结果输出算子的输入类型。');
+      await expect(page.locator('#ai-result-validation')).not.toContainText('暂无问题');
+      await expect(page.locator('#ai-result-validation .ai-validation-issue-msg')).toContainText('输出端口类型不兼容。');
+      const geometry = await summary.evaluate(element => {
+        const rect = element.getBoundingClientRect();
+        const action = element.querySelector('button')!;
+        const actionRect = action.getBoundingClientRect();
+        return { top: rect.top, bottom: rect.bottom, height: window.innerHeight,
+          hit: action.contains(document.elementFromPoint(actionRect.x + actionRect.width / 2, actionRect.y + actionRect.height / 2)) };
+      });
+      expect(geometry.top).toBeGreaterThan(0);
+      expect(geometry.bottom).toBeLessThan(geometry.height);
+      expect(geometry.hit).toBe(true);
+      await summary.getByRole('button', { name: '查看问题' }).click();
+      await expect(page.locator('[data-ai-build-target="ai-build-validation-section"][aria-current="location"]')).toBeVisible();
+      await expectNoHorizontalOverflow(page);
+    });
+  }
+}
+
 test('Build ready light visual baseline at 1366', async ({ page }) => {
   await openAi(page, { width: 1366, height: 768, theme: 'light' });
   await seedBuild(page, 'ready');
@@ -676,7 +734,7 @@ for (const viewport of [
     await seedBuild(page, 'resources');
     await expectNoHorizontalOverflow(page);
     await expect(page.locator('#ai-build-resources-section [data-resource-action="pick_model_resource"]')).toBeVisible();
-    await expect(page.locator('#ai-btn-apply')).toBeVisible();
+    await expect(page.locator('[data-ai-hook="task-navigation-action"]')).toBeVisible();
   });
 
   test(`Build ${viewport.name} visual baseline at ${viewport.width}x${viewport.height}`, async ({ page }) => {

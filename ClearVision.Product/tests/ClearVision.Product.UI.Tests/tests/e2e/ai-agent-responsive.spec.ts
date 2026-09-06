@@ -1431,7 +1431,7 @@ test('Plan pending recommendation records defer without becoming an effective an
 
   const pending = page.locator('input[data-ai-plan-option="true"][value="camera_pending"]');
   await pending.click();
-  await expect(page.locator('[data-ai-hook="clarification-deferred"]')).toContainText('稍后确认，当前不会作为业务答案');
+  await expect(page.locator('[data-ai-hook="clarification-deferred"]')).toContainText('已暂缓');
   await expect(page.locator('#ai-btn-start-build')).toBeDisabled();
   expect(await page.evaluate(() => {
     const panel = (window as any).aiPanel;
@@ -1621,7 +1621,7 @@ test('AI agent workbench default Plan view hides raw semantic trace until diagno
     panel._renderPlanWorkspace(plan);
   });
 
-  await expect(page.locator('#ai-plan-workspace')).toContainText('AI 理解成了什么');
+  await expect(page.locator('#ai-plan-workspace')).toContainText('任务摘要');
   await expect(page.locator('#ai-plan-workspace')).toContainText('推荐方案');
   await expect(page.locator('#ai-plan-workspace')).toContainText('关键问题');
   await expect(page.locator('#ai-plan-workspace')).toContainText('风险与工程详情');

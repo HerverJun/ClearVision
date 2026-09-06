@@ -290,8 +290,9 @@ test('shared counts include questions and one canonical resource across strict, 
   const count = page.locator('[data-ai-hook="task-blockers"]');
   await expect(count).toHaveText('待补齐 3 项');
   await expect(page.locator('#ai-plan-build-status')).toContainText('构建前必需 3 项');
-  await expect(page.locator('.ai-clarification-v2-header')).toContainText('还需确认 2 项');
-  await expect(page.locator('.ai-clarification-v2-resources')).toContainText('待补资源 · 1 项');
+  await expect(page.locator('.ai-clarification-v2-header')).toContainText('待补齐 3 项');
+  await expect(page.locator('[data-ai-hook="clarification-resources"]')).toHaveCount(1);
+  await expect(page.locator('[data-ai-hook="clarification-resources"]')).toContainText('待绑定');
   await page.route('**/api/ai/agent-plan/readiness-preview', async route => {
     const request = route.request().postDataJSON();
     const readiness = await page.evaluate(() => (window as any).aiPanel.pendingVisionPlan.buildReadiness);
@@ -423,7 +424,7 @@ test('single and multiple canonical questions render one accessible focal questi
 
   await expect(page.locator('[data-ai-hook="clarification-question"]')).toHaveCount(1);
   await expect(page.locator('[data-ai-hook="clarification-title"]')).toHaveText('图像从哪里获取？');
-  await expect(page.locator('.ai-clarification-v2-header')).toContainText('还需确认 2 项 · 当前第 1 项');
+  await expect(page.locator('.ai-clarification-v2-header')).toContainText('待补齐 2 项');
   await expect(page.locator('.ai-clarification-v2-recommended')).toHaveText('推荐');
   await expect(page.locator('.ai-clarification-v2-option')).toContainText(['构建将包含图像采集算子。', '适合离线验收，不代表现场相机已就绪。']);
   await expect(page.locator('#ai-btn-start-build')).toBeDisabled();
@@ -485,7 +486,7 @@ test('selection stays confirming until canonical readiness confirms it, then adv
 
   release();
   await expect(page.locator('[data-ai-hook="clarification-title"]')).toHaveText('检测结果输出到哪里？');
-  await expect(page.locator('[data-ai-hook="clarification-confirmed"]')).toContainText('图像从哪里获取？：工业相机');
+  await expect(page.locator('[data-ai-hook="clarification-confirmed"]')).toContainText('图像从哪里获取？工业相机');
   await expect(page.locator('[data-ai-hook="clarification-title"]')).toBeFocused();
   await expect(page.locator('#ai-btn-start-build')).toBeDisabled();
 });
@@ -525,6 +526,54 @@ test('manual supplement uses explicit_user_text and does not copy the main Compo
   await expect(page.locator('#ai-input')).toHaveCount(1);
   await expect(page.locator('[data-ai-hook="clarification-question"]')).toContainText('正在校验构建条件');
   release();
+});
+
+test('todo switching preserves manual drafts and background updates preserve composer focus', async ({ page }) => {
+  await openAi(page, { width: 1366, height: 768 });
+  await seedPlan(page, { questions: 'multiple', resourcePending: true });
+  await page.locator('[data-ai-action="clarification-other"]').click();
+  const manual = page.locator('[data-ai-hook="clarification-manual-input"]');
+  await manual.fill('使用现场相机，保留原始图像用于复核。');
+  await page.locator('[data-todo-key="question:output_target"]').click();
+  await expect(page.locator('[data-ai-hook="clarification-question"]')).toHaveCount(1);
+  await expect(page.locator('[data-ai-hook="clarification-title"]')).toHaveText('检测结果输出到哪里？');
+  await page.locator('[data-todo-key="question:image_source"]').click();
+  await expect(manual).toHaveValue('使用现场相机，保留原始图像用于复核。');
+  await page.locator('#ai-input').fill('正在补充的对话内容');
+  await page.evaluate(() => (window as any).aiPanel._renderPlanWorkspace((window as any).aiPanel.pendingVisionPlan));
+  await expect(page.locator('#ai-input')).toBeFocused();
+  await expect(manual).toHaveValue('使用现场相机，保留原始图像用于复核。');
+});
+
+test('failed save keeps the confirmed editor until persistence succeeds', async ({ page }) => {
+  await page.route('**/api/ai/agent-plan/readiness-preview', route => route.abort());
+  await openAi(page, { width: 1366, height: 768 });
+  await seedPlan(page, { questions: 'multiple' });
+  await page.locator('input[value="industrial_camera"]').check();
+  await expect(page.locator('.ai-clarification-v2-status.is-error')).toBeVisible();
+  await page.evaluate(question => {
+    const panel = (window as any).aiPanel;
+    panel.workspaceSnapshotDirty = true;
+    panel.workspaceSaveErrorGeneration = 1;
+    panel.workspacePersistedGeneration = 0;
+    panel._dispatchAgentWorkspaceEvent({ type: 'workspace/answers-confirmed', payload: {
+      answers: [{ questionId: question.id, field: question.field, value: 'industrial_camera', origin: 'explicit_user_selection' }],
+    } });
+    panel._renderPlanWorkspace(panel.pendingVisionPlan);
+  }, imageSourceQuestion);
+  await expect(page.locator('#ai-btn-retry-workspace-save')).toBeVisible();
+  await expect(page.locator('[data-ai-hook="clarification-title"]')).toHaveText('图像从哪里获取？');
+  await expect(page.locator('input[value="industrial_camera"]')).toBeChecked();
+  await page.locator('#ai-input').fill('保存期间继续编辑对话');
+  await page.evaluate(() => {
+    const panel = (window as any).aiPanel;
+    panel.workspaceSnapshotDirty = false;
+    panel.workspacePersistedGeneration = 1;
+    panel._renderPlanWorkspace(panel.pendingVisionPlan);
+  });
+  await expect(page.locator('#ai-btn-retry-workspace-save')).toHaveCount(0);
+  await expect(page.locator('[data-ai-hook="clarification-title"]')).toHaveText('检测结果输出到哪里？');
+  await expect(page.locator('#ai-input')).toBeFocused();
 });
 
 test('accept-all uses the existing recommended-answer path only for eligible questions', async ({ page }) => {
@@ -634,9 +683,9 @@ test('confirmed summary can reopen the canonical question for modification', asy
   }, imageSourceQuestion);
 
   await expect(page.locator('[data-ai-hook="clarification-confirmed"]')).toContainText('工业相机');
-  await page.locator('[data-ai-action="clarification-edit"]').click();
+  await page.locator('[data-ai-hook="clarification-confirmed"] [data-ai-action="todo-select"]').click();
   await expect(page.locator('[data-ai-hook="clarification-title"]')).toHaveText('图像从哪里获取？');
-  await expect(page.locator('[data-ai-hook="clarification-title"]')).toBeFocused();
+  await expect(page.locator('[data-ai-hook="clarification-confirmed"] [data-ai-action="todo-select"]')).toBeFocused();
 });
 
 test('Router text does not create a second question and resource pending is unique, identifiable, and actionable', async ({ page }) => {
@@ -651,16 +700,37 @@ test('Router text does not create a second question and resource pending is uniq
 
   await expect(page.locator('[data-ai-hook="clarification-question"]')).toHaveCount(1);
   await expect(page.locator('#ai-plan-workspace')).not.toContainText('旧 Router 澄清问题');
-  await expect(page.locator('.ai-clarification-v2-header')).toContainText('还需确认 1 项');
+  await expect(page.locator('.ai-clarification-v2-header')).toContainText('待补齐 2 项');
+  await page.locator('[data-ai-hook="clarification-resources"] [data-ai-action="todo-select"]').click();
   await expect(page.locator('[data-ai-hook="clarification-resources"] .ai-resource-audit-card')).toHaveCount(1);
   await expect(page.locator('[data-ai-hook="clarification-resources"]')).toContainText('表面缺陷检测模型');
   await expect(page.locator('[data-ai-hook="clarification-resources"]')).toContainText('op_detect');
   await expect(page.locator('[data-ai-hook="clarification-resources"]')).toContainText('ModelPath');
-  await expect(page.locator('[data-ai-hook="clarification-resources"]')).toContainText('阻断范围');
+  await expect(page.locator('[data-ai-hook="clarification-resources"]')).toContainText('阻止构建');
   await expect(page.locator('[data-ai-hook="clarification-resources"]')).toContainText('模型文件选择器');
   await expect(page.locator('#ai-plan-workspace input[type="file"]')).toHaveCount(0);
   await expect(page.locator('#ai-plan-workspace [data-resource-action="pick_model_resource"]')).toHaveCount(1);
   await expect(page.locator('#ai-plan-workspace [data-resource-action="switch_to_draft"]')).toHaveCount(1);
+});
+
+test('read-only recovery keeps question and resource editors disabled but navigable', async ({ page }) => {
+  await openAi(page, { width: 1024, height: 768 });
+  await seedPlan(page, { resourcePending: true });
+  await page.evaluate(() => {
+    const panel = (window as any).aiPanel;
+    panel.workspaceRecoveryBlocked = true;
+    panel._renderPlanWorkspace(panel.pendingVisionPlan);
+  });
+  for (const input of await page.locator('[data-ai-hook="clarification-question"] input').all()) {
+    await expect(input).toBeDisabled();
+  }
+  await page.getByRole('button', { name: '表面缺陷检测模型 待绑定', exact: true }).click();
+  for (const control of await page.locator('[data-resource-action]').all()) {
+    await expect(control).toBeDisabled();
+  }
+  await expect(page.locator('[data-resource-action]')).not.toHaveCount(0);
+  await expect(page.locator('#ai-btn-start-build')).toBeDisabled();
+  await expectNoHorizontalOverflow(page);
 });
 
 test('keyboard path reaches options and keeps the current action unique', async ({ page }) => {
@@ -682,6 +752,7 @@ test('keyboard path reaches options and keeps the current action unique', async 
 });
 
 for (const viewport of [
+  { width: 1366, height: 768 },
   { width: 1024, height: 768 },
   { width: 390, height: 844 },
 ]) {
@@ -689,7 +760,17 @@ for (const viewport of [
     await openAi(page, viewport);
     await seedPlan(page, { questions: 'multiple' });
     await expect(page.locator('[data-ai-hook="clarification-question"]')).toBeVisible();
-    await expect(page.locator('#ai-btn-start-build')).toBeVisible();
+    await expect(page.locator('[data-ai-hook="task-navigation-action"]')).toHaveText('处理待办');
+    if (viewport.width >= 1024) {
+      const initial = await page.locator('[data-ai-hook="clarification-question"] button').first().evaluate(element => {
+        const rect = element.getBoundingClientRect();
+        const pane = document.querySelector('#ai-plan-workspace') as HTMLElement;
+        return { top: rect.top, bottom: rect.bottom, paneBottom: pane.getBoundingClientRect().bottom, scrollTop: pane.scrollTop };
+      });
+      expect(initial.scrollTop).toBe(0);
+      expect(initial.top).toBeGreaterThan(0);
+      expect(initial.bottom).toBeLessThanOrEqual(initial.paneBottom);
+    }
     await focusClarificationViewport(page);
     const scrollState = await page.evaluate(() => {
       const pane = document.querySelector('#ai-plan-workspace') as HTMLElement;
@@ -716,7 +797,8 @@ for (const viewport of [
         paneBottom: pane.getBoundingClientRect().bottom,
       };
     });
-    expect(scrollState.scrollTop, JSON.stringify(scrollState)).toBeGreaterThan(0);
+    expect(scrollState.aiViewScrollHeight, JSON.stringify(scrollState)).toBeLessThanOrEqual(scrollState.aiViewHeight + 1);
+    expect(scrollState.mainScrollHeight).toBeLessThanOrEqual(scrollState.mainHeight + 1);
     expect(scrollState.clarificationTop).toBeGreaterThanOrEqual(scrollState.paneTop - 1);
     expect(scrollState.clarificationTop).toBeLessThan(scrollState.paneBottom);
     await expectNoHorizontalOverflow(page);

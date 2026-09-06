@@ -44,6 +44,7 @@ export const aiPanelLifecycleMixin = {
         this._ownedAnimationFrames?.clear?.();
         this._closeApplyPreview?.({ restoreFocus: false, setReady: false });
         this._disposeAccessibility?.();
+        this._disposeAiShell?.();
         this._messageUnsubscribes.forEach(unsubscribe => {
             try {
                 unsubscribe?.();

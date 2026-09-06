@@ -159,12 +159,11 @@ export function deriveAiPlanPresentation(panel, plan) {
 }
 
 function renderUnderstanding(panel, items) {
+    const summary = items.filter(item => ['inspection_object', 'defect_type', 'image_source', 'output_target'].includes(item.field))
+        .map(item => `${item.label}：${item.value}`).join(' · ');
     return `
-        <section class="ai-plan-v2-section ai-plan-v2-understanding" data-ai-hook="plan-understanding">
-            <div class="ai-plan-v2-section-heading">
-                <span>任务理解</span>
-                <strong>AI 理解成了什么</strong>
-            </div>
+        <details class="ai-plan-v2-section ai-plan-v2-understanding" data-ai-hook="plan-understanding">
+            <summary><strong>任务摘要</strong><span>${escapeHtml(panel, summary)}</span></summary>
             <dl class="ai-plan-v2-definition-list">
                 ${items.map(item => `
                     <div class="is-${item.status}">
@@ -174,7 +173,7 @@ function renderUnderstanding(panel, items) {
                     </div>
                 `).join('')}
             </dl>
-        </section>
+        </details>
     `;
 }
 
@@ -380,6 +379,16 @@ function renderEmptyPlan(panel) {
 export function renderAiPlanWorkspace(panel, plan = panel?.pendingVisionPlan) {
     const root = panel?.container?.querySelector('#ai-plan-workspace');
     if (!root) return;
+    const previousFocus = typeof document !== 'undefined' && root.contains?.(document.activeElement) ? document.activeElement : null;
+    const focusContext = previousFocus ? {
+        id: previousFocus.id,
+        hook: previousFocus.dataset?.aiHook,
+        key: previousFocus.closest?.('[data-ai-todo-key]')?.dataset.aiTodoKey,
+        start: previousFocus.selectionStart,
+        end: previousFocus.selectionEnd
+    } : null;
+    const scrollTop = root.scrollTop;
+    const expandedDetails = new Set(Array.from(root.querySelectorAll?.('details[open][data-ai-hook]') || []).map(item => item.dataset.aiHook));
     root.hidden = panel?._getWorkspaceViewMode?.() !== 'plan';
     root.dataset.aiPlanPresentation = 'v2';
     panel?._renderPlanConfirmationGuidance?.(null, null);
@@ -397,13 +406,18 @@ export function renderAiPlanWorkspace(panel, plan = panel?.pendingVisionPlan) {
     const presentation = deriveAiPlanPresentation(panel, plan);
     const canRetryReadiness = !panel?._isPlanSnapshotReadOnly?.() && !panel?.isGenerating &&
         ['idle', 'failed', 'timeout'].includes(panel?.agentWorkspaceState?.readinessStatus || 'idle');
-    const canRetrySave = panel?.workspaceSnapshotDirty && !panel?.workspacePendingMutationCount &&
+    const saveFailed = Number(panel?.workspaceSaveErrorGeneration || 0) > Number(panel?.workspacePersistedGeneration || 0) ||
+        panel?.workspacePersistenceWarning?.level === 'warning';
+    const canRetrySave = panel?.workspaceSnapshotDirty && saveFailed && !panel?.workspacePendingMutationCount &&
         !panel?.workspaceBoundaryInProgress && !panel?._isPlanSnapshotReadOnly?.();
+    const hasTodos = presentation.clarification.totalCount > 0 || presentation.clarification.unanswerableBlockerCount > 0;
     root.innerHTML = `
         <div class="ai-plan-v2" data-ai-hook="plan-workspace-v2">
+            ${canRetrySave ? '<div class="ai-plan-save-error" role="alert">本次更改尚未保存。<button class="ai-plan-action" type="button" id="ai-btn-retry-workspace-save">重试保存</button></div>' : ''}
+            ${hasTodos ? renderAiClarification(panel, plan) : ''}
             ${renderUnderstanding(panel, presentation.understanding)}
             ${renderRoute(panel, presentation.route, presentation)}
-            ${renderAiClarification(panel, plan)}
+            ${!hasTodos ? renderAiClarification(panel, plan) : ''}
             ${renderModeControl(panel, presentation)}
             ${renderEngineeringDetails(panel, plan, presentation)}
             <div class="ai-plan-v2-feedback" id="ai-plan-cta-feedback" role="status" aria-live="polite" hidden></div>
@@ -411,13 +425,25 @@ export function renderAiPlanWorkspace(panel, plan = panel?.pendingVisionPlan) {
                 <span class="ai-plan-action-status" id="ai-plan-build-status"></span>
                 <button class="ai-plan-action is-primary" type="button" id="ai-btn-start-build">开始构建</button>
                 ${canRetryReadiness ? '<button class="ai-plan-action" type="button" id="ai-btn-retry-readiness-preview">重试校验</button>' : ''}
-                ${canRetrySave ? '<button class="ai-plan-action" type="button" id="ai-btn-retry-workspace-save">重试保存</button>' : ''}
                 ${presentation.canViewDraft ? '<button class="ai-plan-v2-view-draft" type="button" data-ai-action="plan-view-draft">查看构建草稿</button>' : ''}
             </div>
         </div>
     `;
 
     bindAiClarificationInteractions(panel, root, plan);
+    root.querySelectorAll('details[data-ai-hook]').forEach(item => { item.open = expandedDetails.has(item.dataset.aiHook); });
+    root.scrollTop = scrollTop;
+    if (focusContext && focusContext.key) {
+        const row = Array.from(root.querySelectorAll('[data-ai-todo-key]')).find(item => item.dataset.aiTodoKey === focusContext.key);
+        const input = focusContext.id ? Array.from(row?.querySelectorAll('[id]') || []).find(item => item.id === focusContext.id)
+            : focusContext.hook ? row?.querySelector(`[data-ai-hook="${focusContext.hook}"]`) : row?.querySelector('[data-resource-input]');
+        if (input && !input.disabled && input.getClientRects().length) {
+            input.focus({ preventScroll: true });
+            if (typeof input.setSelectionRange === 'function' && focusContext.start !== null) {
+                try { input.setSelectionRange(focusContext.start, focusContext.end); } catch { /* Non-text input. */ }
+            }
+        }
+    }
     root.querySelector('#ai-btn-retry-readiness-preview')?.addEventListener('click', () => {
         panel?._requestPlanReadinessPreview?.(panel.pendingVisionPlan, { reason: 'retry' });
         panel?._renderPlanWorkspace?.(panel.pendingVisionPlan);
