@@ -18,10 +18,13 @@ function normalize(value) {
     return clean(value).toLowerCase();
 }
 
-function getParameterNames(item) {
+export function getPendingParameterNames(item) {
+    const ids = getOperatorIds(item);
+    // Older Build results leaked this internal policy into operator work items.
+    const legacyPlanDefault = ids.length > 0 && ids.every(id => id === 'plan_default');
     return toArray(read(item, 'parameterNames', 'ParameterNames'))
         .map(clean)
-        .filter(Boolean);
+        .filter(name => name && !(legacyPlanDefault && normalize(name) === 'resource_policy'));
 }
 
 function getOperatorIds(item) {
@@ -69,7 +72,7 @@ export function partitionPendingParameters(pendingParameters = [], missingResour
     pending.forEach(item => {
         const ordinaryNames = [];
         const resourceNames = [];
-        getParameterNames(item).forEach(parameterName => {
+        getPendingParameterNames(item).forEach(parameterName => {
             const resource = resources.find(candidate => matchesResource(item, parameterName, candidate));
             if (resource) {
                 resourceNames.push(parameterName);

@@ -9735,6 +9735,91 @@ test('AI pending parameter editor displays Chinese operator type metadata', asyn
   const { AiPanel } = await loadAiPanel();
   const panel = createPanel(AiPanel, {
     options: {
+for (const casing of ['camel', 'pascal']) {
+  test(`AI pending parameters bind backend metadata identities and write confirmed values (${casing})`, async () => {
+    const { AiPanel } = await loadAiPanel();
+    const panel = createPanel(AiPanel);
+    const { elements, container } = createBuildWorkspaceContainer();
+    panel.container = container;
+    panel.options.getOperators = () => [
+      ...resourceBindingOperatorMetadata(),
+      { type: 'DetectionSequenceJudge', parameters: [{ name: 'ExpectedLabels', dataType: 'text' }] }
+    ];
+    const detectId = '6352427c-7f5c-40a0-9593-a4913cda56f9';
+    const sequenceId = 'e6f50a88-3dfe-4631-a0c5-1fa84a2d91da';
+    const operators = [
+      { id: sequenceId, type: 'DetectionSequenceJudge', name: 'Sequence judge', metadata: { agentTempId: 'op_sequence' }, parameters: { ExpectedLabels: '' } },
+      { id: detectId, type: 'DeepLearning', name: 'Detector', metadata: { agentTempId: 'op_detect' }, parameters: { Threshold: 0.8 } }
+    ].map(op => casing === 'camel' ? op : {
+      Id: op.id, Type: op.type, Name: op.name,
+      Metadata: { AgentTempId: op.metadata.agentTempId }, Parameters: op.parameters
+    });
+    panel.currentResult = {
+      flow: casing === 'camel' ? { operators } : { Operators: operators },
+      pendingParameters: [
+        { operatorId: 'op_detect', actualOperatorId: 'op_detect', parameterNames: ['Threshold'] },
+        { operatorId: 'op_sequence', actualOperatorId: 'op_sequence', parameterNames: ['ExpectedLabels'] }
+      ]
+    };
+    const response = panel.currentResult;
+    panel._rebuildPendingOperatorBindings({ pending: response.pendingParameters, flow: response.flow, preferIndexFallback: true });
+    panel._renderParameterDraftEditor(response, response.flow);
+
+    assert.equal(panel.pendingOperatorBindings.op_detect.actualOperatorId, detectId);
+    assert.equal(panel.pendingOperatorBindings.op_sequence.actualOperatorId, sequenceId);
+    assert.doesNotMatch(elements['#ai-result-parameter-editor'].innerHTML, /未识别算子类型|未关联到算子|未找到精确算子/);
+    panel._setPendingDraftConfirmedValue('op_detect', 'Threshold', 0.91, 'number', 'user_input');
+    panel._setPendingDraftConfirmedValue('op_sequence', 'ExpectedLabels', 'red,blue', 'text', 'user_input');
+    const unconfirmed = panel._extractOperators(panel._buildFlowWithPendingDrafts(response.flow));
+    assert.equal(panel._readOperatorParameterValue(panel._findOperatorByAnyId(unconfirmed, detectId), 'Threshold'), 0.8);
+    panel._handleConfirmPendingParameters(response, response.flow);
+    const confirmed = panel._extractOperators(panel._buildFlowWithPendingDrafts(response.flow));
+    assert.equal(panel._readOperatorParameterValue(panel._findOperatorByAnyId(confirmed, detectId), 'Threshold'), 0.91);
+    assert.equal(panel._readOperatorParameterValue(panel._findOperatorByAnyId(confirmed, sequenceId), 'ExpectedLabels'), 'red,blue');
+    assert.equal(panel._readOperatorParameterValue(operators[1], 'Threshold'), 0.8);
+  });
+}
+
+test('AI pending operator lookup prioritizes actual IDs and rejects ambiguous metadata aliases', async () => {
+  const { AiPanel } = await loadAiPanel();
+  const panel = createPanel(AiPanel);
+  const first = { id: 'actual-a', metadata: { agentTempId: 'op_detect' } };
+  const second = { id: 'actual-b', metadata: { agentTempId: 'op_detect' } };
+  const exact = { id: 'op_detect', type: 'DeepLearning' };
+  assert.equal(panel._findOperatorByAnyId([first, exact], 'op_detect'), exact);
+  assert.equal(panel._findOperatorByAnyId([first, second], 'op_detect'), null);
+  assert.equal(panel._findOperatorByAnyId([first], 'op_missing'), null);
+  assert.equal(panel._findOperatorByAnyId([first], 'op_detect'), first);
+  const reordered = [
+    { id: 'actual-b', metadata: { agentTempId: 'op_2' } },
+    { id: 'actual-a', metadata: { agentTempId: 'op_1' } }
+  ];
+  panel._rebuildPendingOperatorBindings({
+    pending: [{ operatorId: 'op_1', parameterNames: ['Threshold'] }],
+    flow: { operators: reordered }, preferIndexFallback: true
+  });
+  assert.equal(panel.pendingOperatorBindings.op_1.actualOperatorId, 'actual-a');
+  assert.equal(panel._findOperatorByTempSequence(reordered, 'op_1'), null);
+});
+
+test('AI pending parameter restore removes only the legacy synthetic resource policy field', async () => {
+  const { AiPanel } = await loadAiPanel();
+  const panel = createPanel(AiPanel);
+  const pending = [
+    { OperatorId: 'plan_default', ActualOperatorId: 'plan_default', ParameterNames: ['resource_policy'] },
+    { operatorId: 'op_sequence', parameterNames: ['ExpectedLabels'] },
+    { operatorId: 'op_custom', parameterNames: ['resource_policy'] },
+    { operatorId: 'plan_default', actualOperatorId: 'real-node', parameterNames: ['resource_policy'] }
+  ];
+  const snapshot = structuredClone(pending);
+  const resolved = panel._resolvePendingParametersForDraft({ pendingParameters: pending });
+  assert.equal(resolved.length, 3);
+  assert.equal(resolved[0].operatorId, 'op_sequence');
+  assert.equal(resolved[1].parameterNames[0], 'resource_policy');
+  assert.equal(resolved[2].actualOperatorId, 'real-node');
+  assert.deepEqual(pending, snapshot);
+});
+
       getOperators: () => [
         {
           type: 'ImageAcquisition',

@@ -33,8 +33,7 @@ public sealed class BuildResultAssembler
         var pendingParameters = MergePendingParameters(
             input.ParameterMapping.PendingParameters,
             input.Validation,
-            input.PackageReadiness,
-            input.Request);
+            input.PackageReadiness);
         var missingResources = MergeMissingResources(
             input.Template,
             input.ParameterMapping.MissingResources,
@@ -288,20 +287,12 @@ public sealed class BuildResultAssembler
     private static List<AiPendingParameterInfo> MergePendingParameters(
         IEnumerable<AiPendingParameterInfo> mapped,
         VisionAgentToolResult validation,
-        VisionAgentToolResult packageReadiness,
-        AiFlowGenerationRequest request)
+        VisionAgentToolResult packageReadiness)
     {
+        // Plan defaults describe policy; only mapped or validated node parameters are actionable.
         return VisionAgentBuildSupport.DeduplicatePending(mapped
             .Concat(VisionAgentBuildSupport.ReadPendingParameters(validation.Data))
-            .Concat(VisionAgentBuildSupport.ReadPendingParameters(packageReadiness.Data))
-            .Concat(request.BuildFromPlan?.PlanSnapshot?.RecommendedDefaults
-                .Where(item => item.Value.Contains("pending", StringComparison.OrdinalIgnoreCase))
-                .Select(item => new AiPendingParameterInfo
-                {
-                    OperatorId = "plan_default",
-                    ActualOperatorId = "plan_default",
-                    ParameterNames = [item.Id]
-                }) ?? []));
+            .Concat(VisionAgentBuildSupport.ReadPendingParameters(packageReadiness.Data)));
     }
 
     private static List<AiMissingResourceInfo> MergeMissingResources(

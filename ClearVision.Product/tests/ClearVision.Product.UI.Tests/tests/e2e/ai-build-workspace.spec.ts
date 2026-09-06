@@ -219,8 +219,7 @@ async function openAi(page: Page, options: { width: number; height: number; them
   });
 }
 
-async function seedBuild(page: Page, scenario: BuildScenario): Promise<void> {
-  const payload = createBuildPayload(scenario);
+async function seedBuild(page: Page, scenario: BuildScenario, payload = createBuildPayload(scenario)): Promise<void> {
   await page.evaluate(({ payload, scenario }) => {
     const panel = (window as any).aiPanel;
     const plan = panel._normalizeBackendPlanResult({
@@ -384,6 +383,61 @@ test('resource workspace reuses the existing binding action and updates canonica
   const remaining = await page.evaluate(() => (window as any).aiPanel.currentResult.missingResources.length);
   expect(remaining).toBe(0);
 });
+
+for (const viewport of [{ width: 1366, theme: 'light' }, { width: 1024, theme: 'dark' }] as const) {
+  test(`backend node identities support parameter confirmation and resource binding at ${viewport.width}`, async ({ page }) => {
+    await openAi(page, { ...viewport, height: 768 });
+    const payload = createBuildPayload('mixed');
+    const detectId = '6352427c-7f5c-40a0-9593-a4913cda56f9';
+    const sequenceId = 'e6f50a88-3dfe-4631-a0c5-1fa84a2d91da';
+    payload.flow = structuredClone(buildFlow);
+    payload.flow.operators = payload.flow.operators.map(op => op.id === 'op_roi'
+      ? { ...op, id: detectId, type: 'DeepLearning', name: '深度学习检测', metadata: { agentTempId: 'op_detect' }, parameters: [{ name: 'ModelPath', value: '' }] }
+      : op.id === 'op_threshold'
+        ? { ...op, id: sequenceId, type: 'DetectionSequenceJudge', name: '检测顺序判定', metadata: { agentTempId: 'op_sequence' }, parameters: [{ name: 'ExpectedLabels', value: '' }] }
+        : op);
+    payload.flow.connections = payload.flow.connections.map(connection => ({
+      ...connection,
+      sourceOperatorId: connection.sourceOperatorId === 'op_roi' ? detectId : connection.sourceOperatorId === 'op_threshold' ? sequenceId : connection.sourceOperatorId,
+      targetOperatorId: connection.targetOperatorId === 'op_roi' ? detectId : connection.targetOperatorId === 'op_threshold' ? sequenceId : connection.targetOperatorId,
+    }));
+    payload.pendingParameters = [
+      { operatorId: 'op_detect', parameterNames: ['ModelPath'] },
+      { operatorId: 'op_sequence', parameterNames: ['ExpectedLabels'] },
+      { operatorId: 'plan_default', parameterNames: ['resource_policy'] },
+    ];
+    payload.missingResources = [{ resourceType: 'model_resource', resourceKey: 'op_detect.ModelPath', operatorId: 'op_detect', parameterName: 'ModelPath', description: '绑定检测模型。' }];
+    payload.buildResult.workflowDiff.pendingParameters = payload.pendingParameters;
+    payload.buildResult.operatorPipeline = payload.buildResult.operatorPipeline.map(op => op.tempId === 'op_roi'
+      ? { ...op, tempId: 'op_detect', operatorType: 'DeepLearning', displayName: '深度学习检测' }
+      : op.tempId === 'op_threshold' ? { ...op, tempId: 'op_sequence', operatorType: 'DetectionSequenceJudge', displayName: '检测顺序判定' } : op);
+    payload.buildResult.parameterMapping = [{ tempId: 'op_sequence', operatorType: 'DetectionSequenceJudge', parameterName: 'ExpectedLabels', valueSummary: '<pending>', source: 'pending', pending: true }];
+    payload.applyGate.deploymentBlockers = ['pending_parameter:op_sequence.ExpectedLabels', 'missing_model_resource:op_detect.ModelPath'];
+    payload.buildResult.workflowDiff.deploymentBlockers = payload.applyGate.deploymentBlockers;
+    await seedBuild(page, 'mixed', payload);
+
+    const parameters = page.locator('#ai-build-parameters-section');
+    await expect(parameters).toContainText('检测顺序判定');
+    await expect(parameters).not.toContainText('未关联到算子');
+    await expect(page.locator('#ai-build-workspace')).not.toContainText('未识别算子类型');
+    await expect(parameters).not.toContainText('resource_policy');
+    await expect(page.locator('#ai-build-resources-section')).toContainText('深度学习检测');
+    await parameters.locator('[data-draft-parameter-name="ExpectedLabels"]').fill('red,blue');
+    await page.locator('#ai-btn-confirm-parameters').click();
+    const modelPath = 'C:\\Models\\sequence-detector.onnx';
+    await pickModelResource(page, page.locator('#ai-build-resources-section [data-resource-action="pick_model_resource"]'), modelPath);
+    const values = await page.evaluate(({ detectId, sequenceId }) => {
+      const panel = (window as any).aiPanel;
+      const operators = panel._extractOperators(panel._buildFlowWithPendingDrafts(panel.currentResult.flow));
+      return {
+        model: panel._readOperatorParameterValue(panel._findOperatorByAnyId(operators, detectId), 'ModelPath'),
+        labels: panel._readOperatorParameterValue(panel._findOperatorByAnyId(operators, sequenceId), 'ExpectedLabels'),
+      };
+    }, { detectId, sequenceId });
+    expect(values).toEqual({ model: modelPath, labels: 'red,blue' });
+    await expectNoHorizontalOverflow(page);
+  });
+}
 
 test('mixed ordinary and resource parameters stay partitioned through confirmation and binding', async ({ page }) => {
   await openAi(page, { width: 1366, height: 768, theme: 'light' });

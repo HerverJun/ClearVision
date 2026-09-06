@@ -2100,6 +2100,33 @@ public sealed class VisionAgentBuildOrchestratorTests
         result.BuildResult.WorkflowDiff.DeploymentBlockers.Should().Contain("op_cam.CameraId");
     }
 
+    [Theory]
+    [InlineData("resource_policy", "pending_parameters")]
+    [InlineData("metadata_only", "pending_resources")]
+    public async Task BuildAsync_PendingPlanPolicy_ShouldNotInventOperatorParameters(string policyId, string value)
+    {
+        var orchestrator = CreateOrchestrator(new CapturingAgentRunEventSink());
+        var plan = Plan("surface_defect", ["ImageAcquisition", "SurfaceDefectDetection", "ResultOutput"]) with
+        {
+            RecommendedDefaults =
+            [
+                new VisionAgentDefaultAssumption { Id = policyId, Label = "Resource policy", Value = value }
+            ]
+        };
+        plan = plan with { PlanHash = VisionAgentOrchestrator.ComputePlanHash(plan) };
+
+        var result = await orchestrator.BuildAsync(Request(plan), CancellationToken.None);
+
+        result.Success.Should().BeTrue();
+        result.PendingParameters.Should().NotContain(item => item.OperatorId == "plan_default");
+        result.BuildResult!.PendingParameters.Should().BeEquivalentTo(result.PendingParameters);
+        result.PendingParameters.Should().Contain(item =>
+            item.OperatorId == "op_cam" && item.ParameterNames.Contains("CameraId"));
+        result.MissingResources.Should().Contain(item => item.ResourceKey == "op_cam.CameraId");
+        result.BuildResult.ApplyGate.DeploymentReady.Should().BeFalse();
+        result.BuildResult.WorkflowDiff.DeploymentBlockers.Should().Contain("op_cam.CameraId");
+    }
+
     [Fact(DisplayName = "Build orchestrator should emit global variable drafts as metadata-only suggestions")]
     public async Task BuildAsync_ShouldEmitGlobalVariableDrafts()
     {

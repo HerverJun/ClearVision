@@ -173,8 +173,7 @@ export const aiPanelResourceBindingMixin = {
         const sourceLabel = (normalizedItem.sources || [normalizedItem.source]).filter(Boolean).join(' / ') || '权威 Readiness';
         const resolutionLabel = this._formatResourceResolutionTarget?.(normalizedItem.resolutionTarget) || normalizedItem.resolutionTarget || '当前方案';
         const flow = this.currentResult?.flow || this.currentResult?.Flow;
-        const operator = (this._extractOperators?.(flow || {}) || []).find(op =>
-            [op.id, op.Id, op.tempId, op.TempId].some(id => id && String(id) === String(operatorIdRaw)));
+        const operator = this._findOperatorByAnyId?.(this._extractOperators?.(flow || {}) || [], operatorIdRaw);
         const operatorLabel = operator ? this._formatApplyOperatorLabel?.(operator)
             : getOperatorTypeDisplayName(normalizedItem.operatorType, { fallback: '待识别算子' });
         const technical = [

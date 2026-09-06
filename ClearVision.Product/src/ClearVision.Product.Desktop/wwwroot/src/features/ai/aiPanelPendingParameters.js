@@ -5,7 +5,7 @@ import {
     isPendingParameterSentinel,
     shouldIncludePendingParameter
 } from '../../shared/parameterDependencyRules.js';
-import { partitionPendingParameters } from './aiPendingParameterPartition.js';
+import { getPendingParameterNames, partitionPendingParameters } from './aiPendingParameterPartition.js';
 import { mergeCanonicalResources, normalizeCanonicalResource } from './aiResourceIdentity.js';
 
 export const aiPanelPendingParametersMixin = {
@@ -53,8 +53,8 @@ export const aiPanelPendingParametersMixin = {
                             <div>
                                 <div class="ai-parameter-group-title">${this._escapeHtml(group.label)}</div>
                                 <div class="ai-parameter-group-meta">
-                                    ${group.operatorType ? `<span title="${this._escapeHtml(group.operatorType)}">${this._escapeHtml(getOperatorTypeDisplayName(group.operatorType))}</span>` : '未识别算子类型'}
-                                    ${group.operator ? '' : ' · 当前画布快照中未找到精确算子，提交时将按名称提示 AI 继续审核'}
+                                    ${group.operatorType ? `<span title="${this._escapeHtml(group.operatorType)}">${this._escapeHtml(getOperatorTypeDisplayName(group.operatorType))}</span>` : (group.operator ? '算子类型信息缺失' : '未关联到算子')}
+                                    ${group.operator ? '' : ' · 当前方案中未找到对应节点，请重新构建后确认参数'}
                                 </div>
                             </div>
                             <button class="ai-parameter-group-jump" type="button" data-followup-nav="${this._escapeHtml(group.groupKey)}">定位</button>
@@ -600,19 +600,30 @@ export const aiPanelPendingParametersMixin = {
         };
     },
 
+    _getPendingOperatorAliasIds(operator) {
+        const metadata = operator?.metadata ?? operator?.Metadata;
+        return [
+            operator?.tempId,
+            operator?.TempId,
+            operator?.agentTempId,
+            operator?.AgentTempId,
+            metadata?.agentTempId,
+            metadata?.AgentTempId
+        ].map(value => String(value || '').trim()).filter(Boolean);
+    },
+
     _findOperatorByAnyId(operators, operatorId) {
         const normalizedId = String(operatorId || '').trim();
         if (!normalizedId) return null;
 
-        return (Array.isArray(operators) ? operators : []).find(op => {
-            const candidates = [
-                op?.tempId,
-                op?.TempId,
-                op?.id,
-                op?.Id
-            ].map(value => String(value || '').trim()).filter(Boolean);
-            return candidates.includes(normalizedId);
-        }) || null;
+        const safeOperators = Array.isArray(operators) ? operators : [];
+        const exactMatches = safeOperators.filter(op =>
+            [op?.id, op?.Id].some(value => String(value || '').trim() === normalizedId));
+        if (exactMatches.length > 0) return exactMatches.length === 1 ? exactMatches[0] : null;
+
+        const aliasMatches = safeOperators.filter(op =>
+            this._getPendingOperatorAliasIds(op).includes(normalizedId));
+        return aliasMatches.length === 1 ? aliasMatches[0] : null;
     },
 
     _findOperatorByTempSequence(operators, operatorId) {
@@ -626,6 +637,8 @@ export const aiPanelPendingParametersMixin = {
         }
 
         const safeOperators = Array.isArray(operators) ? operators : [];
+        // Positional recovery is only for legacy flows without explicit node aliases.
+        if (safeOperators.some(op => this._getPendingOperatorAliasIds(op).length > 0)) return null;
         return safeOperators[index] || null;
     },
 
@@ -1766,10 +1779,7 @@ export const aiPanelPendingParametersMixin = {
 
         return items
             .map(item => {
-                const rawNames = item?.parameterNames ?? item?.ParameterNames;
-                const parameterNames = Array.isArray(rawNames)
-                    ? [...new Set(rawNames.map(name => String(name || '').trim()).filter(Boolean))]
-                    : [];
+                const parameterNames = [...new Set(getPendingParameterNames(item))];
 
                 const actualOperatorId = String(item?.actualOperatorId ?? item?.ActualOperatorId ?? '').trim();
                 const operatorId = String(item?.operatorId ?? item?.OperatorId ?? '').trim() || actualOperatorId;
@@ -1780,7 +1790,7 @@ export const aiPanelPendingParametersMixin = {
                     parameterNames
                 };
             })
-            .filter(item => item.operatorId || item.actualOperatorId || item.parameterNames.length > 0);
+            .filter(item => item.parameterNames.length > 0);
     },
 
     _normalizeMissingResources(items) {

@@ -419,6 +419,17 @@ test('pure pending parameter partition assigns overlapping fields only to resour
 });
 
 test('a new running Build Run does not project the previous Apply-ready result as current', () => {
+test('pending partition excludes legacy plan policy without hiding real parameter or resource work', () => {
+  const partition = partitionPendingParameters([
+    { OperatorId: 'plan_default', ParameterNames: ['resource_policy'] },
+    { operatorId: 'op_detect', parameterNames: ['ModelPath', 'Threshold'] },
+    { operatorId: 'op_custom', parameterNames: ['resource_policy'] }
+  ], [{ operatorId: 'op_detect', parameterName: 'ModelPath', resourceKey: 'op_detect.ModelPath' }]);
+  assert.deepEqual(partition.ordinaryPendingParameters.map(item => item.parameterNames), [['Threshold'], ['resource_policy']]);
+  assert.equal(partition.resourceBackedFieldCount, 1);
+  assert.equal(partition.resources.length, 1);
+});
+
   const previous = readyResult();
   const presentation = deriveAiBuildPresentation(createPanel(previous, {
     activeAgentRunId: 'run-new',
